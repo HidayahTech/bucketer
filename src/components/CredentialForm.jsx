@@ -1,63 +1,8 @@
 import { useState } from 'preact/hooks';
-import { detectProvider, extractRegion, PROVIDERS, PROVIDER_LABELS, needsCorsConfig } from '../lib/provider.js';
+import { detectProvider, extractRegion, PROVIDERS, PROVIDER_LABELS } from '../lib/provider.js';
+import { SetupGuide } from './SetupGuide.jsx';
 
 // Credential entry form (§4.5, §4.8)
-
-const isFileProtocol = typeof window !== 'undefined' && window.location.protocol === 'file:';
-
-function CorsSetupGuide({ provider, bucket, endpoint }) {
-  if (!provider || !needsCorsConfig(provider)) return null;
-
-  const origin = isFileProtocol ? '"null"' : (typeof window !== 'undefined' ? `"${window.location.origin}"` : '"https://yourdomain.com"');
-  const endpointDisplay = endpoint || 'https://s3.<region>.backblazeb2.com';
-  const bucketDisplay = bucket || '<your-bucket-name>';
-
-  const corsJson = JSON.stringify({
-    CORSRules: [{
-      AllowedOrigins: [isFileProtocol ? 'null' : (typeof window !== 'undefined' ? window.location.origin : 'https://yourdomain.com')],
-      AllowedMethods: ['GET', 'PUT', 'HEAD', 'POST'],
-      AllowedHeaders: ['Authorization', 'Content-Type', 'Content-MD5', 'x-amz-*', 'ETag'],
-      ExposeHeaders: ['ETag', 'Content-Length', 'Content-Type'],
-      MaxAgeSeconds: 3600,
-    }],
-  }, null, 2);
-
-  const cliCommand = `aws s3api put-bucket-cors \\
-  --endpoint-url ${endpointDisplay} \\
-  --bucket ${bucketDisplay} \\
-  --cors-configuration '${corsJson}'`;
-
-  return (
-    <details class="cors-guide">
-      <summary>
-        {isFileProtocol
-          ? '⚠ CORS setup required before connecting'
-          : 'CORS setup required before connecting'}
-      </summary>
-      <div class="cors-guide-body">
-        {isFileProtocol && (
-          <p class="cors-note cors-note-warn">
-            You are running from <code>file://</code>. The browser sends <code>Origin: null</code>
-            for local files — your bucket's CORS rules must explicitly allow <code>"null"</code> as
-            an origin or every request will be blocked.
-          </p>
-        )}
-        {provider === PROVIDERS.B2 && (
-          <p class="cors-note">
-            B2: do not use your master application key — create a dedicated application key.
-            If B2 says "bucket contains B2 Native CORS rules", remove them with the B2 CLI first.
-          </p>
-        )}
-        <p style={{ marginBottom: '.4rem' }}>Run this command with the AWS CLI:</p>
-        <pre class="cors-cmd">{cliCommand}</pre>
-        <p class="cors-note">
-          If you're deploying to a domain later, replace the origin with your domain URL
-          (e.g. <code>"https://yourdomain.com"</code>) or add both to <code>AllowedOrigins</code>.
-        </p>
-      </div>
-    </details>
-  );
-}
 
 const PROVIDER_OPTIONS = [
   { value: '', label: 'Auto-detect from endpoint' },
@@ -189,10 +134,11 @@ export function CredentialForm({ initial, onSave, loading }) {
         </span>
       </div>
 
-      <CorsSetupGuide
+      <SetupGuide
         provider={form.providerOverride || detected}
-        bucket={form.bucket}
         endpoint={form.endpoint}
+        bucket={form.bucket}
+        keyId={form.keyId}
       />
 
       <div class="btn-row">

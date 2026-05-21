@@ -286,6 +286,11 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 }
 .cors-note { color: var(--text-muted); line-height: 1.5; }
 .cors-note-warn { color: var(--text-warn); font-weight: 500; }
+.setup-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
 .cors-cmd {
   background: #1e1e2e;
   color: #cdd6f4;
