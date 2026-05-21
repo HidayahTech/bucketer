@@ -6,8 +6,17 @@ const DB_NAME = 's3browser';
 const STORE = 's3browser_uploads';
 const DB_VERSION = 1;
 
-// Warning threshold for UploadId expiry — B2 unconfirmed, using R2's 7-day value (Q1 in QUESTIONS.md)
-export const UPLOAD_EXPIRY_WARNING_MS = 7 * 24 * 60 * 60 * 1000;
+// UploadId expiry by provider:
+// - R2: auto-expires after 7 days (documented)
+// - B2: no automatic expiry — incomplete uploads persist indefinitely until
+//       AbortMultipartUpload is called or a lifecycle rule triggers (Q1 resolved)
+// - Others: unknown, use R2's value as a conservative default
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+export function uploadExpiryWarningMs(provider) {
+  if (provider === 'b2') return null; // B2 sessions don't expire automatically
+  return SEVEN_DAYS_MS; // R2 and others: warn after 7 days
+}
 
 let _db = null;
 

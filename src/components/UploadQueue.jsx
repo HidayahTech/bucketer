@@ -6,7 +6,7 @@ import { formatBytes, formatSpeed, formatEta, isPermissionError, parseS3Error } 
 import {
   saveResumeRecord, loadResumeRecord, deleteResumeRecord,
   buildFileIdentity, fileIdentityMatches, computeFileHash,
-  UPLOAD_EXPIRY_WARNING_MS,
+  uploadExpiryWarningMs,
   markUploadActive, markUploadInactive, isUploadActiveElsewhere,
 } from '../lib/indexeddb.js';
 import { UploadQueue as Queue } from '../lib/upload-queue.js';
@@ -202,10 +202,13 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
           });
         } catch { /* IDB may be unavailable */ }
 
-        // Warn if record is approaching expiry (provider session limit)
-        const record = await loadResumeRecord({ provider, endpoint: credentials.endpoint, bucket, destinationKey }).catch(() => null);
-        if (record && (Date.now() - record.startedAt) > UPLOAD_EXPIRY_WARNING_MS * 0.9) {
-          updateItem(id, { expiryWarning: true });
+        // Warn if record is approaching expiry (provider session limit — B2 has none)
+        const expiryMs = uploadExpiryWarningMs(provider);
+        if (expiryMs) {
+          const record = await loadResumeRecord({ provider, endpoint: credentials.endpoint, bucket, destinationKey }).catch(() => null);
+          if (record && (Date.now() - record.startedAt) > expiryMs * 0.9) {
+            updateItem(id, { expiryWarning: true });
+          }
         }
       }
     });

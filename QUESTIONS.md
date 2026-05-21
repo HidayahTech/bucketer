@@ -7,11 +7,13 @@ Updated as implementation proceeds.
 
 ## Open Questions
 
-### Q1 — B2 multipart UploadId session duration (§4.15)
-The spec flags this as "pending verification before implementation."
-I've implemented the warning threshold using a 7-day placeholder (matching R2's known value),
-but B2's actual limit is unconfirmed. Once you verify it with B2 docs or testing, update
-`src/lib/indexeddb.js` → `UPLOAD_EXPIRY_WARNING_MS`.
+### Q1 — B2 multipart UploadId session duration *(resolved)*
+B2 incomplete multipart uploads **do not expire automatically**. They persist indefinitely
+until `AbortMultipartUpload` is called or a lifecycle rule triggers. No hard session timeout.
+
+**Code updated:** `src/lib/indexeddb.js` now exports `uploadExpiryWarningMs(provider)` which
+returns `null` for B2 (no warning needed) and 7 days for R2/others. The expiry warning banner
+in the upload queue only fires for providers with a known expiry limit.
 
 ### Q2 — `ResponseContentDisposition` on B2 presigned URLs (§4.4)
 The spec says "should be explicitly verified against B2's API during implementation."
