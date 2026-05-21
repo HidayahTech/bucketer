@@ -187,7 +187,7 @@ export function HiddenVersions({ client, bucket, prefix }) {
       ) : (
         <>
           <div class="hidden-versions-header">
-            <span class="section-heading" style={{ margin: 0 }}>Hidden versions</span>
+            <span class="section-heading" style={{ margin: 0 }}>Hidden versions &amp; deleted files</span>
             <div style={{ display: 'flex', gap: '.5rem' }}>
               {rows && rows.length > 0 && (
                 <button
@@ -202,6 +202,12 @@ export function HiddenVersions({ client, bucket, prefix }) {
               <button class="btn btn-ghost btn-sm" onClick={load} disabled={loading || deleting}>Refresh</button>
             </div>
           </div>
+
+          <p class="hidden-versions-note">
+            Items here are not visible in the normal listing.
+            <strong> Old versions</strong> are previous copies of files that were overwritten.
+            <strong> Delete markers</strong> are what make files appear deleted — the content still exists in storage, and removing a delete marker will undelete the file.
+          </p>
 
           {error && (
             <ErrorBlock

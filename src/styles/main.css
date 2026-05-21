@@ -393,6 +393,10 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 .version-badge-dm  { background: var(--danger-bg); color: var(--text-danger); }
 .version-badge-old { background: var(--surface-raised); color: var(--text-muted); }
 .col-version-id    { font-family: var(--mono); font-size: .75rem; color: var(--text-muted); }
+.hidden-versions-note {
+  font-size: .8rem; color: var(--text-muted); line-height: 1.5;
+  margin: 0 0 .75rem;
+}
 
 /* ── Scrollbar polish ─────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
