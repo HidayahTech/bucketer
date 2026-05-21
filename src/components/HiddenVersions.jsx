@@ -138,20 +138,29 @@ export function HiddenVersions({ client, bucket, prefix }) {
       {pendingDelete && (
         <div class="modal-overlay" onClick={handleCancel}>
           <div class="modal-dialog" onClick={e => e.stopPropagation()}>
-            <div class="modal-title">{isAll ? 'Purge all hidden versions?' : 'Permanently delete this version?'}</div>
+            <div class="modal-title">
+              {isAll ? 'Purge all hidden versions?' : pendingDelete.type === 'delete-marker' && pendingDelete.isLatest ? 'Undelete this file?' : 'Permanently delete this version?'}
+            </div>
             <div class="modal-body">
               {isAll ? (
-                <p class="modal-caveat">
-                  This will permanently delete {isTruncated ? `${n}+ ` : `all ${n} `}hidden
-                  version{n !== 1 ? 's' : ''}{isTruncated ? ', including any not yet loaded,' : ''}. This cannot be undone.
-                </p>
+                <>
+                  <p class="modal-caveat">
+                    This will permanently delete {isTruncated ? `${n}+ ` : `all ${n} `}hidden
+                    version{n !== 1 ? 's' : ''}{isTruncated ? ', including any not yet loaded,' : ''}.
+                  </p>
+                  <p class="modal-caveat">
+                    Any delete markers in this set will also be removed, which will undelete those files — their previous versions will reappear in the listing.
+                  </p>
+                </>
               ) : (
                 <>
                   <p class="modal-filename" title={pendingDelete.key}>{rel(pendingDelete.key)}</p>
                   <p class="modal-caveat">
-                    {pendingDelete.type === 'delete-marker'
-                      ? 'Removing this delete marker will make the previous version of this file visible again in the listing.'
-                      : 'This permanently removes this version and cannot be undone.'}
+                    {pendingDelete.type === 'delete-marker' && pendingDelete.isLatest
+                      ? 'This delete marker is what makes the file appear deleted. Removing it will undelete the file — the previous version will become visible in the listing again.'
+                      : pendingDelete.type === 'delete-marker'
+                        ? 'This is a superseded delete marker. Removing it will not change the file\'s current visibility.'
+                        : 'This permanently removes this version and cannot be undone.'}
                   </p>
                 </>
               )}
@@ -164,7 +173,7 @@ export function HiddenVersions({ client, bucket, prefix }) {
                 onClick={isAll ? handlePurgeAllConfirm : handleDeleteConfirm}
                 disabled={deleting}
               >
-                {deleting ? <span class="spinner" /> : isAll ? 'Purge all' : 'Delete'}
+                {deleting ? <span class="spinner" /> : isAll ? 'Purge all' : pendingDelete.type === 'delete-marker' && pendingDelete.isLatest ? 'Undelete' : 'Delete'}
               </button>
             </div>
           </div>
@@ -228,7 +237,9 @@ export function HiddenVersions({ client, bucket, prefix }) {
                     </td>
                     <td>
                       {r.type === 'delete-marker'
-                        ? <span class="version-badge version-badge-dm">{r.isLatest ? 'Delete marker' : 'Delete marker (superseded)'}</span>
+                        ? <span class="version-badge version-badge-dm" title={r.isLatest ? 'This marker is hiding the file — removing it will undelete the file' : 'An older delete marker, no longer the current version'}>
+                            {r.isLatest ? 'Delete marker — file hidden' : 'Delete marker (superseded)'}
+                          </span>
                         : <span class="version-badge version-badge-old">Old version</span>
                       }
                     </td>
@@ -241,7 +252,7 @@ export function HiddenVersions({ client, bucket, prefix }) {
                         style={{ color: 'var(--text-danger)', borderColor: 'transparent' }}
                         onClick={() => { setDeleteError(null); setPendingDelete(r); }}
                         disabled={deleting}
-                        title="Permanently delete this version"
+                        title={r.type === 'delete-marker' && r.isLatest ? 'Undelete file (remove this delete marker)' : 'Permanently delete this version'}
                       >✕</button>
                     </td>
                   </tr>
