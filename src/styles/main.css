@@ -261,6 +261,43 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 .error-block summary { cursor: pointer; font-size: .8rem; font-weight: 600; }
 .error-block pre { margin-top: .3rem; white-space: pre-wrap; word-break: break-all; font-family: var(--mono); font-size: .75rem; }
 
+/* ── CORS setup guide ─────────────────────────────────────────────────────── */
+.cors-guide {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: .85rem;
+}
+.cors-guide summary {
+  padding: .55rem .75rem;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-warn);
+  user-select: none;
+  list-style: none;
+}
+.cors-guide summary::before { content: '▶ '; font-size: .7rem; }
+.cors-guide[open] summary::before { content: '▼ '; }
+.cors-guide-body {
+  padding: .6rem .75rem .75rem;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+}
+.cors-note { color: var(--text-muted); line-height: 1.5; }
+.cors-note-warn { color: var(--text-warn); font-weight: 500; }
+.cors-cmd {
+  background: #1e1e2e;
+  color: #cdd6f4;
+  padding: .6rem .75rem;
+  border-radius: var(--radius);
+  font-family: var(--mono);
+  font-size: .75rem;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-x: auto;
+}
+
 /* ── Scrollbar polish ─────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
