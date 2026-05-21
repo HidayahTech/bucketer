@@ -58,7 +58,7 @@ function corsJson(origin) {
   return JSON.stringify({
     CORSRules: [{
       AllowedOrigins: [origin],
-      AllowedMethods: ['GET', 'PUT', 'HEAD', 'POST'],
+      AllowedMethods: ['GET', 'PUT', 'HEAD', 'POST', 'DELETE'],
       AllowedHeaders: ['Authorization', 'Content-Type', 'Content-MD5', 'x-amz-*', 'amz-sdk-invocation-id', 'amz-sdk-request', 'ETag'],
       ExposeHeaders: ['ETag', 'Content-Length', 'Content-Type'],
       MaxAgeSeconds: 3600,

@@ -30,8 +30,12 @@ const CAVEATS = {
   ],
 };
 
+const DISMISS_KEY = 's3b_file_banner_dismissed';
+
 export function FileBanner() {
-  const [dismissed, setDismissed] = useState(false);
+  const [dismissed, setDismissed] = useState(
+    () => !!sessionStorage.getItem(DISMISS_KEY)
+  );
 
   if (dismissed || window.location.protocol !== 'file:') return null;
 
@@ -49,7 +53,7 @@ export function FileBanner() {
           For the most reliable experience, serve via <code>http://localhost</code> instead.
         </div>
       </div>
-      <button class="banner-close" onClick={() => setDismissed(true)} aria-label="Dismiss">✕</button>
+      <button class="banner-close" onClick={() => { sessionStorage.setItem(DISMISS_KEY, '1'); setDismissed(true); }} aria-label="Dismiss">✕</button>
     </div>
   );
 }

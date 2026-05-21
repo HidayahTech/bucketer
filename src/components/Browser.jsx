@@ -1,8 +1,7 @@
-// Object browser: listing, navigation, download (§4.2, §4.4, §4.7, §4.12)
+// Object browser: listing, navigation, download, delete (§4.2, §4.4, §4.7, §4.12)
 import { useState, useEffect, useRef } from 'preact/hooks';
-import { ListObjectsV2Command } from '@aws-sdk/client-s3';
+import { ListObjectsV2Command, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { formatBytes, leafName, isPermissionError } from '../lib/format.js';
 import { defaultMaxKeys } from '../lib/provider.js';
 import { loadMaxKeys } from '../lib/storage.js';
@@ -66,6 +65,9 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const [downloadingKey, setDownloadingKey] = useState(null);
   const [sortCol, setSortCol] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
+  const [pendingDelete, setPendingDelete] = useState(null); // object to confirm
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
   const abortRef = useRef(null);
 
   const maxKeys = loadMaxKeys() || defaultMaxKeys(provider);
@@ -179,7 +181,35 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     }
   }
 
+  function handleDeleteClick(obj) {
+    setDeleteError(null);
+    setPendingDelete(obj);
+  }
+
+  function handleDeleteCancel() {
+    setPendingDelete(null);
+    setDeleteError(null);
+  }
+
+  async function handleDeleteConfirm() {
+    if (!pendingDelete) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: pendingDelete.Key }));
+      onCapabilityChange('delete', 'permitted');
+      setItems(prev => prev.filter(o => o.Key !== pendingDelete.Key));
+      setPendingDelete(null);
+    } catch (err) {
+      setDeleteError(err);
+      if (isPermissionError(err)) onCapabilityChange('delete', 'denied');
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const canDownload = capabilities.download !== 'denied';
+  const canDelete   = capabilities.delete !== 'denied';
   const canList     = capabilities.list !== 'denied';
 
   if (!canList && listError) {
@@ -219,8 +249,35 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
 
   const isEmpty = !listing && sortedItems.length === 0 && sortedFolders.length === 0 && !listError;
 
+  const versioningCaveat = provider === 'b2'
+    ? 'Backblaze B2 may retain older versions of this file. The current version will be hidden but not immediately purged from storage.'
+    : 'If versioning is enabled on this bucket, this creates a delete marker — the object is hidden but recoverable. If versioning is off, deletion is permanent and cannot be undone.';
+
   return (
     <div>
+      {pendingDelete && (
+        <div class="modal-overlay" onClick={handleDeleteCancel}>
+          <div class="modal-dialog" onClick={e => e.stopPropagation()}>
+            <div class="modal-title">Delete file?</div>
+            <div class="modal-body">
+              <p class="modal-filename" title={pendingDelete.Key}>{leafName(pendingDelete.Key)}</p>
+              <p class="modal-caveat">{versioningCaveat}</p>
+              {deleteError && (
+                <div class="modal-error">
+                  Delete failed: {deleteError.message || String(deleteError)}
+                </div>
+              )}
+            </div>
+            <div class="modal-actions">
+              <button class="btn btn-ghost btn-sm" onClick={handleDeleteCancel} disabled={deleting}>Cancel</button>
+              <button class="btn btn-danger btn-sm" onClick={handleDeleteConfirm} disabled={deleting}>
+                {deleting ? <span class="spinner" /> : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Breadcrumb prefix={prefix} onNavigate={navigateTo} />
 
       {downloadError && (
@@ -283,6 +340,15 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                         title={!canDownload ? 'Download not permitted with current credentials' : 'Download'}
                       >
                         {isDownloading ? <span class="spinner" /> : '↓'}
+                      </button>
+                      <button
+                        class="btn btn-ghost btn-sm"
+                        style={{ color: 'var(--text-danger)', borderColor: 'transparent', marginLeft: '.25rem' }}
+                        onClick={() => handleDeleteClick(obj)}
+                        disabled={!canDelete}
+                        title={!canDelete ? 'Delete not permitted with current credentials' : 'Delete'}
+                      >
+                        ✕
                       </button>
                     </td>
                   </tr>

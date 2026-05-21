@@ -96,5 +96,5 @@ export function clearCapabilities() {
 }
 
 export function defaultCapabilities() {
-  return { list: 'unknown', download: 'unknown', upload: 'unknown' };
+  return { list: 'unknown', download: 'unknown', upload: 'unknown', delete: 'unknown' };
 }

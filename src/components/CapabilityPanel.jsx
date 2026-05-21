@@ -4,6 +4,7 @@ const OPS = [
   { key: 'list',     label: 'Browse / List' },
   { key: 'download', label: 'Download' },
   { key: 'upload',   label: 'Upload' },
+  { key: 'delete',   label: 'Delete' },
 ];
 
 function CapIcon({ state }) {
