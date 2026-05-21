@@ -326,6 +326,15 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
   overflow-x: auto;
 }
 
+/* ── Upload log ───────────────────────────────────────────────────────────── */
+.upload-log { margin: 1rem 0; }
+.log-status { text-align: center; width: 1.5rem; font-weight: 700; }
+.log-done   { color: var(--text-success); }
+.log-error  { color: var(--text-danger); cursor: help; }
+.log-name, .log-dest { max-width: 22ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.log-dest   { color: var(--text-muted); font-size: .85rem; }
+.log-num    { white-space: nowrap; color: var(--text-muted); font-size: .85rem; padding-left: 1rem; }
+
 /* ── Scrollbar polish ─────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }

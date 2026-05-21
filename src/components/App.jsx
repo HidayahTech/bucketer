@@ -12,6 +12,7 @@ import { Browser } from './Browser.jsx';
 import { UploadQueue } from './UploadQueue.jsx';
 import { CapabilityPanel } from './CapabilityPanel.jsx';
 import { SettingsPanel } from './SettingsPanel.jsx';
+import { UploadLog } from './UploadLog.jsx';
 import { ErrorBlock } from './ErrorBlock.jsx';
 
 // Session states: disconnected | connecting | connected | failed
@@ -23,6 +24,7 @@ export function App() {
   const [capabilities, setCapabilities] = useState(() => loadCapabilities());
   const [currentPrefix, setCurrentPrefix] = useState('');
   const [browserKey, setBrowserKey] = useState(0); // force re-mount on reconnect
+  const [logKey, setLogKey] = useState(0);         // incremented to refresh upload log
 
   // Capabilities are stored in localStorage and updated reactively (§4.12)
   const handleCapabilityChange = useCallback((op, state) => {
@@ -157,7 +159,10 @@ export function App() {
               onCapabilityChange={handleCapabilityChange}
               capabilities={capabilities}
               onUploadsComplete={() => setBrowserKey(k => k + 1)}
+              onLogEntry={() => setLogKey(k => k + 1)}
             />
+
+            <UploadLog refreshKey={logKey} />
 
             <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '1rem 0' }} />
 

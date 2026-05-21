@@ -7,6 +7,7 @@ import {
   buildFileIdentity, fileIdentityMatches, computeFileHash,
   uploadExpiryWarningMs,
   markUploadActive, markUploadInactive, isUploadActiveElsewhere,
+  saveUploadLogEntry,
 } from '../lib/indexeddb.js';
 import { UploadQueue as Queue } from '../lib/upload-queue.js';
 import { loadPartConcurrency, loadPartSizeMB } from '../lib/storage.js';
@@ -28,7 +29,7 @@ function calcPartSize(fileSize, preferredBytes) {
 let _idCounter = 0;
 function newId() { return ++_idCounter; }
 
-export function UploadQueue({ client, bucket, provider, currentPrefix, credentials, onCapabilityChange, capabilities, onUploadsComplete }) {
+export function UploadQueue({ client, bucket, provider, currentPrefix, credentials, onCapabilityChange, capabilities, onUploadsComplete, onLogEntry }) {
   const [items, setItems] = useState([]);
   const [dragOver, setDragOver] = useState(false);
   const queueRef = useRef(new Queue(QUEUE_CONCURRENCY));
@@ -120,12 +121,20 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         // Small file — single PutObjectCommand
         await uploadSmall(id, file, destinationKey, updateProgress);
       } else {
-        // Large file — lib-storage multipart with resume state
+        // Large file — manual multipart with resume state
         await uploadMultipart(id, file, destinationKey, updateProgress);
       }
 
+      const completedAt = Date.now();
+      const durationSec = (completedAt - startTime) / 1000;
       updateItem(id, { status: 'done', progress: 100 });
       onCapabilityChange('upload', 'permitted');
+      saveUploadLogEntry({
+        fileName: file.name, destinationKey, fileSize: file.size,
+        status: 'done', startedAt: startTime, completedAt, durationSec,
+        avgSpeedBps: durationSec > 0 ? file.size / durationSec : null,
+        errorMessage: null,
+      }).then(() => onLogEntry?.()).catch(() => {});
 
       if ('Notification' in window && Notification.permission === 'granted') {
         new Notification('Upload complete', { body: `${file.name} → ${destinationKey}` });
@@ -134,6 +143,14 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     } catch (err) {
       if (err.name === 'AbortError' || err.message === 'Upload aborted') return;
       updateItem(id, { status: 'error', error: err });
+      const completedAt = Date.now();
+      saveUploadLogEntry({
+        fileName: file.name, destinationKey, fileSize: file.size,
+        status: 'error', startedAt: startTime, completedAt,
+        durationSec: (completedAt - startTime) / 1000,
+        avgSpeedBps: null,
+        errorMessage: err?.message || String(err),
+      }).then(() => onLogEntry?.()).catch(() => {});
       if (isPermissionError(err)) {
         onCapabilityChange('upload', 'denied');
         // Non-resumable failure on multipart: abort session and clear resume record (§4.10)

@@ -4,7 +4,8 @@
 
 const DB_NAME = 's3browser';
 const STORE = 's3browser_uploads';
-const DB_VERSION = 1;
+const LOG_STORE = 'bucketer_upload_log';
+const DB_VERSION = 2;
 
 // UploadId expiry by provider:
 // - R2: auto-expires after 7 days (documented)
@@ -25,7 +26,9 @@ async function openDB() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = e => {
-      e.target.result.createObjectStore(STORE);
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
+      if (!db.objectStoreNames.contains(LOG_STORE)) db.createObjectStore(LOG_STORE, { autoIncrement: true });
     };
     req.onsuccess = e => { _db = e.target.result; resolve(_db); };
     req.onerror = () => reject(req.error);
@@ -128,4 +131,38 @@ export function isUploadActiveElsewhere(destinationKey) {
     const active = getActiveUploads();
     return active[destinationKey] !== undefined && active[destinationKey] !== TAB_ID;
   } catch { return false; }
+}
+
+// ── Upload log (persisted history) ────────────────────────────────────────────
+// Each entry: { fileName, destinationKey, fileSize, status, startedAt,
+//               completedAt, durationSec, avgSpeedBps, errorMessage }
+
+export async function saveUploadLogEntry(entry) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(LOG_STORE, 'readwrite');
+    tx.objectStore(LOG_STORE).add(entry);
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function loadUploadLog() {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(LOG_STORE, 'readonly');
+    const req = tx.objectStore(LOG_STORE).getAll();
+    req.onsuccess = () => resolve((req.result ?? []).reverse()); // newest first
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function clearUploadLog() {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(LOG_STORE, 'readwrite');
+    tx.objectStore(LOG_STORE).clear();
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
 }
