@@ -14,6 +14,7 @@ import { CapabilityPanel } from './CapabilityPanel.jsx';
 import { SettingsPanel } from './SettingsPanel.jsx';
 import { UploadLog } from './UploadLog.jsx';
 import { ErrorBlock } from './ErrorBlock.jsx';
+import { UpdateBanner } from './UpdateBanner.jsx';
 
 // Session states: disconnected | connecting | connected | failed
 export function App() {
@@ -112,6 +113,7 @@ export function App() {
         )}
       </header>
 
+      <UpdateBanner />
       <FileBanner />
 
       {session === 'disconnected' || session === 'connecting' || session === 'failed' ? (

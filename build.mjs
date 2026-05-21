@@ -26,8 +26,10 @@ const result = await esbuild.build({
 const js = result.outputFiles[0].text;
 const css = readFileSync('src/styles/main.css', 'utf8');
 const html = readFileSync('src/index.html', 'utf8');
+const buildId = new Date().toISOString(); // embedded for update checks
 // Use a function to avoid $ special replacement patterns in the JS/CSS content
 const out = html
+  .replace('<!-- BUILD_ID -->', buildId)
   .replace('<!-- BUNDLE_PLACEHOLDER -->', () => `<style>${css}</style><script>${js}</script>`);
 
 mkdirSync('dist', { recursive: true });
