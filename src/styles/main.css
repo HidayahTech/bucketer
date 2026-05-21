@@ -365,6 +365,35 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 }
 .modal-actions { display: flex; justify-content: flex-end; gap: .5rem; }
 
+/* ── Hidden versions panel ───────────────────────────────────────────────── */
+.hidden-versions-bar {
+  margin-top: 1rem;
+  padding-top: .75rem;
+  border-top: 1px solid var(--border);
+}
+.hidden-versions {
+  margin-top: 1rem;
+  padding-top: .75rem;
+  border-top: 1px solid var(--border);
+}
+.hidden-versions-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: .75rem;
+}
+.version-badge {
+  display: inline-block;
+  font-size: .72rem;
+  font-weight: 600;
+  padding: .15rem .45rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.version-badge-dm  { background: var(--danger-bg); color: var(--text-danger); }
+.version-badge-old { background: var(--surface-raised); color: var(--text-muted); }
+.col-version-id    { font-family: var(--mono); font-size: .75rem; color: var(--text-muted); }
+
 /* ── Scrollbar polish ─────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }

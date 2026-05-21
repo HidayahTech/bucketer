@@ -6,6 +6,7 @@ import { formatBytes, leafName, isPermissionError } from '../lib/format.js';
 import { defaultMaxKeys } from '../lib/provider.js';
 import { loadMaxKeys } from '../lib/storage.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
+import { HiddenVersions } from './HiddenVersions.jsx';
 
 const PRESIGN_EXPIRES = 3600; // 1 hour
 
@@ -370,6 +371,8 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
           </button>
         </div>
       )}
+
+      <HiddenVersions key={prefix} client={client} bucket={bucket} prefix={prefix} />
     </div>
   );
 }
