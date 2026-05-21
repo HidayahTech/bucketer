@@ -248,11 +248,17 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     }
 
     try {
-      // List completed parts from provider (authoritative source)
-      const listResp = await client.send(new ListPartsCommand({
-        Bucket: bucket, Key: destinationKey, UploadId: uploadId,
-      }));
-      const completedParts = (listResp.Parts || []).map(p => ({ PartNumber: p.PartNumber, ETag: p.ETag }));
+      // List completed parts from provider — paginate fully (§4.15)
+      const completedParts = [];
+      let partMarker;
+      do {
+        const listResp = await client.send(new ListPartsCommand({
+          Bucket: bucket, Key: destinationKey, UploadId: uploadId,
+          PartNumberMarker: partMarker,
+        }));
+        (listResp.Parts || []).forEach(p => completedParts.push({ PartNumber: p.PartNumber, ETag: p.ETag }));
+        partMarker = listResp.IsTruncated ? listResp.NextPartNumberMarker : undefined;
+      } while (partMarker);
       const completedNums = new Set(completedParts.map(p => p.PartNumber));
 
       // Calculate total parts
