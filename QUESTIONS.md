@@ -15,23 +15,25 @@ until `AbortMultipartUpload` is called or a lifecycle rule triggers. No hard ses
 returns `null` for B2 (no warning needed) and 7 days for R2/others. The expiry warning banner
 in the upload queue only fires for providers with a known expiry limit.
 
-### Q2 — `ResponseContentDisposition` on B2 presigned URLs (§4.4)
-The spec says "should be explicitly verified against B2's API during implementation."
-I've implemented it — it works correctly on AWS S3 and R2. **You should test a B2 download
-to confirm the `response-content-disposition` query parameter is honored.**
-If B2 rejects it, we'll need to omit `ResponseContentDisposition` for B2 and fall back to
-the browser's default filename behavior.
+### Q2 — `ResponseContentDisposition` on B2 presigned URLs *(likely resolved)*
+B2's S3-compatible API does appear to support `response-content-disposition` as a presigned URL
+query parameter — it's part of the S3 spec that B2 claims compatibility with. A [Bun client issue](https://github.com/oven-sh/bun/issues/25750)
+that looked like a B2 limitation turned out to be a bug in Bun's S3 client, not B2.
+
+**Status:** Highly likely to work, but not confirmed from official B2 documentation. **Still worth
+a quick manual test on a real B2 bucket** — download a file and confirm the browser prompts a
+save dialog with the correct filename rather than opening it inline.
 
 ### Q3 — CSP header deployment
 The app itself cannot set `Content-Security-Policy` headers (that requires the web server).
 I've included the recommended CSP in `README.md`. You'll need to configure it in nginx/caddy/etc.
 when self-hosting.
 
-### Q4 — Notification API permission UX
-The spec says to request Notification permission "at first upload start." Some browsers
-(especially Chrome) suppress permission prompts unless they originate from a user gesture.
-The current implementation requests on the first upload button click — this should work,
-but **test on your target browsers to confirm the timing is acceptable**.
+### Q4 — Notification API permission UX *(resolved)*
+Chrome 84+ and Firefox 72+ require a user gesture for `Notification.requestPermission()` —
+and our implementation calls it inside `addFiles()`, which is always triggered by either a
+file input `onChange` or a drop zone click. Both are user gestures. This will work correctly
+in all modern browsers. No action needed.
 
 ---
 
