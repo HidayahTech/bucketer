@@ -14,13 +14,11 @@ const result = await esbuild.build({
   format: 'iife',
   minify: !dev,
   sourcemap: dev ? 'inline' : false,
+  // Use Preact's automatic JSX runtime — no React import needed in each file
+  jsx: 'automatic',
+  jsxImportSource: 'preact',
   define: {
     'process.env.NODE_ENV': dev ? '"development"' : '"production"',
-  },
-  // Alias preact/compat so any React-expecting code resolves correctly
-  alias: {
-    'react': 'preact/compat',
-    'react-dom': 'preact/compat',
   },
   logLevel: 'info',
 });
