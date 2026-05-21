@@ -58,10 +58,10 @@ is achieved, though the session label shows as Connected rather than Connection 
 **To fully align:** Add an `onInitialListFailed` callback from Browser → App to transition to 'failed'.
 Left as a known minor deviation for v0.1.
 
-### D2 — Sidebar form re-connects via splash state  
-When the user submits new credentials from the sidebar while connected, the app briefly transitions
-through the splash/connecting state (because `handleConnect` sets `session: 'connecting'`). This causes
-a flash of the login view before reconnecting. Minor UX issue, non-functional.
+### D2 — Sidebar form re-connects via splash state *(resolved)*
+~~When the user submits new credentials from the sidebar while connected, the app briefly transitions
+through the splash/connecting state.~~ Fixed: sidebar form passes `reconnect: true` to `handleConnect`,
+which skips the 'connecting' transition and stays in 'connected' state while the new client is created.
 
 ---
 

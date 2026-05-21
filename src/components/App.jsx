@@ -41,8 +41,10 @@ export function App() {
     setBrowserKey(k => k + 1); // re-mount browser → triggers new listing probe
   }
 
-  async function handleConnect(creds) {
-    setSession('connecting');
+  async function handleConnect(creds, { reconnect = false } = {}) {
+    // When reconnecting from the sidebar while already connected, stay in 'connected'
+    // state to avoid a flash to the splash view (D2 in QUESTIONS.md)
+    if (!reconnect) setSession('connecting');
     setConnectionError(null);
 
     const provider = creds.provider || detectProvider(creds.endpoint);
@@ -135,8 +137,8 @@ export function App() {
           <aside class="sidebar">
             <CredentialForm
               initial={credentials}
-              onSave={handleConnect}
-              loading={session === 'connecting'}
+              onSave={(creds) => handleConnect(creds, { reconnect: true })}
+              loading={false}
             />
             <hr style={{ border: 'none', borderTop: '1px solid var(--border)' }} />
             <CapabilityPanel capabilities={capabilities} onRefresh={handleRefreshPermissions} />
