@@ -2,7 +2,8 @@
   "type": "module",
   "scripts": {
     "build": "node build.mjs",
-    "dev": "node build.mjs --dev"
+    "dev": "node build.mjs --dev",
+    "serve": "node serve.mjs"
   },
   "dependencies": {
     "@anthropic-ai/claude-code": "^2.1.146",
