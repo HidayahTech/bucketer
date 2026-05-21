@@ -4,16 +4,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Frontend Object Store Up And Downloader — a frontend tool for uploading and downloading files to/from an object store. Hosted on GitLab at `https://gitlab.com/hidayahtech/frontend-object-store-up-and-downloader`.
+Bucketer — a browser-based frontend for uploading, downloading, and managing objects in S3-compatible buckets. Hosted on GitLab at `https://gitlab.com/hidayahtech/bucketer`.
 
-This project is in its initial state. No build system, framework, or source files have been added yet.
-
-## Current dependencies
-
-- `@anthropic-ai/claude-code` — the only declared dependency so far
+Built with Preact + esbuild. The build pipeline produces a single self-contained `dist/index.html` with all JS and CSS inlined. See README.md for full build and deployment docs.
 
 ## Setup
 
 ```bash
 npm install
+npm run build   # → dist/index.html
+npm run serve   # dev build + localhost:3000
 ```
