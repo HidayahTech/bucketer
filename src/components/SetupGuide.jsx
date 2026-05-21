@@ -23,8 +23,14 @@ function Code({ children }) {
       <pre class="cors-cmd">{children}</pre>
       {navigator.clipboard && (
         <button
-          class="btn btn-ghost btn-sm"
-          style={{ position: 'absolute', top: '.35rem', right: '.35rem', fontSize: '.7rem', padding: '.2rem .45rem' }}
+          type="button"
+          class="btn btn-sm"
+          style={{
+            position: 'absolute', top: '.35rem', right: '.35rem',
+            fontSize: '.7rem', padding: '.2rem .45rem',
+            background: 'rgba(255,255,255,.15)', color: '#cdd6f4',
+            border: '1px solid rgba(255,255,255,.25)',
+          }}
           onClick={copy}
         >{copied ? '✓ Copied' : 'Copy'}</button>
       )}
