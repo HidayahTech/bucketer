@@ -134,7 +134,17 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     } catch (err) {
       if (err.name === 'AbortError' || err.message === 'Upload aborted') return;
       updateItem(id, { status: 'error', error: err });
-      if (isPermissionError(err)) onCapabilityChange('upload', 'denied');
+      if (isPermissionError(err)) {
+        onCapabilityChange('upload', 'denied');
+        // Non-resumable failure on multipart: abort session and clear resume record (§4.10)
+        if (file.size >= MULTIPART_THRESHOLD) {
+          const rec = await loadResumeRecord({ provider, endpoint: credentials.endpoint, bucket, destinationKey }).catch(() => null);
+          if (rec) {
+            await client.send(new AbortMultipartUploadCommand({ Bucket: bucket, Key: destinationKey, UploadId: rec.uploadId })).catch(() => {});
+            await deleteResumeRecord({ provider, endpoint: credentials.endpoint, bucket, destinationKey }).catch(() => {});
+          }
+        }
+      }
     } finally {
       delete activeUploadsRef.current[id];
       markUploadInactive(destinationKey);
@@ -180,10 +190,9 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         recordSaved = true;
         try {
           const fileIdentity = buildFileIdentity(file);
-          // Compute hash async without blocking the upload
-          computeFileHash(file).then(hash => {
-            if (hash) fileIdentity.contentHash = hash;
-          });
+          // Compute hash before saving so the record includes it (first+last 64KB, fast)
+          const hash = await computeFileHash(file);
+          if (hash) fileIdentity.contentHash = hash;
           await saveResumeRecord({
             provider, endpoint: credentials.endpoint, bucket, destinationKey,
             uploadId: upload.uploadId,
@@ -224,6 +233,18 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         error: { message: 'File does not match the resume record (name, size, or modification time differs). Please restart the upload.' },
       });
       return;
+    }
+
+    // If a content hash was stored, verify it (recommended check — catches renamed/replaced files)
+    if (fileIdentity.contentHash) {
+      const currentHash = await computeFileHash(file);
+      if (currentHash && currentHash !== fileIdentity.contentHash) {
+        updateItem(id, {
+          status: 'error',
+          error: { message: 'File content hash does not match the resume record. The file may have changed since the upload was started. Please restart the upload.' },
+        });
+        return;
+      }
     }
 
     try {
