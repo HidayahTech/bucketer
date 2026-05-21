@@ -1,93 +1,142 @@
-# Frontend Object Store Up And Downloader
+# S3 Browser
 
+A browser-based tool for uploading and downloading objects in an S3-compatible bucket. No backend — runs entirely in the browser. Primary target is Backblaze B2; also supports Cloudflare R2, Wasabi, AWS S3, DigitalOcean Spaces, and generic S3-compatible endpoints.
 
+See `s3-browser-spec-v0.15.md` for the full specification.
 
-## Getting started
+---
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+## Build
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
-
-```
-cd existing_repo
-git remote add origin https://gitlab.com/hidayahtech/frontend-object-store-up-and-downloader.git
-git branch -M main
-git push -uf origin main
+```bash
+npm install
+npm run build      # → dist/index.html (minified, self-contained)
+npm run dev        # → dist/index.html (source maps, unminified)
 ```
 
-## Integrate with your tools
+The output is a single self-contained `dist/index.html` with all JS and CSS inlined. This works when opened as a `file://` URL in Firefox or Chrome (with caveats — see the in-app banner) and when served from any web server.
 
-* [Set up project integrations](https://gitlab.com/hidayahtech/frontend-object-store-up-and-downloader/-/settings/integrations)
+---
 
-## Collaborate with your team
+## Deployment
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+### Self-hosted (recommended)
 
-## Test and Deploy
+Serve `dist/index.html` from a web server on a dedicated domain, e.g. `https://s3browser.yourdomain.com`.
 
-Use the built-in continuous integration in GitLab.
+Configure your bucket's CORS rules to allow that origin (see below).
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+#### nginx example
 
-***
+```nginx
+location / {
+    root /var/www/s3browser;
+    index index.html;
 
-# Editing this README
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://*.backblazeb2.com https://*.r2.cloudflarestorage.com https://*.wasabisys.com;" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+}
+```
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+**`connect-src` note:** If you need to support arbitrary S3 endpoints (MinIO, custom domains), replace the specific origins with `https:`.
 
-## Suggestions for a good README
+### Local file
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+Open `dist/index.html` directly in Firefox. Chrome works but has a shared null-origin `localStorage` namespace (all local HTML files share the same storage). The app shows a banner with per-browser caveats when running from `file://`.
 
-## Name
-Choose a self-explaining name for your project.
+---
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+## CORS Configuration
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+The app cannot function without CORS configured on the bucket. This is a provider-side prerequisite.
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+### Backblaze B2
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+```bash
+aws s3api put-bucket-cors \
+  --endpoint-url https://s3.<region>.backblazeb2.com \
+  --bucket <your-bucket> \
+  --cors-configuration '{
+    "CORSRules": [{
+      "AllowedOrigins": ["https://s3browser.yourdomain.com"],
+      "AllowedMethods": ["GET","PUT","HEAD","POST"],
+      "AllowedHeaders": ["Authorization","Content-Type","Content-MD5","x-amz-*","ETag"],
+      "ExposeHeaders": ["ETag","Content-Length","Content-Type"],
+      "MaxAgeSeconds": 3600
+    }]
+  }'
+```
+
+**B2 notes:**
+- `MaxAgeSeconds` must be ≤ 86400 (B2 enforces this).
+- Do not use the master application key — create a dedicated application key.
+- If you get "bucket contains B2 Native CORS rules", remove the native rules with the B2 CLI first.
+
+### Cloudflare R2
+
+```bash
+aws s3api put-bucket-cors \
+  --endpoint-url https://<account-id>.r2.cloudflarestorage.com \
+  --bucket <your-bucket> \
+  --cors-configuration '{
+    "CORSRules": [{
+      "AllowedOrigins": ["https://s3browser.yourdomain.com"],
+      "AllowedMethods": ["GET","PUT","HEAD","POST"],
+      "AllowedHeaders": ["Authorization","Content-Type","Content-MD5","x-amz-*","ETag"],
+      "ExposeHeaders": ["ETag","Content-Length","Content-Type"],
+      "MaxAgeSeconds": 3600
+    }]
+  }'
+```
+
+### Wasabi
+
+No CORS configuration needed. Wasabi returns permissive CORS headers automatically.
+
+### AWS S3
+
+Use the AWS console or CLI with your bucket's origin. Standard S3 CORS configuration applies.
+
+---
 
 ## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+1. Open the app and enter your bucket credentials.
+2. **Endpoint URL** — the S3-compatible endpoint for your provider (e.g. `https://s3.us-west-004.backblazeb2.com`).
+3. **Bucket Name** — the bucket to browse.
+4. **Key ID / Secret Key** — your access credentials. The secret key is stored in `sessionStorage` only and cleared when you close the tab.
+4. Click **Connect**. The app will run a `ListObjectsV2` probe to verify access.
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+### Provider override
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+If auto-detection fails (MinIO, custom domains, reverse proxies), select your provider from the override dropdown. This controls `forcePathStyle` and region handling.
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+### Resumable uploads
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+Multipart uploads (≥ 5 MB) automatically save a resume record in IndexedDB. If the upload is interrupted:
+1. Re-add the same file via the upload area.
+2. The app detects the existing resume record and offers **Resume** or **Restart**.
+3. Resume re-selects the file picker — the browser requires this because file handles don't persist across sessions.
+4. The app calls `ListParts` against the provider to get the authoritative list of uploaded parts, then continues from where it left off.
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+---
 
-## License
-For open source projects, say how it is licensed.
+## Credential Security
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+- Secret key uses `type="password"` input — masked and excluded from browser history.
+- Secret key is stored only in `sessionStorage` — cleared on tab close.
+- Key ID, endpoint, and bucket are stored in `localStorage` (not sensitive).
+- All credentials are cleared on Disconnect.
+- Use bucket-scoped keys with minimum required permissions. Read-only access if you only need to browse and download.
+
+---
+
+## Known limitations (v0.1)
+
+- No delete, rename, copy, or bucket management.
+- No automatic retry with backoff (manual retry available).
+- No multiple saved credential profiles.
+- MinIO requires manual provider override (endpoint pattern is user-defined).
+- Large file uploads (>50 GB) work but native tools (`rclone`, B2 CLI, AWS CLI) are more reliable for very large files.
+- Browser tab close during multipart upload leaves orphaned parts on B2 (not R2 — R2 auto-cleans after 7 days).

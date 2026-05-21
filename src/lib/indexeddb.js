@@ -86,3 +86,37 @@ export function fileIdentityMatches(identity, file) {
     identity.lastModified === file.lastModified
   );
 }
+
+// Concurrent tab conflict detection (§4.15)
+// Store active upload key in localStorage with a tab-unique ID; other tabs can check it.
+const TAB_ID = Math.random().toString(36).slice(2);
+const ACTIVE_KEY = 's3b_active_uploads';
+
+function getActiveUploads() {
+  try { return JSON.parse(localStorage.getItem(ACTIVE_KEY) || '{}'); } catch { return {}; }
+}
+
+export function markUploadActive(destinationKey) {
+  try {
+    const active = getActiveUploads();
+    active[destinationKey] = TAB_ID;
+    localStorage.setItem(ACTIVE_KEY, JSON.stringify(active));
+  } catch { /* */ }
+}
+
+export function markUploadInactive(destinationKey) {
+  try {
+    const active = getActiveUploads();
+    if (active[destinationKey] === TAB_ID) {
+      delete active[destinationKey];
+      localStorage.setItem(ACTIVE_KEY, JSON.stringify(active));
+    }
+  } catch { /* */ }
+}
+
+export function isUploadActiveElsewhere(destinationKey) {
+  try {
+    const active = getActiveUploads();
+    return active[destinationKey] !== undefined && active[destinationKey] !== TAB_ID;
+  } catch { return false; }
+}

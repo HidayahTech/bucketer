@@ -7,12 +7,14 @@ import {
   saveResumeRecord, loadResumeRecord, deleteResumeRecord,
   buildFileIdentity, fileIdentityMatches, computeFileHash,
   UPLOAD_EXPIRY_WARNING_MS,
+  markUploadActive, markUploadInactive, isUploadActiveElsewhere,
 } from '../lib/indexeddb.js';
 import { UploadQueue as Queue } from '../lib/upload-queue.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
 
-const MULTIPART_THRESHOLD = 5 * 1024 * 1024; // 5 MB
-const QUEUE_CONCURRENCY = 2;
+const MULTIPART_THRESHOLD = 5 * 1024 * 1024;   // 5 MB
+const LARGE_FILE_WARN    = 50 * 1024 * 1024 * 1024; // 50 GB — recommend native tools (§4.6)
+const QUEUE_CONCURRENCY  = 2;
 
 function calcPartSize(fileSize) {
   return Math.max(5 * 1024 * 1024, Math.ceil(fileSize / 10000));
@@ -50,6 +52,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       error: null,
       destinationKey: (currentPrefix || '') + file.name,
       resumeRecord: null,
+      largeFileWarningDismissed: false,
     }));
     setItems(prev => [...prev, ...newItems]);
 
@@ -81,6 +84,16 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   }
 
   async function runUpload(id, file, destinationKey) {
+    // Concurrent tab conflict detection (§4.15)
+    if (isUploadActiveElsewhere(destinationKey)) {
+      updateItem(id, {
+        status: 'error',
+        error: { message: `Another browser tab appears to be uploading to "${destinationKey}". Close the other tab or wait for it to finish before retrying.` },
+      });
+      return;
+    }
+    markUploadActive(destinationKey);
+
     updateItem(id, { status: 'uploading', error: null });
     const startTime = Date.now();
     let lastBytes = 0;
@@ -124,6 +137,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       if (isPermissionError(err)) onCapabilityChange('upload', 'denied');
     } finally {
       delete activeUploadsRef.current[id];
+      markUploadInactive(destinationKey);
     }
   }
 
@@ -328,6 +342,18 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     return () => window.removeEventListener('beforeunload', handler);
   }, [hasActive]);
 
+  // Page Visibility API — log when tab hides during active upload (§4.6)
+  useEffect(() => {
+    if (!hasActive) return;
+    const handler = () => {
+      if (document.hidden) {
+        console.info('[S3 Browser] Tab hidden during active upload — uploads continue in background.');
+      }
+    };
+    document.addEventListener('visibilitychange', handler);
+    return () => document.removeEventListener('visibilitychange', handler);
+  }, [hasActive]);
+
   // Drop zone
   function handleDrop(e) {
     e.preventDefault();
@@ -377,10 +403,12 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
             <UploadItem
               key={item.id}
               item={item}
+              provider={provider}
               onResume={() => handleResume(item.id)}
               onRestart={() => handleRestart(item.id)}
               onCancel={() => handleCancel(item.id)}
               onRemove={() => handleRemove(item.id)}
+              onDismissLargeWarn={() => updateItem(item.id, { largeFileWarningDismissed: true })}
             />
           ))}
         </div>
@@ -389,8 +417,8 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   );
 }
 
-function UploadItem({ item, onResume, onRestart, onCancel, onRemove }) {
-  const { name, size, status, progress, bytesUploaded, speed, eta, error, expiryWarning, resumeRecord } = item;
+function UploadItem({ item, onResume, onRestart, onCancel, onRemove, onDismissLargeWarn, provider }) {
+  const { name, size, status, progress, bytesUploaded, speed, eta, error, expiryWarning, resumeRecord, largeFileWarningDismissed } = item;
 
   const statusLabel = {
     queued:    'Queued',
@@ -455,6 +483,19 @@ function UploadItem({ item, onResume, onRestart, onCancel, onRemove }) {
         </>
       )}
 
+      {/* 50 GB large file guidance — non-blocking, dismissible (§4.6) */}
+      {size >= LARGE_FILE_WARN && !largeFileWarningDismissed && (
+        <div class="banner banner-warn" style={{ marginTop: '.4rem', padding: '.4rem .6rem', fontSize: '.78rem' }}>
+          <div class="banner-body">
+            <strong>Large file ({formatBytes(size)})</strong> — For files this large, native tools like{' '}
+            <code>rclone</code>, the B2 CLI, or the AWS CLI offer better reliability (checksumming,
+            bandwidth throttling, and resumability outside browser constraints). You can still proceed
+            in-browser, but be aware of these limitations.
+          </div>
+          <button class="banner-close" onClick={() => onDismissLargeWarn()}>✕</button>
+        </div>
+      )}
+
       {expiryWarning && status === 'uploading' && (
         <div class="banner banner-warn" style={{ marginTop: '.4rem', padding: '.4rem .6rem', fontSize: '.78rem' }}>
           This upload session may be approaching the provider's expiry limit. If it expires, you'll need to restart.
@@ -474,6 +515,9 @@ function UploadItem({ item, onResume, onRestart, onCancel, onRemove }) {
             <summary>Error details</summary>
             <pre>{JSON.stringify(parseS3Error(error), null, 2)}</pre>
           </details>
+          {size >= MULTIPART_THRESHOLD && status === 'error' && (
+            <MultipartFailureConsequence provider={provider} />
+          )}
           {(error.Code === 'NoSuchUpload' || error.name === 'NoSuchUpload') && (
             <div style={{ marginTop: '.3rem' }}>
               The multipart upload session has expired. Incomplete parts have been cleaned up.
@@ -481,6 +525,32 @@ function UploadItem({ item, onResume, onRestart, onCancel, onRemove }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+// Provider-specific multipart failure consequence (§4.10)
+function MultipartFailureConsequence({ provider }) {
+  if (provider === 'r2') {
+    return (
+      <div style={{ marginTop: '.3rem' }}>
+        <strong>R2:</strong> Incomplete multipart uploads are automatically aborted after 7 days — no manual cleanup needed.
+      </div>
+    );
+  }
+  if (provider === 'b2') {
+    return (
+      <div style={{ marginTop: '.3rem' }}>
+        <strong>B2:</strong> Incomplete parts may remain and accrue storage charges until aborted.
+        Check your bucket's incomplete multipart uploads and abort them via the B2 console or CLI.
+        Consider setting a lifecycle rule to auto-abort incomplete uploads.
+      </div>
+    );
+  }
+  return (
+    <div style={{ marginTop: '.3rem' }}>
+      Incomplete multipart parts may remain on the provider and accrue storage charges.
+      Check your provider's console for incomplete multipart uploads.
     </div>
   );
 }
