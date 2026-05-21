@@ -97,7 +97,7 @@ export function App() {
   return (
     <div id="app">
       <header class="app-header">
-        <h1>S3 Browser</h1>
+        <h1>Bucketer</h1>
         <span class="spacer" />
         {providerLabel && session === 'connected' && (
           <span class="header-status">{providerLabel}</span>

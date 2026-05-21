@@ -1,7 +1,6 @@
 // Upload queue with multipart, resumable uploads, and concurrency (§4.6, §4.15)
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
-import { PutObjectCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand, ListPartsCommand } from '@aws-sdk/client-s3';
-import { Upload } from '@aws-sdk/lib-storage';
+import { PutObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand, ListPartsCommand } from '@aws-sdk/client-s3';
 import { formatBytes, formatSpeed, formatEta, isPermissionError, parseS3Error } from '../lib/format.js';
 import {
   saveResumeRecord, loadResumeRecord, deleteResumeRecord,
@@ -10,14 +9,19 @@ import {
   markUploadActive, markUploadInactive, isUploadActiveElsewhere,
 } from '../lib/indexeddb.js';
 import { UploadQueue as Queue } from '../lib/upload-queue.js';
+import { loadPartConcurrency, loadPartSizeMB } from '../lib/storage.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
 
-const MULTIPART_THRESHOLD = 5 * 1024 * 1024;   // 5 MB
+const MULTIPART_THRESHOLD = 5 * 1024 * 1024;   // 5 MiB — internal threshold, above the 5 MB spec minimum
 const LARGE_FILE_WARN    = 50 * 1024 * 1024 * 1024; // 50 GB — recommend native tools (§4.6)
 const QUEUE_CONCURRENCY  = 2;
+const PART_CONCURRENCY   = 4; // concurrent part uploads per file (peak memory: 4 × partSize)
 
-function calcPartSize(fileSize) {
-  return Math.max(5 * 1024 * 1024, Math.ceil(fileSize / 10000));
+function calcPartSize(fileSize, preferredBytes) {
+  // S3 spec minimum is 5 MB (5,000,000 bytes, decimal) for all parts except the last.
+  // Total parts must not exceed 10,000.
+  const floor = Math.max(5 * 1000 * 1000, Math.ceil(fileSize / 10000));
+  return (preferredBytes && preferredBytes > floor) ? preferredBytes : floor;
 }
 
 // Status: queued | uploading | paused | resuming | done | error | aborted
@@ -96,16 +100,12 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
 
     updateItem(id, { status: 'uploading', error: null });
     const startTime = Date.now();
-    let lastBytes = 0;
-    let lastTime = startTime;
 
     function updateProgress(loaded, total) {
-      const now = Date.now();
-      const dt = (now - lastTime) / 1000;
-      const db = loaded - lastBytes;
-      const speed = dt > 0.5 ? db / dt : 0;
-      lastBytes = loaded;
-      lastTime = now;
+      // Average speed from upload start — stable even when multiple parts
+      // complete in rapid bursts (avoids the dt-threshold problem).
+      const elapsed = (Date.now() - startTime) / 1000;
+      const speed = elapsed > 0 ? loaded / elapsed : 0;
       const remaining = speed > 0 ? (total - loaded) / speed : null;
       updateItem(id, {
         progress: total > 0 ? (loaded / total) * 100 : 0,
@@ -165,57 +165,69 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   }
 
   async function uploadMultipart(id, file, destinationKey, onProgress) {
-    const partSize = calcPartSize(file.size);
+    const preferredBytes = (loadPartSizeMB() ?? 5) * 1024 * 1024;
+    const partSize = calcPartSize(file.size, preferredBytes);
+    const totalParts = Math.ceil(file.size / partSize);
 
-    const upload = new Upload({
-      client,
-      params: { Bucket: bucket, Key: destinationKey, Body: file, ContentType: file.type || 'application/octet-stream' },
-      partSize,
-      leavePartsOnError: true,
-      queueSize: 4,
-    });
+    const { UploadId: uploadId } = await client.send(new CreateMultipartUploadCommand({
+      Bucket: bucket, Key: destinationKey,
+      ContentType: file.type || 'application/octet-stream',
+    }));
 
-    activeUploadsRef.current[id] = {
-      abort: () => upload.abort(),
-      uploadInstance: upload,
-    };
+    const abortController = new AbortController();
+    activeUploadsRef.current[id] = { abort: () => abortController.abort(), uploadId };
 
-    let recordSaved = false;
+    // Save resume record before any parts so a crash mid-upload is recoverable
+    try {
+      const fileIdentity = buildFileIdentity(file);
+      const hash = await computeFileHash(file);
+      if (hash) fileIdentity.contentHash = hash;
+      await saveResumeRecord({
+        provider, endpoint: credentials.endpoint, bucket, destinationKey,
+        uploadId, partSize, fileIdentity, startedAt: Date.now(),
+      });
+    } catch { /* IDB may be unavailable */ }
 
-    upload.on('httpUploadProgress', async (progress) => {
-      onProgress(progress.loaded || 0, progress.total || file.size);
+    const parts = new Array(totalParts);
+    const queue = Array.from({ length: totalParts }, (_, i) => i + 1);
+    let bytesUploaded = 0;
 
-      // Persist resume record on first progress event (uploadId is set by now) (§4.15)
-      if (!recordSaved && upload.uploadId) {
-        recordSaved = true;
-        try {
-          const fileIdentity = buildFileIdentity(file);
-          // Compute hash before saving so the record includes it (first+last 64KB, fast)
-          const hash = await computeFileHash(file);
-          if (hash) fileIdentity.contentHash = hash;
-          await saveResumeRecord({
-            provider, endpoint: credentials.endpoint, bucket, destinationKey,
-            uploadId: upload.uploadId,
-            partSize,
-            fileIdentity,
-            startedAt: Date.now(),
-          });
-        } catch { /* IDB may be unavailable */ }
+    // Worker pool: PART_CONCURRENCY workers drain the queue concurrently,
+    // giving full pipelining while bounding memory to PART_CONCURRENCY × partSize.
+    async function worker() {
+      for (;;) {
+        const partNumber = queue.shift();
+        if (partNumber === undefined) break;
+        if (abortController.signal.aborted) throw new Error('Upload aborted');
 
-        // Warn if record is approaching expiry (provider session limit — B2 has none)
-        const expiryMs = uploadExpiryWarningMs(provider);
-        if (expiryMs) {
-          const record = await loadResumeRecord({ provider, endpoint: credentials.endpoint, bucket, destinationKey }).catch(() => null);
-          if (record && (Date.now() - record.startedAt) > expiryMs * 0.9) {
-            updateItem(id, { expiryWarning: true });
-          }
-        }
+        const start = (partNumber - 1) * partSize;
+        const end = Math.min(start + partSize, file.size);
+        // slice→arrayBuffer: only this part's bytes live in memory at a time.
+        // Raw Blob is not accepted by the SDK browser handler (calls .getReader()).
+        const chunk = await file.slice(start, end).arrayBuffer();
+
+        const resp = await client.send(
+          new UploadPartCommand({
+            Bucket: bucket, Key: destinationKey, UploadId: uploadId,
+            PartNumber: partNumber, Body: chunk,
+          }),
+          { abortSignal: abortController.signal },
+        );
+
+        parts[partNumber - 1] = { PartNumber: partNumber, ETag: resp.ETag };
+        bytesUploaded += end - start;
+        onProgress(bytesUploaded, file.size);
       }
-    });
+    }
 
-    await upload.done();
+    const concurrency = Math.max(1, loadPartConcurrency() ?? PART_CONCURRENCY);
+    await Promise.all(Array.from({ length: concurrency }, worker));
 
-    // Clear resume record on success
+    await client.send(new CompleteMultipartUploadCommand({
+      Bucket: bucket, Key: destinationKey, UploadId: uploadId,
+      MultipartUpload: { Parts: parts },
+    }));
+
     await deleteResumeRecord({ provider, endpoint: credentials.endpoint, bucket, destinationKey }).catch(() => {});
     delete activeUploadsRef.current[id];
   }
@@ -281,7 +293,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         if (abortController.signal.aborted) throw new Error('Upload aborted');
         const start = (partNumber - 1) * partSize;
         const end = Math.min(start + partSize, item.file.size);
-        const chunk = item.file.slice(start, end);
+        const chunk = await item.file.slice(start, end).arrayBuffer();
 
         const partResp = await client.send(new UploadPartCommand({
           Bucket: bucket, Key: destinationKey, UploadId: uploadId,
@@ -341,10 +353,14 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     if (active?.abort) active.abort();
 
     const item = items.find(it => it.id === id);
-    if (item?.resumeRecord) {
+    const destinationKey = item?.destinationKey;
+    // active.uploadId covers in-progress uploads; item.resumeRecord covers paused ones
+    const uploadId = active?.uploadId ?? item?.resumeRecord?.uploadId;
+
+    if (uploadId && destinationKey) {
       try {
         await client.send(new AbortMultipartUploadCommand({
-          Bucket: bucket, Key: item.destinationKey, UploadId: item.resumeRecord.uploadId,
+          Bucket: bucket, Key: destinationKey, UploadId: uploadId,
         }));
       } catch (err) {
         updateItem(id, {
@@ -353,7 +369,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         });
         return;
       }
-      await deleteResumeRecord({ provider, endpoint: credentials.endpoint, bucket, destinationKey: item.destinationKey }).catch(() => {});
+      await deleteResumeRecord({ provider, endpoint: credentials.endpoint, bucket, destinationKey }).catch(() => {});
     }
 
     setItems(prev => prev.filter(it => it.id !== id));
@@ -377,7 +393,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     if (!hasActive) return;
     const handler = () => {
       if (document.hidden) {
-        console.info('[S3 Browser] Tab hidden during active upload — uploads continue in background.');
+        console.info('[Bucketer] Tab hidden during active upload — uploads continue in background.');
       }
     };
     document.addEventListener('visibilitychange', handler);
@@ -448,7 +464,45 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
 }
 
 function UploadItem({ item, onResume, onRestart, onCancel, onRemove, onDismissLargeWarn, provider }) {
-  const { name, size, status, progress, bytesUploaded, speed, eta, error, expiryWarning, resumeRecord, largeFileWarningDismissed } = item;
+  const { name, size, status, bytesUploaded, speed, error, expiryWarning, resumeRecord, largeFileWarningDismissed } = item;
+
+  // Smoothly interpolated byte counter driven by rAF — advances at the current
+  // speed between real part-completion events, floored at confirmed bytes so it
+  // never goes backward and capped at file size.
+  const [displayedBytes, setDisplayedBytes] = useState(bytesUploaded);
+  const animRef  = useRef(null);
+  const speedRef = useRef(speed);
+  const floorRef = useRef(bytesUploaded);
+
+  useEffect(() => { speedRef.current = speed; }, [speed]);
+
+  useEffect(() => {
+    floorRef.current = bytesUploaded;
+    // Snap forward if confirmed bytes overtook the interpolated display
+    setDisplayedBytes(prev => Math.max(prev, bytesUploaded));
+  }, [bytesUploaded]);
+
+  useEffect(() => {
+    if (status !== 'uploading') {
+      cancelAnimationFrame(animRef.current);
+      setDisplayedBytes(bytesUploaded);
+      return;
+    }
+    let last = performance.now();
+    function tick(now) {
+      const dt = (now - last) / 1000;
+      last = now;
+      setDisplayedBytes(prev =>
+        Math.min(Math.max(prev + speedRef.current * dt, floorRef.current), size)
+      );
+      animRef.current = requestAnimationFrame(tick);
+    }
+    animRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animRef.current);
+  }, [status, size]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const displayProgress = size > 0 ? (displayedBytes / size) * 100 : 0;
+  const liveEta = speed > 0 ? (size - displayedBytes) / speed : null;
 
   const statusLabel = {
     queued:    'Queued',
@@ -501,12 +555,12 @@ function UploadItem({ item, onResume, onRestart, onCancel, onRemove, onDismissLa
       {showProgress && (
         <>
           <div class="progress-bar-wrap">
-            <div class="progress-bar" style={{ width: `${progress.toFixed(1)}%` }} />
+            <div class="progress-bar" style={{ width: `${displayProgress.toFixed(2)}%` }} />
           </div>
           <div class="upload-meta">
-            <span>{formatBytes(bytesUploaded)} / {formatBytes(size)}</span>
+            <span>{Math.floor(displayedBytes).toLocaleString()} / {size.toLocaleString()} B</span>
             {status === 'uploading' && speed > 0 && (
-              <span>{formatSpeed(speed)} · ETA {formatEta(eta)}</span>
+              <span>{formatSpeed(speed)} · ETA {formatEta(liveEta)}</span>
             )}
             {status === 'done' && <span>✓ Complete</span>}
           </div>

@@ -162,21 +162,44 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 .breadcrumb .sep { color: var(--text-muted); }
 .breadcrumb .current { color: var(--text); font-weight: 500; }
 
-.file-list { display: flex; flex-direction: column; gap: 1px; }
-.file-item {
-  display: flex; align-items: center; gap: .75rem;
-  padding: .5rem .6rem; border-radius: var(--radius);
-  border: 1px solid transparent;
-  transition: background var(--transition);
+.file-table {
+  width: 100%;
+  border-collapse: collapse;
   font-size: .9rem;
 }
-.file-item:hover { background: var(--surface-raised); border-color: var(--border); }
-.file-item .file-icon { font-size: 1rem; flex-shrink: 0; }
-.file-item .file-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.file-item .file-dir  { color: var(--accent); cursor: pointer; font-weight: 500; }
-.file-item .file-dir:hover { text-decoration: underline; }
-.file-item .file-size { color: var(--text-muted); font-size: .8rem; white-space: nowrap; }
-.file-item .file-actions { display: flex; gap: .3rem; }
+.file-table thead th {
+  text-align: left;
+  padding: .35rem .6rem;
+  border-bottom: 2px solid var(--border);
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--text-muted);
+  white-space: nowrap;
+  user-select: none;
+}
+.file-table thead th.col-sortable { cursor: pointer; }
+.file-table thead th.col-sortable:hover { color: var(--text); }
+.file-table thead th.col-sort-active { color: var(--accent); }
+.sort-indicator { margin-left: .35rem; font-size: .65rem; opacity: .7; }
+.col-sort-active .sort-indicator { opacity: 1; }
+
+.file-table td {
+  padding: .45rem .6rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.file-table tbody tr:last-child td { border-bottom: none; }
+.file-table tbody .file-row:hover td { background: var(--surface-raised); }
+
+.col-name { width: 99%; }
+.col-name .file-icon { margin-right: .45rem; }
+.col-name .file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40ch; display: inline-block; vertical-align: middle; }
+.col-name .file-dir  { color: var(--accent); font-weight: 500; }
+.col-size     { white-space: nowrap; color: var(--text-muted); font-size: .85rem; padding-left: 1.5rem; }
+.col-modified { white-space: nowrap; color: var(--text-muted); font-size: .85rem; padding-left: 1rem; }
+.col-actions  { white-space: nowrap; text-align: right; padding-left: .5rem; }
 
 .empty-state { color: var(--text-muted); font-size: .9rem; padding: 2rem 0; text-align: center; }
 

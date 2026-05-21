@@ -6,7 +6,7 @@ const isFileProtocol = typeof window !== 'undefined' && window.location.protocol
 
 function currentOrigin() {
   if (typeof window === 'undefined') return 'https://yourdomain.com';
-  if (isFileProtocol) return 'null';
+  if (isFileProtocol) return '*';
   return window.location.origin;
 }
 
@@ -59,14 +59,14 @@ function corsJson(origin) {
     CORSRules: [{
       AllowedOrigins: [origin],
       AllowedMethods: ['GET', 'PUT', 'HEAD', 'POST'],
-      AllowedHeaders: ['Authorization', 'Content-Type', 'Content-MD5', 'x-amz-*', 'ETag'],
+      AllowedHeaders: ['Authorization', 'Content-Type', 'Content-MD5', 'x-amz-*', 'amz-sdk-invocation-id', 'amz-sdk-request', 'ETag'],
       ExposeHeaders: ['ETag', 'Content-Length', 'Content-Type'],
       MaxAgeSeconds: 3600,
     }],
   }, null, 2);
 }
 
-function corsCmd({ endpoint, bucket, origin, profile = 's3browser' }) {
+function corsCmd({ endpoint, bucket, origin, profile = 'bucketer' }) {
   return `aws s3api put-bucket-cors \\
   --profile ${profile} \\
   --endpoint-url ${endpoint || 'https://s3.<region>.backblazeb2.com'} \\
@@ -103,7 +103,7 @@ winget install Amazon.AWSCLI`}</Code>
           Use an application key — <strong>not</strong> your master key. Create one in the B2 console
           under <em>App Keys</em> with access to this bucket.
         </p>
-        <Code>{`aws configure --profile s3browser
+        <Code>{`aws configure --profile bucketer
 # AWS Access Key ID:     ${keyId || '<your-key-id>'}
 # AWS Secret Access Key: <your-secret-key>
 # Default region name:   ${region || '<region e.g. us-west-004>'}
@@ -128,16 +128,17 @@ b2 bucket update ${bkt} --cors-rules '[]'`}</Code>
       <Step n="4" title="Apply S3-compatible CORS rules">
         {isFileProtocol && (
           <p class="cors-note cors-note-warn" style={{ marginBottom: '.4rem' }}>
-            You're running from <code>file://</code> — the origin is the literal string <code>"null"</code>.
-            If you later deploy to a domain, re-run this with that origin instead.
+            You're running from <code>file://</code> — using <code>"*"</code> (wildcard) as the allowed origin,
+            since browsers send <code>Origin: null</code> for local files and most providers reject <code>"null"</code> as invalid.
+            If you later deploy to a domain, re-run this with that specific origin instead.
           </p>
         )}
-        <Code>{corsCmd({ endpoint: ep, bucket: bkt, origin, profile: 's3browser' })}</Code>
+        <Code>{corsCmd({ endpoint: ep, bucket: bkt, origin, profile: 'bucketer' })}</Code>
       </Step>
 
       <Step n="5" title="Verify">
         <Code>{`aws s3api get-bucket-cors \\
-  --profile s3browser \\
+  --profile bucketer \\
   --endpoint-url ${ep} \\
   --bucket ${bkt}`}</Code>
         <p class="cors-note" style={{ marginTop: '.4rem' }}>
@@ -168,7 +169,7 @@ brew install awscli`}</Code>
           Get your R2 API token from the Cloudflare dashboard → R2 → Manage R2 API Tokens.
           Use <code>auto</code> as the region.
         </p>
-        <Code>{`aws configure --profile s3browser
+        <Code>{`aws configure --profile bucketer
 # AWS Access Key ID:     ${keyId || '<r2-access-key-id>'}
 # AWS Secret Access Key: <r2-secret-access-key>
 # Default region name:   auto
@@ -179,7 +180,7 @@ brew install awscli`}</Code>
         <p class="cors-note">
           R2 has supported <code>put-bucket-cors</code> via the S3 API since September 2022.
         </p>
-        <Code>{corsCmd({ endpoint: ep, bucket: bkt, origin, profile: 's3browser' })}</Code>
+        <Code>{corsCmd({ endpoint: ep, bucket: bkt, origin, profile: 'bucketer' })}</Code>
         <p class="cors-note" style={{ marginTop: '.4rem' }}>
           <strong>Note:</strong> R2 automatically aborts incomplete multipart uploads after 7 days,
           so orphaned parts won't accumulate.
@@ -188,7 +189,7 @@ brew install awscli`}</Code>
 
       <Step n="4" title="Verify">
         <Code>{`aws s3api get-bucket-cors \\
-  --profile s3browser \\
+  --profile bucketer \\
   --endpoint-url ${ep} \\
   --bucket ${bkt}`}</Code>
       </Step>
@@ -209,7 +210,7 @@ function GuideWasabi({ endpoint, bucket, keyId }) {
       </Step>
 
       <Step n="2" title="Configure AWS CLI (optional — for other management tasks)">
-        <Code>{`aws configure --profile s3browser
+        <Code>{`aws configure --profile bucketer
 # AWS Access Key ID:     ${keyId || '<wasabi-access-key>'}
 # AWS Secret Access Key: <wasabi-secret-key>
 # Default region name:   <region e.g. us-east-1>
@@ -230,7 +231,7 @@ function GuideAWS({ endpoint, bucket, keyId }) {
   return (
     <div class="setup-steps">
       <Step n="1" title="Install and configure the AWS CLI">
-        <Code>{`aws configure --profile s3browser
+        <Code>{`aws configure --profile bucketer
 # AWS Access Key ID:     ${keyId || '<access-key-id>'}
 # AWS Secret Access Key: <secret-access-key>
 # Default region name:   <region e.g. us-east-1>
@@ -242,13 +243,13 @@ function GuideAWS({ endpoint, bucket, keyId }) {
           For AWS S3 you can omit <code>--endpoint-url</code> (it's the default endpoint).
         </p>
         <Code>{`aws s3api put-bucket-cors \\
-  --profile s3browser \\
+  --profile bucketer \\
   --bucket ${bkt} \\
   --cors-configuration '${corsJson(origin)}'`}</Code>
       </Step>
 
       <Step n="3" title="Verify">
-        <Code>{`aws s3api get-bucket-cors --profile s3browser --bucket ${bkt}`}</Code>
+        <Code>{`aws s3api get-bucket-cors --profile bucketer --bucket ${bkt}`}</Code>
       </Step>
     </div>
   );
@@ -265,7 +266,7 @@ function GuideDOSpaces({ endpoint, bucket, keyId }) {
         <p class="cors-note">
           Generate a Spaces access key in the DigitalOcean dashboard → API → Spaces Keys.
         </p>
-        <Code>{`aws configure --profile s3browser
+        <Code>{`aws configure --profile bucketer
 # AWS Access Key ID:     ${keyId || '<spaces-key>'}
 # AWS Secret Access Key: <spaces-secret>
 # Default region name:   <region e.g. nyc3>
@@ -273,12 +274,12 @@ function GuideDOSpaces({ endpoint, bucket, keyId }) {
       </Step>
 
       <Step n="2" title="Apply CORS rules">
-        <Code>{corsCmd({ endpoint: ep, bucket: bkt, origin, profile: 's3browser' })}</Code>
+        <Code>{corsCmd({ endpoint: ep, bucket: bkt, origin, profile: 'bucketer' })}</Code>
       </Step>
 
       <Step n="3" title="Verify">
         <Code>{`aws s3api get-bucket-cors \\
-  --profile s3browser \\
+  --profile bucketer \\
   --endpoint-url ${ep} \\
   --bucket ${bkt}`}</Code>
       </Step>
@@ -298,7 +299,7 @@ function GuideMinIO({ endpoint, bucket, keyId }) {
           Use your MinIO access key and secret. Set the region to whatever your MinIO
           deployment uses (<code>us-east-1</code> is the common placeholder).
         </p>
-        <Code>{`aws configure --profile s3browser
+        <Code>{`aws configure --profile bucketer
 # AWS Access Key ID:     ${keyId || '<minio-access-key>'}
 # AWS Secret Access Key: <minio-secret-key>
 # Default region name:   us-east-1
@@ -310,12 +311,12 @@ function GuideMinIO({ endpoint, bucket, keyId }) {
           MinIO requires <code>forcePathStyle</code> — select <strong>MinIO</strong> in the Provider
           Override dropdown so the app applies it automatically.
         </p>
-        <Code>{corsCmd({ endpoint: ep, bucket: bkt, origin, profile: 's3browser' })}</Code>
+        <Code>{corsCmd({ endpoint: ep, bucket: bkt, origin, profile: 'bucketer' })}</Code>
       </Step>
 
       <Step n="3" title="Verify">
         <Code>{`aws s3api get-bucket-cors \\
-  --profile s3browser \\
+  --profile bucketer \\
   --endpoint-url ${ep} \\
   --bucket ${bkt}`}</Code>
       </Step>
@@ -331,7 +332,7 @@ function GuideGeneric({ endpoint, bucket, keyId }) {
   return (
     <div class="setup-steps">
       <Step n="1" title="Configure AWS CLI">
-        <Code>{`aws configure --profile s3browser
+        <Code>{`aws configure --profile bucketer
 # AWS Access Key ID:     ${keyId || '<access-key-id>'}
 # AWS Secret Access Key: <secret-access-key>
 # Default region name:   <region>
@@ -339,12 +340,12 @@ function GuideGeneric({ endpoint, bucket, keyId }) {
       </Step>
 
       <Step n="2" title="Apply CORS rules">
-        <Code>{corsCmd({ endpoint: ep, bucket: bkt, origin, profile: 's3browser' })}</Code>
+        <Code>{corsCmd({ endpoint: ep, bucket: bkt, origin, profile: 'bucketer' })}</Code>
       </Step>
 
       <Step n="3" title="Verify">
         <Code>{`aws s3api get-bucket-cors \\
-  --profile s3browser \\
+  --profile bucketer \\
   --endpoint-url ${ep} \\
   --bucket ${bkt}`}</Code>
       </Step>

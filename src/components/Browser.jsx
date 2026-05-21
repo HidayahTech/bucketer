@@ -37,6 +37,23 @@ function formatDate(dateStr) {
   try { return new Date(dateStr).toLocaleDateString(); } catch { return ''; }
 }
 
+function SortTh({ col, sortCol, sortDir, onSort, align, children }) {
+  const active = sortCol === col;
+  return (
+    <th
+      class={`col-sortable${active ? ' col-sort-active' : ''}`}
+      style={align === 'right' ? { textAlign: 'right' } : undefined}
+      onClick={() => onSort(col)}
+      title={`Sort by ${children}`}
+    >
+      {children}
+      <span class="sort-indicator">
+        {active ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
+      </span>
+    </th>
+  );
+}
+
 export function Browser({ client, bucket, provider, credentials, onCapabilityChange, capabilities, onUploadTargetChange, onInitialListFailed }) {
   const [prefix, setPrefix] = useState('');
   const [items, setItems] = useState([]);
@@ -47,9 +64,20 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const [listError, setListError] = useState(null);
   const [downloadError, setDownloadError] = useState(null);
   const [downloadingKey, setDownloadingKey] = useState(null);
+  const [sortCol, setSortCol] = useState('name');
+  const [sortDir, setSortDir] = useState('asc');
   const abortRef = useRef(null);
 
   const maxKeys = loadMaxKeys() || defaultMaxKeys(provider);
+
+  function toggleSort(col) {
+    if (sortCol === col) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortCol(col);
+      setSortDir('asc');
+    }
+  }
 
   // Notify parent of current prefix so upload queue knows where to target
   useEffect(() => {
@@ -166,6 +194,31 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     );
   }
 
+  // Sort folders by name only (no size/date available)
+  const sortedFolders = [...commonPrefixes].sort((a, b) => {
+    const nameA = a.slice(prefix.length).replace(/\/$/, '');
+    const nameB = b.slice(prefix.length).replace(/\/$/, '');
+    const cmp = nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+    return sortDir === 'asc' ? cmp : -cmp;
+  });
+
+  // Sort files by the selected column
+  const sortedItems = items.filter(obj => !!obj.Key.slice(prefix.length)).sort((a, b) => {
+    let cmp = 0;
+    if (sortCol === 'name') {
+      cmp = a.Key.slice(prefix.length).localeCompare(b.Key.slice(prefix.length), undefined, { sensitivity: 'base' });
+    } else if (sortCol === 'size') {
+      cmp = (a.Size || 0) - (b.Size || 0);
+    } else if (sortCol === 'modified') {
+      const tA = a.LastModified ? new Date(a.LastModified).getTime() : 0;
+      const tB = b.LastModified ? new Date(b.LastModified).getTime() : 0;
+      cmp = tA - tB;
+    }
+    return sortDir === 'asc' ? cmp : -cmp;
+  });
+
+  const isEmpty = !listing && sortedItems.length === 0 && sortedFolders.length === 0 && !listError;
+
   return (
     <div>
       <Breadcrumb prefix={prefix} onNavigate={navigateTo} />
@@ -186,44 +239,59 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
         />
       )}
 
-      <div class="file-list">
-        {commonPrefixes.map(cp => (
-          <div key={cp} class="file-item">
-            <span class="file-icon">📁</span>
-            <span class="file-name file-dir" onClick={() => navigateTo(cp)}>
-              {cp.slice(prefix.length).replace(/\/$/, '')}
-            </span>
-          </div>
-        ))}
+      {isEmpty
+        ? <div class="empty-state">This prefix is empty.</div>
+        : (
+          <table class="file-table">
+            <thead>
+              <tr>
+                <SortTh col="name" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort}>Name</SortTh>
+                <SortTh col="size" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort}>Size</SortTh>
+                <SortTh col="modified" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort}>Modified</SortTh>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {sortedFolders.map(cp => (
+                <tr key={cp} class="file-row" onClick={() => navigateTo(cp)} style={{ cursor: 'pointer' }}>
+                  <td class="col-name">
+                    <span class="file-icon">📁</span>
+                    <span class="file-dir">{cp.slice(prefix.length).replace(/\/$/, '')}</span>
+                  </td>
+                  <td class="col-size">—</td>
+                  <td class="col-modified"></td>
+                  <td class="col-actions"></td>
+                </tr>
+              ))}
 
-        {items.map(obj => {
-          const display = obj.Key.slice(prefix.length);
-          if (!display) return null;
-          const isDownloading = downloadingKey === obj.Key;
-          return (
-            <div key={obj.Key} class="file-item">
-              <span class="file-icon">📄</span>
-              <span class="file-name" title={obj.Key}>{display}</span>
-              <span class="file-size">{formatBytes(obj.Size)}</span>
-              <span class="file-size" style={{ marginLeft: '.5rem' }}>{formatDate(obj.LastModified)}</span>
-              <div class="file-actions">
-                <button
-                  class="btn btn-ghost btn-sm"
-                  onClick={() => handleDownload(obj.Key)}
-                  disabled={!canDownload || isDownloading}
-                  title={!canDownload ? 'Download not permitted with current credentials' : 'Download'}
-                >
-                  {isDownloading ? <span class="spinner" /> : '↓'}
-                </button>
-              </div>
-            </div>
-          );
-        })}
-
-        {!listing && items.length === 0 && commonPrefixes.length === 0 && !listError && (
-          <div class="empty-state">This prefix is empty.</div>
-        )}
-      </div>
+              {sortedItems.map(obj => {
+                const display = obj.Key.slice(prefix.length);
+                const isDownloading = downloadingKey === obj.Key;
+                return (
+                  <tr key={obj.Key} class="file-row">
+                    <td class="col-name">
+                      <span class="file-icon">📄</span>
+                      <span class="file-name" title={obj.Key}>{display}</span>
+                    </td>
+                    <td class="col-size">{formatBytes(obj.Size)}</td>
+                    <td class="col-modified">{formatDate(obj.LastModified)}</td>
+                    <td class="col-actions">
+                      <button
+                        class="btn btn-ghost btn-sm"
+                        onClick={() => handleDownload(obj.Key)}
+                        disabled={!canDownload || isDownloading}
+                        title={!canDownload ? 'Download not permitted with current credentials' : 'Download'}
+                      >
+                        {isDownloading ? <span class="spinner" /> : '↓'}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )
+      }
 
       {listing && (
         <div class="empty-state"><span class="spinner" style={{ marginRight: '.5rem' }} />Loading…</div>
