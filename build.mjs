@@ -28,8 +28,9 @@ const result = await esbuild.build({
 const js = result.outputFiles[0].text;
 const css = readFileSync('src/styles/main.css', 'utf8');
 const html = readFileSync('src/index.html', 'utf8');
+// Use a function to avoid $ special replacement patterns in the JS/CSS content
 const out = html
-  .replace('<!-- BUNDLE_PLACEHOLDER -->', `<style>${css}</style><script>${js}</script>`);
+  .replace('<!-- BUNDLE_PLACEHOLDER -->', () => `<style>${css}</style><script>${js}</script>`);
 
 mkdirSync('dist', { recursive: true });
 writeFileSync('dist/index.html', out, 'utf8');
