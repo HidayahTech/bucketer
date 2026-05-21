@@ -43,6 +43,28 @@ but **test on your target browsers to confirm the timing is acceptable**.
 
 ---
 
+## Minor Spec Deviations (Non-blocking)
+
+### D1 — "Connection Failed" session state
+The spec (§4.14) defines a **Connection Failed** session state triggered by the initial listing probe.
+In the current implementation, `createS3Client()` rarely throws (AWS SDK doesn't validate credentials
+at construction time), so the app immediately transitions to `Connected` and shows the listing error
+inline in the Browser component.
+
+**Effect:** The listing error is shown with full diagnostic detail (CORS masking guidance, raw error).
+The user can retry via Refresh Permissions. The spec's stated goal ("Error shown with diagnostic detail")
+is achieved, though the session label shows as Connected rather than Connection Failed.
+
+**To fully align:** Add an `onInitialListFailed` callback from Browser → App to transition to 'failed'.
+Left as a known minor deviation for v0.1.
+
+### D2 — Sidebar form re-connects via splash state  
+When the user submits new credentials from the sidebar while connected, the app briefly transitions
+through the splash/connecting state (because `handleConnect` sets `session: 'connecting'`). This causes
+a flash of the login view before reconnecting. Minor UX issue, non-functional.
+
+---
+
 ## Decisions Made During Implementation
 
 | Decision | Rationale |

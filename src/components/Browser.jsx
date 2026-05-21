@@ -37,7 +37,7 @@ function formatDate(dateStr) {
   try { return new Date(dateStr).toLocaleDateString(); } catch { return ''; }
 }
 
-export function Browser({ client, bucket, provider, credentials, onCapabilityChange, capabilities, onUploadTargetChange }) {
+export function Browser({ client, bucket, provider, credentials, onCapabilityChange, capabilities, onUploadTargetChange, onInitialListFailed }) {
   const [prefix, setPrefix] = useState('');
   const [items, setItems] = useState([]);
   const [commonPrefixes, setCommonPrefixes] = useState([]);
@@ -69,6 +69,8 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     fetchPage(newPrefix, null, true);
   }
 
+  const isInitialProbeRef = useRef(true);
+
   async function fetchPage(targetPrefix, token, replace = false) {
     if (abortRef.current) abortRef.current.abort();
     const controller = new AbortController();
@@ -76,6 +78,8 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
 
     setListing(true);
     setListError(null);
+
+    const isInitial = isInitialProbeRef.current;
 
     try {
       const cmd = new ListObjectsV2Command({
@@ -86,6 +90,8 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
         ContinuationToken: token || undefined,
       });
       const resp = await client.send(cmd, { abortSignal: controller.signal });
+
+      isInitialProbeRef.current = false;
 
       const newItems = resp.Contents || [];
       const newPrefixes = (resp.CommonPrefixes || []).map(cp => cp.Prefix);
@@ -104,6 +110,8 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
       if (err.name === 'AbortError') return;
       setListError(err);
       if (isPermissionError(err)) onCapabilityChange('list', 'denied');
+      // Notify parent when the initial listing probe fails (§4.14 Connection Failed state)
+      if (isInitial && onInitialListFailed) onInitialListFailed(err);
     } finally {
       setListing(false);
     }

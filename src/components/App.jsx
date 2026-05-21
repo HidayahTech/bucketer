@@ -167,6 +167,7 @@ export function App() {
               credentials={credentials}
               onCapabilityChange={handleCapabilityChange}
               capabilities={capabilities}
+              onInitialListFailed={(err) => { setSession('failed'); setConnectionError(err); }}
               onUploadTargetChange={setCurrentPrefix}
             />
           </main>
