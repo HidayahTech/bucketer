@@ -64,7 +64,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const [prefix, setPrefix] = useState(() => {
     if (_sessionFirstMount) {
       _sessionFirstMount = false;
-      return new URLSearchParams(window.location.search).get('prefix') || '';
+      return new URLSearchParams(window.location.hash.slice(1)).get('prefix') || '';
     }
     return '';
   });
@@ -181,7 +181,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     function onPopState(e) {
       const newPrefix = e.state?.prefix !== undefined
         ? e.state.prefix
-        : (new URLSearchParams(window.location.search).get('prefix') || '');
+        : (new URLSearchParams(window.location.hash.slice(1)).get('prefix') || '');
       navigateRef.current(newPrefix, { historyMode: 'none' });
     }
     window.addEventListener('popstate', onPopState);
