@@ -10,6 +10,7 @@ const LS_KEYS = {
   maxKeys: 's3b_max_keys',
   partConcurrency: 's3b_part_concurrency',
   partSizeMB:      's3b_part_size_mb',
+  fileConcurrency: 's3b_file_concurrency',
   capabilities: 's3b_capabilities',
 };
 const SS_KEY_SECRET = 's3b_secret_key';
@@ -74,6 +75,15 @@ export function loadPartSizeMB() {
 
 export function savePartSizeMB(n) {
   safeSet(localStorage, LS_KEYS.partSizeMB, String(n));
+}
+
+export function loadFileConcurrency() {
+  const v = safeGet(localStorage, LS_KEYS.fileConcurrency);
+  return v ? parseInt(v, 10) : null; // null → caller uses its own default
+}
+
+export function saveFileConcurrency(n) {
+  safeSet(localStorage, LS_KEYS.fileConcurrency, String(n));
 }
 
 // Capability state (§4.12) — stored as JSON object {list,download,upload} where

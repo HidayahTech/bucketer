@@ -1,10 +1,11 @@
 // Application settings (page size, upload concurrency, part size) (§4.7)
 import { useState } from 'preact/hooks';
-import { loadMaxKeys, saveMaxKeys, loadPartConcurrency, savePartConcurrency, loadPartSizeMB, savePartSizeMB } from '../lib/storage.js';
+import { loadMaxKeys, saveMaxKeys, loadPartConcurrency, savePartConcurrency, loadPartSizeMB, savePartSizeMB, loadFileConcurrency, saveFileConcurrency } from '../lib/storage.js';
 import { defaultMaxKeys } from '../lib/provider.js';
 
 const DEFAULT_PART_CONCURRENCY = 4;
 const DEFAULT_PART_SIZE_MB     = 5;
+const DEFAULT_FILE_CONCURRENCY = 3;
 
 export function SettingsPanel({ provider }) {
   const providerDefault = defaultMaxKeys(provider);
@@ -18,10 +19,14 @@ export function SettingsPanel({ provider }) {
   const [partSizeValue, setPartSizeValue] = useState(() => {
     const v = loadPartSizeMB(); return String(v ?? DEFAULT_PART_SIZE_MB);
   });
+  const [fileConcurrencyValue, setFileConcurrencyValue] = useState(() => {
+    const v = loadFileConcurrency(); return String(v ?? DEFAULT_FILE_CONCURRENCY);
+  });
 
   // Tracks what's actually persisted — updated on every successful save
   const [activeConcurrency, setActiveConcurrency] = useState(() => loadPartConcurrency() ?? DEFAULT_PART_CONCURRENCY);
   const [activePartSize, setActivePartSize] = useState(() => loadPartSizeMB() ?? DEFAULT_PART_SIZE_MB);
+  const [activeFileConcurrency, setActiveFileConcurrency] = useState(() => loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY);
 
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
@@ -34,17 +39,21 @@ export function SettingsPanel({ provider }) {
     const n = maxKeysValue ? parseInt(maxKeysValue, 10) : providerDefault;
     const c = parseInt(concurrencyValue, 10);
     const p = parseInt(partSizeValue, 10);
+    const f = parseInt(fileConcurrencyValue, 10);
 
     if (isNaN(n) || n <= 0 || n > 100000) { setError('Page size must be 1–100,000.'); return; }
-    if (isNaN(c) || c < 1 || c > 16)      { setError('Concurrency must be 1–16.'); return; }
+    if (isNaN(c) || c < 1 || c > 16)      { setError('Upload part concurrency must be 1–16.'); return; }
     if (isNaN(p) || p < 5 || p > 512)     { setError('Part size must be 5–512 MB.'); return; }
+    if (isNaN(f) || f < 1 || f > 8)       { setError('File concurrency must be 1–8.'); return; }
 
     saveMaxKeys(n);
     savePartConcurrency(c);
     savePartSizeMB(p);
+    saveFileConcurrency(f);
 
     setActiveConcurrency(c);
     setActivePartSize(p);
+    setActiveFileConcurrency(f);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
@@ -54,11 +63,14 @@ export function SettingsPanel({ provider }) {
     setMaxKeysValue('');
     setConcurrencyValue(String(DEFAULT_PART_CONCURRENCY));
     setPartSizeValue(String(DEFAULT_PART_SIZE_MB));
+    setFileConcurrencyValue(String(DEFAULT_FILE_CONCURRENCY));
     saveMaxKeys(providerDefault);
     savePartConcurrency(DEFAULT_PART_CONCURRENCY);
     savePartSizeMB(DEFAULT_PART_SIZE_MB);
+    saveFileConcurrency(DEFAULT_FILE_CONCURRENCY);
     setActiveConcurrency(DEFAULT_PART_CONCURRENCY);
     setActivePartSize(DEFAULT_PART_SIZE_MB);
+    setActiveFileConcurrency(DEFAULT_FILE_CONCURRENCY);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   }
@@ -112,6 +124,20 @@ export function SettingsPanel({ provider }) {
           <span class="hint">Simultaneous part uploads per file (1–16). Default: {DEFAULT_PART_CONCURRENCY}.</span>
           <span class="hint" style={{ color: 'var(--accent)' }}>
             Active: <strong>{activeConcurrency}</strong>
+          </span>
+        </div>
+        <div class="form-group">
+          <label>File concurrency</label>
+          <input
+            type="number"
+            value={fileConcurrencyValue}
+            onInput={e => setFileConcurrencyValue(e.target.value)}
+            min="1"
+            max="8"
+          />
+          <span class="hint">Simultaneous file uploads (1–8). Default: {DEFAULT_FILE_CONCURRENCY}. Higher values improve throughput for many small files; lower values reduce load on constrained backends.</span>
+          <span class="hint" style={{ color: 'var(--accent)' }}>
+            Active: <strong>{activeFileConcurrency}</strong>
           </span>
         </div>
         {error && <span style={{ fontSize: '.8rem', color: 'var(--text-danger)' }}>{error}</span>}

@@ -10,13 +10,13 @@ import {
   saveUploadLogEntry,
 } from '../lib/indexeddb.js';
 import { UploadQueue as Queue } from '../lib/upload-queue.js';
-import { loadPartConcurrency, loadPartSizeMB } from '../lib/storage.js';
+import { loadPartConcurrency, loadPartSizeMB, loadFileConcurrency } from '../lib/storage.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
 
-const MULTIPART_THRESHOLD = 5 * 1024 * 1024;   // 5 MiB — internal threshold, above the 5 MB spec minimum
-const LARGE_FILE_WARN    = 50 * 1024 * 1024 * 1024; // 50 GB — recommend native tools (§4.6)
-const QUEUE_CONCURRENCY  = 2;
-const PART_CONCURRENCY   = 4; // concurrent part uploads per file (peak memory: 4 × partSize)
+const MULTIPART_THRESHOLD       = 5 * 1024 * 1024;   // 5 MiB — internal threshold, above the 5 MB spec minimum
+const LARGE_FILE_WARN           = 50 * 1024 * 1024 * 1024; // 50 GB — recommend native tools (§4.6)
+const DEFAULT_FILE_CONCURRENCY  = 3;
+const PART_CONCURRENCY          = 4; // concurrent part uploads per file (peak memory: 4 × partSize)
 
 function calcPartSize(fileSize, preferredBytes) {
   // S3 spec minimum is 5 MB (5,000,000 bytes, decimal) for all parts except the last.
@@ -61,7 +61,7 @@ function newId() { return ++_idCounter; }
 export function UploadQueue({ client, bucket, provider, currentPrefix, credentials, onCapabilityChange, capabilities, onUploadsComplete, onLogEntry }) {
   const [items, setItems] = useState([]);
   const [dragOver, setDragOver] = useState(false);
-  const queueRef = useRef(new Queue(QUEUE_CONCURRENCY));
+  const queueRef = useRef(new Queue(loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY));
   const activeUploadsRef = useRef({}); // id → { abort, uploadInstance }
   const fileInputRef = useRef(null);
   const folderInputRef = useRef(null);
@@ -118,6 +118,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       return; // User must explicitly choose Resume or Restart
     }
 
+    queueRef.current.concurrency = loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY;
     queueRef.current.enqueue(() => runUpload(item.id, item.file, item.destinationKey));
   }
 
@@ -397,6 +398,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     }
 
     updateItem(id, { status: 'queued', resumeRecord: null, error: null, progress: 0 });
+    queueRef.current.concurrency = loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY;
     queueRef.current.enqueue(() => runUpload(id, item.file, item.destinationKey));
   }
 
