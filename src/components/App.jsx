@@ -124,14 +124,17 @@ export function App() {
         )}
         <StatusBadge session={session} />
         {session === 'connected' && buildShareUrl(credentials) && (
-          <button
-            class="btn btn-ghost btn-sm"
-            style={{ color: '#fff', borderColor: 'rgba(255,255,255,.4)' }}
-            onClick={handleCopyLink}
-            title="Copy a shareable link with endpoint and bucket pre-filled (no credentials)"
-          >
-            {linkCopied ? '✓ Copied' : 'Copy link'}
-          </button>
+          <>
+            <button
+              class="btn btn-ghost btn-sm"
+              style={{ color: '#fff', borderColor: 'rgba(255,255,255,.4)' }}
+              onClick={handleCopyLink}
+              title="Copy a shareable link with endpoint and bucket pre-filled (no credentials)"
+            >
+              Copy link
+            </button>
+            {linkCopied && <span style={{ fontSize: '.8rem', color: '#86efac' }}>✓ Copied</span>}
+          </>
         )}
         {session === 'connected' && (
           <button class="btn btn-ghost btn-sm" style={{ color: '#fff', borderColor: 'rgba(255,255,255,.4)' }} onClick={handleDisconnect}>
