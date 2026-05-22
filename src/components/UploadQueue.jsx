@@ -494,55 +494,50 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
-        onClick={() => canUpload && fileInputRef.current?.click()}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => e.key === 'Enter' && canUpload && fileInputRef.current?.click()}
-        aria-disabled={!canUpload}
-        style={{ cursor: canUpload ? 'pointer' : 'not-allowed', opacity: canUpload ? 1 : .5 }}
+        style={{ opacity: canUpload ? 1 : .5 }}
       >
-        Drop files or folders here, or:
-        <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'center', marginTop: '.5rem' }}>
-          <button
-            type="button"
-            class="btn btn-ghost btn-sm"
-            style={{ pointerEvents: 'auto' }}
-            onClick={(e) => { e.stopPropagation(); canUpload && fileInputRef.current?.click(); }}
-            disabled={!canUpload}
-          >Choose files</button>
-          <button
-            type="button"
-            class="btn btn-ghost btn-sm"
-            style={{ pointerEvents: 'auto' }}
-            onClick={(e) => { e.stopPropagation(); canUpload && folderInputRef.current?.click(); }}
-            disabled={!canUpload}
-          >Choose folder</button>
-        </div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          style={{ display: 'none' }}
-          onChange={(e) => {
-            addFiles(Array.from(e.target.files).map(f => ({ file: f, relativePath: f.name })));
-            e.target.value = '';
-          }}
-        />
-        <input
-          ref={folderInputRef}
-          type="file"
-          webkitdirectory=""
-          multiple
-          style={{ display: 'none' }}
-          onChange={(e) => {
-            addFiles(Array.from(e.target.files).map(f => ({
-              file: f,
-              relativePath: f.webkitRelativePath || f.name,
-            })));
-            e.target.value = '';
-          }}
-        />
+        Drop files or folders here
       </div>
+
+      <div style={{ display: 'flex', gap: '.5rem', marginTop: '.5rem' }}>
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={!canUpload}
+        >Choose files</button>
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm"
+          onClick={() => folderInputRef.current?.click()}
+          disabled={!canUpload}
+        >Choose folder</button>
+      </div>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          addFiles(Array.from(e.target.files).map(f => ({ file: f, relativePath: f.name })));
+          e.target.value = '';
+        }}
+      />
+      <input
+        ref={folderInputRef}
+        type="file"
+        webkitdirectory=""
+        multiple
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          addFiles(Array.from(e.target.files).map(f => ({
+            file: f,
+            relativePath: f.webkitRelativePath || f.name,
+          })));
+          e.target.value = '';
+        }}
+      />
 
       {items.length > 0 && (
         <div class="upload-queue" style={{ marginTop: '.75rem' }}>
