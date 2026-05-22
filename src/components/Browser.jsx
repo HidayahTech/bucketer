@@ -14,7 +14,8 @@ import { HiddenVersions } from './HiddenVersions.jsx';
 // always start at root — only the very first mount restores the URL-specified path.
 let _sessionFirstMount = true;
 
-const PRESIGN_EXPIRES = 3600; // 1 hour
+const PRESIGN_EXPIRES = 3600;        // 1 hour
+const TEXT_PREVIEW_LIMIT = 100 * 1024; // 100 KB cap for text previews
 
 function Breadcrumb({ prefix, onNavigate }) {
   if (!prefix) return (
@@ -86,6 +87,9 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const [previewError, setPreviewError] = useState(null);
   const [resolvedKind, setResolvedKind] = useState(null);
   const [notPreviewable, setNotPreviewable] = useState(false);
+  const [detectedContentType, setDetectedContentType] = useState(null);
+  const [previewText, setPreviewText] = useState(null);
+  const [previewTruncated, setPreviewTruncated] = useState(false);
   const abortRef = useRef(null);
   // Always-current reference to navigateTo for the popstate handler (which has [] deps)
   const navigateRef = useRef(null);
@@ -233,9 +237,12 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   async function handlePreview(obj) {
     setPreviewItem(obj);
     setPreviewUrl(null);
+    setPreviewText(null);
+    setPreviewTruncated(false);
     setPreviewError(null);
     setResolvedKind(null);
     setNotPreviewable(false);
+    setDetectedContentType(null);
     try {
       let kind, contentType;
       try {
@@ -253,20 +260,37 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
       }
       if (!kind) {
         setNotPreviewable(true);
+        setDetectedContentType(contentType || null);
         return;
       }
       setResolvedKind(kind);
-      const url = await getSignedUrl(
-        client,
-        new GetObjectCommand({
-          Bucket: bucket,
-          Key: obj.Key,
-          ResponseContentDisposition: 'inline',
-          ...(contentType ? { ResponseContentType: contentType } : {}),
-        }),
-        { expiresIn: PRESIGN_EXPIRES },
-      );
-      setPreviewUrl(url);
+
+      if (kind === 'text') {
+        // Force text/plain regardless of stored ContentType — prevents HTML/JS execution
+        const url = await getSignedUrl(
+          client,
+          new GetObjectCommand({
+            Bucket: bucket, Key: obj.Key,
+            ResponseContentDisposition: 'inline',
+            ResponseContentType: 'text/plain; charset=utf-8',
+          }),
+          { expiresIn: PRESIGN_EXPIRES },
+        );
+        const resp = await fetch(url, { headers: { Range: `bytes=0-${TEXT_PREVIEW_LIMIT - 1}` } });
+        setPreviewText(await resp.text());
+        setPreviewTruncated(resp.status === 206);
+      } else {
+        const url = await getSignedUrl(
+          client,
+          new GetObjectCommand({
+            Bucket: bucket, Key: obj.Key,
+            ResponseContentDisposition: 'inline',
+            ...(contentType ? { ResponseContentType: contentType } : {}),
+          }),
+          { expiresIn: PRESIGN_EXPIRES },
+        );
+        setPreviewUrl(url);
+      }
     } catch (err) {
       setPreviewError(err);
     }
@@ -275,9 +299,13 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   function closePreview() {
     setPreviewItem(null);
     setPreviewUrl(null);
+    setPreviewText(null);
+    setPreviewTruncated(false);
     setPreviewError(null);
     setResolvedKind(null);
     setNotPreviewable(false);
+    setDetectedContentType(null);
+    setDetectedContentType(null);
   }
 
   useEffect(() => {
@@ -414,12 +442,15 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                       <div class="preview-tap-zone preview-tap-next" onClick={() => navigatePreviewRef.current(1)} style={!nextPreviewItem ? { pointerEvents: 'none' } : undefined} aria-label="Next" />
                     </>
                   )}
-                  {!previewUrl && !previewError && !notPreviewable && (
+                  {!previewUrl && !previewText && !previewError && !notPreviewable && (
                     <div class="empty-state"><span class="spinner" style={{ marginRight: '.5rem' }} />Loading…</div>
                   )}
                   {notPreviewable && (
                     <div class="preview-unavailable">
                       <p>This file can't be previewed in the browser.</p>
+                      {detectedContentType && (
+                        <p class="preview-unavailable-type">Content-Type: <code>{detectedContentType}</code></p>
+                      )}
                       <button
                         class="btn btn-ghost"
                         onClick={() => handleDownload(previewItem.Key)}
@@ -440,6 +471,17 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                   )}
                   {previewUrl && kind === 'video' && (
                     <video controls src={previewUrl} class="preview-media" />
+                  )}
+                  {previewUrl && kind === 'pdf' && (
+                    <iframe src={previewUrl} class="preview-pdf" title={leafName(previewItem.Key)} />
+                  )}
+                  {previewText !== null && kind === 'text' && (
+                    <div class="preview-text-wrap">
+                      <pre class="preview-text">{previewText}</pre>
+                      {previewTruncated && (
+                        <div class="preview-truncated">Preview limited to 100 KB — download for the full file.</div>
+                      )}
+                    </div>
                   )}
                 </div>
                 {previewableItems.length > 1 && previewIdx !== -1 && kind !== 'image' && (
