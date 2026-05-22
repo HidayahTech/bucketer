@@ -85,6 +85,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const [previewUrl, setPreviewUrl] = useState(null);
   const [previewError, setPreviewError] = useState(null);
   const [resolvedKind, setResolvedKind] = useState(null);
+  const [notPreviewable, setNotPreviewable] = useState(false);
   const abortRef = useRef(null);
   // Always-current reference to navigateTo for the popstate handler (which has [] deps)
   const navigateRef = useRef(null);
@@ -234,6 +235,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     setPreviewUrl(null);
     setPreviewError(null);
     setResolvedKind(null);
+    setNotPreviewable(false);
     try {
       let kind, contentType;
       try {
@@ -250,9 +252,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
         kind = mediaKind(obj.Key);
       }
       if (!kind) {
-        setPreviewError(new Error(
-          contentType ? `Cannot preview this file type (${contentType})` : 'Cannot preview this file type'
-        ));
+        setNotPreviewable(true);
         return;
       }
       setResolvedKind(kind);
@@ -277,6 +277,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     setPreviewUrl(null);
     setPreviewError(null);
     setResolvedKind(null);
+    setNotPreviewable(false);
   }
 
   useEffect(() => {
@@ -395,26 +396,38 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
             <div class="modal-dialog preview-dialog" onClick={e => e.stopPropagation()}>
               <div class="modal-title preview-title">
                 <span class="preview-filename" title={previewItem.Key}>{leafName(previewItem.Key)}</span>
-                {previewableItems.length > 1 && (
+                {previewableItems.length > 1 && previewIdx !== -1 && (
                   <span class="preview-counter">{previewIdx + 1} / {previewableItems.length}</span>
                 )}
                 <button class="preview-close" onClick={closePreview} aria-label="Close">✕</button>
               </div>
               <div class="preview-body">
                 {/* Buttons only for non-image media (audio, video) */}
-                {previewableItems.length > 1 && kind !== 'image' && (
+                {previewableItems.length > 1 && previewIdx !== -1 && kind !== 'image' && (
                   <button class="preview-nav" onClick={() => navigatePreviewRef.current(-1)} disabled={!prevPreviewItem} aria-label="Previous">‹</button>
                 )}
                 <div class="preview-content">
                   {/* Transparent tap zones for image navigation (left/right half) */}
-                  {previewableItems.length > 1 && kind === 'image' && previewUrl && (
+                  {previewableItems.length > 1 && previewIdx !== -1 && kind === 'image' && previewUrl && (
                     <>
                       <div class="preview-tap-zone preview-tap-prev" onClick={() => navigatePreviewRef.current(-1)} style={!prevPreviewItem ? { pointerEvents: 'none' } : undefined} aria-label="Previous" />
                       <div class="preview-tap-zone preview-tap-next" onClick={() => navigatePreviewRef.current(1)} style={!nextPreviewItem ? { pointerEvents: 'none' } : undefined} aria-label="Next" />
                     </>
                   )}
-                  {!previewUrl && !previewError && (
+                  {!previewUrl && !previewError && !notPreviewable && (
                     <div class="empty-state"><span class="spinner" style={{ marginRight: '.5rem' }} />Loading…</div>
+                  )}
+                  {notPreviewable && (
+                    <div class="preview-unavailable">
+                      <p>This file can't be previewed in the browser.</p>
+                      <button
+                        class="btn btn-ghost"
+                        onClick={() => handleDownload(previewItem.Key)}
+                        disabled={!canDownload || downloadingKey === previewItem.Key}
+                      >
+                        {downloadingKey === previewItem.Key ? <span class="spinner" /> : 'Download instead'}
+                      </button>
+                    </div>
                   )}
                   {previewError && (
                     <div class="modal-error">Preview failed: {previewError.message || String(previewError)}</div>
@@ -429,7 +442,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                     <video controls src={previewUrl} class="preview-media" />
                   )}
                 </div>
-                {previewableItems.length > 1 && kind !== 'image' && (
+                {previewableItems.length > 1 && previewIdx !== -1 && kind !== 'image' && (
                   <button class="preview-nav" onClick={() => navigatePreviewRef.current(1)} disabled={!nextPreviewItem} aria-label="Next">›</button>
                 )}
               </div>
@@ -495,24 +508,22 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                     <td class="col-name">
                       <span class="file-icon">📄</span>
                       <span
-                        class={`file-name${(mediaKind(obj.Key) || !leafName(obj.Key).includes('.')) ? ' file-name-previewable' : ''}`}
+                        class="file-name file-name-previewable"
                         title={obj.Key}
-                        onClick={(mediaKind(obj.Key) || !leafName(obj.Key).includes('.')) ? () => handlePreview(obj) : undefined}
+                        onClick={() => handlePreview(obj)}
                       >{display}</span>
                     </td>
                     <td class="col-size">{formatBytes(obj.Size)}</td>
                     <td class="col-modified">{formatDate(obj.LastModified)}</td>
                     <td class="col-actions">
-                      {(mediaKind(obj.Key) || !leafName(obj.Key).includes('.')) && (
-                        <button
-                          class="btn btn-ghost btn-sm"
-                          onClick={() => handlePreview(obj)}
-                          title="Preview"
-                          style={{ marginRight: '.25rem' }}
-                        >
-                          ⊙
-                        </button>
-                      )}
+                      <button
+                        class="btn btn-ghost btn-sm"
+                        onClick={() => handlePreview(obj)}
+                        title="Preview"
+                        style={{ marginRight: '.25rem' }}
+                      >
+                        ⊙
+                      </button>
                       <button
                         class="btn btn-ghost btn-sm"
                         onClick={() => handleDownload(obj.Key)}
