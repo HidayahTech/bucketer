@@ -525,9 +525,8 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         }}
       />
       <input
-        ref={folderInputRef}
+        ref={(el) => { folderInputRef.current = el; if (el) el.webkitdirectory = true; }}
         type="file"
-        webkitdirectory=""
         multiple
         style={{ display: 'none' }}
         onChange={(e) => {
