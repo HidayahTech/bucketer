@@ -1,14 +1,18 @@
 // Polls the server for a newer build and prompts the user to refresh
 import { useState, useEffect } from 'preact/hooks';
 
-// Poll every 60s for the first 10 minutes, then double each interval up to 30 minutes.
+// Poll every ~60s for the first 10 minutes, then double each interval up to ~30 minutes.
+// ±25% jitter is applied to every interval so multiple users don't poll in lockstep.
 const BASE_MS       = 60_000;      // 1 minute
 const MAX_MS        = 1_800_000;   // 30 minutes
 const FAST_CHECKS   = 10;          // how many checks at BASE_MS before backoff
+const JITTER        = 0.25;        // ±25%
 
 function nextDelay(attempt) {
-  if (attempt < FAST_CHECKS) return BASE_MS;
-  return Math.min(BASE_MS * 2 ** (attempt - FAST_CHECKS + 1), MAX_MS);
+  const base = attempt < FAST_CHECKS
+    ? BASE_MS
+    : Math.min(BASE_MS * 2 ** (attempt - FAST_CHECKS + 1), MAX_MS);
+  return Math.round(base + base * JITTER * (Math.random() * 2 - 1));
 }
 
 function getCurrentBuildId() {
