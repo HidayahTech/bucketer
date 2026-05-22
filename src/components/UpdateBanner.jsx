@@ -1,7 +1,15 @@
 // Polls the server for a newer build and prompts the user to refresh
 import { useState, useEffect } from 'preact/hooks';
 
-const INTERVAL_MS = 60_000;
+// Poll every 60s for the first 10 minutes, then double each interval up to 30 minutes.
+const BASE_MS       = 60_000;      // 1 minute
+const MAX_MS        = 1_800_000;   // 30 minutes
+const FAST_CHECKS   = 10;          // how many checks at BASE_MS before backoff
+
+function nextDelay(attempt) {
+  if (attempt < FAST_CHECKS) return BASE_MS;
+  return Math.min(BASE_MS * 2 ** (attempt - FAST_CHECKS + 1), MAX_MS);
+}
 
 function getCurrentBuildId() {
   const el = document.querySelector('meta[name="build-id"]');
@@ -28,19 +36,24 @@ export function UpdateBanner() {
     const currentId = getCurrentBuildId();
     if (!currentId) return;
 
-    const id = setInterval(async () => {
+    let attempt = 0;
+    let timerId;
+
+    async function check() {
       try {
         const fetchedId = await fetchBuildId();
         if (fetchedId && fetchedId !== currentId) {
           setHasUpdate(true);
-          clearInterval(id);
+          return;
         }
       } catch {
         // Network error — silently skip this check
       }
-    }, INTERVAL_MS);
+      timerId = setTimeout(check, nextDelay(++attempt));
+    }
 
-    return () => clearInterval(id);
+    timerId = setTimeout(check, nextDelay(attempt));
+    return () => clearTimeout(timerId);
   }, []);
 
   if (!hasUpdate || dismissed) return null;
