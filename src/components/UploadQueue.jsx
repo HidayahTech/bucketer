@@ -205,10 +205,12 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     const controller = new AbortController();
     activeUploadsRef.current[id] = { abort: () => controller.abort() };
 
-    // Simulate progress for single-part (indeterminate — just 0 → 100 on completion)
     onProgress(0, file.size);
+    // Uint8Array rather than File/Blob: the SDK browser handler calls .getReader()
+    // expecting a ReadableStream, which Blob does not have.
+    const body = new Uint8Array(await file.arrayBuffer());
     await client.send(
-      new PutObjectCommand({ Bucket: bucket, Key: destinationKey, Body: file, ContentType: file.type || 'application/octet-stream' }),
+      new PutObjectCommand({ Bucket: bucket, Key: destinationKey, Body: body, ContentType: file.type || 'application/octet-stream' }),
       { abortSignal: controller.signal }
     );
     onProgress(file.size, file.size);
