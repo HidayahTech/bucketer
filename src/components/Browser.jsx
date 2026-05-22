@@ -89,8 +89,6 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const navigateRef = useRef(null);
   // Always-current reference to preview navigator, updated after sortedItems is computed
   const navigatePreviewRef = useRef(null);
-  // Touch tracking for swipe-to-navigate in preview
-  const touchStartXRef = useRef(null);
   // Capture the prefix value at mount time for the initial history replaceState
   const initialPrefixRef = useRef(prefix);
 
@@ -378,21 +376,19 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                 )}
                 <button class="preview-close" onClick={closePreview} aria-label="Close">✕</button>
               </div>
-              <div
-                class="preview-body"
-                onTouchStart={e => { touchStartXRef.current = e.touches[0].clientX; }}
-                onTouchEnd={e => {
-                  if (touchStartXRef.current === null) return;
-                  const dx = e.changedTouches[0].clientX - touchStartXRef.current;
-                  touchStartXRef.current = null;
-                  if (Math.abs(dx) < 50) return;
-                  navigatePreviewRef.current(dx < 0 ? 1 : -1);
-                }}
-              >
-                {previewableItems.length > 1 && (
+              <div class="preview-body">
+                {/* Buttons only for non-image media (audio, video) */}
+                {previewableItems.length > 1 && kind !== 'image' && (
                   <button class="preview-nav" onClick={() => navigatePreviewRef.current(-1)} disabled={!prevPreviewItem} aria-label="Previous">‹</button>
                 )}
                 <div class="preview-content">
+                  {/* Transparent tap zones for image navigation (left/right half) */}
+                  {previewableItems.length > 1 && kind === 'image' && previewUrl && (
+                    <>
+                      <div class="preview-tap-zone preview-tap-prev" onClick={() => navigatePreviewRef.current(-1)} style={!prevPreviewItem ? { pointerEvents: 'none' } : undefined} aria-label="Previous" />
+                      <div class="preview-tap-zone preview-tap-next" onClick={() => navigatePreviewRef.current(1)} style={!nextPreviewItem ? { pointerEvents: 'none' } : undefined} aria-label="Next" />
+                    </>
+                  )}
                   {!previewUrl && !previewError && (
                     <div class="empty-state"><span class="spinner" style={{ marginRight: '.5rem' }} />Loading…</div>
                   )}
@@ -409,7 +405,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                     <video controls src={previewUrl} class="preview-media" />
                   )}
                 </div>
-                {previewableItems.length > 1 && (
+                {previewableItems.length > 1 && kind !== 'image' && (
                   <button class="preview-nav" onClick={() => navigatePreviewRef.current(1)} disabled={!nextPreviewItem} aria-label="Next">›</button>
                 )}
               </div>

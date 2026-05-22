@@ -403,6 +403,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
   min-height: 120px;
 }
 .preview-content {
+  position: relative;
   flex: 1;
   min-width: 0;
   display: flex;
@@ -410,6 +411,12 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
   justify-content: center;
   overflow: hidden;
 }
+.preview-tap-zone {
+  position: absolute; top: 0; bottom: 0; width: 50%;
+  cursor: pointer; z-index: 1;
+}
+.preview-tap-prev { left: 0; }
+.preview-tap-next { right: 0; }
 .preview-nav {
   flex-shrink: 0;
   align-self: center;
