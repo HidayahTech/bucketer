@@ -25,6 +25,35 @@ function calcPartSize(fileSize, preferredBytes) {
   return (preferredBytes && preferredBytes > floor) ? preferredBytes : floor;
 }
 
+// Recursively collect { file, relativePath } pairs from FileSystemEntry objects.
+// readEntries() returns at most 100 entries per call, so drain each directory reader
+// in a loop until it yields an empty batch.
+async function collectFileEntries(entries) {
+  const result = [];
+
+  async function traverse(entry, pathPrefix) {
+    if (entry.isFile) {
+      await new Promise(resolve => {
+        entry.file(
+          file => { result.push({ file, relativePath: pathPrefix + file.name }); resolve(); },
+          () => resolve(), // skip unreadable files
+        );
+      });
+    } else if (entry.isDirectory) {
+      const reader = entry.createReader();
+      const prefix = pathPrefix + entry.name + '/';
+      while (true) {
+        const batch = await new Promise((resolve, reject) => reader.readEntries(resolve, reject));
+        if (!batch.length) break;
+        for (const e of batch) await traverse(e, prefix);
+      }
+    }
+  }
+
+  for (const entry of entries) await traverse(entry, '');
+  return result;
+}
+
 // Status: queued | uploading | paused | resuming | done | error | aborted
 let _idCounter = 0;
 function newId() { return ++_idCounter; }
@@ -35,6 +64,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   const queueRef = useRef(new Queue(QUEUE_CONCURRENCY));
   const activeUploadsRef = useRef({}); // id → { abort, uploadInstance }
   const fileInputRef = useRef(null);
+  const folderInputRef = useRef(null);
   const notifAskedRef = useRef(false);
 
   const canUpload = capabilities.upload !== 'denied';
@@ -43,11 +73,14 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     setItems(prev => prev.map(it => it.id === id ? { ...it, ...patch } : it));
   }, []);
 
-  function addFiles(files) {
-    const newItems = Array.from(files).map(file => ({
+  // fileEntries: Array<{ file: File, relativePath: string }>
+  // relativePath preserves folder structure (e.g. "photos/2024/img.jpg").
+  // For plain file picks it equals file.name.
+  function addFiles(fileEntries) {
+    const newItems = fileEntries.map(({ file, relativePath }) => ({
       id: newId(),
       file,
-      name: file.name,
+      name: relativePath,
       size: file.size,
       status: 'queued',
       progress: 0,
@@ -55,7 +88,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       speed: 0,
       eta: null,
       error: null,
-      destinationKey: (currentPrefix || '') + file.name,
+      destinationKey: (currentPrefix || '') + relativePath,
       resumeRecord: null,
       largeFileWarningDismissed: false,
     }));
@@ -417,13 +450,30 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     return () => document.removeEventListener('visibilitychange', handler);
   }, [hasActive]);
 
-  // Drop zone
-  function handleDrop(e) {
+  // Drop zone — supports both files and folders via the FileSystem API.
+  // DataTransfer items must be read synchronously before any await.
+  async function handleDrop(e) {
     e.preventDefault();
     setDragOver(false);
     if (!canUpload) return;
-    const files = e.dataTransfer?.files;
-    if (files?.length) addFiles(files);
+
+    const fsEntries = [];
+    const items = e.dataTransfer?.items;
+    if (items) {
+      for (let i = 0; i < items.length; i++) {
+        const entry = items[i].kind === 'file' && items[i].webkitGetAsEntry?.();
+        if (entry) fsEntries.push(entry);
+      }
+    }
+
+    if (fsEntries.length) {
+      const fileEntries = await collectFileEntries(fsEntries);
+      if (fileEntries.length) addFiles(fileEntries);
+    } else {
+      // Fallback for browsers without FileSystem API
+      const files = e.dataTransfer?.files;
+      if (files?.length) addFiles(Array.from(files).map(f => ({ file: f, relativePath: f.name })));
+    }
   }
 
   return (
@@ -450,13 +500,46 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         aria-disabled={!canUpload}
         style={{ cursor: canUpload ? 'pointer' : 'not-allowed', opacity: canUpload ? 1 : .5 }}
       >
-        Drop files here or click to choose
+        Drop files or folders here, or:
+        <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'center', marginTop: '.5rem' }}>
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            style={{ pointerEvents: 'auto' }}
+            onClick={(e) => { e.stopPropagation(); canUpload && fileInputRef.current?.click(); }}
+            disabled={!canUpload}
+          >Choose files</button>
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            style={{ pointerEvents: 'auto' }}
+            onClick={(e) => { e.stopPropagation(); canUpload && folderInputRef.current?.click(); }}
+            disabled={!canUpload}
+          >Choose folder</button>
+        </div>
         <input
           ref={fileInputRef}
           type="file"
           multiple
           style={{ display: 'none' }}
-          onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }}
+          onChange={(e) => {
+            addFiles(Array.from(e.target.files).map(f => ({ file: f, relativePath: f.name })));
+            e.target.value = '';
+          }}
+        />
+        <input
+          ref={folderInputRef}
+          type="file"
+          webkitdirectory=""
+          multiple
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            addFiles(Array.from(e.target.files).map(f => ({
+              file: f,
+              relativePath: f.webkitRelativePath || f.name,
+            })));
+            e.target.value = '';
+          }}
         />
       </div>
 
