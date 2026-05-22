@@ -196,6 +196,8 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 .col-name { width: 99%; }
 .col-name .file-icon { margin-right: .45rem; }
 .col-name .file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40ch; display: inline-block; vertical-align: middle; }
+.col-name .file-name-previewable { color: var(--accent); cursor: pointer; }
+.col-name .file-name-previewable:hover { text-decoration: underline; }
 .col-name .file-dir  { color: var(--accent); font-weight: 500; }
 .col-size     { white-space: nowrap; color: var(--text-muted); font-size: .85rem; padding-left: 1.5rem; }
 .col-modified { white-space: nowrap; color: var(--text-muted); font-size: .85rem; padding-left: 1rem; }
@@ -395,12 +397,26 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 }
 .preview-close:hover { color: var(--text); background: var(--surface-raised); }
 .preview-body {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 120px;
   overflow: auto;
 }
+.preview-nav {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  background: rgba(0,0,0,.3); color: #fff; border: none;
+  border-radius: var(--radius); width: 2.25rem; padding: 1rem .4rem;
+  font-size: 1.6rem; line-height: 1; cursor: pointer; z-index: 1;
+  opacity: .65; transition: opacity var(--transition), background var(--transition);
+  display: flex; align-items: center; justify-content: center;
+}
+.preview-nav:hover:not(:disabled) { opacity: 1; background: rgba(0,0,0,.5); }
+.preview-nav:disabled { opacity: .2; cursor: default; }
+.preview-nav-prev { left: .5rem; }
+.preview-nav-next { right: .5rem; }
+.preview-counter { font-size: .75rem; font-weight: 400; color: var(--text-muted); white-space: nowrap; }
 .preview-media {
   max-width: 100%;
   max-height: 72vh;

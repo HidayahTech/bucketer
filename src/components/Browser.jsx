@@ -87,6 +87,8 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const abortRef = useRef(null);
   // Always-current reference to navigateTo for the popstate handler (which has [] deps)
   const navigateRef = useRef(null);
+  // Always-current reference to preview navigator, updated after sortedItems is computed
+  const navigatePreviewRef = useRef(null);
   // Capture the prefix value at mount time for the initial history replaceState
   const initialPrefixRef = useRef(prefix);
 
@@ -256,7 +258,11 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
 
   useEffect(() => {
     if (!previewItem) return;
-    function onKey(e) { if (e.key === 'Escape') closePreview(); }
+    function onKey(e) {
+      if (e.key === 'Escape')     closePreview();
+      if (e.key === 'ArrowLeft')  navigatePreviewRef.current?.(-1);
+      if (e.key === 'ArrowRight') navigatePreviewRef.current?.(1);
+    }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [previewItem]);
@@ -281,18 +287,6 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const canDownload = capabilities.download !== 'denied';
   const canDelete   = capabilities.delete !== 'denied';
   const canList     = capabilities.list !== 'denied';
-
-  if (!canList && listError) {
-    return (
-      <div>
-        <ErrorBlock
-          error={listError}
-          title="Cannot list bucket contents"
-          guidance="Check that your key has ListObjects permission on this bucket."
-        />
-      </div>
-    );
-  }
 
   // Sort folders by name only (no size/date available)
   const sortedFolders = [...commonPrefixes].sort((a, b) => {
@@ -322,6 +316,28 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const versioningCaveat = provider === 'b2'
     ? 'Backblaze B2 may retain older versions of this file. The current version will be hidden but not immediately purged from storage.'
     : 'If versioning is enabled on this bucket, this creates a delete marker — the object is hidden but recoverable. If versioning is off, deletion is permanent and cannot be undone.';
+
+  // Preview navigation — ordered to match the current display sort
+  const previewableItems = sortedItems.filter(obj => mediaKind(obj.Key));
+  const previewIdx = previewItem ? previewableItems.findIndex(o => o.Key === previewItem.Key) : -1;
+  const prevPreviewItem = previewIdx > 0 ? previewableItems[previewIdx - 1] : null;
+  const nextPreviewItem = previewIdx >= 0 && previewIdx < previewableItems.length - 1 ? previewableItems[previewIdx + 1] : null;
+  navigatePreviewRef.current = (delta) => {
+    const target = delta < 0 ? prevPreviewItem : nextPreviewItem;
+    if (target) handlePreview(target);
+  };
+
+  if (!canList && listError) {
+    return (
+      <div>
+        <ErrorBlock
+          error={listError}
+          title="Cannot list bucket contents"
+          guidance="Check that your key has ListObjects permission on this bucket."
+        />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -355,9 +371,15 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
             <div class="modal-dialog preview-dialog" onClick={e => e.stopPropagation()}>
               <div class="modal-title preview-title">
                 <span class="preview-filename" title={previewItem.Key}>{leafName(previewItem.Key)}</span>
+                {previewableItems.length > 1 && (
+                  <span class="preview-counter">{previewIdx + 1} / {previewableItems.length}</span>
+                )}
                 <button class="preview-close" onClick={closePreview} aria-label="Close">✕</button>
               </div>
               <div class="preview-body">
+                {previewableItems.length > 1 && (
+                  <button class="preview-nav preview-nav-prev" onClick={() => navigatePreviewRef.current(-1)} disabled={!prevPreviewItem} aria-label="Previous">‹</button>
+                )}
                 {!previewUrl && !previewError && (
                   <div class="empty-state"><span class="spinner" style={{ marginRight: '.5rem' }} />Loading…</div>
                 )}
@@ -372,6 +394,9 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                 )}
                 {previewUrl && kind === 'video' && (
                   <video controls src={previewUrl} class="preview-media" />
+                )}
+                {previewableItems.length > 1 && (
+                  <button class="preview-nav preview-nav-next" onClick={() => navigatePreviewRef.current(1)} disabled={!nextPreviewItem} aria-label="Next">›</button>
                 )}
               </div>
               <div class="modal-actions">
@@ -435,7 +460,11 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                   <tr key={obj.Key} class="file-row">
                     <td class="col-name">
                       <span class="file-icon">📄</span>
-                      <span class="file-name" title={obj.Key}>{display}</span>
+                      <span
+                        class={`file-name${mediaKind(obj.Key) ? ' file-name-previewable' : ''}`}
+                        title={obj.Key}
+                        onClick={mediaKind(obj.Key) ? () => handlePreview(obj) : undefined}
+                      >{display}</span>
                     </td>
                     <td class="col-size">{formatBytes(obj.Size)}</td>
                     <td class="col-modified">{formatDate(obj.LastModified)}</td>
