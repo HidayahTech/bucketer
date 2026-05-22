@@ -171,6 +171,38 @@ export function App() {
                 />
               </div>
             )}
+
+            <hr class="splash-divider" />
+
+            <div class="splash-info">
+              <div class="splash-info-section">
+                <div class="splash-info-heading">Your data stays private</div>
+                <p>
+                  Bucketer runs entirely in your browser. Your files, credentials, and requests
+                  travel directly between your browser and your storage bucket — this server
+                  is never involved and never sees any of it.
+                </p>
+              </div>
+
+              <div class="splash-info-section">
+                <div class="splash-info-heading">What is an S3-compatible bucket?</div>
+                <p>
+                  S3 is a widely-adopted standard for cloud storage, originally created by Amazon
+                  Web Services. Many providers use the same interface: Backblaze B2, Cloudflare R2,
+                  Wasabi, MinIO, and others.
+                </p>
+                <p>To connect you need three things from your storage provider:</p>
+                <ul class="splash-info-list">
+                  <li><strong>Endpoint</strong> — the provider's storage URL (e.g. <code>https://s3.us-east-1.amazonaws.com</code>)</li>
+                  <li><strong>Bucket name</strong> — the name of your storage container</li>
+                  <li><strong>Key ID and Secret Key</strong> — access credentials, similar to a username and password</li>
+                </ul>
+                <p>
+                  There is no account to create here. Access is controlled entirely by the
+                  credentials your storage provider gives you.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       ) : (
@@ -185,6 +217,31 @@ export function App() {
             <CapabilityPanel capabilities={capabilities} onRefresh={handleRefreshPermissions} />
             <hr style={{ border: 'none', borderTop: '1px solid var(--border)' }} />
             <SettingsPanel provider={credentials.provider} />
+            <hr style={{ border: 'none', borderTop: '1px solid var(--border)' }} />
+            <details class="s3-primer">
+              <summary class="s3-primer-summary">About S3 buckets</summary>
+              <div class="s3-primer-body">
+                <p>
+                  S3 buckets don't have real folders. What looks like a folder is just a
+                  shared prefix in the file name — a file stored as{' '}
+                  <code>photos/2024/trip.jpg</code> appears inside{' '}
+                  <code>photos / 2024</code>, but its full name is the entire path.
+                </p>
+                <p>A few things that follow from this:</p>
+                <ul>
+                  <li>Empty folders don't exist — they disappear when the last file inside them is deleted.</li>
+                  <li>Files can only be in one place — there are no shortcuts or aliases.</li>
+                  <li>
+                    Deleting a file is permanent unless your bucket has versioning enabled,
+                    in which case older versions can be recovered.
+                  </li>
+                </ul>
+                <p>
+                  Access is controlled by your Key ID and Secret Key, not by user accounts.
+                  Anyone with those credentials has whatever permissions were granted to that key.
+                </p>
+              </div>
+            </details>
           </aside>
 
           <main class="main-content">

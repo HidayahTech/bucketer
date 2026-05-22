@@ -459,8 +459,32 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 
 /* ── Disconnected splash ──────────────────────────────────────────────────── */
 .splash {
-  max-width: 480px; margin: 4rem auto; padding: 2rem;
+  max-width: 560px; margin: 3rem auto; padding: 2rem;
   background: var(--surface); border-radius: var(--radius);
   box-shadow: var(--shadow); border: 1px solid var(--border);
 }
 .splash h2 { margin-bottom: 1rem; }
+.splash-divider { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+.splash-info { display: flex; flex-direction: column; gap: 1.25rem; }
+.splash-info-section { display: flex; flex-direction: column; gap: .5rem; font-size: .85rem; color: var(--text-muted); }
+.splash-info-heading { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); }
+.splash-info-section p { line-height: 1.55; }
+.splash-info-list { padding-left: 1.25rem; display: flex; flex-direction: column; gap: .3rem; }
+.splash-info-list li { line-height: 1.55; }
+.splash-info-section code { font-family: var(--mono); font-size: .8rem; background: var(--surface-raised); padding: .1rem .3rem; border-radius: 3px; }
+
+/* ── S3 primer accordion (sidebar) ───────────────────────────────────────── */
+.s3-primer { font-size: .82rem; color: var(--text-muted); }
+.s3-primer-summary {
+  cursor: pointer; font-size: .75rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em;
+  color: var(--text-muted); list-style: none;
+  display: flex; align-items: center; gap: .4rem;
+  user-select: none;
+}
+.s3-primer-summary::-webkit-details-marker { display: none; }
+.s3-primer-summary::before { content: '▶'; font-size: .6rem; transition: transform var(--transition); }
+.s3-primer[open] .s3-primer-summary::before { transform: rotate(90deg); }
+.s3-primer-body { display: flex; flex-direction: column; gap: .6rem; margin-top: .75rem; line-height: 1.55; }
+.s3-primer-body ul { padding-left: 1.25rem; display: flex; flex-direction: column; gap: .3rem; }
+.s3-primer-body code { font-family: var(--mono); font-size: .78rem; background: var(--surface-raised); padding: .1rem .3rem; border-radius: 3px; }
