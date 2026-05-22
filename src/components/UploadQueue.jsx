@@ -461,7 +461,8 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     const items = e.dataTransfer?.items;
     if (items) {
       for (let i = 0; i < items.length; i++) {
-        const entry = items[i].kind === 'file' && items[i].webkitGetAsEntry?.();
+        const item = items[i];
+        const entry = item.kind === 'file' && (item.getAsEntry?.() ?? item.webkitGetAsEntry?.());
         if (entry) fsEntries.push(entry);
       }
     }
