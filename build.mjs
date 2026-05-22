@@ -4,6 +4,7 @@
 
 import * as esbuild from 'esbuild';
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { execFileSync } from 'child_process';
 
 const dev = process.argv.includes('--dev');
 
@@ -17,6 +18,7 @@ const result = await esbuild.build({
   // Use Preact's automatic JSX runtime — no React import needed in each file
   jsx: 'automatic',
   jsxImportSource: 'preact',
+  loader: { '.png': 'dataurl' },
   define: {
     'process.env.NODE_ENV': dev ? '"development"' : '"production"',
   },
@@ -35,3 +37,16 @@ const out = html
 mkdirSync('dist', { recursive: true });
 writeFileSync('dist/index.html', out, 'utf8');
 console.log(`Built dist/index.html (${(out.length / 1024).toFixed(1)} KB)`);
+
+// Generate favicon.ico from logo (requires ImageMagick 7+)
+try {
+  execFileSync('magick', [
+    'src/assets/bucketer-logo.png',
+    '-resize', '256x256',
+    '-define', 'icon:auto-resize=256,128,64,48,32,16',
+    'dist/favicon.ico',
+  ]);
+  console.log('Generated dist/favicon.ico');
+} catch {
+  console.warn('favicon.ico generation skipped (ImageMagick not available)');
+}

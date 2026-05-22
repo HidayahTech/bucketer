@@ -6,20 +6,20 @@
   --surface: #ffffff;
   --surface-raised: #f1f3f5;
   --border: #dee2e6;
-  --border-focus: #4dabf7;
+  --border-focus: #35c4e0;
   --text: #212529;
   --text-muted: #6c757d;
   --text-danger: #c92a2a;
   --text-success: #2f9e44;
   --text-warn: #e67700;
-  --accent: #1971c2;
-  --accent-hover: #1864ab;
+  --accent: #1aa3c0;
+  --accent-hover: #158fa8;
   --danger: #e03131;
   --danger-hover: #c92a2a;
   --success-bg: #ebfbee;
   --warn-bg: #fff9db;
   --danger-bg: #fff5f5;
-  --info-bg: #e7f5ff;
+  --info-bg: #e0f7fb;
   --font: system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "Cascadia Code", "Fira Code", "Consolas", monospace;
   --radius: 6px;
@@ -34,15 +34,15 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 #app { display: flex; flex-direction: column; min-height: 100vh; }
 
 .app-header {
-  background: var(--accent);
+  background: #1b2438;
   color: #fff;
   padding: .75rem 1.25rem;
   display: flex;
   align-items: center;
   gap: 1rem;
-  box-shadow: 0 2px 4px rgba(0,0,0,.15);
+  box-shadow: 0 2px 4px rgba(0,0,0,.25);
 }
-.app-header h1 { font-size: 1.1rem; font-weight: 600; }
+.app-logo { height: 2rem; width: auto; display: block; }
 .app-header .spacer { flex: 1; }
 .app-header .header-status { font-size: .8rem; opacity: .85; }
 

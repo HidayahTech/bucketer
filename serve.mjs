@@ -3,7 +3,7 @@
 // Run with: npm run serve
 
 import * as esbuild from 'esbuild';
-import { readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { createServer } from 'http';
 import { extname } from 'path';
 
@@ -20,6 +20,7 @@ const result = await esbuild.build({
   sourcemap: 'inline',
   jsx: 'automatic',
   jsxImportSource: 'preact',
+  loader: { '.png': 'dataurl' },
   define: { 'process.env.NODE_ENV': '"development"' },
   logLevel: 'info',
 });
@@ -35,6 +36,11 @@ console.log(`Built dist/index.html (${(out.length / 1024).toFixed(1)} KB)`);
 
 // Serve
 const server = createServer((req, res) => {
+  if (req.url === '/favicon.ico' && existsSync('dist/favicon.ico')) {
+    res.setHeader('Content-Type', 'image/x-icon');
+    res.end(readFileSync('dist/favicon.ico'));
+    return;
+  }
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.end(out);
 });

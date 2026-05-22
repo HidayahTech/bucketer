@@ -1,5 +1,6 @@
 // Root app component — session state machine (§4.14)
 import { useState, useEffect, useCallback } from 'preact/hooks';
+import logoUrl from '../assets/bucketer-logo.png';
 import { createS3Client } from '../lib/s3-client.js';
 import { detectProvider, PROVIDER_LABELS } from '../lib/provider.js';
 import {
@@ -116,7 +117,7 @@ export function App() {
   return (
     <div id="app">
       <header class="app-header">
-        <h1>Bucketer</h1>
+        <img src={logoUrl} alt="Bucketer" class="app-logo" />
         <span class="spacer" />
         {providerLabel && session === 'connected' && (
           <span class="header-status">{providerLabel}</span>
