@@ -6,6 +6,7 @@ import { formatBytes, leafName, isPermissionError } from '../lib/format.js';
 import { defaultMaxKeys } from '../lib/provider.js';
 import { loadMaxKeys } from '../lib/storage.js';
 import { pushPrefixHistory } from '../lib/url-params.js';
+import { mediaKind, mimeType } from '../lib/media.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
 import { HiddenVersions } from './HiddenVersions.jsx';
 
@@ -80,6 +81,9 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const [pendingDelete, setPendingDelete] = useState(null); // object to confirm
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
+  const [previewItem, setPreviewItem] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [previewError, setPreviewError] = useState(null);
   const abortRef = useRef(null);
   // Always-current reference to navigateTo for the popstate handler (which has [] deps)
   const navigateRef = useRef(null);
@@ -222,6 +226,41 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     setDeleteError(null);
   }
 
+  async function handlePreview(obj) {
+    setPreviewItem(obj);
+    setPreviewUrl(null);
+    setPreviewError(null);
+    try {
+      const mime = mimeType(obj.Key);
+      const url = await getSignedUrl(
+        client,
+        new GetObjectCommand({
+          Bucket: bucket,
+          Key: obj.Key,
+          ResponseContentDisposition: 'inline',
+          ...(mime ? { ResponseContentType: mime } : {}),
+        }),
+        { expiresIn: PRESIGN_EXPIRES },
+      );
+      setPreviewUrl(url);
+    } catch (err) {
+      setPreviewError(err);
+    }
+  }
+
+  function closePreview() {
+    setPreviewItem(null);
+    setPreviewUrl(null);
+    setPreviewError(null);
+  }
+
+  useEffect(() => {
+    if (!previewItem) return;
+    function onKey(e) { if (e.key === 'Escape') closePreview(); }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [previewItem]);
+
   async function handleDeleteConfirm() {
     if (!pendingDelete) return;
     setDeleting(true);
@@ -309,6 +348,43 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
         </div>
       )}
 
+      {previewItem && (() => {
+        const kind = mediaKind(previewItem.Key);
+        return (
+          <div class="modal-overlay" onClick={closePreview}>
+            <div class="modal-dialog preview-dialog" onClick={e => e.stopPropagation()}>
+              <div class="modal-title preview-title">
+                <span class="preview-filename" title={previewItem.Key}>{leafName(previewItem.Key)}</span>
+                <button class="preview-close" onClick={closePreview} aria-label="Close">✕</button>
+              </div>
+              <div class="preview-body">
+                {!previewUrl && !previewError && (
+                  <div class="empty-state"><span class="spinner" style={{ marginRight: '.5rem' }} />Loading…</div>
+                )}
+                {previewError && (
+                  <div class="modal-error">Preview failed: {previewError.message || String(previewError)}</div>
+                )}
+                {previewUrl && kind === 'image' && (
+                  <img src={previewUrl} alt={leafName(previewItem.Key)} class="preview-media" />
+                )}
+                {previewUrl && kind === 'audio' && (
+                  <audio controls src={previewUrl} class="preview-audio" />
+                )}
+                {previewUrl && kind === 'video' && (
+                  <video controls src={previewUrl} class="preview-media" />
+                )}
+              </div>
+              <div class="modal-actions">
+                <button class="btn btn-ghost btn-sm" onClick={closePreview}>Close</button>
+                <button class="btn btn-ghost btn-sm" onClick={() => handleDownload(previewItem.Key)} disabled={!canDownload || downloadingKey === previewItem.Key}>
+                  {downloadingKey === previewItem.Key ? <span class="spinner" /> : 'Download'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       <Breadcrumb prefix={prefix} onNavigate={navigateTo} />
 
       {downloadError && (
@@ -364,6 +440,16 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                     <td class="col-size">{formatBytes(obj.Size)}</td>
                     <td class="col-modified">{formatDate(obj.LastModified)}</td>
                     <td class="col-actions">
+                      {mediaKind(obj.Key) && (
+                        <button
+                          class="btn btn-ghost btn-sm"
+                          onClick={() => handlePreview(obj)}
+                          title="Preview"
+                          style={{ marginRight: '.25rem' }}
+                        >
+                          ⊙
+                        </button>
+                      )}
                       <button
                         class="btn btn-ghost btn-sm"
                         onClick={() => handleDownload(obj.Key)}
