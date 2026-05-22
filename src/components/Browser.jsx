@@ -5,8 +5,13 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { formatBytes, leafName, isPermissionError } from '../lib/format.js';
 import { defaultMaxKeys } from '../lib/provider.js';
 import { loadMaxKeys } from '../lib/storage.js';
+import { pushPrefixHistory } from '../lib/url-params.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
 import { HiddenVersions } from './HiddenVersions.jsx';
+
+// Read the URL prefix exactly once per page session. Subsequent mounts (reconnects)
+// always start at root — only the very first mount restores the URL-specified path.
+let _sessionFirstMount = true;
 
 const PRESIGN_EXPIRES = 3600; // 1 hour
 
@@ -55,7 +60,13 @@ function SortTh({ col, sortCol, sortDir, onSort, align, children }) {
 }
 
 export function Browser({ client, bucket, provider, credentials, onCapabilityChange, capabilities, onUploadTargetChange, onInitialListFailed }) {
-  const [prefix, setPrefix] = useState('');
+  const [prefix, setPrefix] = useState(() => {
+    if (_sessionFirstMount) {
+      _sessionFirstMount = false;
+      return new URLSearchParams(window.location.search).get('prefix') || '';
+    }
+    return '';
+  });
   const [items, setItems] = useState([]);
   const [commonPrefixes, setCommonPrefixes] = useState([]);
   const [continuationToken, setContinuationToken] = useState(null);
@@ -70,6 +81,10 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
   const abortRef = useRef(null);
+  // Always-current reference to navigateTo for the popstate handler (which has [] deps)
+  const navigateRef = useRef(null);
+  // Capture the prefix value at mount time for the initial history replaceState
+  const initialPrefixRef = useRef(prefix);
 
   const maxKeys = loadMaxKeys() || defaultMaxKeys(provider);
 
@@ -87,9 +102,11 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     if (onUploadTargetChange) onUploadTargetChange(prefix);
   }, [prefix]);
 
-  // Navigate to a new prefix — flush state synchronously (§4.7, §4.14)
-  function navigateTo(newPrefix) {
+  // Navigate to a new prefix — flush state and push a browser history entry (§4.7, §4.14)
+  function navigateTo(newPrefix, { historyMode = 'push' } = {}) {
     if (abortRef.current) abortRef.current.abort();
+    if (historyMode === 'push')    pushPrefixHistory(newPrefix, false);
+    if (historyMode === 'replace') pushPrefixHistory(newPrefix, true);
     setPrefix(newPrefix);
     setItems([]);
     setCommonPrefixes([]);
@@ -99,6 +116,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     setDownloadError(null);
     fetchPage(newPrefix, null, true);
   }
+  navigateRef.current = navigateTo;
 
   const isInitialProbeRef = useRef(true);
 
@@ -148,11 +166,23 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     }
   }
 
-  // Initial load
+  // Initial load — use replaceState so the initial prefix doesn't add a history entry
   useEffect(() => {
-    navigateTo('');
+    navigateTo(initialPrefixRef.current, { historyMode: 'replace' });
     return () => { if (abortRef.current) abortRef.current.abort(); };
   }, [client, bucket]);
+
+  // Back / forward button support — restore prefix from history state
+  useEffect(() => {
+    function onPopState(e) {
+      const newPrefix = e.state?.prefix !== undefined
+        ? e.state.prefix
+        : (new URLSearchParams(window.location.search).get('prefix') || '');
+      navigateRef.current(newPrefix, { historyMode: 'none' });
+    }
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   async function handleDownload(key) {
     setDownloadError(null);

@@ -6,11 +6,11 @@
     "serve": "node serve.mjs"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=18.0.0"
   },
   "dependencies": {
+    "@anthropic-ai/claude-code": "^2.1.147",
     "@aws-sdk/client-s3": "^3.1051.0",
-    "@aws-sdk/lib-storage": "^3.1051.0",
     "@aws-sdk/s3-request-presigner": "^3.1051.0",
     "preact": "^10.29.2"
   },

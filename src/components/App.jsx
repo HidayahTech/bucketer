@@ -6,6 +6,7 @@ import {
   loadCredentials, saveCredentials, clearCredentials,
   loadCapabilities, saveCapabilities, clearCapabilities, defaultCapabilities,
 } from '../lib/storage.js';
+import { readUrlParams, hasUrlParams, buildShareUrl } from '../lib/url-params.js';
 import { FileBanner } from './FileBanner.jsx';
 import { CredentialForm } from './CredentialForm.jsx';
 import { Browser } from './Browser.jsx';
@@ -19,13 +20,16 @@ import { UpdateBanner } from './UpdateBanner.jsx';
 // Session states: disconnected | connecting | connected | failed
 export function App() {
   const [session, setSession] = useState('disconnected');
-  const [credentials, setCredentials] = useState(() => loadCredentials());
+  // Merge URL params over stored credentials so the form is pre-filled on load
+  const [credentials, setCredentials] = useState(() => ({ ...loadCredentials(), ...readUrlParams() }));
   const [client, setClient] = useState(null);
   const [connectionError, setConnectionError] = useState(null);
   const [capabilities, setCapabilities] = useState(() => loadCapabilities());
   const [currentPrefix, setCurrentPrefix] = useState('');
   const [browserKey, setBrowserKey] = useState(0); // force re-mount on reconnect
   const [logKey, setLogKey] = useState(0);         // incremented to refresh upload log
+  const [linkCopied, setLinkCopied] = useState(false);
+  const urlParamsPresent = hasUrlParams();
 
   // Capabilities are stored in localStorage and updated reactively (§4.12)
   const handleCapabilityChange = useCallback((op, state) => {
@@ -80,13 +84,25 @@ export function App() {
     setBrowserKey(k => k + 1);
   }
 
-  // Auto-connect if credentials are stored (secret key is in sessionStorage so may be present on page reload)
+  // Auto-connect if credentials are stored. Merge URL params so endpoint/bucket
+  // from the URL override stored values (secret key never comes from URL).
   useEffect(() => {
     const stored = loadCredentials();
-    if (stored.endpoint && stored.bucket && stored.keyId && stored.secretKey) {
-      handleConnect(stored);
+    const merged = { ...stored, ...readUrlParams() };
+    if (merged.endpoint && merged.bucket && merged.keyId && merged.secretKey) {
+      handleConnect(merged);
     }
   }, []);
+
+  async function handleCopyLink() {
+    const url = buildShareUrl(credentials);
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch { /* clipboard API unavailable */ }
+  }
 
   const providerLabel = credentials.provider ? PROVIDER_LABELS[credentials.provider] : null;
 
@@ -106,6 +122,16 @@ export function App() {
           <span class="header-status">{providerLabel}</span>
         )}
         <StatusBadge session={session} />
+        {session === 'connected' && buildShareUrl(credentials) && (
+          <button
+            class="btn btn-ghost btn-sm"
+            style={{ color: '#fff', borderColor: 'rgba(255,255,255,.4)' }}
+            onClick={handleCopyLink}
+            title="Copy a shareable link with endpoint and bucket pre-filled (no credentials)"
+          >
+            {linkCopied ? '✓ Copied' : 'Copy link'}
+          </button>
+        )}
         {session === 'connected' && (
           <button class="btn btn-ghost btn-sm" style={{ color: '#fff', borderColor: 'rgba(255,255,255,.4)' }} onClick={handleDisconnect}>
             Disconnect
@@ -120,6 +146,13 @@ export function App() {
         <div class="main-content">
           <div class="splash">
             <h2>Connect to a bucket</h2>
+            {urlParamsPresent && (
+              <div class="banner banner-info" style={{ marginBottom: '1rem' }}>
+                <div class="banner-body">
+                  Endpoint and bucket pre-filled from URL — enter your Key ID and Secret Key to connect.
+                </div>
+              </div>
+            )}
             <CredentialForm
               initial={credentials}
               onSave={handleConnect}
