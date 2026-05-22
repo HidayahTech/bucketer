@@ -92,7 +92,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       resumeRecord: null,
       largeFileWarningDismissed: false,
     }));
-    setItems(prev => [...prev, ...newItems]);
+    setItems(prev => [...newItems, ...prev]);
 
     // Request Notification API permission on first batch (Q4 in QUESTIONS.md)
     if (!notifAskedRef.current && 'Notification' in window) {
