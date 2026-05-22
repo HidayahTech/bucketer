@@ -89,6 +89,8 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const navigateRef = useRef(null);
   // Always-current reference to preview navigator, updated after sortedItems is computed
   const navigatePreviewRef = useRef(null);
+  // Touch tracking for swipe-to-navigate in preview
+  const touchStartXRef = useRef(null);
   // Capture the prefix value at mount time for the initial history replaceState
   const initialPrefixRef = useRef(prefix);
 
@@ -376,27 +378,39 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                 )}
                 <button class="preview-close" onClick={closePreview} aria-label="Close">✕</button>
               </div>
-              <div class="preview-body">
+              <div
+                class="preview-body"
+                onTouchStart={e => { touchStartXRef.current = e.touches[0].clientX; }}
+                onTouchEnd={e => {
+                  if (touchStartXRef.current === null) return;
+                  const dx = e.changedTouches[0].clientX - touchStartXRef.current;
+                  touchStartXRef.current = null;
+                  if (Math.abs(dx) < 50) return;
+                  navigatePreviewRef.current(dx < 0 ? 1 : -1);
+                }}
+              >
                 {previewableItems.length > 1 && (
-                  <button class="preview-nav preview-nav-prev" onClick={() => navigatePreviewRef.current(-1)} disabled={!prevPreviewItem} aria-label="Previous">‹</button>
+                  <button class="preview-nav" onClick={() => navigatePreviewRef.current(-1)} disabled={!prevPreviewItem} aria-label="Previous">‹</button>
                 )}
-                {!previewUrl && !previewError && (
-                  <div class="empty-state"><span class="spinner" style={{ marginRight: '.5rem' }} />Loading…</div>
-                )}
-                {previewError && (
-                  <div class="modal-error">Preview failed: {previewError.message || String(previewError)}</div>
-                )}
-                {previewUrl && kind === 'image' && (
-                  <img src={previewUrl} alt={leafName(previewItem.Key)} class="preview-media" />
-                )}
-                {previewUrl && kind === 'audio' && (
-                  <audio controls src={previewUrl} class="preview-audio" />
-                )}
-                {previewUrl && kind === 'video' && (
-                  <video controls src={previewUrl} class="preview-media" />
-                )}
+                <div class="preview-content">
+                  {!previewUrl && !previewError && (
+                    <div class="empty-state"><span class="spinner" style={{ marginRight: '.5rem' }} />Loading…</div>
+                  )}
+                  {previewError && (
+                    <div class="modal-error">Preview failed: {previewError.message || String(previewError)}</div>
+                  )}
+                  {previewUrl && kind === 'image' && (
+                    <img src={previewUrl} alt={leafName(previewItem.Key)} class="preview-media" />
+                  )}
+                  {previewUrl && kind === 'audio' && (
+                    <audio controls src={previewUrl} class="preview-audio" />
+                  )}
+                  {previewUrl && kind === 'video' && (
+                    <video controls src={previewUrl} class="preview-media" />
+                  )}
+                </div>
                 {previewableItems.length > 1 && (
-                  <button class="preview-nav preview-nav-next" onClick={() => navigatePreviewRef.current(1)} disabled={!nextPreviewItem} aria-label="Next">›</button>
+                  <button class="preview-nav" onClick={() => navigatePreviewRef.current(1)} disabled={!nextPreviewItem} aria-label="Next">›</button>
                 )}
               </div>
               <div class="modal-actions">
