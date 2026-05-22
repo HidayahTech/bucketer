@@ -26,3 +26,14 @@ export function mediaKind(key) {
 export function mimeType(key) {
   return MIME[fileExt(key)] || null;
 }
+
+// Derive a previewable kind from a Content-Type header value.
+// Handles any image/*, audio/*, or video/* type without a lookup table.
+export function mimeKind(contentType) {
+  if (!contentType) return null;
+  const base = contentType.split(';')[0].trim().toLowerCase();
+  if (base.startsWith('image/')) return 'image';
+  if (base.startsWith('audio/')) return 'audio';
+  if (base.startsWith('video/')) return 'video';
+  return null;
+}

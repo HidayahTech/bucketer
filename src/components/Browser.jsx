@@ -1,12 +1,12 @@
 // Object browser: listing, navigation, download, delete (§4.2, §4.4, §4.7, §4.12)
 import { useState, useEffect, useRef } from 'preact/hooks';
-import { ListObjectsV2Command, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { ListObjectsV2Command, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { formatBytes, leafName, isPermissionError } from '../lib/format.js';
 import { defaultMaxKeys } from '../lib/provider.js';
 import { loadMaxKeys } from '../lib/storage.js';
 import { pushPrefixHistory } from '../lib/url-params.js';
-import { mediaKind, mimeType } from '../lib/media.js';
+import { mediaKind, mimeType, mimeKind } from '../lib/media.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
 import { HiddenVersions } from './HiddenVersions.jsx';
 
@@ -84,6 +84,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const [previewItem, setPreviewItem] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [previewError, setPreviewError] = useState(null);
+  const [resolvedKind, setResolvedKind] = useState(null);
   const abortRef = useRef(null);
   // Always-current reference to navigateTo for the popstate handler (which has [] deps)
   const navigateRef = useRef(null);
@@ -232,15 +233,36 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     setPreviewItem(obj);
     setPreviewUrl(null);
     setPreviewError(null);
+    setResolvedKind(null);
     try {
-      const mime = mimeType(obj.Key);
+      let kind, contentType;
+      try {
+        const head = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: obj.Key }));
+        contentType = head.ContentType || '';
+        kind = mimeKind(contentType) || mediaKind(obj.Key);
+        // If ContentType is generic but extension tells us the type, use the extension MIME
+        if (!mimeKind(contentType) && mediaKind(obj.Key)) {
+          contentType = mimeType(obj.Key) || contentType;
+        }
+      } catch {
+        // HeadObject failed (e.g. no permission) — fall back to extension-based detection
+        contentType = mimeType(obj.Key) || '';
+        kind = mediaKind(obj.Key);
+      }
+      if (!kind) {
+        setPreviewError(new Error(
+          contentType ? `Cannot preview this file type (${contentType})` : 'Cannot preview this file type'
+        ));
+        return;
+      }
+      setResolvedKind(kind);
       const url = await getSignedUrl(
         client,
         new GetObjectCommand({
           Bucket: bucket,
           Key: obj.Key,
           ResponseContentDisposition: 'inline',
-          ...(mime ? { ResponseContentType: mime } : {}),
+          ...(contentType ? { ResponseContentType: contentType } : {}),
         }),
         { expiresIn: PRESIGN_EXPIRES },
       );
@@ -254,6 +276,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     setPreviewItem(null);
     setPreviewUrl(null);
     setPreviewError(null);
+    setResolvedKind(null);
   }
 
   useEffect(() => {
@@ -317,8 +340,9 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     ? 'Backblaze B2 may retain older versions of this file. The current version will be hidden but not immediately purged from storage.'
     : 'If versioning is enabled on this bucket, this creates a delete marker — the object is hidden but recoverable. If versioning is off, deletion is permanent and cannot be undone.';
 
-  // Preview navigation — ordered to match the current display sort
-  const previewableItems = sortedItems.filter(obj => mediaKind(obj.Key));
+  // Preview navigation — ordered to match the current display sort.
+  // Includes extension-less files since they may have a previewable ContentType.
+  const previewableItems = sortedItems.filter(obj => mediaKind(obj.Key) || !leafName(obj.Key).includes('.'));
   const previewIdx = previewItem ? previewableItems.findIndex(o => o.Key === previewItem.Key) : -1;
   const prevPreviewItem = previewIdx > 0 ? previewableItems[previewIdx - 1] : null;
   const nextPreviewItem = previewIdx >= 0 && previewIdx < previewableItems.length - 1 ? previewableItems[previewIdx + 1] : null;
@@ -365,7 +389,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
       )}
 
       {previewItem && (() => {
-        const kind = mediaKind(previewItem.Key);
+        const kind = resolvedKind;
         return (
           <div class="modal-overlay" onClick={closePreview}>
             <div class="modal-dialog preview-dialog" onClick={e => e.stopPropagation()}>
@@ -471,15 +495,15 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                     <td class="col-name">
                       <span class="file-icon">📄</span>
                       <span
-                        class={`file-name${mediaKind(obj.Key) ? ' file-name-previewable' : ''}`}
+                        class={`file-name${(mediaKind(obj.Key) || !leafName(obj.Key).includes('.')) ? ' file-name-previewable' : ''}`}
                         title={obj.Key}
-                        onClick={mediaKind(obj.Key) ? () => handlePreview(obj) : undefined}
+                        onClick={(mediaKind(obj.Key) || !leafName(obj.Key).includes('.')) ? () => handlePreview(obj) : undefined}
                       >{display}</span>
                     </td>
                     <td class="col-size">{formatBytes(obj.Size)}</td>
                     <td class="col-modified">{formatDate(obj.LastModified)}</td>
                     <td class="col-actions">
-                      {mediaKind(obj.Key) && (
+                      {(mediaKind(obj.Key) || !leafName(obj.Key).includes('.')) && (
                         <button
                           class="btn btn-ghost btn-sm"
                           onClick={() => handlePreview(obj)}
