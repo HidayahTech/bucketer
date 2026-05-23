@@ -40,10 +40,18 @@ export function UploadLog({ refreshKey }) {
 
   if (loading || entries.length === 0) return null;
 
+  const totalBytes = entries.reduce((s, e) => s + (e.fileSize || 0), 0);
+  const errorCount = entries.filter(e => e.status !== 'done').length;
+  const summary = `${entries.length} file${entries.length !== 1 ? 's' : ''} · ${formatBytes(totalBytes)}${errorCount > 0 ? ` · ${errorCount} failed` : ''}`;
+
   return (
-    <div class="upload-log">
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: '1rem', marginBottom: '.5rem' }}>
-        <div class="section-heading" style={{ margin: 0 }}>Upload history</div>
+    <details class="upload-log">
+      <summary class="upload-log-summary">
+        <span class="section-heading" style={{ margin: 0, display: 'inline' }}>Upload history</span>
+        <span class="upload-log-summary-meta">{summary}</span>
+      </summary>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '.5rem' }}>
         <button class="btn btn-ghost btn-sm" onClick={handleClear}>Clear</button>
       </div>
 
@@ -77,6 +85,6 @@ export function UploadLog({ refreshKey }) {
           ))}
         </tbody>
       </table>
-    </div>
+    </details>
   );
 }

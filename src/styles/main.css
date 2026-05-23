@@ -376,6 +376,11 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 
 /* ── Upload log ───────────────────────────────────────────────────────────── */
 .upload-log { margin: 1rem 0; }
+.upload-log-summary { display: flex; align-items: baseline; gap: .75rem; cursor: pointer; list-style: none; padding: .25rem 0; }
+.upload-log-summary::-webkit-details-marker { display: none; }
+.upload-log-summary::before { content: '▶'; font-size: .65rem; color: var(--text-muted); transition: transform .15s; flex-shrink: 0; }
+details[open] .upload-log-summary::before { transform: rotate(90deg); }
+.upload-log-summary-meta { font-size: .8rem; color: var(--text-muted); }
 .log-status { text-align: center; width: 1.5rem; font-weight: 700; }
 .log-done   { color: var(--text-success); }
 .log-error  { color: var(--text-danger); cursor: help; }
