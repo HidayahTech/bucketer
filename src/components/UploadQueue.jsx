@@ -661,6 +661,21 @@ function BatchSummary({ items, provider, onResume, onRestart, onCancel, onRemove
 
   const actionItems = [...errorItems, ...pausedItems];
 
+  const [cancelPrimed, setCancelPrimed] = useState(false);
+  const cancelPrimedTimer = useRef(null);
+
+  function handleCancelAllClick() {
+    if (!cancelPrimed) {
+      setCancelPrimed(true);
+      clearTimeout(cancelPrimedTimer.current);
+      cancelPrimedTimer.current = setTimeout(() => setCancelPrimed(false), 3000);
+    } else {
+      clearTimeout(cancelPrimedTimer.current);
+      setCancelPrimed(false);
+      onCancelAll();
+    }
+  }
+
   return (
     <div class="batch-summary">
       <div class="batch-summary-top">
@@ -673,8 +688,12 @@ function BatchSummary({ items, provider, onResume, onRestart, onCancel, onRemove
         {overallSpeed > 0 && <span class="batch-speed">{formatSpeed(overallSpeed)}</span>}
         {liveEta !== null && <span class="batch-eta"> · ETA {formatEta(liveEta)}</span>}
         {(isActive || queuedCount > 0) && (
-          <button class="btn btn-ghost btn-sm" style={{ marginLeft: '.4rem', color: 'var(--text-danger)' }} onClick={onCancelAll}>
-            Cancel all
+          <button
+            class="btn btn-ghost btn-sm"
+            style={{ marginLeft: '.4rem', color: 'var(--text-danger)' }}
+            onClick={handleCancelAllClick}
+          >
+            {cancelPrimed ? 'Sure?' : 'Cancel all'}
           </button>
         )}
         {hasClearable && (
