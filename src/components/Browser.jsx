@@ -1,6 +1,6 @@
 // Object browser: listing, navigation, download, delete (§4.2, §4.4, §4.7, §4.12)
 import { useState, useEffect, useRef } from 'preact/hooks';
-import { ListObjectsV2Command, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { ListObjectsV2Command, GetObjectCommand, DeleteObjectCommand, DeleteObjectsCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { formatBytes, leafName, isPermissionError } from '../lib/format.js';
 import { defaultMaxKeys } from '../lib/provider.js';
@@ -82,6 +82,8 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const [pendingDelete, setPendingDelete] = useState(null); // object to confirm
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
+  // folderDelete: null | { prefix, phase: 'confirm'|'listing'|'deleting'|'done', total, deleted, errors }
+  const [folderDelete, setFolderDelete] = useState(null);
   const [previewItem, setPreviewItem] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [previewError, setPreviewError] = useState(null);
@@ -336,6 +338,64 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     }
   }
 
+  function handleFolderDeleteClick(cp, e) {
+    e.stopPropagation();
+    setFolderDelete({ prefix: cp, phase: 'confirm', total: null, deleted: 0, errors: [] });
+  }
+
+  async function handleFolderDeleteConfirm() {
+    const fp = folderDelete.prefix;
+    setFolderDelete(prev => ({ ...prev, phase: 'listing' }));
+
+    const keys = [];
+    let token;
+    try {
+      do {
+        const resp = await client.send(new ListObjectsV2Command({
+          Bucket: bucket, Prefix: fp, MaxKeys: 1000, ContinuationToken: token,
+        }));
+        (resp.Contents || []).forEach(o => keys.push(o.Key));
+        token = resp.IsTruncated ? resp.NextContinuationToken : undefined;
+      } while (token);
+    } catch (err) {
+      setFolderDelete(prev => ({ ...prev, phase: 'done', errors: [{ key: '(listing)', message: err.message }] }));
+      return;
+    }
+
+    if (keys.length === 0) {
+      setCommonPrefixes(prev => prev.filter(p => p !== fp));
+      setFolderDelete(null);
+      return;
+    }
+
+    setFolderDelete(prev => ({ ...prev, phase: 'deleting', total: keys.length }));
+
+    const errors = [];
+    let deleted = 0;
+    for (let i = 0; i < keys.length; i += 1000) {
+      const batch = keys.slice(i, i + 1000).map(Key => ({ Key }));
+      try {
+        const resp = await client.send(new DeleteObjectsCommand({
+          Bucket: bucket, Delete: { Objects: batch, Quiet: true },
+        }));
+        const batchErrors = resp.Errors || [];
+        errors.push(...batchErrors.map(e => ({ key: e.Key, message: e.Message || e.Code })));
+        deleted += batch.length - batchErrors.length;
+      } catch (err) {
+        batch.forEach(o => errors.push({ key: o.Key, message: err.message }));
+      }
+      setFolderDelete(prev => ({ ...prev, deleted }));
+    }
+
+    onCapabilityChange('delete', 'permitted');
+    setFolderDelete(prev => ({ ...prev, phase: 'done', deleted, errors }));
+    fetchPage(prefix, null, true);
+  }
+
+  function closeFolderDeleteModal() {
+    setFolderDelete(null);
+  }
+
   const canDownload = capabilities.download !== 'denied';
   const canDelete   = capabilities.delete !== 'denied';
   const canList     = capabilities.list !== 'denied';
@@ -413,6 +473,52 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                 {deleting ? <span class="spinner" /> : 'Delete'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {folderDelete && (
+        <div class="modal-overlay" onClick={folderDelete.phase === 'confirm' ? closeFolderDeleteModal : undefined}>
+          <div class="modal-dialog" onClick={e => e.stopPropagation()}>
+            {folderDelete.phase === 'confirm' && (<>
+              <div class="modal-title">Delete folder?</div>
+              <div class="modal-body">
+                <p class="modal-filename">{folderDelete.prefix.slice(prefix.length)}</p>
+                <p class="modal-caveat">All objects inside will be permanently deleted. {versioningCaveat}</p>
+              </div>
+              <div class="modal-actions">
+                <button class="btn btn-ghost btn-sm" onClick={closeFolderDeleteModal}>Cancel</button>
+                <button class="btn btn-danger btn-sm" onClick={handleFolderDeleteConfirm}>Delete folder</button>
+              </div>
+            </>)}
+            {(folderDelete.phase === 'listing' || folderDelete.phase === 'deleting') && (<>
+              <div class="modal-title">Deleting folder…</div>
+              <div class="modal-body">
+                <p class="modal-filename">{folderDelete.prefix.slice(prefix.length)}</p>
+                {folderDelete.phase === 'listing'
+                  ? <p class="modal-caveat"><span class="spinner" style={{ marginRight: '.4rem' }} />Listing objects…</p>
+                  : <p class="modal-caveat"><span class="spinner" style={{ marginRight: '.4rem' }} />Deleting {folderDelete.deleted} / {folderDelete.total} objects…</p>
+                }
+              </div>
+            </>)}
+            {folderDelete.phase === 'done' && (<>
+              <div class="modal-title">{folderDelete.errors.length === 0 ? 'Folder deleted' : 'Deleted with errors'}</div>
+              <div class="modal-body">
+                <p class="modal-filename">{folderDelete.prefix.slice(prefix.length)}</p>
+                <p class="modal-caveat">{folderDelete.deleted} object{folderDelete.deleted !== 1 ? 's' : ''} deleted.</p>
+                {folderDelete.errors.length > 0 && (
+                  <div class="modal-error">
+                    {folderDelete.errors.slice(0, 5).map((e, i) => (
+                      <div key={i}>{e.key}: {e.message}</div>
+                    ))}
+                    {folderDelete.errors.length > 5 && <div>…and {folderDelete.errors.length - 5} more</div>}
+                  </div>
+                )}
+              </div>
+              <div class="modal-actions">
+                <button class="btn btn-ghost btn-sm" onClick={closeFolderDeleteModal}>Close</button>
+              </div>
+            </>)}
           </div>
         </div>
       )}
@@ -538,7 +644,15 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                   </td>
                   <td class="col-size">—</td>
                   <td class="col-modified"></td>
-                  <td class="col-actions"></td>
+                  <td class="col-actions">
+                    <button
+                      class="btn btn-ghost btn-sm"
+                      style={{ color: 'var(--text-danger)', borderColor: 'transparent' }}
+                      onClick={e => handleFolderDeleteClick(cp, e)}
+                      disabled={!canDelete}
+                      title={!canDelete ? 'Delete not permitted with current credentials' : 'Delete folder and all contents'}
+                    >✕</button>
+                  </td>
                 </tr>
               ))}
 
