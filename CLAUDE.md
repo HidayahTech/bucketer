@@ -8,6 +8,10 @@ Bucketer — a browser-based frontend for uploading, downloading, and managing o
 
 Built with Preact + esbuild. The build pipeline produces a single self-contained `dist/index.html` with all JS and CSS inlined. See README.md for full build and deployment docs.
 
+## Workflow
+
+Always ask for confirmation before committing or pushing.
+
 ## Setup
 
 ```bash
