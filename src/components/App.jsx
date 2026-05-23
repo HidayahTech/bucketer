@@ -30,6 +30,7 @@ export function App() {
   const [browserKey, setBrowserKey] = useState(0); // force re-mount on reconnect
   const [logKey, setLogKey] = useState(0);         // incremented to refresh upload log
   const [linkCopied, setLinkCopied] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const urlParamsPresent = hasUrlParams();
 
   // Capabilities are stored in localStorage and updated reactively (§4.12)
@@ -95,6 +96,13 @@ export function App() {
     }
   }, []);
 
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const handler = (e) => { if (e.key === 'Escape') setSidebarOpen(false); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [sidebarOpen]);
+
   async function handleCopyLink() {
     const url = buildShareUrl(credentials);
     if (!url) return;
@@ -117,6 +125,15 @@ export function App() {
   return (
     <div id="app">
       <header class="app-header">
+        {session === 'connected' && (
+          <button
+            class="hamburger"
+            onClick={() => setSidebarOpen(o => !o)}
+            aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
+          >
+            {sidebarOpen ? '✕' : '☰'}
+          </button>
+        )}
         <img src={logoUrl} alt="Bucketer" class="app-logo" />
         <span class="spacer" />
         {providerLabel && session === 'connected' && (
@@ -207,7 +224,8 @@ export function App() {
         </div>
       ) : (
         <div class="app-body">
-          <aside class="sidebar">
+          {sidebarOpen && <div class="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
+          <aside class={`sidebar${sidebarOpen ? ' sidebar-open' : ''}`}>
             <CredentialForm
               initial={credentials}
               onSave={(creds) => handleConnect(creds, { reconnect: true })}

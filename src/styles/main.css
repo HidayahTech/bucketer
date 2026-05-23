@@ -46,12 +46,13 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 .app-header .spacer { flex: 1; }
 .app-header .header-status { font-size: .8rem; opacity: .85; }
 
-.app-body { flex: 1; display: flex; gap: 0; }
+.app-body { flex: 1; display: flex; gap: 0; position: relative; overflow-x: hidden; }
 
 .sidebar {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
   width: 300px;
-  min-width: 260px;
-  max-width: 360px;
+  max-width: calc(100vw - 2rem);
   border-right: 1px solid var(--border);
   background: var(--surface);
   display: flex;
@@ -59,7 +60,32 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
   padding: 1rem;
   gap: 1rem;
   overflow-y: auto;
+  z-index: 100;
+  transform: translateX(-100%);
+  transition: transform .22s ease;
+  box-shadow: 2px 0 16px rgba(0,0,0,.1);
 }
+.sidebar.sidebar-open { transform: translateX(0); }
+
+.sidebar-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,.35);
+  z-index: 99;
+}
+
+.hamburger {
+  background: none;
+  border: 1px solid rgba(255,255,255,.3);
+  color: #fff;
+  border-radius: var(--radius);
+  padding: .3rem .55rem;
+  cursor: pointer;
+  font-size: 1.15rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.hamburger:hover { background: rgba(255,255,255,.1); }
 
 .main-content { flex: 1; padding: 1rem; overflow-y: auto; min-width: 0; }
 
@@ -516,12 +542,6 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-
-/* ── Responsive ───────────────────────────────────────────────────────────── */
-@media (max-width: 640px) {
-  .app-body { flex-direction: column; }
-  .sidebar { width: 100%; max-width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
-}
 
 /* ── Disconnected splash ──────────────────────────────────────────────────── */
 .splash {
