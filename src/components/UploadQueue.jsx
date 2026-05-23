@@ -68,6 +68,14 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   const notifAskedRef = useRef(false);
 
   const canUpload = capabilities.upload !== 'denied';
+  const completeTimerRef = useRef(null);
+
+  const scheduleComplete = useCallback(() => {
+    clearTimeout(completeTimerRef.current);
+    completeTimerRef.current = setTimeout(() => {
+      if (onUploadsComplete) onUploadsComplete();
+    }, 1500);
+  }, [onUploadsComplete]);
 
   const updateItem = useCallback((id, patch) => {
     setItems(prev => prev.map(it => it.id === id ? { ...it, ...patch } : it));
@@ -173,7 +181,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       if ('Notification' in window && Notification.permission === 'granted') {
         new Notification('Upload complete', { body: `${file.name} → ${destinationKey}` });
       }
-      if (onUploadsComplete) onUploadsComplete();
+      scheduleComplete();
     } catch (err) {
       if (err.name === 'AbortError' || err.message === 'Upload aborted') return;
       updateItem(id, { status: 'error', error: err });
@@ -368,7 +376,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       await deleteResumeRecord({ provider, endpoint: credentials.endpoint, bucket, destinationKey }).catch(() => {});
       updateItem(id, { status: 'done', progress: 100, resumeRecord: null });
       onCapabilityChange('upload', 'permitted');
-      if (onUploadsComplete) onUploadsComplete();
+      scheduleComplete();
 
     } catch (err) {
       if (err?.Code === 'NoSuchUpload' || err?.name === 'NoSuchUpload') {
