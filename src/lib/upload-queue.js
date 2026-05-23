@@ -15,6 +15,11 @@ export class UploadQueue {
     });
   }
 
+  // Drop all pending (not yet started) tasks without starting them.
+  clear() {
+    this._pending = [];
+  }
+
   _drain() {
     while (this._running < this.concurrency && this._pending.length > 0) {
       const { task, resolve, reject } = this._pending.shift();

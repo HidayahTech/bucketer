@@ -410,6 +410,27 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     queueRef.current.enqueue(() => runUpload(id, item.file, item.destinationKey));
   }
 
+  function handleCancelAll() {
+    // Abort all in-flight requests
+    Object.values(activeUploadsRef.current).forEach(active => active?.abort?.());
+    // Drop everything still waiting in the queue
+    queueRef.current.clear();
+    // Best-effort multipart cleanup (fire-and-forget)
+    items.forEach(item => {
+      const uploadId = activeUploadsRef.current[item.id]?.uploadId ?? item.resumeRecord?.uploadId;
+      if (uploadId) {
+        client.send(new AbortMultipartUploadCommand({
+          Bucket: bucket, Key: item.destinationKey, UploadId: uploadId,
+        })).catch(() => {});
+      }
+    });
+    setItems(prev => prev.map(it =>
+      (it.status === 'queued' || it.status === 'uploading' || it.status === 'resuming')
+        ? { ...it, status: 'aborted' }
+        : it
+    ));
+  }
+
   async function handleCancel(id) {
     const active = activeUploadsRef.current[id];
     if (active?.abort) active.abort();
@@ -577,6 +598,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
               onRemove={handleRemove}
               onDismissLargeWarn={(id) => updateItem(id, { largeFileWarningDismissed: true })}
               onClearDone={handleClearDone}
+              onCancelAll={handleCancelAll}
             />
           )}
         </div>
@@ -585,7 +607,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   );
 }
 
-function BatchSummary({ items, provider, onResume, onRestart, onCancel, onRemove, onDismissLargeWarn, onClearDone }) {
+function BatchSummary({ items, provider, onResume, onRestart, onCancel, onRemove, onDismissLargeWarn, onClearDone, onCancelAll }) {
   const doneItems     = items.filter(i => i.status === 'done');
   const abortedItems  = items.filter(i => i.status === 'aborted');
   const errorItems    = items.filter(i => i.status === 'error');
@@ -650,6 +672,11 @@ function BatchSummary({ items, provider, onResume, onRestart, onCancel, onRemove
         <span class="spacer" />
         {overallSpeed > 0 && <span class="batch-speed">{formatSpeed(overallSpeed)}</span>}
         {liveEta !== null && <span class="batch-eta"> · ETA {formatEta(liveEta)}</span>}
+        {(isActive || queuedCount > 0) && (
+          <button class="btn btn-ghost btn-sm" style={{ marginLeft: '.4rem', color: 'var(--text-danger)' }} onClick={onCancelAll}>
+            Cancel all
+          </button>
+        )}
         {hasClearable && (
           <button class="btn btn-ghost btn-sm" style={{ marginLeft: '.4rem' }} onClick={onClearDone}>
             Clear done
