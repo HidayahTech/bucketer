@@ -44,7 +44,7 @@ export function SettingsPanel({ provider }) {
     if (isNaN(n) || n <= 0 || n > 100000) { setError('Page size must be 1–100,000.'); return; }
     if (isNaN(c) || c < 1 || c > 16)      { setError('Upload part concurrency must be 1–16.'); return; }
     if (isNaN(p) || p < 5 || p > 512)     { setError('Part size must be 5–512 MB.'); return; }
-    if (isNaN(f) || f < 1 || f > 8)       { setError('File concurrency must be 1–8.'); return; }
+    if (isNaN(f) || f < 1 || f > 16)      { setError('File concurrency must be 1–16.'); return; }
 
     saveMaxKeys(n);
     savePartConcurrency(c);
@@ -133,9 +133,9 @@ export function SettingsPanel({ provider }) {
             value={fileConcurrencyValue}
             onInput={e => setFileConcurrencyValue(e.target.value)}
             min="1"
-            max="8"
+            max="16"
           />
-          <span class="hint">Simultaneous file uploads (1–8). Default: {DEFAULT_FILE_CONCURRENCY}. Higher values improve throughput for many small files; lower values reduce load on constrained backends.</span>
+          <span class="hint">Simultaneous file uploads (1–16). Default: {DEFAULT_FILE_CONCURRENCY}. Higher values improve throughput for many small files; lower values reduce load on constrained backends.</span>
           <span class="hint" style={{ color: 'var(--accent)' }}>
             Active: <strong>{activeFileConcurrency}</strong>
           </span>
