@@ -70,6 +70,10 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   const canUpload = capabilities.upload !== 'denied';
   const hadActiveRef = useRef(false);
 
+  const [destinationPrefix, setDestinationPrefix] = useState(currentPrefix || '');
+  // Keep in sync with browser navigation, but let the user override by typing
+  useEffect(() => { setDestinationPrefix(currentPrefix || ''); }, [currentPrefix]);
+
   // Fire onUploadsComplete once when the queue fully drains (no uploading/queued items left)
   useEffect(() => {
     const hasActive = items.some(i => i.status === 'uploading' || i.status === 'resuming' || i.status === 'queued');
@@ -98,7 +102,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       speed: 0,
       eta: null,
       error: null,
-      destinationKey: (currentPrefix || '') + relativePath,
+      destinationKey: (destinationPrefix && !destinationPrefix.endsWith('/') ? destinationPrefix + '/' : destinationPrefix) + relativePath,
       resumeRecord: null,
       largeFileWarningDismissed: false,
     }));
@@ -516,8 +520,19 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
 
   return (
     <div>
-      <div class="section-heading" style={{ marginBottom: '.5rem' }}>
-        Upload to: <code style={{ fontWeight: 400 }}>/{currentPrefix || ''}</code>
+      <div class="form-group" style={{ marginBottom: '.75rem' }}>
+        <label>Destination folder</label>
+        <input
+          type="text"
+          value={destinationPrefix}
+          onInput={e => setDestinationPrefix(e.target.value)}
+          placeholder="(root of bucket)"
+          disabled={!canUpload}
+        />
+        <span class="hint">
+          Where uploaded files will be placed. Navigating the browser updates this automatically.
+          You can also type any path here — it doesn't need to exist yet.
+        </span>
       </div>
 
       {!canUpload && (
