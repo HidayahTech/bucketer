@@ -254,6 +254,27 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 .upload-error-detail summary { cursor: pointer; font-weight: 600; }
 .upload-error-detail pre { white-space: pre-wrap; word-break: break-all; margin-top: .25rem; font-family: var(--mono); font-size: .75rem; }
 
+/* ── Batch upload summary ─────────────────────────────────────────────────── */
+.batch-summary {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: .6rem .75rem;
+  font-size: .85rem;
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+}
+.batch-summary-top { display: flex; align-items: center; flex-wrap: wrap; gap: .2rem; }
+.batch-summary-count { font-weight: 500; }
+.batch-queued { color: var(--text-muted); }
+.batch-errors { color: var(--text-danger); }
+.batch-speed  { color: var(--accent); font-size: .8rem; white-space: nowrap; }
+.batch-eta    { color: var(--text-muted); font-size: .8rem; white-space: nowrap; }
+.batch-summary-meta { display: flex; justify-content: space-between; color: var(--text-muted); font-size: .75rem; }
+.batch-all-done { color: var(--text-success); }
+.batch-inflight { display: flex; flex-direction: column; gap: .4rem; border-top: 1px solid var(--border); padding-top: .4rem; margin-top: .1rem; }
+
 /* ── Capability badges ────────────────────────────────────────────────────── */
 .cap-list { display: flex; flex-direction: column; gap: .3rem; font-size: .8rem; }
 .cap-item { display: flex; align-items: center; gap: .4rem; }

@@ -433,6 +433,10 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     setItems(prev => prev.filter(it => it.id !== id));
   }
 
+  function handleClearDone() {
+    setItems(prev => prev.filter(it => it.status !== 'done' && it.status !== 'aborted'));
+  }
+
   // beforeunload guard while any upload is active (§4.6)
   const hasActive = items.some(it => it.status === 'uploading' || it.status === 'resuming');
   useEffect(() => {
@@ -544,16 +548,145 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
 
       {items.length > 0 && (
         <div class="upload-queue" style={{ marginTop: '.75rem' }}>
-          {items.map(item => (
+          {items.length === 1 ? (
+            <UploadItem
+              key={items[0].id}
+              item={items[0]}
+              provider={provider}
+              onResume={() => handleResume(items[0].id)}
+              onRestart={() => handleRestart(items[0].id)}
+              onCancel={() => handleCancel(items[0].id)}
+              onRemove={() => handleRemove(items[0].id)}
+              onDismissLargeWarn={() => updateItem(items[0].id, { largeFileWarningDismissed: true })}
+            />
+          ) : (
+            <BatchSummary
+              items={items}
+              provider={provider}
+              onResume={handleResume}
+              onRestart={handleRestart}
+              onCancel={handleCancel}
+              onRemove={handleRemove}
+              onDismissLargeWarn={(id) => updateItem(id, { largeFileWarningDismissed: true })}
+              onClearDone={handleClearDone}
+            />
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BatchSummary({ items, provider, onResume, onRestart, onCancel, onRemove, onDismissLargeWarn, onClearDone }) {
+  const doneItems     = items.filter(i => i.status === 'done');
+  const abortedItems  = items.filter(i => i.status === 'aborted');
+  const errorItems    = items.filter(i => i.status === 'error');
+  const pausedItems   = items.filter(i => i.status === 'paused');
+  const inFlightItems = items.filter(i => i.status === 'uploading' || i.status === 'resuming');
+  const queuedCount   = items.filter(i => i.status === 'queued').length;
+
+  const totalFiles     = items.length;
+  const completedCount = doneItems.length;
+  const totalBytes     = items.reduce((s, i) => s + i.size, 0);
+  const confirmedBytes = items.reduce((s, i) => s + (i.status === 'done' ? i.size : i.bytesUploaded), 0);
+  const overallSpeed   = inFlightItems.reduce((s, i) => s + i.speed, 0);
+
+  const isActive = inFlightItems.length > 0;
+  const hasClearable = !isActive && !queuedCount && !pausedItems.length && (doneItems.length + abortedItems.length > 0);
+
+  const [displayedBytes, setDisplayedBytes] = useState(confirmedBytes);
+  const animRef  = useRef(null);
+  const speedRef = useRef(overallSpeed);
+  const floorRef = useRef(confirmedBytes);
+
+  useEffect(() => { speedRef.current = overallSpeed; }, [overallSpeed]);
+
+  useEffect(() => {
+    floorRef.current = confirmedBytes;
+    setDisplayedBytes(prev => Math.max(prev, confirmedBytes));
+  }, [confirmedBytes]);
+
+  useEffect(() => {
+    if (!isActive) {
+      cancelAnimationFrame(animRef.current);
+      setDisplayedBytes(confirmedBytes);
+      return;
+    }
+    let last = performance.now();
+    function tick(now) {
+      const dt = (now - last) / 1000;
+      last = now;
+      setDisplayedBytes(prev =>
+        Math.min(Math.max(prev + speedRef.current * dt, floorRef.current), totalBytes)
+      );
+      animRef.current = requestAnimationFrame(tick);
+    }
+    animRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animRef.current);
+  }, [isActive, totalBytes]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const displayProgress = totalBytes > 0 ? Math.min((displayedBytes / totalBytes) * 100, 100) : 0;
+  const liveEta = overallSpeed > 0 ? (totalBytes - displayedBytes) / overallSpeed : null;
+  const allDone = completedCount === totalFiles && errorItems.length === 0 && abortedItems.length === 0;
+
+  const actionItems = [...errorItems, ...pausedItems];
+
+  return (
+    <div class="batch-summary">
+      <div class="batch-summary-top">
+        <span class="batch-summary-count">
+          {completedCount} / {totalFiles} files
+          {queuedCount > 0 && <span class="batch-queued"> · {queuedCount} queued</span>}
+          {errorItems.length > 0 && <span class="batch-errors"> · {errorItems.length} failed</span>}
+        </span>
+        <span class="spacer" />
+        {overallSpeed > 0 && <span class="batch-speed">{formatSpeed(overallSpeed)}</span>}
+        {liveEta !== null && <span class="batch-eta"> · ETA {formatEta(liveEta)}</span>}
+        {hasClearable && (
+          <button class="btn btn-ghost btn-sm" style={{ marginLeft: '.4rem' }} onClick={onClearDone}>
+            Clear done
+          </button>
+        )}
+      </div>
+
+      <div class="progress-bar-wrap">
+        <div class="progress-bar" style={{ width: `${displayProgress.toFixed(2)}%` }} />
+      </div>
+
+      <div class="batch-summary-meta">
+        <span>{formatBytes(displayedBytes)} / {formatBytes(totalBytes)}</span>
+        {allDone && <span class="batch-all-done">✓ All complete</span>}
+      </div>
+
+      {inFlightItems.length > 0 && (
+        <div class="batch-inflight">
+          {inFlightItems.map(item => (
             <UploadItem
               key={item.id}
               item={item}
               provider={provider}
-              onResume={() => handleResume(item.id)}
-              onRestart={() => handleRestart(item.id)}
-              onCancel={() => handleCancel(item.id)}
-              onRemove={() => handleRemove(item.id)}
-              onDismissLargeWarn={() => updateItem(item.id, { largeFileWarningDismissed: true })}
+              onResume={() => onResume(item.id)}
+              onRestart={() => onRestart(item.id)}
+              onCancel={() => onCancel(item.id)}
+              onRemove={() => onRemove(item.id)}
+              onDismissLargeWarn={() => onDismissLargeWarn(item.id)}
+            />
+          ))}
+        </div>
+      )}
+
+      {actionItems.length > 0 && (
+        <div class="batch-inflight">
+          {actionItems.map(item => (
+            <UploadItem
+              key={item.id}
+              item={item}
+              provider={provider}
+              onResume={() => onResume(item.id)}
+              onRestart={() => onRestart(item.id)}
+              onCancel={() => onCancel(item.id)}
+              onRemove={() => onRemove(item.id)}
+              onDismissLargeWarn={() => onDismissLargeWarn(item.id)}
             />
           ))}
         </div>
