@@ -18,7 +18,7 @@ const result = await esbuild.build({
   // Use Preact's automatic JSX runtime — no React import needed in each file
   jsx: 'automatic',
   jsxImportSource: 'preact',
-  loader: { '.png': 'dataurl' },
+  loader: { '.png': 'dataurl', '.svg': 'dataurl' },
   define: {
     'process.env.NODE_ENV': dev ? '"development"' : '"production"',
   },
@@ -26,7 +26,9 @@ const result = await esbuild.build({
 });
 
 const js = result.outputFiles[0].text;
-const css = readFileSync('src/styles/main.css', 'utf8');
+const rawCss = readFileSync('src/styles/main.css', 'utf8');
+const cssResult = await esbuild.transform(rawCss, { loader: 'css', minify: !dev });
+const css = cssResult.code;
 const html = readFileSync('src/index.html', 'utf8');
 const buildId = new Date().toISOString(); // embedded for update checks
 // Use a function to avoid $ special replacement patterns in the JS/CSS content
