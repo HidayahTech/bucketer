@@ -221,7 +221,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 
 .col-name { width: 99%; }
 .col-name .file-icon { margin-right: .45rem; }
-.col-name .file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40ch; display: inline-block; vertical-align: middle; }
+.col-name .file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; display: inline-block; vertical-align: middle; }
 .col-name .file-name-previewable { color: var(--accent); cursor: pointer; }
 .col-name .file-name-previewable:hover { text-decoration: underline; }
 .col-name .file-dir  { color: var(--accent); font-weight: 500; }
