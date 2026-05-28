@@ -17,6 +17,81 @@ let _sessionFirstMount = true;
 const PRESIGN_EXPIRES = 3600;        // 1 hour
 const TEXT_PREVIEW_LIMIT = 100 * 1024; // 100 KB cap for text previews
 
+const COPY_LINK_PRESETS = [
+  { label: '1 hour',   seconds: 3600 },
+  { label: '24 hours', seconds: 86400 },
+  { label: '7 days',   seconds: 604800 },
+];
+
+function CopyLinkPopover({ client, bucket, fileKey, onClose, onCopied, direction = 'down' }) {
+  const [showCustom, setShowCustom] = useState(false);
+  const [customValue, setCustomValue] = useState('1');
+  const [customUnit, setCustomUnit] = useState('hours');
+  const [copying, setCopying] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function copyLink(expiresIn) {
+    setCopying(true);
+    setError(null);
+    try {
+      const url = await getSignedUrl(
+        client,
+        new GetObjectCommand({ Bucket: bucket, Key: fileKey, ResponseContentDisposition: 'inline' }),
+        { expiresIn },
+      );
+      await navigator.clipboard.writeText(url);
+      onCopied();
+      onClose();
+    } catch (err) {
+      setError(err.message || String(err));
+      setCopying(false);
+    }
+  }
+
+  function handleCustomCopy() {
+    const mult = { minutes: 60, hours: 3600, days: 86400 };
+    const n = parseInt(customValue, 10);
+    if (!n || n < 1) { setError('Enter a positive number.'); return; }
+    const seconds = n * mult[customUnit];
+    if (seconds > 604800) { setError('Maximum is 7 days.'); return; }
+    copyLink(seconds);
+  }
+
+  return (
+    <div class={`copy-link-popover${direction === 'up' ? ' copy-link-popover--up' : ''}`}>
+      <div class="copy-link-presets">
+        {COPY_LINK_PRESETS.map(p => (
+          <button key={p.seconds} class="btn btn-ghost btn-sm" onClick={() => copyLink(p.seconds)} disabled={copying}>
+            {p.label}
+          </button>
+        ))}
+        <button class="btn btn-ghost btn-sm" onClick={() => setShowCustom(v => !v)} disabled={copying}>
+          Custom…
+        </button>
+      </div>
+      {showCustom && (
+        <div class="copy-link-custom">
+          <input
+            type="number" min="1" class="copy-link-num"
+            value={customValue}
+            onInput={e => { setCustomValue(e.target.value); setError(null); }}
+          />
+          <select class="copy-link-unit" value={customUnit} onChange={e => setCustomUnit(e.target.value)}>
+            <option value="minutes">min</option>
+            <option value="hours">hrs</option>
+            <option value="days">days</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onClick={handleCustomCopy} disabled={copying}>
+            {copying ? <span class="spinner" /> : 'Copy'}
+          </button>
+        </div>
+      )}
+      {error && <div class="copy-link-error">{error}</div>}
+      <div class="copy-link-note">Link expires after the selected duration.</div>
+    </div>
+  );
+}
+
 function Breadcrumb({ prefix, onNavigate }) {
   if (!prefix) return (
     <div class="breadcrumb"><span class="current">/ (root)</span></div>
@@ -92,7 +167,13 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const [detectedContentType, setDetectedContentType] = useState(null);
   const [previewText, setPreviewText] = useState(null);
   const [previewTruncated, setPreviewTruncated] = useState(false);
+  const [tableCopyKey, setTableCopyKey] = useState(null);
+  const [tableCopied, setTableCopied] = useState(null);
+  const [previewCopyOpen, setPreviewCopyOpen] = useState(false);
+  const [previewCopied, setPreviewCopied] = useState(false);
   const abortRef = useRef(null);
+  const tableCopyWrapRef = useRef(null);
+  const previewCopyWrapRef = useRef(null);
   // Always-current reference to navigateTo for the popstate handler (which has [] deps)
   const navigateRef = useRef(null);
   // Always-current reference to preview navigator, updated after sortedItems is computed
@@ -198,6 +279,29 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
+  useEffect(() => {
+    if (!tableCopyKey) return;
+    function onDown(e) {
+      if (tableCopyWrapRef.current && !tableCopyWrapRef.current.contains(e.target)) setTableCopyKey(null);
+    }
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [tableCopyKey]);
+
+  useEffect(() => {
+    if (!previewCopyOpen) return;
+    function onDown(e) {
+      if (previewCopyWrapRef.current && !previewCopyWrapRef.current.contains(e.target)) setPreviewCopyOpen(false);
+    }
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [previewCopyOpen]);
+
+  function handleTableCopyLinkCopied(key) {
+    setTableCopied(key);
+    setTimeout(() => setTableCopied(k => k === key ? null : k), 2000);
+  }
+
   async function handleDownload(key) {
     setDownloadError(null);
     setDownloadingKey(key);
@@ -245,6 +349,8 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     setResolvedKind(null);
     setNotPreviewable(false);
     setDetectedContentType(null);
+    setPreviewCopyOpen(false);
+    setPreviewCopied(false);
     try {
       let kind, contentType;
       try {
@@ -307,7 +413,8 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     setResolvedKind(null);
     setNotPreviewable(false);
     setDetectedContentType(null);
-    setDetectedContentType(null);
+    setPreviewCopyOpen(false);
+    setPreviewCopied(false);
   }
 
   useEffect(() => {
@@ -596,6 +703,19 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
               </div>
               <div class="modal-actions">
                 <button class="btn btn-ghost btn-sm" onClick={closePreview}>Close</button>
+                <div class="copy-link-wrap" ref={previewCopyOpen ? previewCopyWrapRef : undefined}>
+                  <button class="btn btn-ghost btn-sm" onClick={() => setPreviewCopyOpen(v => !v)} disabled={!canDownload}>
+                    {previewCopied ? '✓ Copied' : 'Copy link'}
+                  </button>
+                  {previewCopyOpen && (
+                    <CopyLinkPopover
+                      client={client} bucket={bucket} fileKey={previewItem.Key}
+                      onClose={() => setPreviewCopyOpen(false)}
+                      onCopied={() => { setPreviewCopied(true); setTimeout(() => setPreviewCopied(false), 2000); }}
+                      direction="up"
+                    />
+                  )}
+                </div>
                 <button class="btn btn-ghost btn-sm" onClick={() => handleDownload(previewItem.Key)} disabled={!canDownload || downloadingKey === previewItem.Key}>
                   {downloadingKey === previewItem.Key ? <span class="spinner" /> : 'Download'}
                 </button>
@@ -685,9 +805,30 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                         onClick={() => handleDownload(obj.Key)}
                         disabled={!canDownload || isDownloading}
                         title={!canDownload ? 'Download not permitted with current credentials' : 'Download'}
+                        style={{ marginRight: '.25rem' }}
                       >
                         {isDownloading ? <span class="spinner" /> : '↓'}
                       </button>
+                      <div
+                        class="copy-link-wrap"
+                        ref={tableCopyKey === obj.Key ? tableCopyWrapRef : undefined}
+                      >
+                        <button
+                          class="btn btn-ghost btn-sm"
+                          onClick={() => setTableCopyKey(k => k === obj.Key ? null : obj.Key)}
+                          disabled={!canDownload}
+                          title="Copy link"
+                        >
+                          {tableCopied === obj.Key ? '✓' : '⎘'}
+                        </button>
+                        {tableCopyKey === obj.Key && (
+                          <CopyLinkPopover
+                            client={client} bucket={bucket} fileKey={obj.Key}
+                            onClose={() => setTableCopyKey(null)}
+                            onCopied={() => handleTableCopyLinkCopied(obj.Key)}
+                          />
+                        )}
+                      </div>
                       <button
                         class="btn btn-ghost btn-sm"
                         style={{ color: 'var(--text-danger)', borderColor: 'transparent', marginLeft: '.25rem' }}

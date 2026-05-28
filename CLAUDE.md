@@ -12,6 +12,8 @@ Built with Preact + esbuild. The build pipeline produces a single self-contained
 
 Always ask for confirmation before committing or pushing.
 
+Never include `@anthropic-ai/claude-code` in commits or pushes. It is a local development tool only and must never be deployed. If `package.json` or `package-lock.json` show changes to that package, exclude those files from the commit.
+
 ## Setup
 
 ```bash

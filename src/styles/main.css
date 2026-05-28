@@ -510,6 +510,49 @@ details[open] .upload-log-summary::before { transform: rotate(90deg); }
   min-width: 280px;
 }
 
+/* ── Copy link popover ───────────────────────────────────────────────────── */
+.copy-link-wrap { position: relative; display: inline-block; }
+.copy-link-popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 4px 12px rgba(0,0,0,.12);
+  padding: .5rem;
+  z-index: 50;
+  min-width: 230px;
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+}
+.copy-link-popover--up { top: auto; bottom: calc(100% + 4px); }
+.copy-link-presets { display: flex; gap: .3rem; flex-wrap: wrap; }
+.copy-link-custom { display: flex; gap: .3rem; align-items: center; }
+.copy-link-num {
+  width: 3.5rem;
+  padding: .3rem .4rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: .8rem;
+  font-family: var(--font);
+  background: var(--surface);
+  color: var(--text);
+}
+.copy-link-unit {
+  flex: 1;
+  padding: .3rem .4rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: .8rem;
+  font-family: var(--font);
+  background: var(--surface);
+  color: var(--text);
+}
+.copy-link-error { font-size: .75rem; color: var(--text-danger); }
+.copy-link-note { font-size: .72rem; color: var(--text-muted); }
+
 /* ── Hidden versions panel ───────────────────────────────────────────────── */
 .hidden-versions-bar {
   margin-top: 1rem;
