@@ -1,6 +1,15 @@
-export const CURRENT_VERSION = '1.6.0';
+export const CURRENT_VERSION = '1.7.0';
 
 export const CHANGELOG = [
+  {
+    version: '1.7.0',
+    date: '2026-05-28',
+    title: 'Dark mode',
+    changes: [
+      'Full dark mode via prefers-color-scheme: dark — no manual toggle needed',
+      'All UI surfaces, modals, tables, and status indicators adapt automatically to the system theme',
+    ],
+  },
   {
     version: '1.6.0',
     date: '2026-05-28',

@@ -5,6 +5,11 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.7.0] — 2026-05-28
+
+- Full dark mode support via `prefers-color-scheme: dark` — no manual toggle needed
+- All UI surfaces, modals, tables, and status indicators adapt automatically to the system theme
+
 ## [1.6.0] — 2026-05-28
 
 - Files and folders can now be dropped directly onto the file browser to queue them for upload
