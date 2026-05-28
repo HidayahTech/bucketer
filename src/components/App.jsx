@@ -1,5 +1,5 @@
 // Root app component — session state machine (§4.14)
-import { useState, useEffect, useCallback } from 'preact/hooks';
+import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import logoUrl from '../assets/bucketer-logo.svg';
 import { createS3Client } from '../lib/s3-client.js';
 import { detectProvider, PROVIDER_LABELS } from '../lib/provider.js';
