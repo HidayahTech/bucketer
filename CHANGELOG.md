@@ -5,6 +5,14 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.8.0] — 2026-05-28
+
+- Folder listings are cached in memory to avoid redundant network calls when revisiting folders
+- Cache TTL is configurable in Settings: Off, 30 s, 2 min (default), or 10 min
+- Mutations (delete, rename, create folder, upload) always invalidate the cache for the affected folder
+- Refresh button (↺) in the browser toolbar forces a fresh listing regardless of cache state
+- Cache is session-scoped (in-memory only) and resets on reconnect — no stale data across sessions
+
 ## [1.7.0] — 2026-05-28
 
 - Full dark mode support via `prefers-color-scheme: dark` — no manual toggle needed

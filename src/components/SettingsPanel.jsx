@@ -1,11 +1,12 @@
 // Application settings (page size, upload concurrency, part size) (§4.7)
 import { useState } from 'preact/hooks';
-import { loadMaxKeys, saveMaxKeys, loadPartConcurrency, savePartConcurrency, loadPartSizeMB, savePartSizeMB, loadFileConcurrency, saveFileConcurrency } from '../lib/storage.js';
+import { loadMaxKeys, saveMaxKeys, loadPartConcurrency, savePartConcurrency, loadPartSizeMB, savePartSizeMB, loadFileConcurrency, saveFileConcurrency, loadListingCacheTTL, saveListingCacheTTL } from '../lib/storage.js';
 import { defaultMaxKeys } from '../lib/provider.js';
 
-const DEFAULT_PART_CONCURRENCY = 4;
-const DEFAULT_PART_SIZE_MB     = 5;
-const DEFAULT_FILE_CONCURRENCY = 3;
+const DEFAULT_PART_CONCURRENCY  = 4;
+const DEFAULT_PART_SIZE_MB      = 5;
+const DEFAULT_FILE_CONCURRENCY  = 3;
+const DEFAULT_LISTING_CACHE_TTL = 120;
 
 export function SettingsPanel({ provider }) {
   const providerDefault = defaultMaxKeys(provider);
@@ -21,6 +22,9 @@ export function SettingsPanel({ provider }) {
   });
   const [fileConcurrencyValue, setFileConcurrencyValue] = useState(() => {
     const v = loadFileConcurrency(); return String(v ?? DEFAULT_FILE_CONCURRENCY);
+  });
+  const [cacheTTLValue, setCacheTTLValue] = useState(() => {
+    const v = loadListingCacheTTL(); return String(v ?? DEFAULT_LISTING_CACHE_TTL);
   });
 
   // Tracks what's actually persisted — updated on every successful save
@@ -50,6 +54,7 @@ export function SettingsPanel({ provider }) {
     savePartConcurrency(c);
     savePartSizeMB(p);
     saveFileConcurrency(f);
+    saveListingCacheTTL(parseInt(cacheTTLValue, 10));
 
     setActiveConcurrency(c);
     setActivePartSize(p);
@@ -64,10 +69,12 @@ export function SettingsPanel({ provider }) {
     setConcurrencyValue(String(DEFAULT_PART_CONCURRENCY));
     setPartSizeValue(String(DEFAULT_PART_SIZE_MB));
     setFileConcurrencyValue(String(DEFAULT_FILE_CONCURRENCY));
+    setCacheTTLValue(String(DEFAULT_LISTING_CACHE_TTL));
     saveMaxKeys(providerDefault);
     savePartConcurrency(DEFAULT_PART_CONCURRENCY);
     savePartSizeMB(DEFAULT_PART_SIZE_MB);
     saveFileConcurrency(DEFAULT_FILE_CONCURRENCY);
+    saveListingCacheTTL(DEFAULT_LISTING_CACHE_TTL);
     setActiveConcurrency(DEFAULT_PART_CONCURRENCY);
     setActivePartSize(DEFAULT_PART_SIZE_MB);
     setActiveFileConcurrency(DEFAULT_FILE_CONCURRENCY);
@@ -79,6 +86,21 @@ export function SettingsPanel({ provider }) {
     <div>
       <div class="section-heading">Settings</div>
       <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+        <div class="form-group">
+          <label>Listing cache</label>
+          <select value={cacheTTLValue} onChange={e => setCacheTTLValue(e.target.value)}>
+            <option value="0">Off — always fetch fresh</option>
+            <option value="30">30 seconds</option>
+            <option value="120">2 minutes (default)</option>
+            <option value="600">10 minutes</option>
+          </select>
+          <span class="hint">
+            How long to keep folder listing results in memory. Revisiting a folder
+            within this window skips the network call. Mutations (delete, rename,
+            upload) always invalidate the cache for the affected folder.
+            Recommended: Off for buckets with frequent concurrent writes (e.g. Backblaze B2).
+          </span>
+        </div>
         <div class="form-group">
           <label>Page size (MaxKeys)</label>
           <input

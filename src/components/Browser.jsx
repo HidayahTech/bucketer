@@ -4,7 +4,7 @@ import { ListObjectsV2Command, GetObjectCommand, DeleteObjectCommand, DeleteObje
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { formatBytes, leafName, isPermissionError } from '../lib/format.js';
 import { defaultMaxKeys } from '../lib/provider.js';
-import { loadMaxKeys } from '../lib/storage.js';
+import { loadMaxKeys, loadListingCacheTTL } from '../lib/storage.js';
 import { pushPrefixHistory } from '../lib/url-params.js';
 import { mediaKind, mimeType, mimeKind } from '../lib/media.js';
 import { collectFileEntries } from '../lib/file-entries.js';
@@ -260,6 +260,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const [previewCopyOpen, setPreviewCopyOpen] = useState(false);
   const [previewCopied, setPreviewCopied] = useState(false);
   const abortRef = useRef(null);
+  const cacheRef = useRef(new Map());
   const tableCopyWrapRef = useRef(null);
   const previewCopyWrapRef = useRef(null);
   const batchCopyWrapRef = useRef(null);
@@ -271,6 +272,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const initialPrefixRef = useRef(prefix);
 
   const maxKeys = loadMaxKeys() || defaultMaxKeys(provider);
+  const cacheTTL = loadListingCacheTTL() ?? 120; // seconds; 0 = off
 
   function toggleSort(col) {
     if (sortCol === col) {
@@ -289,6 +291,10 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   // Navigate to a new prefix — flush state and push a browser history entry (§4.7, §4.14)
   function navigateTo(newPrefix, { historyMode = 'push' } = {}) {
     if (abortRef.current) abortRef.current.abort();
+    // Save current listing to cache before leaving (skip for initial replace-navigation)
+    if (cacheTTL > 0 && historyMode !== 'replace' && (items.length > 0 || commonPrefixes.length > 0)) {
+      cacheRef.current.set(prefix, { items, commonPrefixes, isTruncated, continuationToken, timestamp: Date.now() });
+    }
     if (historyMode === 'push')    pushPrefixHistory(newPrefix, false);
     if (historyMode === 'replace') pushPrefixHistory(newPrefix, true);
     setPrefix(newPrefix);
@@ -309,6 +315,20 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const isInitialProbeRef = useRef(true);
 
   async function fetchPage(targetPrefix, token, replace = false) {
+    // Serve from cache on initial navigation (not pagination)
+    if (replace && !token && cacheTTL > 0) {
+      const cached = cacheRef.current.get(targetPrefix);
+      if (cached && (Date.now() - cached.timestamp) < cacheTTL * 1000) {
+        setItems(cached.items);
+        setCommonPrefixes(cached.commonPrefixes);
+        setContinuationToken(cached.continuationToken);
+        setIsTruncated(cached.isTruncated);
+        setListError(null);
+        isInitialProbeRef.current = false;
+        return;
+      }
+    }
+
     if (abortRef.current) abortRef.current.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -423,6 +443,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
         await client.send(new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: batch, Quiet: true } }));
       }
       onCapabilityChange('delete', 'permitted');
+      invalidateCache(prefix);
       setItems(prev => prev.filter(o => !selectedKeys.has(o.Key)));
       setSelectedKeys(new Set());
       setBatchDeletePending(false);
@@ -503,6 +524,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
         Key: newKey, MetadataDirective: 'COPY',
       }));
       await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: oldKey }));
+      invalidateCache(prefix);
       setItems(prev => prev.map(o => o.Key === oldKey ? { ...o, Key: newKey } : o));
       setRenamingKey(null);
     } catch (err) {
@@ -650,6 +672,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     try {
       await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: pendingDelete.Key }));
       onCapabilityChange('delete', 'permitted');
+      invalidateCache(prefix);
       setItems(prev => prev.filter(o => o.Key !== pendingDelete.Key));
       setPendingDelete(null);
     } catch (err) {
@@ -710,12 +733,28 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     }
 
     onCapabilityChange('delete', 'permitted');
+    invalidateCache(prefix);
     setFolderDelete(prev => ({ ...prev, phase: 'done', deleted, errors }));
     fetchPage(prefix, null, true);
   }
 
   function closeFolderDeleteModal() {
     setFolderDelete(null);
+  }
+
+  function invalidateCache(p) {
+    cacheRef.current.delete(p);
+  }
+
+  function handleRefresh() {
+    if (abortRef.current) abortRef.current.abort();
+    invalidateCache(prefix);
+    setItems([]);
+    setCommonPrefixes([]);
+    setContinuationToken(null);
+    setIsTruncated(false);
+    setListError(null);
+    fetchPage(prefix, null, true);
   }
 
   function openNewFolder() {
@@ -736,6 +775,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
       await client.send(new PutObjectCommand({
         Bucket: bucket, Key: key, Body: '', ContentType: 'application/x-directory',
       }));
+      invalidateCache(prefix);
       setCommonPrefixes(prev => [...prev, key].sort());
       setNewFolderOpen(false);
     } catch (err) {
@@ -1087,6 +1127,9 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
           </div>
         )}
         <div class="browser-toolbar-actions">
+          <button class="btn btn-ghost btn-sm" onClick={handleRefresh} title="Refresh listing" style={{ marginRight: '.25rem' }}>
+            ↺
+          </button>
           <button class="btn btn-ghost btn-sm" onClick={openNewFolder} title="Create a new folder">
             + New folder
           </button>

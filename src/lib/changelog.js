@@ -1,6 +1,18 @@
-export const CURRENT_VERSION = '1.7.0';
+export const CURRENT_VERSION = '1.8.0';
 
 export const CHANGELOG = [
+  {
+    version: '1.8.0',
+    date: '2026-05-28',
+    title: 'Listing cache and refresh button',
+    changes: [
+      'Folder listings are cached in memory to avoid redundant network calls when revisiting folders',
+      'Cache TTL is configurable in Settings: Off, 30 s, 2 min (default), or 10 min',
+      'Mutations (delete, rename, create folder, upload) always invalidate the cache for the affected folder',
+      'Refresh button (↺) in the browser toolbar forces a fresh listing regardless of cache state',
+      'Cache is session-scoped (in-memory only) and resets on reconnect — no stale data across sessions',
+    ],
+  },
   {
     version: '1.7.0',
     date: '2026-05-28',
