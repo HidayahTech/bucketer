@@ -1,6 +1,17 @@
-export const CURRENT_VERSION = '1.9.0';
+export const CURRENT_VERSION = '1.10.0';
 
 export const CHANGELOG = [
+  {
+    version: '1.10.0',
+    date: '2026-05-28',
+    title: 'Smarter update check',
+    changes: [
+      'Update check now uses a HEAD request as a fast first step — if ETag/Last-Modified headers match, no body is fetched at all',
+      'Falls back to a 512-byte Range request to compare build IDs when HEAD is inconclusive, instead of fetching the full page every poll',
+      'Once a real update is confirmed, fetches the full page with default cache mode so the browser can cache it for the user\'s subsequent reload',
+      'Update banner now shows the specific version number: "Version 1.10.0 is available."',
+    ],
+  },
   {
     version: '1.9.0',
     date: '2026-05-28',
