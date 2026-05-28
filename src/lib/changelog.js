@@ -1,6 +1,14 @@
-export const CURRENT_VERSION = '1.10.0';
+export const CURRENT_VERSION = '1.10.1';
 
 export const CHANGELOG = [
+  {
+    version: '1.10.1',
+    date: '2026-05-28',
+    title: 'Spec drift documentation',
+    changes: [
+      'Added SPEC-DRIFT.md — documents all implementation drift from spec v0.15, including features implemented beyond original scope',
+    ],
+  },
   {
     version: '1.10.0',
     date: '2026-05-28',
