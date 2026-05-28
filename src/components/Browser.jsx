@@ -1,6 +1,6 @@
 // Object browser: listing, navigation, download, delete (§4.2, §4.4, §4.7, §4.12)
 import { useState, useEffect, useRef } from 'preact/hooks';
-import { ListObjectsV2Command, GetObjectCommand, DeleteObjectCommand, DeleteObjectsCommand, HeadObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
+import { ListObjectsV2Command, GetObjectCommand, DeleteObjectCommand, DeleteObjectsCommand, HeadObjectCommand, PutObjectCommand, CopyObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { formatBytes, leafName, isPermissionError } from '../lib/format.js';
 import { defaultMaxKeys } from '../lib/provider.js';
@@ -240,6 +240,10 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const [batchDeleteError, setBatchDeleteError] = useState(null);
   const [batchCopyOpen, setBatchCopyOpen] = useState(false);
   const [batchCopied, setBatchCopied] = useState(null);
+  const [renamingKey, setRenamingKey] = useState(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [renameError, setRenameError] = useState(null);
+  const [renameSaving, setRenameSaving] = useState(false);
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [newFolderError, setNewFolderError] = useState(null);
@@ -419,6 +423,36 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
       setBatchDeleteError(err);
     } finally {
       setBatchDeleting(false);
+    }
+  }
+
+  function startRename(key) {
+    setRenamingKey(key);
+    setRenameValue(leafName(key));
+    setRenameError(null);
+  }
+
+  async function commitRename(oldKey) {
+    const newName = renameValue.trim();
+    if (!newName) { setRenameError('Name cannot be empty.'); return; }
+    if (newName.includes('/')) { setRenameError('Name cannot contain slashes.'); return; }
+    const newKey = prefix + newName;
+    if (newKey === oldKey) { setRenamingKey(null); return; }
+    if (items.some(o => o.Key === newKey)) { setRenameError('A file with that name already exists.'); return; }
+    setRenameSaving(true);
+    setRenameError(null);
+    try {
+      await client.send(new CopyObjectCommand({
+        Bucket: bucket, CopySource: `${bucket}/${oldKey}`,
+        Key: newKey, MetadataDirective: 'COPY',
+      }));
+      await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: oldKey }));
+      setItems(prev => prev.map(o => o.Key === oldKey ? { ...o, Key: newKey } : o));
+      setRenamingKey(null);
+    } catch (err) {
+      setRenameError(err.message || String(err));
+    } finally {
+      setRenameSaving(false);
     }
   }
 
@@ -1055,11 +1089,32 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                     </td>
                     <td class="col-name">
                       <span class="file-icon">📄</span>
-                      <span
-                        class="file-name file-name-previewable"
-                        title={obj.Key}
-                        onClick={() => handlePreview(obj)}
-                      >{display}</span>
+                      {renamingKey === obj.Key ? (
+                        <span class="rename-inline">
+                          <input
+                            class="rename-input"
+                            value={renameValue}
+                            onInput={e => { setRenameValue(e.target.value); setRenameError(null); }}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') commitRename(obj.Key);
+                              if (e.key === 'Escape') setRenamingKey(null);
+                            }}
+                            autoFocus
+                            onClick={e => e.stopPropagation()}
+                          />
+                          {renameError && <span class="rename-error">{renameError}</span>}
+                          <button class="btn btn-ghost btn-sm" onClick={e => { e.stopPropagation(); commitRename(obj.Key); }} disabled={renameSaving}>
+                            {renameSaving ? <span class="spinner" /> : '✓'}
+                          </button>
+                          <button class="btn btn-ghost btn-sm" onClick={e => { e.stopPropagation(); setRenamingKey(null); }} disabled={renameSaving}>✕</button>
+                        </span>
+                      ) : (
+                        <span
+                          class="file-name file-name-previewable"
+                          title={obj.Key}
+                          onClick={() => handlePreview(obj)}
+                        >{display}</span>
+                      )}
                     </td>
                     <td class="col-size">{formatBytes(obj.Size)}</td>
                     <td class="col-modified">{formatDate(obj.LastModified)}</td>
@@ -1071,6 +1126,14 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                         style={{ marginRight: '.25rem' }}
                       >
                         ⊙
+                      </button>
+                      <button
+                        class="btn btn-ghost btn-sm"
+                        onClick={e => { e.stopPropagation(); startRename(obj.Key); }}
+                        title="Rename"
+                        style={{ marginRight: '.25rem' }}
+                      >
+                        ✎
                       </button>
                       <button
                         class="btn btn-ghost btn-sm"

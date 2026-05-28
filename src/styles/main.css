@@ -513,6 +513,17 @@ details[open] .upload-log-summary::before { transform: rotate(90deg); }
 /* ── Browser toolbar (filter + actions) ──────────────────────────────────── */
 .browser-toolbar { display: flex; align-items: center; gap: .5rem; margin: .5rem 0 .75rem; }
 .browser-toolbar-actions { margin-left: auto; }
+/* ── Inline rename ───────────────────────────────────────────────────────── */
+.rename-inline { display: inline-flex; align-items: center; gap: .25rem; flex: 1; min-width: 0; }
+.rename-input {
+  flex: 1; min-width: 0;
+  padding: .2rem .4rem;
+  border: 1px solid var(--border-focus); border-radius: var(--radius);
+  font-size: .875rem; font-family: var(--font);
+  background: var(--surface); color: var(--text);
+}
+.rename-error { font-size: .75rem; color: var(--text-danger); white-space: nowrap; }
+
 /* ── Multi-select batch bar ──────────────────────────────────────────────── */
 .batch-bar {
   display: flex; align-items: center; gap: .5rem;

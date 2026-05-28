@@ -1,6 +1,17 @@
-export const CURRENT_VERSION = '1.3.0';
+export const CURRENT_VERSION = '1.4.0';
 
 export const CHANGELOG = [
+  {
+    version: '1.4.0',
+    date: '2026-05-28',
+    title: 'Rename files',
+    changes: [
+      'Rename button (✎) on each file row activates an inline edit field',
+      'Confirm with Enter or the ✓ button; cancel with Escape or ✕',
+      'Validates that the new name is non-empty, contains no slashes, and is not already taken',
+      'Implemented as a server-side copy + delete to preserve all object metadata',
+    ],
+  },
   {
     version: '1.3.0',
     date: '2026-05-28',
