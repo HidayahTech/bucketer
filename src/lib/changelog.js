@@ -1,6 +1,16 @@
-export const CURRENT_VERSION = '1.1.0';
+export const CURRENT_VERSION = '1.2.0';
 
 export const CHANGELOG = [
+  {
+    version: '1.2.0',
+    date: '2026-05-28',
+    title: 'Create folder',
+    changes: [
+      'New folder button in the browser toolbar creates a folder at the current prefix',
+      'Validates the name (no slashes, no duplicates) before creating',
+      'Folder appears immediately in the listing without a full reload',
+    ],
+  },
   {
     version: '1.1.0',
     date: '2026-05-28',

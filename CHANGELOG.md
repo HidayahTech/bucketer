@@ -5,6 +5,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.2.0] — 2026-05-28
+
+- New folder button in the browser toolbar creates a folder at the current prefix
+- Validates the name (no slashes, no duplicates) before creating
+- Folder appears immediately in the listing without a full reload
+
 ## [1.1.0] — 2026-05-28
 
 - Filter bar above the file table to search files and folders by name in real time

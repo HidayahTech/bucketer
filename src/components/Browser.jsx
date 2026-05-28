@@ -1,6 +1,6 @@
 // Object browser: listing, navigation, download, delete (§4.2, §4.4, §4.7, §4.12)
 import { useState, useEffect, useRef } from 'preact/hooks';
-import { ListObjectsV2Command, GetObjectCommand, DeleteObjectCommand, DeleteObjectsCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { ListObjectsV2Command, GetObjectCommand, DeleteObjectCommand, DeleteObjectsCommand, HeadObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { formatBytes, leafName, isPermissionError } from '../lib/format.js';
 import { defaultMaxKeys } from '../lib/provider.js';
@@ -168,6 +168,10 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const [previewText, setPreviewText] = useState(null);
   const [previewTruncated, setPreviewTruncated] = useState(false);
   const [filterQuery, setFilterQuery] = useState('');
+  const [newFolderOpen, setNewFolderOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [newFolderError, setNewFolderError] = useState(null);
+  const [newFolderSaving, setNewFolderSaving] = useState(false);
   const [tableCopyKey, setTableCopyKey] = useState(null);
   const [tableCopied, setTableCopied] = useState(null);
   const [previewCopyOpen, setPreviewCopyOpen] = useState(false);
@@ -505,6 +509,33 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     setFolderDelete(null);
   }
 
+  function openNewFolder() {
+    setNewFolderName('');
+    setNewFolderError(null);
+    setNewFolderOpen(true);
+  }
+
+  async function handleCreateFolder() {
+    const name = newFolderName.trim();
+    if (!name) { setNewFolderError('Enter a folder name.'); return; }
+    if (name.includes('/')) { setNewFolderError('Folder name cannot contain slashes.'); return; }
+    const key = prefix + name + '/';
+    if (commonPrefixes.includes(key)) { setNewFolderError('A folder with that name already exists.'); return; }
+    setNewFolderSaving(true);
+    setNewFolderError(null);
+    try {
+      await client.send(new PutObjectCommand({
+        Bucket: bucket, Key: key, Body: '', ContentType: 'application/x-directory',
+      }));
+      setCommonPrefixes(prev => [...prev, key].sort());
+      setNewFolderOpen(false);
+    } catch (err) {
+      setNewFolderError(err.message || String(err));
+    } finally {
+      setNewFolderSaving(false);
+    }
+  }
+
   const canDownload = capabilities.download !== 'denied';
   const canDelete   = capabilities.delete !== 'denied';
   const canList     = capabilities.list !== 'denied';
@@ -640,6 +671,32 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
         </div>
       )}
 
+      {newFolderOpen && (
+        <div class="modal-overlay" onClick={() => setNewFolderOpen(false)}>
+          <div class="modal-dialog" onClick={e => e.stopPropagation()}>
+            <div class="modal-title">New folder</div>
+            <div class="modal-body">
+              <input
+                class="form-input"
+                type="text"
+                placeholder="Folder name"
+                value={newFolderName}
+                onInput={e => { setNewFolderName(e.target.value); setNewFolderError(null); }}
+                onKeyDown={e => { if (e.key === 'Enter') handleCreateFolder(); if (e.key === 'Escape') setNewFolderOpen(false); }}
+                autoFocus
+              />
+              {newFolderError && <div class="modal-error">{newFolderError}</div>}
+            </div>
+            <div class="modal-actions">
+              <button class="btn btn-ghost btn-sm" onClick={() => setNewFolderOpen(false)} disabled={newFolderSaving}>Cancel</button>
+              <button class="btn btn-primary btn-sm" onClick={handleCreateFolder} disabled={newFolderSaving}>
+                {newFolderSaving ? <span class="spinner" /> : 'Create'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {previewItem && (() => {
         const kind = resolvedKind;
         return (
@@ -737,22 +794,29 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
 
       <Breadcrumb prefix={prefix} onNavigate={navigateTo} />
 
-      {(sortedItems.length > 0 || sortedFolders.length > 0 || filterQ) && (
-        <div class="filter-bar">
-          <input
-            class="filter-input"
-            type="search"
-            placeholder="Filter by name…"
-            value={filterQuery}
-            onInput={e => setFilterQuery(e.target.value)}
-          />
-          {filterQ && (
-            <span class="filter-count">
-              {visibleItems.length + visibleFolders.length} of {sortedItems.length + sortedFolders.length}
-            </span>
-          )}
+      <div class="browser-toolbar">
+        {(sortedItems.length > 0 || sortedFolders.length > 0 || filterQ) && (
+          <div class="filter-bar">
+            <input
+              class="filter-input"
+              type="search"
+              placeholder="Filter by name…"
+              value={filterQuery}
+              onInput={e => setFilterQuery(e.target.value)}
+            />
+            {filterQ && (
+              <span class="filter-count">
+                {visibleItems.length + visibleFolders.length} of {sortedItems.length + sortedFolders.length}
+              </span>
+            )}
+          </div>
+        )}
+        <div class="browser-toolbar-actions">
+          <button class="btn btn-ghost btn-sm" onClick={openNewFolder} title="Create a new folder">
+            + New folder
+          </button>
         </div>
-      )}
+      </div>
 
       {downloadError && (
         <ErrorBlock
