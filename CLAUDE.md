@@ -24,6 +24,18 @@ These are structural guarantees about the build output that `build.mjs` enforces
 
 When adding new invariants, implement them as assertions in `build.mjs` after the file is written, and document them here.
 
+## Bug Tracking and Test Cases
+
+Whenever a real bug is encountered and fixed, it must be logged in `BUG-LOG.md` before closing out the work. Each entry should capture:
+
+- **Symptom** — what the user or developer observed
+- **Root cause** — the precise technical reason it happened
+- **Fix** — what changed
+- **Why it wasn't caught earlier** — what made it hard to see in advance
+- **Test case** — the specific assertion or scenario that would mechanically prevent a recurrence
+
+Real bugs are the highest-value source of test cases. A test derived from a bug that actually happened is worth more than a speculative edge case, because it documents a failure mode the project has already encountered. When writing tests, consult `BUG-LOG.md` first and ensure every entry has corresponding test coverage.
+
 ## Setup
 
 ```bash
