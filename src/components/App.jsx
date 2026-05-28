@@ -34,6 +34,7 @@ export function App() {
   const [linkCopied, setLinkCopied] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
+  const addFilesRef = useRef(null);
   const urlParamsPresent = hasUrlParams();
 
   // Capabilities are stored in localStorage and updated reactively (§4.12)
@@ -281,6 +282,7 @@ export function App() {
               capabilities={capabilities}
               onUploadsComplete={() => setBrowserKey(k => k + 1)}
               onLogEntry={() => setLogKey(k => k + 1)}
+              onMount={({ addFiles }) => { addFilesRef.current = addFiles; }}
             />
 
             <UploadLog refreshKey={logKey} />
@@ -297,6 +299,7 @@ export function App() {
               capabilities={capabilities}
               onInitialListFailed={(err) => { setSession('failed'); setConnectionError(err); }}
               onUploadTargetChange={setCurrentPrefix}
+              onExternalDrop={(entries) => addFilesRef.current?.(entries)}
             />
           </main>
         </div>

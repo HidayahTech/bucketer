@@ -11,6 +11,7 @@ import {
 } from '../lib/indexeddb.js';
 import { UploadQueue as Queue } from '../lib/upload-queue.js';
 import { loadPartConcurrency, loadPartSizeMB, loadFileConcurrency } from '../lib/storage.js';
+import { collectFileEntries } from '../lib/file-entries.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
 
 const MULTIPART_THRESHOLD       = 5 * 1024 * 1024;   // 5 MiB — internal threshold, above the 5 MB spec minimum
@@ -25,40 +26,11 @@ function calcPartSize(fileSize, preferredBytes) {
   return (preferredBytes && preferredBytes > floor) ? preferredBytes : floor;
 }
 
-// Recursively collect { file, relativePath } pairs from FileSystemEntry objects.
-// readEntries() returns at most 100 entries per call, so drain each directory reader
-// in a loop until it yields an empty batch.
-async function collectFileEntries(entries) {
-  const result = [];
-
-  async function traverse(entry, pathPrefix) {
-    if (entry.isFile) {
-      await new Promise(resolve => {
-        entry.file(
-          file => { result.push({ file, relativePath: pathPrefix + file.name }); resolve(); },
-          () => resolve(), // skip unreadable files
-        );
-      });
-    } else if (entry.isDirectory) {
-      const reader = entry.createReader();
-      const prefix = pathPrefix + entry.name + '/';
-      while (true) {
-        const batch = await new Promise((resolve, reject) => reader.readEntries(resolve, reject));
-        if (!batch.length) break;
-        for (const e of batch) await traverse(e, prefix);
-      }
-    }
-  }
-
-  for (const entry of entries) await traverse(entry, '');
-  return result;
-}
-
 // Status: queued | uploading | paused | resuming | done | error | aborted
 let _idCounter = 0;
 function newId() { return ++_idCounter; }
 
-export function UploadQueue({ client, bucket, provider, currentPrefix, credentials, onCapabilityChange, capabilities, onUploadsComplete, onLogEntry }) {
+export function UploadQueue({ client, bucket, provider, currentPrefix, credentials, onCapabilityChange, capabilities, onUploadsComplete, onLogEntry, onMount }) {
   const [items, setItems] = useState([]);
   const [dragOver, setDragOver] = useState(false);
   const queueRef = useRef(new Queue(loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY));
@@ -86,6 +58,9 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   const updateItem = useCallback((id, patch) => {
     setItems(prev => prev.map(it => it.id === id ? { ...it, ...patch } : it));
   }, []);
+
+  // Expose addFiles to parent (e.g. for drop zones outside this component)
+  useEffect(() => { onMount?.({ addFiles }); }, []);
 
   // fileEntries: Array<{ file: File, relativePath: string }>
   // relativePath preserves folder structure (e.g. "photos/2024/img.jpg").

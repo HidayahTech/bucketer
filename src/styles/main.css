@@ -513,6 +513,17 @@ details[open] .upload-log-summary::before { transform: rotate(90deg); }
 /* ── Browser toolbar (filter + actions) ──────────────────────────────────── */
 .browser-toolbar { display: flex; align-items: center; gap: .5rem; margin: .5rem 0 .75rem; }
 .browser-toolbar-actions { margin-left: auto; }
+/* ── Browser drag-and-drop overlay ──────────────────────────────────────── */
+.browser-drop-active { outline: 2px dashed var(--accent); outline-offset: -4px; border-radius: var(--radius); }
+.browser-drop-overlay {
+  position: absolute; inset: 0; z-index: 20;
+  background: rgba(26, 163, 192, .08);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; font-weight: 600; color: var(--accent);
+  pointer-events: none;
+  border-radius: var(--radius);
+}
+
 /* ── File properties (metadata) modal ───────────────────────────────────── */
 .meta-dialog { max-width: 480px; }
 .meta-table { width: 100%; border-collapse: collapse; font-size: .82rem; }

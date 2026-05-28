@@ -7,6 +7,7 @@ import { defaultMaxKeys } from '../lib/provider.js';
 import { loadMaxKeys } from '../lib/storage.js';
 import { pushPrefixHistory } from '../lib/url-params.js';
 import { mediaKind, mimeType, mimeKind } from '../lib/media.js';
+import { collectFileEntries } from '../lib/file-entries.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
 import { HiddenVersions } from './HiddenVersions.jsx';
 
@@ -202,7 +203,7 @@ function SortTh({ col, sortCol, sortDir, onSort, align, children }) {
   );
 }
 
-export function Browser({ client, bucket, provider, credentials, onCapabilityChange, capabilities, onUploadTargetChange, onInitialListFailed }) {
+export function Browser({ client, bucket, provider, credentials, onCapabilityChange, capabilities, onUploadTargetChange, onInitialListFailed, onExternalDrop }) {
   const [prefix, setPrefix] = useState(() => {
     if (_sessionFirstMount) {
       _sessionFirstMount = false;
@@ -240,6 +241,8 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const [batchDeleteError, setBatchDeleteError] = useState(null);
   const [batchCopyOpen, setBatchCopyOpen] = useState(false);
   const [batchCopied, setBatchCopied] = useState(null);
+  const [tableDragOver, setTableDragOver] = useState(false);
+  const dragCounterRef = useRef(0);
   const [metaItem, setMetaItem] = useState(null);
   const [metaData, setMetaData] = useState(null);
   const [metaLoading, setMetaLoading] = useState(false);
@@ -427,6 +430,40 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
       setBatchDeleteError(err);
     } finally {
       setBatchDeleting(false);
+    }
+  }
+
+  function handleTableDragEnter(e) {
+    e.preventDefault();
+    dragCounterRef.current += 1;
+    if (onExternalDrop) setTableDragOver(true);
+  }
+
+  function handleTableDragLeave() {
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current === 0) setTableDragOver(false);
+  }
+
+  async function handleTableDrop(e) {
+    e.preventDefault();
+    dragCounterRef.current = 0;
+    setTableDragOver(false);
+    if (!onExternalDrop) return;
+    const fsEntries = [];
+    const items = e.dataTransfer?.items;
+    if (items) {
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const entry = item.kind === 'file' && (item.getAsEntry?.() ?? item.webkitGetAsEntry?.());
+        if (entry) fsEntries.push(entry);
+      }
+    }
+    if (fsEntries.length) {
+      const fileEntries = await collectFileEntries(fsEntries);
+      if (fileEntries.length) onExternalDrop(fileEntries);
+    } else {
+      const files = e.dataTransfer?.files;
+      if (files?.length) onExternalDrop(Array.from(files).map(f => ({ file: f, relativePath: f.name })));
     }
   }
 
@@ -775,7 +812,17 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   }
 
   return (
-    <div>
+    <div
+      class={tableDragOver ? 'browser-drop-active' : undefined}
+      onDragEnter={handleTableDragEnter}
+      onDragOver={e => e.preventDefault()}
+      onDragLeave={handleTableDragLeave}
+      onDrop={handleTableDrop}
+      style={{ position: 'relative' }}
+    >
+      {tableDragOver && (
+        <div class="browser-drop-overlay">Drop files to upload to this folder</div>
+      )}
       {pendingDelete && (
         <div class="modal-overlay" onClick={handleDeleteCancel}>
           <div class="modal-dialog" onClick={e => e.stopPropagation()}>

@@ -1,6 +1,17 @@
-export const CURRENT_VERSION = '1.5.0';
+export const CURRENT_VERSION = '1.6.0';
 
 export const CHANGELOG = [
+  {
+    version: '1.6.0',
+    date: '2026-05-28',
+    title: 'Drag-and-drop upload onto file table',
+    changes: [
+      'Files and folders can now be dropped directly onto the file browser to queue them for upload',
+      'Visual drop target overlay appears while dragging over the browser area',
+      'Folder drops preserve directory structure (same as the upload queue\'s folder picker)',
+      'Dropped files are queued into the existing upload queue targeting the current folder',
+    ],
+  },
   {
     version: '1.5.0',
     date: '2026-05-28',

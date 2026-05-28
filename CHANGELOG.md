@@ -5,6 +5,13 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.6.0] — 2026-05-28
+
+- Files and folders can now be dropped directly onto the file browser to queue them for upload
+- Visual drop target overlay appears while dragging over the browser area
+- Folder drops preserve directory structure (same as the upload queue's folder picker)
+- Dropped files are queued into the existing upload queue targeting the current folder
+
 ## [1.5.0] — 2026-05-28
 
 - Properties button (ℹ) on each file row opens a panel showing HeadObject metadata
