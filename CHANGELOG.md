@@ -5,6 +5,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.9.0] — 2026-05-28
+
+- App version is now embedded in the built HTML as a `<meta name="app-version">` tag, available to the update checker
+- Build script enforces a build invariants check: both `build-id` and `app-version` meta tags must fall within the first 512 bytes of the output, matching the update checker's range fetch boundary
+- Build fails loudly with a clear message if a structural change would push metadata past the byte limit
+
 ## [1.8.0] — 2026-05-28
 
 - Folder listings are cached in memory to avoid redundant network calls when revisiting folders

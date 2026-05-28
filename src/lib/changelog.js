@@ -1,6 +1,16 @@
-export const CURRENT_VERSION = '1.8.0';
+export const CURRENT_VERSION = '1.9.0';
 
 export const CHANGELOG = [
+  {
+    version: '1.9.0',
+    date: '2026-05-28',
+    title: 'Build invariants and app-version metadata',
+    changes: [
+      'App version is now embedded in the built HTML as a meta tag, available to the update checker',
+      'Build script enforces a build invariants check: both build-id and app-version meta tags must fall within the first 512 bytes of the output, matching the update checker\'s range fetch boundary',
+      'Build fails loudly with a clear message if a structural change would push metadata past the byte limit',
+    ],
+  },
   {
     version: '1.8.0',
     date: '2026-05-28',
