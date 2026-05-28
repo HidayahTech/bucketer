@@ -5,6 +5,11 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.5.0] — 2026-05-28
+
+- Properties button (ℹ) on each file row opens a panel showing HeadObject metadata
+- Displays Content-Type, file size, last modified date, ETag, storage class, version ID, and any custom x-amz-meta-* headers
+
 ## [1.4.0] — 2026-05-28
 
 - Rename button (✎) on each file row activates an inline edit field

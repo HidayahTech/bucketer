@@ -240,6 +240,10 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const [batchDeleteError, setBatchDeleteError] = useState(null);
   const [batchCopyOpen, setBatchCopyOpen] = useState(false);
   const [batchCopied, setBatchCopied] = useState(null);
+  const [metaItem, setMetaItem] = useState(null);
+  const [metaData, setMetaData] = useState(null);
+  const [metaLoading, setMetaLoading] = useState(false);
+  const [metaError, setMetaError] = useState(null);
   const [renamingKey, setRenamingKey] = useState(null);
   const [renameValue, setRenameValue] = useState('');
   const [renameError, setRenameError] = useState(null);
@@ -423,6 +427,21 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
       setBatchDeleteError(err);
     } finally {
       setBatchDeleting(false);
+    }
+  }
+
+  async function handleShowMeta(obj) {
+    setMetaItem(obj);
+    setMetaData(null);
+    setMetaError(null);
+    setMetaLoading(true);
+    try {
+      const head = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: obj.Key }));
+      setMetaData(head);
+    } catch (err) {
+      setMetaError(err.message || String(err));
+    } finally {
+      setMetaLoading(false);
     }
   }
 
@@ -872,6 +891,40 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
         </div>
       )}
 
+      {metaItem && (
+        <div class="modal-overlay" onClick={() => setMetaItem(null)}>
+          <div class="modal-dialog meta-dialog" onClick={e => e.stopPropagation()}>
+            <div class="modal-title">File properties</div>
+            <div class="modal-body">
+              <p class="modal-filename" title={metaItem.Key}>{leafName(metaItem.Key)}</p>
+              {metaLoading && <div class="empty-state"><span class="spinner" style={{ marginRight: '.4rem' }} />Loading…</div>}
+              {metaError && <div class="modal-error">{metaError}</div>}
+              {metaData && (() => {
+                const custom = Object.entries(metaData.Metadata || {});
+                return (
+                  <table class="meta-table">
+                    <tbody>
+                      {metaData.ContentType && <tr><td class="meta-key">Content-Type</td><td class="meta-val">{metaData.ContentType}</td></tr>}
+                      {metaData.ContentLength != null && <tr><td class="meta-key">Size</td><td class="meta-val">{formatBytes(metaData.ContentLength)}</td></tr>}
+                      {metaData.LastModified && <tr><td class="meta-key">Last Modified</td><td class="meta-val">{new Date(metaData.LastModified).toLocaleString()}</td></tr>}
+                      {metaData.ETag && <tr><td class="meta-key">ETag</td><td class="meta-val meta-mono">{metaData.ETag}</td></tr>}
+                      {metaData.StorageClass && <tr><td class="meta-key">Storage Class</td><td class="meta-val">{metaData.StorageClass}</td></tr>}
+                      {metaData.VersionId && <tr><td class="meta-key">Version ID</td><td class="meta-val meta-mono">{metaData.VersionId}</td></tr>}
+                      {custom.map(([k, v]) => (
+                        <tr key={k}><td class="meta-key">x-amz-meta-{k}</td><td class="meta-val">{v}</td></tr>
+                      ))}
+                    </tbody>
+                  </table>
+                );
+              })()}
+            </div>
+            <div class="modal-actions">
+              <button class="btn btn-ghost btn-sm" onClick={() => setMetaItem(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {previewItem && (() => {
         const kind = resolvedKind;
         return (
@@ -1119,6 +1172,14 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                     <td class="col-size">{formatBytes(obj.Size)}</td>
                     <td class="col-modified">{formatDate(obj.LastModified)}</td>
                     <td class="col-actions">
+                      <button
+                        class="btn btn-ghost btn-sm"
+                        onClick={e => { e.stopPropagation(); handleShowMeta(obj); }}
+                        title="Properties"
+                        style={{ marginRight: '.25rem' }}
+                      >
+                        ℹ
+                      </button>
                       <button
                         class="btn btn-ghost btn-sm"
                         onClick={() => handlePreview(obj)}

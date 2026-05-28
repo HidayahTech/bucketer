@@ -1,6 +1,15 @@
-export const CURRENT_VERSION = '1.4.0';
+export const CURRENT_VERSION = '1.5.0';
 
 export const CHANGELOG = [
+  {
+    version: '1.5.0',
+    date: '2026-05-28',
+    title: 'File properties panel',
+    changes: [
+      'Properties button (ℹ) on each file row opens a panel showing HeadObject metadata',
+      'Displays Content-Type, file size, last modified date, ETag, storage class, version ID, and any custom x-amz-meta-* headers',
+    ],
+  },
   {
     version: '1.4.0',
     date: '2026-05-28',
