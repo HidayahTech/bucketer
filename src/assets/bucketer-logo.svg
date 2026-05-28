@@ -1,0 +1,65 @@
+<svg viewBox="0 0 100 115" xmlns="http://www.w3.org/2000/svg" width="400" height="460">
+  <defs>
+    <clipPath id="cc">
+      <path d="M8,36 L22,104 L78,104 L92,36 Z"/>
+    </clipPath>
+  </defs>
+
+  <!-- Handle: angular peaked -->
+  <path d="M18,32 L50,10 L82,32" fill="none" stroke="#38BDF8" stroke-width="5" stroke-linejoin="round" stroke-linecap="round"/>
+
+  <!-- Bucket body -->
+  <path d="M8,36 L22,104 L78,104 L92,36 Z" fill="#111827" stroke="#2D3748" stroke-width="0.5"/>
+
+  <!-- Objects (clipped to bucket body) -->
+  <g clip-path="url(#cc)">
+
+    <!-- Document: portrait card, text lines -->
+    <g transform="translate(24,47) rotate(-9,6,8)">
+      <rect width="12" height="16" rx="1.5" fill="#0F2033" stroke="#38BDF8" stroke-width=".7"/>
+      <line x1="1.5" y1="5"   x2="10.5" y2="5"   stroke="#38BDF8" stroke-width="1.3" stroke-linecap="round" opacity=".9"/>
+      <line x1="1.5" y1="8.5" x2="9"    y2="8.5"  stroke="#38BDF8" stroke-width="1.3" stroke-linecap="round" opacity=".9"/>
+      <line x1="1.5" y1="12"  x2="10.5" y2="12"   stroke="#38BDF8" stroke-width="1.3" stroke-linecap="round" opacity=".9"/>
+    </g>
+
+    <!-- Image: landscape card, mountain + sun -->
+    <g transform="translate(54,43) rotate(7,9,6.5)">
+      <rect width="18" height="13" rx="1.5" fill="#0F2033" stroke="#38BDF8" stroke-width=".7"/>
+      <polygon points="2,11 9,3 16,11" fill="#38BDF8" opacity=".82"/>
+      <circle cx="15.5" cy="3.5" r="1.8" fill="#38BDF8" opacity=".82"/>
+    </g>
+
+    <!-- Video: wide card, play triangle -->
+    <g transform="translate(32,62) rotate(-5,10,6.5)">
+      <rect width="20" height="13" rx="1.5" fill="#0F2033" stroke="#38BDF8" stroke-width=".7"/>
+      <polygon points="5,1.5 5,11.5 16.5,6.5" fill="#38BDF8" opacity=".88"/>
+    </g>
+
+    <!-- Audio: narrow tall card, waveform bars -->
+    <g transform="translate(26,73) rotate(11,5,8)">
+      <rect width="10" height="16" rx="1.5" fill="#0F2033" stroke="#38BDF8" stroke-width=".7"/>
+      <rect x="1"   y="7"   width="2.2" height="7"    rx=".8" fill="#38BDF8" opacity=".75"/>
+      <rect x="3.9" y="2.5" width="2.2" height="11.5" rx=".8" fill="#38BDF8" opacity=".92"/>
+      <rect x="6.8" y="5"   width="2.2" height="9"    rx=".8" fill="#38BDF8" opacity=".82"/>
+    </g>
+
+    <!-- Spreadsheet: square card, grid -->
+    <g transform="translate(59,68) rotate(-7,7,7)">
+      <rect width="14" height="14" rx="1.5" fill="#0F2033" stroke="#38BDF8" stroke-width=".7"/>
+      <line x1="7"   y1="1.5" x2="7"    y2="12.5" stroke="#38BDF8" stroke-width="1.1" opacity=".88"/>
+      <line x1="1.5" y1="5"   x2="12.5" y2="5"    stroke="#38BDF8" stroke-width="1.1" opacity=".88"/>
+      <line x1="1.5" y1="9"   x2="12.5" y2="9"    stroke="#38BDF8" stroke-width="1.1" opacity=".88"/>
+    </g>
+
+    <!-- Code: portrait card, angle brackets -->
+    <g transform="translate(47,82) rotate(5,6,8)">
+      <rect width="12" height="16" rx="1.5" fill="#0F2033" stroke="#38BDF8" stroke-width=".7"/>
+      <path d="M5,3.5 L2,8 L5,12.5"  fill="none" stroke="#38BDF8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity=".88"/>
+      <path d="M7,3.5 L10,8 L7,12.5" fill="none" stroke="#38BDF8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity=".88"/>
+    </g>
+
+  </g>
+
+  <!-- Rim (drawn last, on top) -->
+  <rect x="4" y="26" width="92" height="14" rx="7" fill="#1E293B"/>
+</svg>
