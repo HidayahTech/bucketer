@@ -1,6 +1,17 @@
-export const CURRENT_VERSION = '1.0.0';
+export const CURRENT_VERSION = '1.1.0';
 
 export const CHANGELOG = [
+  {
+    version: '1.1.0',
+    date: '2026-05-28',
+    title: 'Filter / search',
+    changes: [
+      'Filter bar above the file table to search files and folders by name in real time',
+      'Shows a match count (X of Y) when a filter is active',
+      'Filter resets automatically when navigating into a different folder',
+      'Preview navigation respects the active filter so arrow keys stay within results',
+    ],
+  },
   {
     version: '1.0.0',
     date: '2026-05-28',

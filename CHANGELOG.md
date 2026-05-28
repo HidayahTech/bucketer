@@ -5,6 +5,13 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.1.0] — 2026-05-28
+
+- Filter bar above the file table to search files and folders by name in real time
+- Shows a match count (X of Y) when a filter is active
+- Filter resets automatically when navigating into a different folder
+- Preview navigation respects the active filter so arrow keys stay within results
+
 ## [1.0.0] — 2026-05-28
 
 Initial release.

@@ -510,6 +510,19 @@ details[open] .upload-log-summary::before { transform: rotate(90deg); }
   min-width: 280px;
 }
 
+/* ── Filter bar ──────────────────────────────────────────────────────────── */
+.filter-bar { display: flex; align-items: center; gap: .5rem; margin: .5rem 0 .75rem; }
+.filter-input {
+  flex: 1; max-width: 280px;
+  padding: .3rem .6rem;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  font-size: .85rem; font-family: var(--font);
+  background: var(--surface); color: var(--text);
+  transition: border-color var(--transition);
+}
+.filter-input:focus { outline: none; border-color: var(--border-focus); }
+.filter-count { font-size: .78rem; color: var(--text-muted); white-space: nowrap; }
+
 /* ── Changelog modal ─────────────────────────────────────────────────────── */
 .changelog-dialog { max-width: 540px; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column; }
 .changelog-body { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1.25rem; padding-right: .25rem; font-size: .875rem; }

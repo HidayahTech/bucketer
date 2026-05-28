@@ -167,6 +167,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const [detectedContentType, setDetectedContentType] = useState(null);
   const [previewText, setPreviewText] = useState(null);
   const [previewTruncated, setPreviewTruncated] = useState(false);
+  const [filterQuery, setFilterQuery] = useState('');
   const [tableCopyKey, setTableCopyKey] = useState(null);
   const [tableCopied, setTableCopied] = useState(null);
   const [previewCopyOpen, setPreviewCopyOpen] = useState(false);
@@ -209,6 +210,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     setIsTruncated(false);
     setListError(null);
     setDownloadError(null);
+    setFilterQuery('');
     fetchPage(newPrefix, null, true);
   }
   navigateRef.current = navigateTo;
@@ -530,7 +532,15 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     return sortDir === 'asc' ? cmp : -cmp;
   });
 
-  const isEmpty = !listing && sortedItems.length === 0 && sortedFolders.length === 0 && !listError;
+  const filterQ = filterQuery.trim().toLowerCase();
+  const visibleFolders = filterQ
+    ? sortedFolders.filter(cp => cp.slice(prefix.length).replace(/\/$/, '').toLowerCase().includes(filterQ))
+    : sortedFolders;
+  const visibleItems = filterQ
+    ? sortedItems.filter(obj => obj.Key.slice(prefix.length).toLowerCase().includes(filterQ))
+    : sortedItems;
+
+  const isEmpty = !listing && visibleItems.length === 0 && visibleFolders.length === 0 && !listError;
 
   const versioningCaveat = provider === 'b2'
     ? 'Backblaze B2 may retain older versions of this file. The current version will be hidden but not immediately purged from storage.'
@@ -538,7 +548,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
 
   // Preview navigation — ordered to match the current display sort.
   // Includes extension-less files since they may have a previewable ContentType.
-  const previewableItems = sortedItems.filter(obj => mediaKind(obj.Key) || !leafName(obj.Key).includes('.'));
+  const previewableItems = visibleItems.filter(obj => mediaKind(obj.Key) || !leafName(obj.Key).includes('.'));
   const previewIdx = previewItem ? previewableItems.findIndex(o => o.Key === previewItem.Key) : -1;
   const prevPreviewItem = previewIdx > 0 ? previewableItems[previewIdx - 1] : null;
   const nextPreviewItem = previewIdx >= 0 && previewIdx < previewableItems.length - 1 ? previewableItems[previewIdx + 1] : null;
@@ -727,6 +737,23 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
 
       <Breadcrumb prefix={prefix} onNavigate={navigateTo} />
 
+      {(sortedItems.length > 0 || sortedFolders.length > 0 || filterQ) && (
+        <div class="filter-bar">
+          <input
+            class="filter-input"
+            type="search"
+            placeholder="Filter by name…"
+            value={filterQuery}
+            onInput={e => setFilterQuery(e.target.value)}
+          />
+          {filterQ && (
+            <span class="filter-count">
+              {visibleItems.length + visibleFolders.length} of {sortedItems.length + sortedFolders.length}
+            </span>
+          )}
+        </div>
+      )}
+
       {downloadError && (
         <ErrorBlock
           error={downloadError}
@@ -744,7 +771,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
       )}
 
       {isEmpty
-        ? <div class="empty-state">This prefix is empty.</div>
+        ? <div class="empty-state">{filterQ ? 'No files match the filter.' : 'This prefix is empty.'}</div>
         : (
           <table class="file-table">
             <thead>
@@ -756,7 +783,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
               </tr>
             </thead>
             <tbody>
-              {sortedFolders.map(cp => (
+              {visibleFolders.map(cp => (
                 <tr key={cp} class="file-row" onClick={() => navigateTo(cp)} style={{ cursor: 'pointer' }}>
                   <td class="col-name">
                     <span class="file-icon">📁</span>
@@ -776,7 +803,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                 </tr>
               ))}
 
-              {sortedItems.map(obj => {
+              {visibleItems.map(obj => {
                 const display = obj.Key.slice(prefix.length);
                 const isDownloading = downloadingKey === obj.Key;
                 return (
