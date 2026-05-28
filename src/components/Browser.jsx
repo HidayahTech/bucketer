@@ -92,6 +92,72 @@ function CopyLinkPopover({ client, bucket, fileKey, onClose, onCopied, direction
   );
 }
 
+function BatchCopyLinkPopover({ client, bucket, keys, onClose, onCopied }) {
+  const [showCustom, setShowCustom] = useState(false);
+  const [customValue, setCustomValue] = useState('1');
+  const [customUnit, setCustomUnit] = useState('hours');
+  const [copying, setCopying] = useState(false);
+  const [error, setError] = useState(null);
+
+  async function copyLinks(expiresIn) {
+    setCopying(true);
+    setError(null);
+    try {
+      const urls = await Promise.all(keys.map(key => getSignedUrl(
+        client,
+        new GetObjectCommand({ Bucket: bucket, Key: key, ResponseContentDisposition: 'inline' }),
+        { expiresIn },
+      )));
+      await navigator.clipboard.writeText(urls.join('\n'));
+      onCopied(keys.length);
+      onClose();
+    } catch (err) {
+      setError(err.message || String(err));
+      setCopying(false);
+    }
+  }
+
+  function handleCustomCopy() {
+    const mult = { minutes: 60, hours: 3600, days: 86400 };
+    const n = parseInt(customValue, 10);
+    if (!n || n < 1) { setError('Enter a positive number.'); return; }
+    const seconds = n * mult[customUnit];
+    if (seconds > 604800) { setError('Maximum is 7 days.'); return; }
+    copyLinks(seconds);
+  }
+
+  return (
+    <div class="copy-link-popover copy-link-popover--up">
+      <div class="copy-link-presets">
+        {COPY_LINK_PRESETS.map(p => (
+          <button key={p.seconds} class="btn btn-ghost btn-sm" onClick={() => copyLinks(p.seconds)} disabled={copying}>
+            {p.label}
+          </button>
+        ))}
+        <button class="btn btn-ghost btn-sm" onClick={() => setShowCustom(v => !v)} disabled={copying}>
+          Custom…
+        </button>
+      </div>
+      {showCustom && (
+        <div class="copy-link-custom">
+          <input type="number" min="1" class="copy-link-num" value={customValue}
+            onInput={e => { setCustomValue(e.target.value); setError(null); }} />
+          <select class="copy-link-unit" value={customUnit} onChange={e => setCustomUnit(e.target.value)}>
+            <option value="minutes">min</option>
+            <option value="hours">hrs</option>
+            <option value="days">days</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onClick={handleCustomCopy} disabled={copying}>
+            {copying ? <span class="spinner" /> : 'Copy'}
+          </button>
+        </div>
+      )}
+      {error && <div class="copy-link-error">{error}</div>}
+      <div class="copy-link-note">{keys.length} link{keys.length !== 1 ? 's' : ''}, one per line. Expires after selected duration.</div>
+    </div>
+  );
+}
+
 function Breadcrumb({ prefix, onNavigate }) {
   if (!prefix) return (
     <div class="breadcrumb"><span class="current">/ (root)</span></div>
@@ -168,6 +234,12 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const [previewText, setPreviewText] = useState(null);
   const [previewTruncated, setPreviewTruncated] = useState(false);
   const [filterQuery, setFilterQuery] = useState('');
+  const [selectedKeys, setSelectedKeys] = useState(new Set());
+  const [batchDeletePending, setBatchDeletePending] = useState(false);
+  const [batchDeleting, setBatchDeleting] = useState(false);
+  const [batchDeleteError, setBatchDeleteError] = useState(null);
+  const [batchCopyOpen, setBatchCopyOpen] = useState(false);
+  const [batchCopied, setBatchCopied] = useState(null);
   const [newFolderOpen, setNewFolderOpen] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [newFolderError, setNewFolderError] = useState(null);
@@ -179,6 +251,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const abortRef = useRef(null);
   const tableCopyWrapRef = useRef(null);
   const previewCopyWrapRef = useRef(null);
+  const batchCopyWrapRef = useRef(null);
   // Always-current reference to navigateTo for the popstate handler (which has [] deps)
   const navigateRef = useRef(null);
   // Always-current reference to preview navigator, updated after sortedItems is computed
@@ -215,6 +288,9 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     setListError(null);
     setDownloadError(null);
     setFilterQuery('');
+    setSelectedKeys(new Set());
+    setBatchCopyOpen(false);
+    setBatchCopied(null);
     fetchPage(newPrefix, null, true);
   }
   navigateRef.current = navigateTo;
@@ -302,6 +378,49 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
   }, [previewCopyOpen]);
+
+  useEffect(() => {
+    if (!batchCopyOpen) return;
+    function onDown(e) {
+      if (batchCopyWrapRef.current && !batchCopyWrapRef.current.contains(e.target)) setBatchCopyOpen(false);
+    }
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [batchCopyOpen]);
+
+  function toggleSelect(key, e) {
+    e.stopPropagation();
+    setSelectedKeys(prev => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  }
+
+  function toggleSelectAll(visItems) {
+    const allSelected = visItems.length > 0 && visItems.every(o => selectedKeys.has(o.Key));
+    setSelectedKeys(allSelected ? new Set() : new Set(visItems.map(o => o.Key)));
+  }
+
+  async function handleBatchDelete() {
+    setBatchDeleting(true);
+    setBatchDeleteError(null);
+    const keys = [...selectedKeys];
+    try {
+      for (let i = 0; i < keys.length; i += 1000) {
+        const batch = keys.slice(i, i + 1000).map(Key => ({ Key }));
+        await client.send(new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: batch, Quiet: true } }));
+      }
+      onCapabilityChange('delete', 'permitted');
+      setItems(prev => prev.filter(o => !selectedKeys.has(o.Key)));
+      setSelectedKeys(new Set());
+      setBatchDeletePending(false);
+    } catch (err) {
+      setBatchDeleteError(err);
+    } finally {
+      setBatchDeleting(false);
+    }
+  }
 
   function handleTableCopyLinkCopied(key) {
     setTableCopied(key);
@@ -572,6 +691,8 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     : sortedItems;
 
   const isEmpty = !listing && visibleItems.length === 0 && visibleFolders.length === 0 && !listError;
+  const allVisibleSelected = visibleItems.length > 0 && visibleItems.every(o => selectedKeys.has(o.Key));
+  const someVisibleSelected = !allVisibleSelected && visibleItems.some(o => selectedKeys.has(o.Key));
 
   const versioningCaveat = provider === 'b2'
     ? 'Backblaze B2 may retain older versions of this file. The current version will be hidden but not immediately purged from storage.'
@@ -667,6 +788,26 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                 <button class="btn btn-ghost btn-sm" onClick={closeFolderDeleteModal}>Close</button>
               </div>
             </>)}
+          </div>
+        </div>
+      )}
+
+      {batchDeletePending && (
+        <div class="modal-overlay" onClick={() => setBatchDeletePending(false)}>
+          <div class="modal-dialog" onClick={e => e.stopPropagation()}>
+            <div class="modal-title">Delete {selectedKeys.size} file{selectedKeys.size !== 1 ? 's' : ''}?</div>
+            <div class="modal-body">
+              <p class="modal-caveat">{versioningCaveat}</p>
+              {batchDeleteError && (
+                <div class="modal-error">Delete failed: {batchDeleteError.message || String(batchDeleteError)}</div>
+              )}
+            </div>
+            <div class="modal-actions">
+              <button class="btn btn-ghost btn-sm" onClick={() => setBatchDeletePending(false)} disabled={batchDeleting}>Cancel</button>
+              <button class="btn btn-danger btn-sm" onClick={handleBatchDelete} disabled={batchDeleting}>
+                {batchDeleting ? <span class="spinner" /> : `Delete ${selectedKeys.size}`}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -818,6 +959,32 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
         </div>
       </div>
 
+      {selectedKeys.size > 0 && (
+        <div class="batch-bar">
+          <span class="batch-count">{selectedKeys.size} selected</span>
+          <button class="btn btn-ghost btn-sm" onClick={() => setSelectedKeys(new Set())}>Clear</button>
+          <div class="copy-link-wrap" ref={batchCopyOpen ? batchCopyWrapRef : undefined} style={{ marginLeft: 'auto' }}>
+            <button class="btn btn-ghost btn-sm" onClick={() => setBatchCopyOpen(v => !v)} disabled={!canDownload}>
+              {batchCopied !== null ? `✓ ${batchCopied} link${batchCopied !== 1 ? 's' : ''} copied` : 'Copy links'}
+            </button>
+            {batchCopyOpen && (
+              <BatchCopyLinkPopover
+                client={client} bucket={bucket} keys={[...selectedKeys]}
+                onClose={() => setBatchCopyOpen(false)}
+                onCopied={(count) => { setBatchCopied(count); setTimeout(() => setBatchCopied(null), 2000); }}
+              />
+            )}
+          </div>
+          <button
+            class="btn btn-danger btn-sm"
+            onClick={() => { setBatchDeleteError(null); setBatchDeletePending(true); }}
+            disabled={!canDelete}
+          >
+            Delete {selectedKeys.size}
+          </button>
+        </div>
+      )}
+
       {downloadError && (
         <ErrorBlock
           error={downloadError}
@@ -840,6 +1007,15 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
           <table class="file-table">
             <thead>
               <tr>
+                <th class="col-check">
+                  <input
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    ref={el => { if (el) el.indeterminate = someVisibleSelected; }}
+                    onChange={() => toggleSelectAll(visibleItems)}
+                    title="Select all"
+                  />
+                </th>
                 <SortTh col="name" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort}>Name</SortTh>
                 <SortTh col="size" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort}>Size</SortTh>
                 <SortTh col="modified" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort}>Modified</SortTh>
@@ -849,6 +1025,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
             <tbody>
               {visibleFolders.map(cp => (
                 <tr key={cp} class="file-row" onClick={() => navigateTo(cp)} style={{ cursor: 'pointer' }}>
+                  <td class="col-check" />
                   <td class="col-name">
                     <span class="file-icon">📁</span>
                     <span class="file-dir">{cp.slice(prefix.length).replace(/\/$/, '')}</span>
@@ -870,8 +1047,12 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
               {visibleItems.map(obj => {
                 const display = obj.Key.slice(prefix.length);
                 const isDownloading = downloadingKey === obj.Key;
+                const isSelected = selectedKeys.has(obj.Key);
                 return (
-                  <tr key={obj.Key} class="file-row">
+                  <tr key={obj.Key} class={`file-row${isSelected ? ' file-row-selected' : ''}`}>
+                    <td class="col-check" onClick={e => toggleSelect(obj.Key, e)}>
+                      <input type="checkbox" checked={isSelected} onChange={e => toggleSelect(obj.Key, e)} />
+                    </td>
                     <td class="col-name">
                       <span class="file-icon">📄</span>
                       <span

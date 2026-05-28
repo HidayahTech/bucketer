@@ -5,6 +5,13 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.3.0] — 2026-05-28
+
+- Checkboxes on file rows and a select-all header checkbox for bulk selection
+- Batch delete: confirm and delete all selected files in one operation
+- Batch copy links: generate presigned URLs for all selected files (one per line) with the same duration picker as single-file copy
+- Selection is cleared automatically on folder navigation
+
 ## [1.2.0] — 2026-05-28
 
 - New folder button in the browser toolbar creates a folder at the current prefix

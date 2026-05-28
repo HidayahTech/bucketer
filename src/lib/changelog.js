@@ -1,6 +1,17 @@
-export const CURRENT_VERSION = '1.2.0';
+export const CURRENT_VERSION = '1.3.0';
 
 export const CHANGELOG = [
+  {
+    version: '1.3.0',
+    date: '2026-05-28',
+    title: 'Multi-select and batch operations',
+    changes: [
+      'Checkboxes on file rows and a select-all header checkbox for bulk selection',
+      'Batch delete: confirm and delete all selected files in one operation',
+      'Batch copy links: generate presigned URLs for all selected files (one per line) with the same duration picker as single-file copy',
+      'Selection is cleared automatically on folder navigation',
+    ],
+  },
   {
     version: '1.2.0',
     date: '2026-05-28',
