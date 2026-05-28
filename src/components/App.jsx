@@ -17,6 +17,8 @@ import { SettingsPanel } from './SettingsPanel.jsx';
 import { UploadLog } from './UploadLog.jsx';
 import { ErrorBlock } from './ErrorBlock.jsx';
 import { UpdateBanner } from './UpdateBanner.jsx';
+import { ChangelogModal } from './ChangelogModal.jsx';
+import { CURRENT_VERSION } from '../lib/changelog.js';
 
 // Session states: disconnected | connecting | connected | failed
 export function App() {
@@ -31,6 +33,7 @@ export function App() {
   const [logKey, setLogKey] = useState(0);         // incremented to refresh upload log
   const [linkCopied, setLinkCopied] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [changelogOpen, setChangelogOpen] = useState(false);
   const urlParamsPresent = hasUrlParams();
 
   // Capabilities are stored in localStorage and updated reactively (§4.12)
@@ -124,6 +127,7 @@ export function App() {
 
   return (
     <div id="app">
+      {changelogOpen && <ChangelogModal onClose={() => setChangelogOpen(false)} />}
       <header class="app-header">
         {session === 'connected' && (
           <button
@@ -158,6 +162,9 @@ export function App() {
             Disconnect
           </button>
         )}
+        <button class="btn-version" onClick={() => setChangelogOpen(true)} title="View changelog">
+          v{CURRENT_VERSION}
+        </button>
       </header>
 
       <UpdateBanner />
