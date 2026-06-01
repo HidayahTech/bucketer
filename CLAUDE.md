@@ -40,6 +40,30 @@ Whenever a real bug is encountered and fixed, it must be logged in `BUG-LOG.md` 
 
 Real bugs are the highest-value source of test cases. A test derived from a bug that actually happened is worth more than a speculative edge case, because it documents a failure mode the project has already encountered. When writing tests, consult `BUG-LOG.md` first and ensure every entry has corresponding test coverage.
 
+## Test Suite
+
+Tests live in `test/` and run with `node --test` (no framework). The suite has two layers:
+
+**Unit tests — pure Node, no build step needed:**
+- `format.test.js` — `formatBytes`, `formatSpeed`, `formatEta`, `leafName`, `parseS3Error`, `isPermissionError`
+- `media.test.js` — `mediaKind`, `mimeKind`, `mimeType`
+- `provider.test.js` — `detectProvider`, `extractRegion`, `requiresPathStyle`, `defaultMaxKeys`, `needsCorsConfig`
+- `upload-queue.test.js` — `UploadQueue` concurrency, clear, error handling
+- `calc-part-size.test.js` — `calcPartSize` (S3 5 MB floor, 10,000-part ceiling)
+- `collect-parts.test.js` — `collectParts` pagination (BUG-007); uses mock S3 client
+- `url-params.test.js` — `buildShareUrl`, `readUrlParams`, `hasUrlParams`, `pushPrefixHistory`; uses `global.window` mock
+- `indexeddb-pure.test.js` — `buildFileIdentity`, `fileIdentityMatches`, `uploadExpiryWarningMs`, tab-conflict functions; uses `global.localStorage` mock
+- `indexeddb-storage.test.js` — `saveResumeRecord`/`loadResumeRecord`/`deleteResumeRecord`, `computeFileHash`, `buildFileIdentityWithHash`, upload log; uses `fake-indexeddb`
+- `storage.test.js` — all credential and settings functions; uses `global.localStorage`/`global.sessionStorage` mocks
+- `file-entries.test.js` — `collectFileEntries` traversal and >100-file pagination; uses a pure-JS FileSystemEntry mock
+- `s3-client.test.js` — `createS3Client` region resolution and `forcePathStyle`
+- `cors-config.test.js` — `corsJson` structure, AllowedMethods (BUG-012), required SDK headers
+
+**Build output assertions — require `npm run build` first:**
+- `build.test.js` — placeholder removal (BUG-001), Preact JSX transform (BUG-002), version consistency, CORS DELETE (BUG-012), single-bundle structure
+
+**Adding new tests:** Write `test/<name>.test.js`. The test command (`node --test test/*.test.js`) picks it up automatically. For browser globals, set `global.<name>` before the module import. For IndexedDB, use `fake-indexeddb`.
+
 ## Setup
 
 ```bash

@@ -7,6 +7,11 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.12.7] — 2026-06-01 — Document test suite in CLAUDE.md and update BUG-LOG
+
+- Added "Test Suite" section to `CLAUDE.md`: lists all 14 test files with their scope, explains the two-layer structure (unit vs build-output), and documents how to add new tests
+- Updated `BUG-LOG.md`: added **Coverage:** lines to BUG-001, BUG-002, BUG-007, BUG-008, BUG-012, BUG-013, BUG-015 linking each to its implementing test file and suite
+
 ## [1.12.6] — 2026-06-01 — Fill remaining test gaps
 
 - `mimeType()` tests added to `test/media.test.js`: 11 tests covering MIME type lookup, case-insensitivity, unknown/no-extension returns null, nested path handling

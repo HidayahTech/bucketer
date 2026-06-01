@@ -1,8 +1,17 @@
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.12.6';
+export const CURRENT_VERSION = '1.12.7';
 
 export const CHANGELOG = [
+  {
+    "version": "1.12.7",
+    "date": "2026-06-01",
+    "title": "Document test suite in CLAUDE.md and update BUG-LOG",
+    "changes": [
+      "Added \"Test Suite\" section to CLAUDE.md: lists all 14 test files with their scope, explains the two-layer structure (unit vs build-output), and documents how to add new tests",
+      "Updated BUG-LOG.md: added **Coverage:** lines to BUG-001, BUG-002, BUG-007, BUG-008, BUG-012, BUG-013, BUG-015 linking each to its implementing test file and suite"
+    ]
+  },
   {
     "version": "1.12.6",
     "date": "2026-06-01",
