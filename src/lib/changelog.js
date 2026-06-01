@@ -1,8 +1,19 @@
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.11.5';
+export const CURRENT_VERSION = '1.11.6';
 
 export const CHANGELOG = [
+  {
+    "version": "1.11.6",
+    "date": "2026-06-01",
+    "title": "Add url-params test suite",
+    "changes": [
+      "New test/url-params.test.js: 19 tests covering buildShareUrl, readUrlParams, hasUrlParams, and pushPrefixHistory",
+      "BUG-013 regression test: params must live in the hash fragment, never the query string",
+      "Credential exclusion test: keyId and secretKey must never appear in share URLs",
+      "pushPrefixHistory tests: hash vs query string, pushState vs replaceState, param preservation, root navigation removes prefix key"
+    ]
+  },
   {
     "version": "1.11.5",
     "date": "2026-06-01",

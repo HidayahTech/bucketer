@@ -7,6 +7,13 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.11.6] — 2026-06-01 — Add url-params test suite
+
+- New `test/url-params.test.js`: 19 tests covering `buildShareUrl`, `readUrlParams`, `hasUrlParams`, and `pushPrefixHistory`
+- BUG-013 regression test: params must live in the hash fragment, never the query string
+- Credential exclusion test: `keyId` and `secretKey` must never appear in share URLs
+- `pushPrefixHistory` tests: hash vs query string, pushState vs replaceState, param preservation, root navigation removes prefix key
+
 ## [1.11.5] — 2026-06-01 — Improve test suite quality
 
 - Removed redundant lookup-table assertions from media.test.js; kept one representative per category plus tests that exercise actual logic (case-insensitivity, path handling, charset stripping)
