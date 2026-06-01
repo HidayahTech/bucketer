@@ -7,6 +7,14 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.12.0] — 2026-06-01 — IndexedDB resume record and file hash tests
+
+- Added `fake-indexeddb` as devDependency to provide an in-memory IndexedDB in Node
+- New `test/indexeddb-storage.test.js`: 11 tests covering `saveResumeRecord`, `loadResumeRecord`, `deleteResumeRecord`, and `computeFileHash`
+- Resume record tests: round-trip fidelity, null return for missing key, overwrite at same key, independent keys
+- Delete tests: removal confirmed, no-op delete resolves cleanly, sibling keys are preserved
+- `computeFileHash` tests: determinism, content sensitivity, and the partial-hash invariant (only head+tail 64 KB are hashed — two files with identical endpoints but different middle produce the same hash)
+
 ## [1.11.9] — 2026-06-01 — Extract calcPartSize and add tests
 
 - Moved `calcPartSize` from `UploadQueue.jsx` into `src/lib/upload-queue.js` (exported) so it can be tested without loading JSX

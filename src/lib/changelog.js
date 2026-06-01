@@ -1,8 +1,20 @@
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.11.9';
+export const CURRENT_VERSION = '1.12.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.12.0",
+    "date": "2026-06-01",
+    "title": "IndexedDB resume record and file hash tests",
+    "changes": [
+      "Added fake-indexeddb as devDependency to provide an in-memory IndexedDB in Node",
+      "New test/indexeddb-storage.test.js: 11 tests covering saveResumeRecord, loadResumeRecord, deleteResumeRecord, and computeFileHash",
+      "Resume record tests: round-trip fidelity, null return for missing key, overwrite at same key, independent keys",
+      "Delete tests: removal confirmed, no-op delete resolves cleanly, sibling keys are preserved",
+      "computeFileHash tests: determinism, content sensitivity, and the partial-hash invariant (only head+tail 64 KB are hashed — two files with identical endpoints but different middle produce the same hash)"
+    ]
+  },
   {
     "version": "1.11.9",
     "date": "2026-06-01",
