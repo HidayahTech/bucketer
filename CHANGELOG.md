@@ -7,6 +7,13 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.11.7] — 2026-06-01 — Add indexeddb pure-function tests
+
+- New `test/indexeddb-pure.test.js`: 18 tests covering pure functions and localStorage-based tab conflict detection
+- BUG-015 regression tests: `uploadExpiryWarningMs('b2')` must return `null`; R2 and generic must return 7 days
+- `buildFileIdentity` and `fileIdentityMatches`: identity construction and all three mismatch cases
+- Tab conflict detection: this-tab vs other-tab discrimination, inactive cleanup, multi-key independence, other-tab entry not removed by this tab's `markUploadInactive`
+
 ## [1.11.6] — 2026-06-01 — Add url-params test suite
 
 - New `test/url-params.test.js`: 19 tests covering `buildShareUrl`, `readUrlParams`, `hasUrlParams`, and `pushPrefixHistory`

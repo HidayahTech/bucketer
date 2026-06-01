@@ -1,8 +1,19 @@
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.11.6';
+export const CURRENT_VERSION = '1.11.7';
 
 export const CHANGELOG = [
+  {
+    "version": "1.11.7",
+    "date": "2026-06-01",
+    "title": "Add indexeddb pure-function tests",
+    "changes": [
+      "New test/indexeddb-pure.test.js: 18 tests covering pure functions and localStorage-based tab conflict detection",
+      "BUG-015 regression tests: uploadExpiryWarningMs('b2') must return null; R2 and generic must return 7 days",
+      "buildFileIdentity and fileIdentityMatches: identity construction and all three mismatch cases",
+      "Tab conflict detection: this-tab vs other-tab discrimination, inactive cleanup, multi-key independence, other-tab entry not removed by this tab's markUploadInactive"
+    ]
+  },
   {
     "version": "1.11.6",
     "date": "2026-06-01",
