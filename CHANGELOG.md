@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.11.2] — 2026-06-01 — Document update poller in README
+
+- Expanded security model section to explicitly state the update poll targets the app's own URL only, never a third-party host, and stops once a new build is detected
+
 ## [1.11.1] — 2026-06-01 — Sandbox PDF preview iframe
 
 - Added `sandbox=""` to the PDF preview `<iframe>` — disables scripts, forms, popups, same-origin access, and top navigation; native PDF rendering is unaffected

@@ -1,8 +1,16 @@
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.11.1';
+export const CURRENT_VERSION = '1.11.2';
 
 export const CHANGELOG = [
+  {
+    "version": "1.11.2",
+    "date": "2026-06-01",
+    "title": "Document update poller in README",
+    "changes": [
+      "Expanded security model section to explicitly state the update poll targets the app's own URL only, never a third-party host, and stops once a new build is detected"
+    ]
+  },
   {
     "version": "1.11.1",
     "date": "2026-06-01",

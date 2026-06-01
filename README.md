@@ -6,7 +6,7 @@ A browser-based tool for uploading, downloading, and managing objects in an S3-c
 
 ## Security model
 
-Bucketer has no backend. The only network requests it makes are to your S3 endpoint and a same-origin poll to detect when a new build is available — there is no Bucketer-controlled server, no analytics, and no telemetry.
+Bucketer has no backend. The only network requests it makes are to your S3 endpoint and a same-origin poll to detect when a new build is available — there is no Bucketer-controlled server, no analytics, and no telemetry. The update poll requests the app's own URL (`window.location`), never a third-party host; it stops as soon as a new build is detected.
 
 **Trusts:** the browser, the host serving the HTML file, and every library bundled into it. A compromised host or a malicious dependency could read credentials from `sessionStorage`. The `connect-src` CSP in the deployment examples limits where the page can make requests, which constrains what a malicious dependency could exfiltrate — deploy with a tightly scoped `connect-src` for the strongest protection.
 
