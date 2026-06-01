@@ -1,9 +1,20 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.12.12';
+export const CURRENT_VERSION = '1.12.13';
 
 export const CHANGELOG = [
+  {
+    "version": "1.12.13",
+    "date": "2026-06-01",
+    "title": "Auto-tag on push",
+    "changes": [
+      "Pre-push hook now runs npm run build before npm test (full local validation)",
+      "Pre-push hook auto-creates an annotated version tag if one does not exist for the current package.json version",
+      "push.followTags true configured by npm install via the prepare script — tags travel with every push automatically",
+      "CLAUDE.md updated to document the tagging guarantee"
+    ]
+  },
   {
     "version": "1.12.12",
     "date": "2026-06-01",

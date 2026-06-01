@@ -7,6 +7,13 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.12.13] — 2026-06-01 — Auto-tag on push
+
+- Pre-push hook now runs `npm run build` before `npm test` (full local validation)
+- Pre-push hook auto-creates an annotated version tag if one does not exist for the current `package.json` version
+- `push.followTags true` configured by `npm install` via the `prepare` script — tags travel with every push automatically
+- CLAUDE.md updated to document the tagging guarantee
+
 ## [1.12.12] — 2026-06-01 — Build before test in GitLab CI
 
 - GitLab CI now runs `npm run build` before `npm test`

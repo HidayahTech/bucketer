@@ -1,15 +1,28 @@
 #!/bin/sh
-# Pre-push hook — test suite must pass before any push is accepted.
+# Pre-push hook — builds, runs the full test suite, and ensures the current
+# version is tagged before pushing. The tag is pushed automatically via
+# push.followTags (configured by `npm install` via the prepare script).
 #
 # To override in an emergency (human operator only):
 #   git push --no-verify
 #
 # This hook is configured automatically by `npm install` via the `prepare` script.
-# If it stops running, re-run: npm run setup-hooks
 
 set -e
 
+echo "Building..."
+npm run build
+
 echo "Running tests..."
 npm test
+
+VERSION=$(node -p "require('./package.json').version")
+TAG="v${VERSION}"
+if git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
+  echo "Tag ${TAG} already exists."
+else
+  git tag -a "${TAG}" -m "${TAG}"
+  echo "Tag ${TAG} created — will be pushed automatically."
+fi
 
 echo "Tests passed — push proceeding."

@@ -1,12 +1,12 @@
 {
   "type": "module",
-  "version": "1.12.12",
+  "version": "1.12.13",
   "scripts": {
     "build": "node build.mjs",
     "dev": "node build.mjs --dev",
     "serve": "node serve.mjs",
     "test": "node --test test/*.test.js",
-    "prepare": "git config core.hooksPath .githooks 2>/dev/null || true"
+    "prepare": "git config core.hooksPath .githooks 2>/dev/null; git config push.followTags true 2>/dev/null; true"
   },
   "engines": {
     "node": ">=18.0.0"
