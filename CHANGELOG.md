@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.10.7] — 2026-06-01 — Move internal planning docs to docs/
+
+- Moved `IMPROVEMENT-PLAN.md`, `SPEC-DRIFT.md`, `QUESTIONS.md`, `TODO.md`, and `s3-browser-spec-v0.15.md` from the repo root into `docs/`
+
 ## [1.10.6] — 2026-06-01 — Drop full fetch from update checker
 
 - Update checker no longer pre-fetches the full page when a new build is detected

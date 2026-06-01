@@ -1,8 +1,16 @@
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.10.6';
+export const CURRENT_VERSION = '1.10.7';
 
 export const CHANGELOG = [
+  {
+    "version": "1.10.7",
+    "date": "2026-06-01",
+    "title": "Move internal planning docs to docs/",
+    "changes": [
+      "Moved IMPROVEMENT-PLAN.md, SPEC-DRIFT.md, QUESTIONS.md, TODO.md, and s3-browser-spec-v0.15.md from the repo root into docs/"
+    ]
+  },
   {
     "version": "1.10.6",
     "date": "2026-06-01",
