@@ -7,6 +7,13 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.12.3] — 2026-06-01 — Add s3-client.js tests
+
+- New `test/s3-client.test.js`: 12 tests for `createS3Client` region resolution and `forcePathStyle`
+- Region priority: `regionOverride` > `extractRegion()` > `us-east-1` fallback; all three tiers tested
+- R2 region is always `auto`; B2 and AWS extract from endpoint subdomain
+- `forcePathStyle` true for B2 and MinIO; false for R2, AWS, generic
+
 ## [1.12.2] — 2026-06-01 — Add file-entries.js tests
 
 - New `test/file-entries.test.js`: 10 tests for `collectFileEntries` using a pure JS FileSystemEntry mock

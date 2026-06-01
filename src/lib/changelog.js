@@ -1,8 +1,19 @@
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.12.2';
+export const CURRENT_VERSION = '1.12.3';
 
 export const CHANGELOG = [
+  {
+    "version": "1.12.3",
+    "date": "2026-06-01",
+    "title": "Add s3-client.js tests",
+    "changes": [
+      "New test/s3-client.test.js: 12 tests for createS3Client region resolution and forcePathStyle",
+      "Region priority: regionOverride > extractRegion() > us-east-1 fallback; all three tiers tested",
+      "R2 region is always auto; B2 and AWS extract from endpoint subdomain",
+      "forcePathStyle true for B2 and MinIO; false for R2, AWS, generic"
+    ]
+  },
   {
     "version": "1.12.2",
     "date": "2026-06-01",
