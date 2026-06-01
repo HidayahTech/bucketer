@@ -56,3 +56,18 @@ describe('mimeKind', () => {
   test('empty string → null', () => assert.equal(mimeKind(''), null));
   test('undefined → null', () => assert.equal(mimeKind(undefined), null));
 });
+
+describe('mimeType', () => {
+  // Returns the MIME type string for a file path; used when setting Content-Type on upload.
+  test('jpg → image/jpeg', () => assert.equal(mimeType('photo.jpg'), 'image/jpeg'));
+  test('png → image/png',  () => assert.equal(mimeType('image.PNG'), 'image/png'));
+  test('mp3 → audio/mpeg', () => assert.equal(mimeType('track.mp3'), 'audio/mpeg'));
+  test('mp4 → video/mp4',  () => assert.equal(mimeType('clip.mp4'), 'video/mp4'));
+  test('pdf → application/pdf', () => assert.equal(mimeType('doc.pdf'), 'application/pdf'));
+  test('json → application/json', () => assert.equal(mimeType('data.json'), 'application/json'));
+  test('txt → text/plain', () => assert.equal(mimeType('notes.txt'), 'text/plain'));
+  test('extension is case-insensitive', () => assert.equal(mimeType('photo.JPEG'), 'image/jpeg'));
+  test('unknown extension → null', () => assert.equal(mimeType('archive.zip'), null));
+  test('no extension → null', () => assert.equal(mimeType('Makefile'), null));
+  test('nested path → uses leaf extension', () => assert.equal(mimeType('docs/guide.pdf'), 'application/pdf'));
+});

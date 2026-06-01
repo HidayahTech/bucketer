@@ -7,6 +7,12 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.12.6] — 2026-06-01 — Fill remaining test gaps
+
+- `mimeType()` tests added to `test/media.test.js`: 11 tests covering MIME type lookup, case-insensitivity, unknown/no-extension returns null, nested path handling
+- Upload log tests added to `test/indexeddb-storage.test.js`: `saveUploadLogEntry`, `loadUploadLog` (newest-first ordering, field preservation), `clearUploadLog`
+- Test count: 256 → 272
+
 ## [1.12.5] — 2026-06-01 — Extract corsJson and buildFileIdentityWithHash; add tests
 
 - Extracted `corsJson(origin)` from `SetupGuide.jsx` into `src/lib/cors-config.js` (exported)

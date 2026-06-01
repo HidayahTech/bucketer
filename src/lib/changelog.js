@@ -1,8 +1,18 @@
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.12.5';
+export const CURRENT_VERSION = '1.12.6';
 
 export const CHANGELOG = [
+  {
+    "version": "1.12.6",
+    "date": "2026-06-01",
+    "title": "Fill remaining test gaps",
+    "changes": [
+      "mimeType() tests added to test/media.test.js: 11 tests covering MIME type lookup, case-insensitivity, unknown/no-extension returns null, nested path handling",
+      "Upload log tests added to test/indexeddb-storage.test.js: saveUploadLogEntry, loadUploadLog (newest-first ordering, field preservation), clearUploadLog",
+      "Test count: 256 → 272"
+    ]
+  },
   {
     "version": "1.12.5",
     "date": "2026-06-01",

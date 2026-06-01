@@ -25,6 +25,9 @@ import {
   deleteResumeRecord,
   computeFileHash,
   buildFileIdentityWithHash,
+  saveUploadLogEntry,
+  loadUploadLog,
+  clearUploadLog,
 } from '../src/lib/indexeddb.js';
 
 // ── Resume record lifecycle ───────────────────────────────────────────────────
@@ -175,5 +178,55 @@ describe('buildFileIdentityWithHash', () => {
     const id1 = await buildFileIdentityWithHash(f1);
     const id2 = await buildFileIdentityWithHash(f2);
     assert.notEqual(id1.contentHash, id2.contentHash);
+  });
+});
+
+// ── Upload log ────────────────────────────────────────────────────────────────
+
+const LOG_ENTRY = {
+  fileName: 'video.mp4', destinationKey: 'uploads/video.mp4', fileSize: 104857600,
+  status: 'done', startedAt: 1700000000000, completedAt: 1700000060000,
+  durationSec: 60, avgSpeedBps: 1747626, errorMessage: null,
+};
+
+describe('saveUploadLogEntry / loadUploadLog', () => {
+  test('saved entry appears in loaded log', async () => {
+    await saveUploadLogEntry(LOG_ENTRY);
+    const log = await loadUploadLog();
+    assert.ok(log.some(e => e.fileName === 'video.mp4'), 'saved entry must appear in log');
+  });
+
+  test('loadUploadLog returns newest entries first', async () => {
+    await saveUploadLogEntry({ ...LOG_ENTRY, fileName: 'first.mp4' });
+    await saveUploadLogEntry({ ...LOG_ENTRY, fileName: 'second.mp4' });
+    const log = await loadUploadLog();
+    const names = log.map(e => e.fileName);
+    const firstIdx = names.indexOf('first.mp4');
+    const secondIdx = names.indexOf('second.mp4');
+    assert.ok(secondIdx < firstIdx, 'second entry must appear before first (newest first)');
+  });
+
+  test('all entry fields are preserved', async () => {
+    await saveUploadLogEntry(LOG_ENTRY);
+    const log = await loadUploadLog();
+    const entry = log.find(e => e.fileName === 'video.mp4');
+    assert.ok(entry, 'entry must be found');
+    assert.equal(entry.fileSize,  LOG_ENTRY.fileSize);
+    assert.equal(entry.status,    LOG_ENTRY.status);
+    assert.equal(entry.durationSec, LOG_ENTRY.durationSec);
+  });
+});
+
+describe('clearUploadLog', () => {
+  test('log is empty after clear', async () => {
+    await saveUploadLogEntry(LOG_ENTRY);
+    await clearUploadLog();
+    const log = await loadUploadLog();
+    assert.equal(log.length, 0);
+  });
+
+  test('clearUploadLog resolves without error when log is already empty', async () => {
+    await clearUploadLog();
+    await assert.doesNotReject(() => clearUploadLog());
   });
 });
