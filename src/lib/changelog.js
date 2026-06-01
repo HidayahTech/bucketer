@@ -1,8 +1,23 @@
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.11.4';
+export const CURRENT_VERSION = '1.11.5';
 
 export const CHANGELOG = [
+  {
+    "version": "1.11.5",
+    "date": "2026-06-01",
+    "title": "Improve test suite quality",
+    "changes": [
+      "Removed redundant lookup-table assertions from media.test.js; kept one representative per category plus tests that exercise actual logic (case-insensitivity, path handling, charset stripping)",
+      "Added explicit HTML/JS security invariant tests to mediaKind and mimeKind (these kinds must resolve to 'text', never a rendered type)",
+      "Added hostname false-positive tests to detectProvider: provider domain in a URL path or as a hostname suffix must not match",
+      "Added MinIO and DO Spaces to defaultMaxKeys coverage",
+      "Added Code-vs-name precedence test to parseS3Error",
+      "Removed misleading BUG-007 comment from leafName tests",
+      "Removed \"all tasks eventually complete\" from UploadQueue tests (no specific invariant)",
+      "Test count: 133 → 117 (16 removed were duplicate code-path assertions)"
+    ]
+  },
   {
     "version": "1.11.4",
     "date": "2026-06-01",

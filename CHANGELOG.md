@@ -7,6 +7,17 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.11.5] — 2026-06-01 — Improve test suite quality
+
+- Removed redundant lookup-table assertions from media.test.js; kept one representative per category plus tests that exercise actual logic (case-insensitivity, path handling, charset stripping)
+- Added explicit HTML/JS security invariant tests to mediaKind and mimeKind (these kinds must resolve to 'text', never a rendered type)
+- Added hostname false-positive tests to detectProvider: provider domain in a URL path or as a hostname suffix must not match
+- Added MinIO and DO Spaces to defaultMaxKeys coverage
+- Added Code-vs-name precedence test to parseS3Error
+- Removed misleading BUG-007 comment from leafName tests
+- Removed "all tasks eventually complete" from UploadQueue tests (no specific invariant)
+- Test count: 133 → 117 (16 removed were duplicate code-path assertions)
+
 ## [1.11.4] — 2026-06-01 — Apply intent comments to all source files
 
 - Added WHY-focused comments to all JS/JSX source files documenting design intent, spec references, and non-obvious invariants
