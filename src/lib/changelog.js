@@ -1,9 +1,18 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.12.11';
+export const CURRENT_VERSION = '1.12.12';
 
 export const CHANGELOG = [
+  {
+    "version": "1.12.12",
+    "date": "2026-06-01",
+    "title": "Build before test in GitLab CI",
+    "changes": [
+      "GitLab CI now runs npm run build before npm test",
+      "CI validates the build from source in a clean environment, then tests its own output rather than the committed dist file"
+    ]
+  },
   {
     "version": "1.12.11",
     "date": "2026-06-01",

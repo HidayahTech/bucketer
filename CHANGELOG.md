@@ -7,6 +7,11 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.12.12] — 2026-06-01 — Build before test in GitLab CI
+
+- GitLab CI now runs `npm run build` before `npm test`
+- CI validates the build from source in a clean environment, then tests its own output rather than the committed dist file
+
 ## [1.12.11] — 2026-06-01 — Link copyright footer to HidayahTech website
 
 - Copyright notice in the app footer now links to `https://hidayahtech.com`
