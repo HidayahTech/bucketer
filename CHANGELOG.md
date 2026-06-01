@@ -7,6 +7,13 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.12.14] — 2026-06-01 — CI release job
+
+- Added `scripts/release.mjs` — uploads `dist/index.html` to the Package Registry and creates a GitLab Release with CHANGELOG description and asset link
+- `.gitlab-ci.yml` now has two stages: `test` and `release`
+- Release job runs only on version tags (`v*.*.*`), depends on the test job, uses `CI_JOB_TOKEN` (no PAT needed)
+- Test job passes `dist/index.html` as an artifact to the release job
+
 ## [1.12.13] — 2026-06-01 — Auto-tag on push
 
 - Pre-push hook now runs `npm run build` before `npm test` (full local validation)

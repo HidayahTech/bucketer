@@ -1,9 +1,20 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.12.13';
+export const CURRENT_VERSION = '1.12.14';
 
 export const CHANGELOG = [
+  {
+    "version": "1.12.14",
+    "date": "2026-06-01",
+    "title": "CI release job",
+    "changes": [
+      "Added scripts/release.mjs — uploads dist/index.html to the Package Registry and creates a GitLab Release with CHANGELOG description and asset link",
+      ".gitlab-ci.yml now has two stages: test and release",
+      "Release job runs only on version tags (v*.*.*), depends on the test job, uses CI_JOB_TOKEN (no PAT needed)",
+      "Test job passes dist/index.html as an artifact to the release job"
+    ]
+  },
   {
     "version": "1.12.13",
     "date": "2026-06-01",
