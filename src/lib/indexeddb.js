@@ -1,6 +1,13 @@
-// Resumable upload state via IndexedDB (§4.15)
-// Store: s3browser_uploads
-// Key: {provider}:{endpoint}:{bucket}:{destinationKey}
+// Persistent upload state via IndexedDB (§4.15, REQ-8).
+//
+// Two object stores:
+//   s3browser_uploads:   multipart resume records — survives tab close, browser restart
+//   bucketer_upload_log: upload history with auto-increment ID
+//
+// Resume records are keyed by provider:endpoint:bucket:destinationKey and are saved
+// BEFORE any parts are uploaded. This is the critical invariant: if the browser crashes
+// on part 1, the record already exists and the user can recover. If it were saved after
+// the first part, a crash before that save would leave an orphaned multipart session.
 
 const DB_NAME = 's3browser';
 const STORE = 's3browser_uploads';
@@ -39,6 +46,7 @@ function recordKey({ provider, endpoint, bucket, destinationKey }) {
   return `${provider}:${endpoint}:${bucket}:${destinationKey}`;
 }
 
+// Must be called BEFORE any UploadPartCommand so a crash mid-upload is recoverable.
 export async function saveResumeRecord(params) {
   // params: { provider, endpoint, bucket, destinationKey, uploadId, partSize, fileIdentity, startedAt }
   const db = await openDB();
@@ -70,7 +78,10 @@ export async function deleteResumeRecord({ provider, endpoint, bucket, destinati
   });
 }
 
-// Compute a fast partial hash (first + last 64 KB via SubtleCrypto) for file identity (§4.15)
+// SHA-256 of the first and last 64 KB of the file (§4.15 file identity). Partial hash
+// is fast enough for interactive use without reading the entire file. Returns null if
+// SubtleCrypto is unavailable (some Safari / Private Browsing contexts) — resume still
+// works using name/size/mtime without the content hash.
 export async function computeFileHash(file) {
   try {
     const CHUNK = 64 * 1024;
@@ -87,6 +98,10 @@ export async function computeFileHash(file) {
   }
 }
 
+// Build a verifiable identity for a File. On resume, fileIdentityMatches() confirms the
+// user re-selected the same file — not one that was renamed, resized, or replaced since
+// the upload started. The optional contentHash (stored separately by the caller) provides
+// extra certainty when name/size/mtime happen to collide.
 export function buildFileIdentity(file) {
   return { name: file.name, size: file.size, lastModified: file.lastModified };
 }
@@ -99,8 +114,11 @@ export function fileIdentityMatches(identity, file) {
   );
 }
 
-// Concurrent tab conflict detection (§4.15)
-// Store active upload key in localStorage with a tab-unique ID; other tabs can check it.
+// Concurrent tab conflict detection (§4.15). Two tabs uploading to the same destination
+// key would overwrite each other's parts and corrupt resume state. Each tab registers
+// its in-flight uploads in localStorage under a tab-unique ID. isUploadActiveElsewhere()
+// returns true when a different tab's ID is present, triggering a user-visible warning.
+// Best-effort: private mode disables detection gracefully.
 const TAB_ID = Math.random().toString(36).slice(2);
 const ACTIVE_KEY = 's3b_active_uploads';
 

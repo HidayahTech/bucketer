@@ -1,6 +1,13 @@
 import { useState } from 'preact/hooks';
 
-// Browser context warning when running from file:// (§4.13)
+// Browser context warning when running from file:// (§4.13).
+//
+// When the app runs from a local file instead of a server, browsers apply stricter security
+// rules that differ per browser: shared null-origin localStorage (Chrome), SubtleCrypto
+// inconsistency (Safari), CORS sending Origin: null rather than a real origin.
+//
+// Dismissed via sessionStorage (not localStorage) so the warning reappears on the next
+// page load — the user hasn't permanently acknowledged it, just cleared the current view.
 
 function detectBrowser() {
   const ua = navigator.userAgent;

@@ -1,4 +1,20 @@
-// Root app component — session state machine (§4.14)
+// Root session state machine (§4.14).
+//
+// Four mutually exclusive session states drive what the user sees:
+//   disconnected: no credentials; only credential entry UI shown
+//   connecting:   credentials saved, initial ListObjectsV2 probe in flight
+//   connected:    probe succeeded; full Browser UI rendered
+//   failed:       probe failed (auth, CORS, network); error + option to reconfigure
+//
+// Credential lifecycle: load from localStorage on mount, merge URL hash params
+// (endpoint/bucket from a share link override stored values; secret key never comes
+// from the URL). Save on connect; clear all on disconnect.
+//
+// Capability state (list/download/upload/delete: permitted|denied|unknown) is stored in
+// localStorage and updated reactively when operations fail. Cleared on credential change.
+//
+// Browser component is re-mounted (key={browserKey} increment) on every reconnect to
+// flush its in-memory listing cache and force a fresh listing probe.
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import logoUrl from '../assets/bucketer-logo.svg';
 import { createS3Client } from '../lib/s3-client.js';
@@ -40,7 +56,9 @@ export function App() {
   const addFilesRef = useRef(null);
   const urlParamsPresent = hasUrlParams();
 
-  // Capabilities are stored in localStorage and updated reactively (§4.12)
+  // Capability state is updated reactively as operations fail (§4.12).
+  // The idempotency check (prev[op] === state) prevents unnecessary re-renders and
+  // storage writes when the same operation fails multiple times in rapid succession.
   const handleCapabilityChange = useCallback((op, state) => {
     setCapabilities(prev => {
       if (prev[op] === state) return prev;
@@ -50,6 +68,9 @@ export function App() {
     });
   }, []);
 
+  // Resets all capabilities to 'unknown' and re-mounts Browser to trigger a fresh probe.
+  // Called from CapabilityPanel when the user wants to re-check permissions after
+  // changing bucket policy or key permissions without disconnecting and reconnecting.
   function handleRefreshPermissions() {
     const fresh = defaultCapabilities();
     setCapabilities(fresh);
@@ -58,8 +79,8 @@ export function App() {
   }
 
   async function handleConnect(creds, { reconnect = false } = {}) {
-    // When reconnecting from the sidebar while already connected, stay in 'connected'
-    // state to avoid a flash to the splash view (D2 in QUESTIONS.md)
+    // reconnect:true keeps session='connected' to avoid a flash to the splash view when
+    // the user updates credentials from the sidebar while already browsing (§4.14).
     if (!reconnect) setSession('connecting');
     setConnectionError(null);
 
@@ -82,6 +103,9 @@ export function App() {
     }
   }
 
+  // Clears all session state atomically. Credentials and capabilities are removed from
+  // localStorage so the next page load starts at the disconnected splash screen.
+  // browserKey increment remounts Browser to discard any cached listing state.
   function handleDisconnect() {
     setSession('disconnected');
     setClient(null);

@@ -1,4 +1,19 @@
-// In-app setup guide: AWS CLI configuration + CORS setup, per provider (§4.2, §4.8)
+// Provider-specific CORS setup guide (§4.2, §4.8).
+//
+// CORS is a blocking prerequisite: without it, browsers reject all S3 API responses.
+// This guide generates correct aws s3api put-bucket-cors commands pre-filled with the
+// user's endpoint, bucket, and key ID to minimize transcription errors.
+//
+// Provider differences:
+//   B2:     ClearNativeCors step required first (native rules conflict with S3 API rules)
+//   R2:     Region 'auto'; warns about 7-day auto-abort of incomplete multipart uploads
+//   Wasabi: No CORS setup needed — returns permissive headers automatically
+//   AWS:    Standard put-bucket-cors without --endpoint-url
+//   MinIO:  Standard put-bucket-cors with custom endpoint
+//
+// File:// origin: browsers send Origin: null for local files; most providers reject "null".
+// When window.location.protocol === 'file:', the guide uses wildcard origin "*" and warns
+// that users must re-run CORS setup with a real origin after deploying to a domain.
 import { useState } from 'preact/hooks';
 import { PROVIDERS, extractRegion, needsCorsConfig } from '../lib/provider.js';
 

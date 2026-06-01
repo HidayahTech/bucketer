@@ -1,6 +1,10 @@
-// Recursively collect { file, relativePath } pairs from FileSystemEntry objects.
-// readEntries() returns at most 100 entries per call, so drain each directory reader
-// in a loop until it yields an empty batch.
+// Recursively enumerate files from FileSystemEntry objects (drag-and-drop, folder picker),
+// returning flat { file, relativePath } pairs with folder structure preserved.
+//
+// Critical: the Directory Reader API returns at most 100 entries per readEntries() call.
+// The loop below repeats until an empty batch is returned — stopping after the first call
+// would silently drop files in folders with more than 100 items.
+// Unreadable entries (permission errors, broken symlinks) are skipped without throwing.
 export async function collectFileEntries(entries) {
   const result = [];
 

@@ -4,7 +4,6 @@
 
 import * as esbuild from 'esbuild';
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
-import { execFileSync } from 'child_process';
 
 // ── Build invariant: update-check metadata must fit within this byte range ──
 // UpdateBanner fetches Range: bytes=0-(UPDATE_CHECK_RANGE_BYTES-1) to detect
@@ -130,15 +129,3 @@ for (const tag of invariantTags) {
 }
 if (invariantFailed) process.exit(1);
 
-// Generate favicon.ico from logo (requires ImageMagick 7+)
-try {
-  execFileSync('magick', [
-    'src/assets/bucketer-logo.png',
-    '-resize', '256x256',
-    '-define', 'icon:auto-resize=256,128,64,48,32,16',
-    'dist/favicon.ico',
-  ]);
-  console.log('Generated dist/favicon.ico');
-} catch {
-  console.warn('favicon.ico generation skipped (ImageMagick not available)');
-}

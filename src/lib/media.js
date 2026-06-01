@@ -1,3 +1,14 @@
+// File type detection for preview and Content-Type handling.
+//
+// Two complementary strategies:
+//   mediaKind(key) / mimeType(key) — extension-based; fast; handles the common case
+//   mimeKind(contentType)          — header-based; handles correct Content-Type with
+//                                    missing or non-standard extension
+//
+// SECURITY: text preview always forces ResponseContentType='text/plain' at the call site
+// (in Browser.jsx handlePreview). This prevents an uploaded HTML or script file from
+// being rendered by the browser when previewed — only raw source text is shown.
+
 const KIND = {
   jpg: 'image', jpeg: 'image', png: 'image', gif: 'image',
   webp: 'image', svg: 'image', bmp: 'image', avif: 'image',

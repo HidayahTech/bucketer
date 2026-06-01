@@ -2,4 +2,3 @@ node_modules/
 .tools/
 dist/*
 !dist/index.html
-!dist/favicon.ico

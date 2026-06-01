@@ -1,4 +1,14 @@
-// Capability state display (§4.12)
+// Permission state display (REQ-7, §4.12).
+//
+// Shows { list, download, upload, delete } as ✓/✕/? indicators.
+// Operations start 'unknown' (assumed permitted) and transition to 'denied' only after
+// an actual failure — never via an advance probe.
+//
+// Upload permission is never probed with a test write because that would trigger bucket
+// events, webhooks, replication, and storage charges (§4.12).
+//
+// "Refresh Permissions" resets all capabilities to 'unknown' and remounts Browser to
+// re-probe. Useful when server-side key permissions change without a full reconnect.
 
 const OPS = [
   { key: 'list',     label: 'Browse / List' },

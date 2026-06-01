@@ -1,5 +1,12 @@
-// URL-based session configuration and browser history helpers.
-// All params live in the hash fragment (#) so they are never sent to the server.
+// URL hash fragment serialization for shareable links and browser history (§4.14).
+//
+// All params live in the hash fragment (#) rather than the query string (?), so they
+// are never transmitted to the server in HTTP request URLs (REQ-5). The hash is
+// purely client-side; the browser strips it before sending requests.
+//
+// Shareable URLs include only endpoint, bucket, provider, and region — never key ID
+// or secret key. This lets a user share a pre-configured connection URL with a
+// colleague who still authenticates separately.
 
 function hashParams() {
   return new URLSearchParams(window.location.hash.slice(1));
@@ -37,9 +44,11 @@ export function buildShareUrl(credentials) {
   return hash ? `${base}#${hash}` : base;
 }
 
-// Push (or replace) the current S3 prefix into browser history, preserving all
-// other hash params. Safe to call from file:// — Chrome blocks pushState there,
-// so failures are silently swallowed.
+// Update browser history when navigating to a prefix (§4.14). Preserves all other
+// hash params (endpoint, bucket, provider) while updating only the prefix param.
+// replace=true uses replaceState (initial load, back-button restores) so those
+// navigations don't add extra entries. Safe on file:// — Chrome blocks pushState
+// for local files; errors are silently swallowed.
 export function pushPrefixHistory(prefix, replace = false) {
   try {
     const p = hashParams();

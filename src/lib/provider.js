@@ -1,4 +1,8 @@
-// Provider detection and per-provider configuration (§4.8, §5)
+// Provider detection and per-provider configuration (§4.8, §5).
+//
+// This is the single place where provider-specific behavioral differences are encoded
+// (path-style URLs, region extraction, default page size, CORS requirements). All other
+// modules are provider-agnostic and call these helpers when they need to vary behavior.
 
 export const PROVIDERS = {
   B2: 'b2',
@@ -20,7 +24,10 @@ export const PROVIDER_LABELS = {
   [PROVIDERS.GENERIC]: 'Generic S3',
 };
 
-// Regex patterns for auto-detection — tested against hostname only, not the full URL
+// Tested against the endpoint hostname only (not the full URL). Hostname-only matching
+// prevents false positives on path components or query strings (e.g. a reverse proxy
+// at /r2/ would incorrectly match if we tested the full URL). Patterns are anchored
+// with $ to prevent suffix-based misdetection (e.g. 'mybackblazeb2.com' must not match).
 const PATTERNS = [
   { re: /\.backblazeb2\.com$/i,        provider: PROVIDERS.B2 },
   { re: /\.r2\.cloudflarestorage\.com$/i, provider: PROVIDERS.R2 },
@@ -75,12 +82,16 @@ export function extractRegion(endpoint, provider) {
   }
 }
 
-// Whether this provider requires forcePathStyle (§5, Group A)
+// B2 and MinIO require path-style URLs (§5 Group A). Using virtual-hosted style for
+// these providers sends requests to the wrong host and produces auth-like errors that
+// are hard to diagnose (noted as a snag in §4.3).
 export function requiresPathStyle(provider) {
   return provider === PROVIDERS.B2 || provider === PROVIDERS.MINIO;
 }
 
-// Default MaxKeys per page for listing (§4.7)
+// B2: 200 because ListObjectsV2 is a Class C operation (billed per call); smaller pages
+// make the cost of browsing legible. Others: 1000 (S3 API maximum; no per-call cost).
+// User can override via Settings, persisted in localStorage.
 export function defaultMaxKeys(provider) {
   return provider === PROVIDERS.B2 ? 200 : 1000;
 }

@@ -1,4 +1,16 @@
-// Hidden versions panel: lists and deletes old versions and delete markers
+// Hidden versions panel: lists old versions and delete markers (D-6).
+//
+// In S3 versioned buckets, ListObjectsV2 only shows the latest version of each key.
+// This panel uses ListObjectVersionsCommand to surface:
+//   - Old versions (IsLatest=false): previous copies of overwritten objects
+//   - Delete markers: tombstones that hide a file from the normal listing
+//
+// Removing a delete marker where IsLatest=true UNDELETES the file (the prior version
+// becomes visible). The confirmation dialog reflects this with "Undelete?" vs "Delete version?".
+//
+// Purge-all exhausts all pagination before deleting. Partial purge (deleting only the
+// loaded page) would leave orphaned versions and show a misleading "done" message.
+// Batched in 1000-object chunks — the S3 DeleteObjects API maximum.
 import { useState } from 'preact/hooks';
 import { ListObjectVersionsCommand, DeleteObjectCommand, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 import { formatBytes } from '../lib/format.js';
@@ -14,6 +26,9 @@ function shortVersionId(id) {
   return id.length > 18 ? id.slice(0, 18) + '…' : id;
 }
 
+// Extracts only old versions (IsLatest=false) and all delete markers from a
+// ListObjectVersions response page. Latest versions are shown by the main listing;
+// they are deliberately excluded here to avoid confusion with "normal" files.
 function collectHidden(resp) {
   const hidden = [];
   for (const v of (resp.Versions || [])) {

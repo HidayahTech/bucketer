@@ -1,4 +1,9 @@
-// Object browser: listing, navigation, download, delete (§4.2, §4.4, §4.7, §4.12)
+// Object browser — listing, navigation, sorting, filter, preview, download, delete,
+// rename, batch operations, drag-and-drop, and browser history (§4.2, §4.4, §4.7, §4.12).
+//
+// Reports capability discoveries (permitted/denied) back to App via onCapabilityChange.
+// Notifies App when the initial listing probe fails via onInitialListFailed (§4.14).
+// Coordinates with UploadQueue via onUploadTargetChange (upload destination = current prefix).
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { ListObjectsV2Command, GetObjectCommand, DeleteObjectCommand, DeleteObjectsCommand, HeadObjectCommand, PutObjectCommand, CopyObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -13,10 +18,16 @@ import { HiddenVersions } from './HiddenVersions.jsx';
 
 // Read the URL prefix exactly once per page session. Subsequent mounts (reconnects)
 // always start at root — only the very first mount restores the URL-specified path.
+// Module-level (not component state) so it persists across remounts without resetting.
 let _sessionFirstMount = true;
 
-const PRESIGN_EXPIRES = 3600;        // 1 hour
-const TEXT_PREVIEW_LIMIT = 100 * 1024; // 100 KB cap for text previews
+// 1 hour: long enough for interactive use (preview, copy-link) but short enough that
+// a leaked presigned URL expires overnight without manual rotation.
+const PRESIGN_EXPIRES = 3600;
+
+// Range-limited to 100 KB to prevent loading multi-GB log files into browser memory.
+// Response status 206 (Partial Content) indicates truncation — the UI shows a warning.
+const TEXT_PREVIEW_LIMIT = 100 * 1024;
 
 const COPY_LINK_PRESETS = [
   { label: '1 hour',   seconds: 3600 },
@@ -203,6 +214,11 @@ function SortTh({ col, sortCol, sortDir, onSort, align, children }) {
   );
 }
 
+// State is organized by concern — each interactive feature has its own slice.
+// selectedKeys is a Set for O(1) has() checks per row (not an Array).
+// folderDelete is a single state object with a phase field ('confirm'|'listing'|'deleting'|'done')
+// to make the multi-step state machine explicit and prevent invalid combinations.
+// cacheRef and abortRef are Refs (not state) to avoid triggering re-renders.
 export function Browser({ client, bucket, provider, credentials, onCapabilityChange, capabilities, onUploadTargetChange, onInitialListFailed, onExternalDrop }) {
   const [prefix, setPrefix] = useState(() => {
     if (_sessionFirstMount) {
@@ -314,6 +330,11 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
 
   const isInitialProbeRef = useRef(true);
 
+  // Listing cache (D-7): session-scoped in-memory Map keyed by prefix. On initial navigation
+  // (replace=true, no token), check the cache first. Cache hit: restore all pagination state
+  // atomically (items + prefixes + token + isTruncated). Cache miss: fetch from S3.
+  // Cache is NOT used for Load More (pagination) — only for navigating back to a prefix.
+  // Mutations (delete, rename, upload, folder create) call invalidateCache() to prevent stale views.
   async function fetchPage(targetPrefix, token, replace = false) {
     // Serve from cache on initial navigation (not pagination)
     if (replace && !token && cacheTTL > 0) {
@@ -368,6 +389,9 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
       setListError(err);
       if (isPermissionError(err)) onCapabilityChange('list', 'denied');
       // Notify parent when the initial listing probe fails (§4.14 Connection Failed state)
+      // isInitialProbeRef gates a single call to onInitialListFailed (§4.14).
+      // Only the very first listing failure triggers App to switch to 'failed' session state.
+      // Subsequent errors (e.g., manual retry) do not re-trigger that transition.
       if (isInitial && onInitialListFailed) onInitialListFailed(err);
     } finally {
       setListing(false);
@@ -454,6 +478,10 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     }
   }
 
+  // dragCounterRef debounces nested dragenter/dragleave. The HTML5 spec fires dragenter for
+  // every element the cursor crosses (including children), so without counting, the drop
+  // overlay would flicker as the cursor moves across table rows. Counter hits 0 only when
+  // the user has fully exited the drop target.
   function handleTableDragEnter(e) {
     e.preventDefault();
     dragCounterRef.current += 1;
@@ -509,6 +537,9 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     setRenameError(null);
   }
 
+  // S3 has no rename. Rename = CopyObject + DeleteObject.
+  // Copy FIRST: if copy fails, the original is untouched. MetadataDirective: 'COPY' preserves
+  // Content-Type and custom metadata — the default 'REPLACE' would strip them.
   async function commitRename(oldKey) {
     const newName = renameValue.trim();
     if (!newName) { setRenameError('Name cannot be empty.'); return; }
@@ -539,6 +570,9 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     setTimeout(() => setTableCopied(k => k === key ? null : k), 2000);
   }
 
+  // Download via presigned URL — transfers entirely via browser's download manager with no
+  // JS buffering. ResponseContentDisposition: 'attachment' forces a download with the correct
+  // leaf filename; without it, the browser would try to open image/video files inline.
   async function handleDownload(key) {
     setDownloadError(null);
     setDownloadingKey(key);
@@ -577,6 +611,10 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     setDeleteError(null);
   }
 
+  // Preview: detects kind via HeadObject → ContentType first, extension second.
+  // SECURITY: text previews always use ResponseContentType='text/plain; charset=utf-8'
+  // regardless of the stored ContentType. This prevents an uploaded HTML or JS file from
+  // being rendered by the browser — the preview always shows raw source text.
   async function handlePreview(obj) {
     setPreviewItem(obj);
     setPreviewUrl(null);

@@ -2,7 +2,21 @@ import { useState } from 'preact/hooks';
 import { detectProvider, extractRegion, PROVIDERS, PROVIDER_LABELS } from '../lib/provider.js';
 import { SetupGuide } from './SetupGuide.jsx';
 
-// Credential entry form (§4.5, §4.8)
+// Credential entry form (REQ-1, §4.5, §4.8).
+//
+// Provider auto-detection: calls detectProvider(endpoint) as the user types. Detected
+// provider and region are shown as display hints — the user can override via dropdown
+// when auto-detection is wrong (reverse proxies, custom domains).
+//
+// Region input: shown only when the endpoint doesn't embed the region. For B2/Wasabi/AWS,
+// region is extracted from the URL. For R2, 'auto' is recommended. For MinIO and GENERIC,
+// the field appears with a placeholder.
+//
+// Secret key: type="password" prevents on-screen display and excludes from autofill history.
+// Storage policy: sessionStorage only (cleared on tab close, never in localStorage).
+//
+// Endpoint URL is trimmed and trailing slashes stripped before saving — ensures
+// 'https://example.com/' and 'https://example.com' produce identical S3Clients.
 
 const PROVIDER_OPTIONS = [
   { value: '', label: 'Auto-detect from endpoint' },

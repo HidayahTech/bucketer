@@ -7,6 +7,12 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.11.4] — 2026-06-01 — Apply intent comments to all source files
+
+- Added WHY-focused comments to all JS/JSX source files documenting design intent, spec references, and non-obvious invariants
+- Covers all 9 lib/ modules and all 14 components including Browser.jsx and UploadQueue.jsx
+- Key invariants documented: resume record saved before first part upload, text preview forces text/plain for security, listing cache invalidated on every mutation, rename uses copy-before-delete, dragCounter debounce for nested drag events
+
 ## [1.11.3] — 2026-06-01 — Anchor provider detection to hostname
 
 - Provider detection now parses the endpoint URL and tests patterns against the hostname only, preventing false matches on paths or query strings

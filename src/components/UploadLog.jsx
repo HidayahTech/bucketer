@@ -1,4 +1,8 @@
-// Persistent upload history log
+// Persistent upload history log (IndexedDB upload_log store).
+//
+// refreshKey prop: incremented by App whenever uploads complete. The useEffect dependency
+// on refreshKey is the signal to re-read from IndexedDB — avoids prop-drilling individual
+// upload results through the component tree.
 import { useState, useEffect } from 'preact/hooks';
 import { loadUploadLog, clearUploadLog } from '../lib/indexeddb.js';
 import { formatBytes, formatSpeed } from '../lib/format.js';

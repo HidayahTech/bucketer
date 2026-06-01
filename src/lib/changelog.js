@@ -1,8 +1,18 @@
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.11.3';
+export const CURRENT_VERSION = '1.11.4';
 
 export const CHANGELOG = [
+  {
+    "version": "1.11.4",
+    "date": "2026-06-01",
+    "title": "Apply intent comments to all source files",
+    "changes": [
+      "Added WHY-focused comments to all JS/JSX source files documenting design intent, spec references, and non-obvious invariants",
+      "Covers all 9 lib/ modules and all 14 components including Browser.jsx and UploadQueue.jsx",
+      "Key invariants documented: resume record saved before first part upload, text preview forces text/plain for security, listing cache invalidated on every mutation, rename uses copy-before-delete, dragCounter debounce for nested drag events"
+    ]
+  },
   {
     "version": "1.11.3",
     "date": "2026-06-01",

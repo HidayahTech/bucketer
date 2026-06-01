@@ -1,4 +1,22 @@
-// Upload queue with multipart, resumable uploads, and concurrency (§4.6, §4.15)
+// Upload engine (REQ-4, REQ-8, §4.6, §4.15).
+//
+// Routing: files < 5 MiB → single PutObjectCommand; ≥ 5 MiB → manual multipart.
+//
+// Why raw SDK commands instead of lib-storage (D-2):
+// CreateMultipartUploadCommand returns UploadId synchronously before any parts are sent.
+// This lets us save the resume record to IndexedDB BEFORE the first UploadPartCommand —
+// the critical invariant for cross-session recovery. lib-storage would require extracting
+// UploadId from an httpUploadProgress event callback (fragile, timing-dependent).
+//
+// Cross-session resume (REQ-8, §4.15):
+//   On enqueue: check IndexedDB for a resume record at the same destination.
+//   If found: pause and prompt Resume or Restart.
+//   Resume: verify file identity, call ListParts (provider is authoritative on ACK'd parts),
+//   upload remaining parts, complete with full part list sorted by PartNumber.
+//   NoSuchUpload: session expired; delete stale record and tell user to restart.
+//
+// File concurrency: N=3 default (D-3, configurable). Part concurrency: 4 per file (configurable).
+// Peak RAM at defaults: 3 files × 4 parts × 5 MiB = 60 MiB.
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import { PutObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand, ListPartsCommand } from '@aws-sdk/client-s3';
 import { formatBytes, formatSpeed, formatEta, isPermissionError, parseS3Error } from '../lib/format.js';
@@ -92,8 +110,11 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     newItems.forEach(item => enqueueUpload(item));
   }
 
+  // Check for a stale multipart session in IndexedDB before starting a new upload.
+  // If a record exists, the previous session was interrupted. Pausing here forces the user
+  // to explicitly choose Resume (continue) or Restart (abort old session) — we never
+  // silently overwrite, because a restart at the wrong moment would lose the already-uploaded parts.
   async function enqueueUpload(item) {
-    // Check for existing resume record before starting
     let existingRecord = null;
     try {
       existingRecord = await loadResumeRecord({
@@ -304,7 +325,9 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     }
 
     try {
-      // List completed parts from provider — paginate fully (§4.15)
+      // ListParts is the authoritative source for which parts were ACK'd by the provider (§4.15).
+      // We do not trust the local resume record's part list — the session may have continued
+      // in another browser or tab. Paginate fully: each page returns max 1000 parts.
       const completedParts = [];
       let partMarker;
       do {
@@ -358,6 +381,8 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       onCapabilityChange('upload', 'permitted');
 
     } catch (err) {
+      // NoSuchUpload: the provider has expired or garbage-collected the multipart session.
+      // Delete the stale record so the user is not offered resume again for this file.
       if (err?.Code === 'NoSuchUpload' || err?.name === 'NoSuchUpload') {
         await deleteResumeRecord({ provider, endpoint: credentials.endpoint, bucket, destinationKey }).catch(() => {});
         updateItem(id, {

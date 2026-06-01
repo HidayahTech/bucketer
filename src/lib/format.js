@@ -1,4 +1,4 @@
-// Formatting utilities
+// UI formatting utilities: byte sizes, speeds, ETAs, S3 key leaf names, and S3 error normalization.
 
 export function formatBytes(bytes) {
   if (bytes === 0) return '0 B';
@@ -26,7 +26,10 @@ export function leafName(key) {
   return i >= 0 ? key.slice(i + 1) : key;
 }
 
-// S3 error helpers
+// Normalize AWS SDK v3 error objects (§4.10, §4.12). Provider implementations use
+// varying field names (Code vs name, $metadata.httpStatusCode, etc.). parseS3Error
+// extracts canonical fields. isPermissionError detects AccessDenied / 403 / 401 to
+// transition capability state from 'unknown' or 'permitted' to 'denied'.
 export function parseS3Error(err) {
   return {
     message: err?.message || String(err),

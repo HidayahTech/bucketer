@@ -1,4 +1,12 @@
-// Structured error display (§4.10)
+// Structured error display (§4.10).
+//
+// Parses AWS SDK v3 error objects (Code, $metadata.httpStatusCode, $metadata.requestId)
+// and renders them with optional consequence and guidance strings from the call site.
+//
+// CORS heuristic: when the parsed error has no HTTP status (null) or the message mentions
+// 'fetch'/'network', the error is likely CORS-masked. In this case an extra note is shown
+// explaining that the actual auth/routing error may be hidden by the browser's CORS layer.
+// Users should verify with curl or the AWS CLI to see the real response.
 import { parseS3Error } from '../lib/format.js';
 
 export function ErrorBlock({ error, title, consequence, guidance }) {
