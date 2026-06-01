@@ -12,6 +12,8 @@ Built with Preact + esbuild. The build pipeline produces a single self-contained
 
 Always ask for confirmation before committing or pushing.
 
+**Tests must pass before every push.** Run `npm test` before pushing. The pre-push git hook enforces this automatically — a push that fails tests is aborted. The only override is `git push --no-verify`, which must only be used by the human operator in genuine emergencies. Never use `--no-verify` to work around a failing test; fix the test or the code instead.
+
 `@anthropic-ai/claude-code` is not a project dependency and must never appear in `package.json`, `package-lock.json`, or any commit. It is installed separately in `.tools/` (gitignored). See **Claude Code Setup** below.
 
 ## Build Invariants
@@ -41,9 +43,10 @@ Real bugs are the highest-value source of test cases. A test derived from a bug 
 ## Setup
 
 ```bash
-npm install
+npm install     # also configures the pre-push git hook automatically
 npm run build   # → dist/index.html
 npm run serve   # dev build + localhost:3000
+npm test        # run test suite
 ```
 
 ## Claude Code Setup

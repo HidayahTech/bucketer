@@ -1,0 +1,15 @@
+#!/bin/sh
+# Pre-push hook — test suite must pass before any push is accepted.
+#
+# To override in an emergency (human operator only):
+#   git push --no-verify
+#
+# This hook is configured automatically by `npm install` via the `prepare` script.
+# If it stops running, re-run: npm run setup-hooks
+
+set -e
+
+echo "Running tests..."
+npm test
+
+echo "Tests passed — push proceeding."
