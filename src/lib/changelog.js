@@ -1,6 +1,30 @@
-export const CURRENT_VERSION = '1.10.1';
+export const CURRENT_VERSION = '1.10.4';
 
 export const CHANGELOG = [
+  {
+    version: '1.10.4',
+    date: '2026-06-01',
+    title: 'AGPL-3.0 license',
+    changes: [
+      'Added LICENSE file: GNU Affero General Public License v3.0 (AGPL-3.0)',
+    ],
+  },
+  {
+    version: '1.10.3',
+    date: '2026-06-01',
+    title: 'README correction',
+    changes: [
+      'Fixed README: dist/index.html and dist/favicon.ico are committed to the repo for auditability, not gitignored',
+    ],
+  },
+  {
+    version: '1.10.2',
+    date: '2026-05-31',
+    title: 'Developer tooling cleanup',
+    changes: [
+      'Moved Claude Code out of project dependencies into a gitignored .tools/ directory — no longer appears in package.json',
+    ],
+  },
   {
     version: '1.10.1',
     date: '2026-05-28',
