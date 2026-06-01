@@ -1,3 +1,4 @@
+// Copyright (C) 2026 HidayahTech, LLC
 // URL hash fragment serialization for shareable links and browser history (§4.14).
 //
 // All params live in the hash fragment (#) rather than the query string (?), so they

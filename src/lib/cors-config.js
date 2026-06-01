@@ -1,3 +1,4 @@
+// Copyright (C) 2026 HidayahTech, LLC
 // CORS configuration template for S3-compatible buckets (§4.2, §5 CORS setup).
 //
 // AllowedHeaders must include the amz-sdk headers explicitly — the x-amz-* wildcard

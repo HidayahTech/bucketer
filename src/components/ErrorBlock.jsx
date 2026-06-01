@@ -1,3 +1,4 @@
+// Copyright (C) 2026 HidayahTech, LLC
 // Structured error display (§4.10).
 //
 // Parses AWS SDK v3 error objects (Code, $metadata.httpStatusCode, $metadata.requestId)

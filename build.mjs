@@ -58,6 +58,7 @@ if (!changelog.length || changelog[0].version !== appVersion) {
 }
 
 const changelogJs = [
+  '// Copyright (C) 2026 HidayahTech, LLC',
   '// @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).',
   '',
   `export const CURRENT_VERSION = '${appVersion}';`,

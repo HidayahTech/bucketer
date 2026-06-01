@@ -228,3 +228,11 @@ When versioning is enabled on a bucket, deleting a file creates a delete marker 
 - MinIO requires manual provider override (endpoint pattern is user-defined).
 - Large uploads (> 50 GB) work but native tools (`rclone`, `b2`, AWS CLI) are more reliable at that scale.
 - Browser tab close during a multipart upload leaves orphaned parts on B2 (R2 auto-cleans after 7 days; AWS S3 supports lifecycle rules for incomplete multipart uploads).
+
+---
+
+## License
+
+Copyright (C) 2026 HidayahTech, LLC
+
+Licensed under the [GNU Affero General Public License v3.0](LICENSE).

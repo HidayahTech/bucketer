@@ -1,3 +1,4 @@
+// Copyright (C) 2026 HidayahTech, LLC
 // Provider detection and per-provider configuration (§4.8, §5).
 //
 // This is the single place where provider-specific behavioral differences are encoded

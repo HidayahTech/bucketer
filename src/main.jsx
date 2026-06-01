@@ -1,3 +1,4 @@
+// Copyright (C) 2026 HidayahTech, LLC
 // Entry point — mounts App into the #app div injected by build.mjs.
 // No logic here: state, routing, and session lifecycle live in App.jsx.
 import { render } from 'preact';

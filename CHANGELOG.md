@@ -7,6 +7,13 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.12.9] — 2026-06-01 — Add copyright notices
+
+- Added `Copyright (C) 2026 HidayahTech, LLC` to the top of all 24 source files (`src/**/*.js`, `src/**/*.jsx`)
+- `build.mjs` injects the notice into the generated `src/lib/changelog.js` so it survives rebuilds
+- Added copyright line to top of `LICENSE` file
+- Added License section to `README.md` with copyright and AGPL-3.0 reference
+
 ## [1.12.8] — 2026-06-01 — Extract preparePutBody and add BUG-003 tests
 
 - Extracted `preparePutBody(file)` from `UploadQueue.jsx` into `src/lib/upload-queue.js` (exported)

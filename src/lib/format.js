@@ -1,3 +1,4 @@
+// Copyright (C) 2026 HidayahTech, LLC
 // UI formatting utilities: byte sizes, speeds, ETAs, S3 key leaf names, and S3 error normalization.
 
 export function formatBytes(bytes) {

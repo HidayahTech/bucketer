@@ -1,3 +1,4 @@
+// Copyright (C) 2026 HidayahTech, LLC
 // Permission state display (REQ-7, §4.12).
 //
 // Shows { list, download, upload, delete } as ✓/✕/? indicators.

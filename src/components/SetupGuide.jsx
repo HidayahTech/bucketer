@@ -1,3 +1,4 @@
+// Copyright (C) 2026 HidayahTech, LLC
 // Provider-specific CORS setup guide (§4.2, §4.8).
 //
 // CORS is a blocking prerequisite: without it, browsers reject all S3 API responses.

@@ -1,3 +1,4 @@
+// Copyright (C) 2026 HidayahTech, LLC
 // Object browser — listing, navigation, sorting, filter, preview, download, delete,
 // rename, batch operations, drag-and-drop, and browser history (§4.2, §4.4, §4.7, §4.12).
 //

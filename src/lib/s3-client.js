@@ -1,3 +1,4 @@
+// Copyright (C) 2026 HidayahTech, LLC
 // S3Client factory (§4.3). Called once per credential set; the returned client is
 // stateless and reused for all operations until the user disconnects.
 import { S3Client } from '@aws-sdk/client-s3';

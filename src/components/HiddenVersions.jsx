@@ -1,3 +1,4 @@
+// Copyright (C) 2026 HidayahTech, LLC
 // Hidden versions panel: lists old versions and delete markers (D-6).
 //
 // In S3 versioned buckets, ListObjectsV2 only shows the latest version of each key.

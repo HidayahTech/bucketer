@@ -1,8 +1,20 @@
+// Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.12.8';
+export const CURRENT_VERSION = '1.12.9';
 
 export const CHANGELOG = [
+  {
+    "version": "1.12.9",
+    "date": "2026-06-01",
+    "title": "Add copyright notices",
+    "changes": [
+      "Added Copyright (C) 2026 HidayahTech, LLC to the top of all 24 source files (src/**/*.js, src/**/*.jsx)",
+      "build.mjs injects the notice into the generated src/lib/changelog.js so it survives rebuilds",
+      "Added copyright line to top of LICENSE file",
+      "Added License section to README.md with copyright and AGPL-3.0 reference"
+    ]
+  },
   {
     "version": "1.12.8",
     "date": "2026-06-01",

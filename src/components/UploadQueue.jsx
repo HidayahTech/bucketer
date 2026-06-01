@@ -1,3 +1,4 @@
+// Copyright (C) 2026 HidayahTech, LLC
 // Upload engine (REQ-4, REQ-8, §4.6, §4.15).
 //
 // Routing: files < 5 MiB → single PutObjectCommand; ≥ 5 MiB → manual multipart.

@@ -1,3 +1,4 @@
+// Copyright (C) 2026 HidayahTech, LLC
 import { useState } from 'preact/hooks';
 
 // Browser context warning when running from file:// (§4.13).

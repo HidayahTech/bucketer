@@ -1,3 +1,4 @@
+// Copyright (C) 2026 HidayahTech, LLC
 // Credential and settings persistence (REQ-6, §4.5).
 //
 // Dual-storage model: non-sensitive fields (endpoint, bucket, keyId, provider,

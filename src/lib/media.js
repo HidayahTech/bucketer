@@ -1,3 +1,4 @@
+// Copyright (C) 2026 HidayahTech, LLC
 // File type detection for preview and Content-Type handling.
 //
 // Two complementary strategies:

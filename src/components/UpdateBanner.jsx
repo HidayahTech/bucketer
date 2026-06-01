@@ -1,3 +1,4 @@
+// Copyright (C) 2026 HidayahTech, LLC
 // Polls the server for a newer build and prompts the user to refresh.
 //
 // Strategy (cheapest to most expensive):

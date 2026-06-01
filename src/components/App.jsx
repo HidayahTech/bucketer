@@ -1,3 +1,4 @@
+// Copyright (C) 2026 HidayahTech, LLC
 // Root session state machine (§4.14).
 //
 // Four mutually exclusive session states drive what the user sees:

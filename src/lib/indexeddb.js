@@ -1,3 +1,4 @@
+// Copyright (C) 2026 HidayahTech, LLC
 // Persistent upload state via IndexedDB (§4.15, REQ-8).
 //
 // Two object stores:

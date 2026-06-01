@@ -1,3 +1,4 @@
+// Copyright (C) 2026 HidayahTech, LLC
 // Recursively enumerate files from FileSystemEntry objects (drag-and-drop, folder picker),
 // returning flat { file, relativePath } pairs with folder structure preserved.
 //

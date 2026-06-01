@@ -1,3 +1,4 @@
+// Copyright (C) 2026 HidayahTech, LLC
 import { useState } from 'preact/hooks';
 import { detectProvider, extractRegion, PROVIDERS, PROVIDER_LABELS } from '../lib/provider.js';
 import { SetupGuide } from './SetupGuide.jsx';

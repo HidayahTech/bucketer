@@ -1,3 +1,4 @@
+// Copyright (C) 2026 HidayahTech, LLC
 import { ListPartsCommand } from '@aws-sdk/client-s3';
 
 // BUG-003: The AWS SDK v3 browser fetch handler calls .getReader() on the Body,

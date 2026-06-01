@@ -1,3 +1,4 @@
+// Copyright (C) 2026 HidayahTech, LLC
 // Persistent upload history log (IndexedDB upload_log store).
 //
 // refreshKey prop: incremented by App whenever uploads complete. The useEffect dependency

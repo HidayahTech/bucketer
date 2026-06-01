@@ -1,3 +1,4 @@
+// Copyright (C) 2026 HidayahTech, LLC
 // Application settings (page size, upload concurrency, part size) (§4.7)
 import { useState } from 'preact/hooks';
 import { loadMaxKeys, saveMaxKeys, loadPartConcurrency, savePartConcurrency, loadPartSizeMB, savePartSizeMB, loadFileConcurrency, saveFileConcurrency, loadListingCacheTTL, saveListingCacheTTL } from '../lib/storage.js';
