@@ -3,6 +3,15 @@
 // The concurrency value is read from the constructor argument at enqueue time, so
 // Settings changes take effect for subsequent files without restarting uploads.
 
+// S3 hard limits: minimum part size 5 MB (decimal), maximum 10,000 parts per upload.
+// preferredBytes is honoured only when it is above the computed floor — we never go
+// below the floor because that would either violate the 5 MB minimum (last part excluded)
+// or push the part count over 10,000 for very large files.
+export function calcPartSize(fileSize, preferredBytes) {
+  const floor = Math.max(5 * 1000 * 1000, Math.ceil(fileSize / 10000));
+  return (preferredBytes && preferredBytes > floor) ? preferredBytes : floor;
+}
+
 export class UploadQueue {
   constructor(concurrency = 2) {
     this.concurrency = concurrency;

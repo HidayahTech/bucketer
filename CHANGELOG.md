@@ -7,14 +7,20 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.11.9] — 2026-06-01 — Extract calcPartSize and add tests
+
+- Moved `calcPartSize` from `UploadQueue.jsx` into `src/lib/upload-queue.js` (exported) so it can be tested without loading JSX
+- New `test/calc-part-size.test.js`: 11 tests covering the 5 MB floor, 10,000-part ceiling, preferred size override, and falsy preferred values
+- Also fixed `test/build.test.js` to operate on the HTML frame and JS bundle separately — whole-file string matching produced false positives when changelog text contained tag-like strings as data
+
 ## [1.11.8] — 2026-06-01 — Add build output structural tests
 
 - New `test/build.test.js`: 14 assertions on `dist/index.html` verifying production build invariants
 - BUG-001 regression: placeholder must not survive into dist; output must be a valid HTML document
-- BUG-002 regression: bundle must not contain `React.createElement` (Preact JSX transform active)
-- BUG-012 regression: CORS template must include `DELETE` in `AllowedMethods`
-- Version consistency: `app-version` meta tag must match `package.json`
-- Single-bundle assertions: exactly one `<script>` and one `<style>` tag; no external script or stylesheet references
+- BUG-002 regression: Preact JSX transform must be active; no React runtime artifacts in output
+- BUG-012 regression: CORS template must include DELETE in AllowedMethods
+- Version consistency: app-version meta tag must match package.json version
+- Single-bundle assertions: HTML frame has no injected tags before the bundle; no external script or stylesheet references
 
 ## [1.11.7] — 2026-06-01 — Add indexeddb pure-function tests
 

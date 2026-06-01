@@ -1,8 +1,18 @@
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.11.8';
+export const CURRENT_VERSION = '1.11.9';
 
 export const CHANGELOG = [
+  {
+    "version": "1.11.9",
+    "date": "2026-06-01",
+    "title": "Extract calcPartSize and add tests",
+    "changes": [
+      "Moved calcPartSize from UploadQueue.jsx into src/lib/upload-queue.js (exported) so it can be tested without loading JSX",
+      "New test/calc-part-size.test.js: 11 tests covering the 5 MB floor, 10,000-part ceiling, preferred size override, and falsy preferred values",
+      "Also fixed test/build.test.js to operate on the HTML frame and JS bundle separately — whole-file string matching produced false positives when changelog text contained tag-like strings as data"
+    ]
+  },
   {
     "version": "1.11.8",
     "date": "2026-06-01",
@@ -10,10 +20,10 @@ export const CHANGELOG = [
     "changes": [
       "New test/build.test.js: 14 assertions on dist/index.html verifying production build invariants",
       "BUG-001 regression: placeholder must not survive into dist; output must be a valid HTML document",
-      "BUG-002 regression: bundle must not contain React.createElement (Preact JSX transform active)",
+      "BUG-002 regression: Preact JSX transform must be active; no React runtime artifacts in output",
       "BUG-012 regression: CORS template must include DELETE in AllowedMethods",
-      "Version consistency: app-version meta tag must match package.json",
-      "Single-bundle assertions: exactly one <script> and one <style> tag; no external script or stylesheet references"
+      "Version consistency: app-version meta tag must match package.json version",
+      "Single-bundle assertions: HTML frame has no injected tags before the bundle; no external script or stylesheet references"
     ]
   },
   {

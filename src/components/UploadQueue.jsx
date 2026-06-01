@@ -27,7 +27,7 @@ import {
   markUploadActive, markUploadInactive, isUploadActiveElsewhere,
   saveUploadLogEntry,
 } from '../lib/indexeddb.js';
-import { UploadQueue as Queue } from '../lib/upload-queue.js';
+import { UploadQueue as Queue, calcPartSize } from '../lib/upload-queue.js';
 import { loadPartConcurrency, loadPartSizeMB, loadFileConcurrency } from '../lib/storage.js';
 import { collectFileEntries } from '../lib/file-entries.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
@@ -36,13 +36,6 @@ const MULTIPART_THRESHOLD       = 5 * 1024 * 1024;   // 5 MiB — internal thres
 const LARGE_FILE_WARN           = 50 * 1024 * 1024 * 1024; // 50 GB — recommend native tools (§4.6)
 const DEFAULT_FILE_CONCURRENCY  = 3;
 const PART_CONCURRENCY          = 4; // concurrent part uploads per file (peak memory: 4 × partSize)
-
-function calcPartSize(fileSize, preferredBytes) {
-  // S3 spec minimum is 5 MB (5,000,000 bytes, decimal) for all parts except the last.
-  // Total parts must not exceed 10,000.
-  const floor = Math.max(5 * 1000 * 1000, Math.ceil(fileSize / 10000));
-  return (preferredBytes && preferredBytes > floor) ? preferredBytes : floor;
-}
 
 // Status: queued | uploading | paused | resuming | done | error | aborted
 let _idCounter = 0;
