@@ -7,6 +7,11 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.11.3] — 2026-06-01 — Anchor provider detection to hostname
+
+- Provider detection now parses the endpoint URL and tests patterns against the hostname only, preventing false matches on paths or query strings
+- Detection regexes anchored with `$` to prevent suffix-based misdetection
+
 ## [1.11.2] — 2026-06-01 — Document update poller in README
 
 - Expanded security model section to explicitly state the update poll targets the app's own URL only, never a third-party host, and stops once a new build is detected

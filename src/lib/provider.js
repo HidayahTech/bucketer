@@ -20,19 +20,22 @@ export const PROVIDER_LABELS = {
   [PROVIDERS.GENERIC]: 'Generic S3',
 };
 
-// Regex patterns for auto-detection from endpoint URL
+// Regex patterns for auto-detection — tested against hostname only, not the full URL
 const PATTERNS = [
-  { re: /\.backblazeb2\.com/i,        provider: PROVIDERS.B2 },
-  { re: /\.r2\.cloudflarestorage\.com/i, provider: PROVIDERS.R2 },
-  { re: /\.wasabisys\.com/i,          provider: PROVIDERS.WASABI },
-  { re: /\.amazonaws\.com/i,          provider: PROVIDERS.AWS },
-  { re: /\.digitaloceanspaces\.com/i, provider: PROVIDERS.DO_SPACES },
+  { re: /\.backblazeb2\.com$/i,        provider: PROVIDERS.B2 },
+  { re: /\.r2\.cloudflarestorage\.com$/i, provider: PROVIDERS.R2 },
+  { re: /\.wasabisys\.com$/i,          provider: PROVIDERS.WASABI },
+  { re: /\.amazonaws\.com$/i,          provider: PROVIDERS.AWS },
+  { re: /\.digitaloceanspaces\.com$/i, provider: PROVIDERS.DO_SPACES },
 ];
 
 export function detectProvider(endpoint) {
-  for (const { re, provider } of PATTERNS) {
-    if (re.test(endpoint)) return provider;
-  }
+  try {
+    const host = new URL(endpoint).hostname;
+    for (const { re, provider } of PATTERNS) {
+      if (re.test(host)) return provider;
+    }
+  } catch { /* unparseable endpoint — fall through to GENERIC */ }
   return PROVIDERS.GENERIC;
 }
 

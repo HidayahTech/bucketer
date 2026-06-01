@@ -1,8 +1,17 @@
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.11.2';
+export const CURRENT_VERSION = '1.11.3';
 
 export const CHANGELOG = [
+  {
+    "version": "1.11.3",
+    "date": "2026-06-01",
+    "title": "Anchor provider detection to hostname",
+    "changes": [
+      "Provider detection now parses the endpoint URL and tests patterns against the hostname only, preventing false matches on paths or query strings",
+      "Detection regexes anchored with $ to prevent suffix-based misdetection"
+    ]
+  },
   {
     "version": "1.11.2",
     "date": "2026-06-01",
