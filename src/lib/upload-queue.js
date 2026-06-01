@@ -1,5 +1,12 @@
 import { ListPartsCommand } from '@aws-sdk/client-s3';
 
+// BUG-003: The AWS SDK v3 browser fetch handler calls .getReader() on the Body,
+// expecting a ReadableStream. File and Blob do not have .getReader(). Converting
+// to Uint8Array gives the SDK a typed array it can handle in all environments.
+export async function preparePutBody(file) {
+  return new Uint8Array(await file.arrayBuffer());
+}
+
 // Bounded-concurrency task queue for file uploads (§4.6).
 // Spec default N=2; implemented as N=3 (D-3 — HTTP/2 multiplexing justification).
 // The concurrency value is read from the constructor argument at enqueue time, so

@@ -7,6 +7,14 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.12.8] — 2026-06-01 — Extract preparePutBody and add BUG-003 tests
+
+- Extracted `preparePutBody(file)` from `UploadQueue.jsx` into `src/lib/upload-queue.js` (exported)
+- `uploadSmall` now calls `preparePutBody(file)` instead of inlining the conversion
+- BUG-003 regression tests added to `test/calc-part-size.test.js`: returns Uint8Array, never Blob, content preserved, empty file produces empty array
+- Added **Coverage:** line for BUG-003 in `BUG-LOG.md`
+- Test count: 272 → 276
+
 ## [1.12.7] — 2026-06-01 — Document test suite in CLAUDE.md and update BUG-LOG
 
 - Added "Test Suite" section to `CLAUDE.md`: lists all 14 test files with their scope, explains the two-layer structure (unit vs build-output), and documents how to add new tests

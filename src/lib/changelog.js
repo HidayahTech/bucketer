@@ -1,8 +1,20 @@
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.12.7';
+export const CURRENT_VERSION = '1.12.8';
 
 export const CHANGELOG = [
+  {
+    "version": "1.12.8",
+    "date": "2026-06-01",
+    "title": "Extract preparePutBody and add BUG-003 tests",
+    "changes": [
+      "Extracted preparePutBody(file) from UploadQueue.jsx into src/lib/upload-queue.js (exported)",
+      "uploadSmall now calls preparePutBody(file) instead of inlining the conversion",
+      "BUG-003 regression tests added to test/calc-part-size.test.js: returns Uint8Array, never Blob, content preserved, empty file produces empty array",
+      "Added **Coverage:** line for BUG-003 in BUG-LOG.md",
+      "Test count: 272 → 276"
+    ]
+  },
   {
     "version": "1.12.7",
     "date": "2026-06-01",

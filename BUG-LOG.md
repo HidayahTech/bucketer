@@ -83,6 +83,8 @@ The multipart path (≥ 5 MB) worked because it already did the conversion per p
 **Test case:**
 Unit test for `uploadSmall`: mock the S3 client and assert that the `Body` passed to `PutObjectCommand` is a `Uint8Array`, not a `File` or `Blob`.
 
+**Coverage:** `test/calc-part-size.test.js` — "preparePutBody" suite. The conversion is extracted to `preparePutBody()` in `src/lib/upload-queue.js`; tests assert the result is a `Uint8Array`, never a `Blob`, and that content and empty-file cases are correct.
+
 ---
 
 ## BUG-004 — Folder picker silently opened in plain file mode (Preact JSX + `webkitdirectory`)

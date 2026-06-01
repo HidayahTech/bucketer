@@ -27,7 +27,7 @@ import {
   markUploadActive, markUploadInactive, isUploadActiveElsewhere,
   saveUploadLogEntry,
 } from '../lib/indexeddb.js';
-import { UploadQueue as Queue, calcPartSize, collectParts } from '../lib/upload-queue.js';
+import { UploadQueue as Queue, calcPartSize, collectParts, preparePutBody } from '../lib/upload-queue.js';
 import { loadPartConcurrency, loadPartSizeMB, loadFileConcurrency } from '../lib/storage.js';
 import { collectFileEntries } from '../lib/file-entries.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
@@ -209,9 +209,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     activeUploadsRef.current[id] = { abort: () => controller.abort() };
 
     onProgress(0, file.size);
-    // Uint8Array rather than File/Blob: the SDK browser handler calls .getReader()
-    // expecting a ReadableStream, which Blob does not have.
-    const body = new Uint8Array(await file.arrayBuffer());
+    const body = await preparePutBody(file); // BUG-003: must be Uint8Array, not Blob
     await client.send(
       new PutObjectCommand({ Bucket: bucket, Key: destinationKey, Body: body, ContentType: file.type || 'application/octet-stream' }),
       { abortSignal: controller.signal }

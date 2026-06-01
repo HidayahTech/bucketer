@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { calcPartSize } from '../src/lib/upload-queue.js';
+import { calcPartSize, preparePutBody } from '../src/lib/upload-queue.js';
 
 const MB  = 1_000_000;       // decimal MB (S3 spec uses decimal)
 const MiB = 1024 * 1024;     // binary MiB
@@ -72,5 +72,38 @@ describe('calcPartSize', () => {
 
   test('null preferred returns floor', () => {
     assert.equal(calcPartSize(20 * MB, null), 5 * MB);
+  });
+});
+
+// ── preparePutBody (BUG-003) ──────────────────────────────────────────────────
+
+describe('preparePutBody', () => {
+  // BUG-003: The AWS SDK v3 browser fetch handler calls .getReader() on the Body,
+  // expecting a ReadableStream. File and Blob don't have .getReader(). This function
+  // converts the file to Uint8Array which the SDK can handle in all environments.
+
+  test('returns a Uint8Array', async () => {
+    const blob = new Blob(['hello world']);
+    const result = await preparePutBody(blob);
+    assert.ok(result instanceof Uint8Array, 'must return Uint8Array, not File or Blob');
+  });
+
+  test('result is not a Blob or File', async () => {
+    const blob = new Blob(['test data']);
+    const result = await preparePutBody(blob);
+    assert.ok(!(result instanceof Blob), 'must not be a Blob — SDK cannot call .getReader() on Blob');
+  });
+
+  test('content is preserved through the conversion', async () => {
+    const data = new Uint8Array([1, 2, 3, 4, 5]);
+    const blob = new Blob([data]);
+    const result = await preparePutBody(blob);
+    assert.deepEqual(Array.from(result), [1, 2, 3, 4, 5]);
+  });
+
+  test('empty file produces empty Uint8Array', async () => {
+    const blob = new Blob([]);
+    const result = await preparePutBody(blob);
+    assert.equal(result.length, 0);
   });
 });
