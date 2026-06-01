@@ -1,8 +1,21 @@
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.11.7';
+export const CURRENT_VERSION = '1.11.8';
 
 export const CHANGELOG = [
+  {
+    "version": "1.11.8",
+    "date": "2026-06-01",
+    "title": "Add build output structural tests",
+    "changes": [
+      "New test/build.test.js: 14 assertions on dist/index.html verifying production build invariants",
+      "BUG-001 regression: placeholder must not survive into dist; output must be a valid HTML document",
+      "BUG-002 regression: bundle must not contain React.createElement (Preact JSX transform active)",
+      "BUG-012 regression: CORS template must include DELETE in AllowedMethods",
+      "Version consistency: app-version meta tag must match package.json",
+      "Single-bundle assertions: exactly one <script> and one <style> tag; no external script or stylesheet references"
+    ]
+  },
   {
     "version": "1.11.7",
     "date": "2026-06-01",

@@ -7,6 +7,15 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.11.8] — 2026-06-01 — Add build output structural tests
+
+- New `test/build.test.js`: 14 assertions on `dist/index.html` verifying production build invariants
+- BUG-001 regression: placeholder must not survive into dist; output must be a valid HTML document
+- BUG-002 regression: bundle must not contain `React.createElement` (Preact JSX transform active)
+- BUG-012 regression: CORS template must include `DELETE` in `AllowedMethods`
+- Version consistency: `app-version` meta tag must match `package.json`
+- Single-bundle assertions: exactly one `<script>` and one `<style>` tag; no external script or stylesheet references
+
 ## [1.11.7] — 2026-06-01 — Add indexeddb pure-function tests
 
 - New `test/indexeddb-pure.test.js`: 18 tests covering pure functions and localStorage-based tab conflict detection
