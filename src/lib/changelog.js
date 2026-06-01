@@ -1,9 +1,18 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.12.10';
+export const CURRENT_VERSION = '1.12.11';
 
 export const CHANGELOG = [
+  {
+    "version": "1.12.11",
+    "date": "2026-06-01",
+    "title": "Link copyright footer to HidayahTech website",
+    "changes": [
+      "Copyright notice in the app footer now links to https://hidayahtech.com",
+      "Link inherits the muted footer color; accent color on hover"
+    ]
+  },
   {
     "version": "1.12.10",
     "date": "2026-06-01",

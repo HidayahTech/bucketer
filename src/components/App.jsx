@@ -333,7 +333,7 @@ export function App() {
         </div>
       )}
       <footer class="app-footer">
-        Copyright &copy; 2026 HidayahTech, LLC
+        Copyright &copy; 2026 <a href="https://hidayahtech.com" target="_blank" rel="noopener noreferrer">HidayahTech, LLC</a>
       </footer>
     </div>
   );

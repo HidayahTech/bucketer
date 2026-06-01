@@ -7,6 +7,11 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.12.11] — 2026-06-01 — Link copyright footer to HidayahTech website
+
+- Copyright notice in the app footer now links to `https://hidayahtech.com`
+- Link inherits the muted footer color; accent color on hover
+
 ## [1.12.10] — 2026-06-01 — Add copyright footer to app UI
 
 - Added a footer bar at the bottom of the app displaying "Copyright © 2026 HidayahTech, LLC"
