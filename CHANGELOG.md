@@ -5,6 +5,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.10.4] — 2026-06-01
+
+- Added LICENSE file: GNU Affero General Public License v3.0 (AGPL-3.0)
+
 ## [1.10.3] — 2026-06-01
 
 - Fixed README: `dist/index.html` and `dist/favicon.ico` are committed to the repo (not gitignored) — updated docs to reflect this and explain the rationale (auditability)
