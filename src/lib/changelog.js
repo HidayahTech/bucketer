@@ -1,8 +1,19 @@
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.12.1';
+export const CURRENT_VERSION = '1.12.2';
 
 export const CHANGELOG = [
+  {
+    "version": "1.12.2",
+    "date": "2026-06-01",
+    "title": "Add file-entries.js tests",
+    "changes": [
+      "New test/file-entries.test.js: 10 tests for collectFileEntries using a pure JS FileSystemEntry mock",
+      "Flat list, nested folder traversal, mixed root entries, and correct relative path construction",
+      "Pagination invariant: folders with 150 and 250 files (simulated with batches of 100) must collect all entries — not just the first 100",
+      "Error resilience: unreadable file entries are silently skipped without throwing"
+    ]
+  },
   {
     "version": "1.12.1",
     "date": "2026-06-01",

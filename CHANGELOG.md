@@ -7,6 +7,13 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.12.2] — 2026-06-01 — Add file-entries.js tests
+
+- New `test/file-entries.test.js`: 10 tests for `collectFileEntries` using a pure JS FileSystemEntry mock
+- Flat list, nested folder traversal, mixed root entries, and correct relative path construction
+- Pagination invariant: folders with 150 and 250 files (simulated with batches of 100) must collect all entries — not just the first 100
+- Error resilience: unreadable file entries are silently skipped without throwing
+
 ## [1.12.1] — 2026-06-01 — Add storage.js tests
 
 - New `test/storage.test.js`: 23 tests covering the full credential and settings persistence layer
