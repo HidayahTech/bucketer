@@ -1,9 +1,17 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.12.14';
+export const CURRENT_VERSION = '1.12.15';
 
 export const CHANGELOG = [
+  {
+    "version": "1.12.15",
+    "date": "2026-06-01",
+    "title": "README badges",
+    "changes": [
+      "Add pipeline status, latest release, and AGPL v3 license badges to README"
+    ]
+  },
   {
     "version": "1.12.14",
     "date": "2026-06-01",

@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.12.15] — 2026-06-01 — README badges
+
+- Add pipeline status, latest release, and AGPL v3 license badges to README
+
 ## [1.12.14] — 2026-06-01 — CI release job
 
 - Added `scripts/release.mjs` — uploads `dist/index.html` to the Package Registry and creates a GitLab Release with CHANGELOG description and asset link

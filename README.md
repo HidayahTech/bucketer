@@ -1,5 +1,7 @@
 # Bucketer
 
+[![pipeline status](https://gitlab.com/hidayahtech/bucketer/badges/main/pipeline.svg)](https://gitlab.com/hidayahtech/bucketer/-/commits/main) [![Latest Release](https://gitlab.com/hidayahtech/bucketer/-/badges/release.svg)](https://gitlab.com/hidayahtech/bucketer/-/releases) [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+
 A browser-based tool for uploading, downloading, and managing objects in an S3-compatible bucket. No backend — runs entirely in the browser. Primary target is Backblaze B2; also supports Cloudflare R2, Wasabi, AWS S3, DigitalOcean Spaces, MinIO, and generic S3-compatible endpoints.
 
 ---
