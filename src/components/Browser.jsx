@@ -1068,7 +1068,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                     <video controls src={previewUrl} class="preview-media" />
                   )}
                   {previewUrl && kind === 'pdf' && (
-                    <iframe src={previewUrl} class="preview-pdf" title={leafName(previewItem.Key)} />
+                    <iframe src={previewUrl} class="preview-pdf" title={leafName(previewItem.Key)} sandbox="" />
                   )}
                   {previewText !== null && kind === 'text' && (
                     <div class="preview-text-wrap">

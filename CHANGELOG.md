@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.11.1] — 2026-06-01 — Sandbox PDF preview iframe
+
+- Added `sandbox=""` to the PDF preview `<iframe>` — disables scripts, forms, popups, same-origin access, and top navigation; native PDF rendering is unaffected
+
 ## [1.11.0] — 2026-06-01 — SVG favicon, drop favicon.ico
 
 - Favicon is now an inline SVG data URL — the same SVG already imported for the app logo is reused, adding zero bytes to the bundle

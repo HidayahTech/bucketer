@@ -1,8 +1,16 @@
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.11.0';
+export const CURRENT_VERSION = '1.11.1';
 
 export const CHANGELOG = [
+  {
+    "version": "1.11.1",
+    "date": "2026-06-01",
+    "title": "Sandbox PDF preview iframe",
+    "changes": [
+      "Added sandbox=\"\" to the PDF preview <iframe> — disables scripts, forms, popups, same-origin access, and top navigation; native PDF rendering is unaffected"
+    ]
+  },
   {
     "version": "1.11.0",
     "date": "2026-06-01",
