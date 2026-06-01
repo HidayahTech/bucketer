@@ -22,7 +22,7 @@ import { PutObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, Comp
 import { formatBytes, formatSpeed, formatEta, isPermissionError, parseS3Error } from '../lib/format.js';
 import {
   saveResumeRecord, loadResumeRecord, deleteResumeRecord,
-  buildFileIdentity, fileIdentityMatches, computeFileHash,
+  buildFileIdentityWithHash, fileIdentityMatches, computeFileHash,
   uploadExpiryWarningMs,
   markUploadActive, markUploadInactive, isUploadActiveElsewhere,
   saveUploadLogEntry,
@@ -234,9 +234,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
 
     // Save resume record before any parts so a crash mid-upload is recoverable
     try {
-      const fileIdentity = buildFileIdentity(file);
-      const hash = await computeFileHash(file);
-      if (hash) fileIdentity.contentHash = hash;
+      const fileIdentity = await buildFileIdentityWithHash(file);
       await saveResumeRecord({
         provider, endpoint: credentials.endpoint, bucket, destinationKey,
         uploadId, partSize, fileIdentity, startedAt: Date.now(),

@@ -16,6 +16,7 @@
 // that users must re-run CORS setup with a real origin after deploying to a domain.
 import { useState } from 'preact/hooks';
 import { PROVIDERS, extractRegion, needsCorsConfig } from '../lib/provider.js';
+import { corsJson } from '../lib/cors-config.js';
 
 const isFileProtocol = typeof window !== 'undefined' && window.location.protocol === 'file:';
 
@@ -67,18 +68,6 @@ function Step({ n, title, children }) {
       </div>
     </div>
   );
-}
-
-function corsJson(origin) {
-  return JSON.stringify({
-    CORSRules: [{
-      AllowedOrigins: [origin],
-      AllowedMethods: ['GET', 'PUT', 'HEAD', 'POST', 'DELETE'],
-      AllowedHeaders: ['Authorization', 'Content-Type', 'Content-MD5', 'x-amz-*', 'amz-sdk-invocation-id', 'amz-sdk-request', 'ETag'],
-      ExposeHeaders: ['ETag', 'Content-Length', 'Content-Type'],
-      MaxAgeSeconds: 3600,
-    }],
-  }, null, 2);
 }
 
 function corsCmd({ endpoint, bucket, origin, profile = 'bucketer' }) {

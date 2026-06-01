@@ -114,6 +114,16 @@ export function fileIdentityMatches(identity, file) {
   );
 }
 
+// BUG-008: contentHash must be added to fileIdentity BEFORE saveResumeRecord is called.
+// Adding it after means a crash between save and hash write leaves a record without a hash,
+// so a content-changed file would not be detected on resume.
+export async function buildFileIdentityWithHash(file) {
+  const identity = buildFileIdentity(file);
+  const hash = await computeFileHash(file);
+  if (hash) identity.contentHash = hash;
+  return identity;
+}
+
 // Concurrent tab conflict detection (§4.15). Two tabs uploading to the same destination
 // key would overwrite each other's parts and corrupt resume state. Each tab registers
 // its in-flight uploads in localStorage under a tab-unique ID. isUploadActiveElsewhere()

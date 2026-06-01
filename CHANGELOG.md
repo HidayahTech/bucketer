@@ -7,6 +7,14 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.12.5] — 2026-06-01 — Extract corsJson and buildFileIdentityWithHash; add tests
+
+- Extracted `corsJson(origin)` from `SetupGuide.jsx` into `src/lib/cors-config.js` (exported)
+- New `test/cors-config.test.js`: 11 tests — structure, AllowedMethods (BUG-012), AllowedHeaders (SDK headers must be explicit), ExposeHeaders
+- Extracted `buildFileIdentityWithHash(file)` into `src/lib/indexeddb.js` (exported); `UploadQueue.jsx` now calls it instead of inlining the three-line pattern
+- BUG-008 regression tests added to `test/indexeddb-storage.test.js`: contentHash present, deterministic, content-sensitive
+- The SDK headers `amz-sdk-invocation-id` and `amz-sdk-request` must appear explicitly — the `x-amz-*` wildcard does not cover them
+
 ## [1.12.4] — 2026-06-01 — Extract collectParts and add BUG-007 tests
 
 - Extracted `collectParts(client, {bucket, key, uploadId})` from `UploadQueue.jsx` into `src/lib/upload-queue.js` (exported)

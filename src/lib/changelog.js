@@ -1,8 +1,20 @@
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.12.4';
+export const CURRENT_VERSION = '1.12.5';
 
 export const CHANGELOG = [
+  {
+    "version": "1.12.5",
+    "date": "2026-06-01",
+    "title": "Extract corsJson and buildFileIdentityWithHash; add tests",
+    "changes": [
+      "Extracted corsJson(origin) from SetupGuide.jsx into src/lib/cors-config.js (exported)",
+      "New test/cors-config.test.js: 11 tests — structure, AllowedMethods (BUG-012), AllowedHeaders (SDK headers must be explicit), ExposeHeaders",
+      "Extracted buildFileIdentityWithHash(file) into src/lib/indexeddb.js (exported); UploadQueue.jsx now calls it instead of inlining the three-line pattern",
+      "BUG-008 regression tests added to test/indexeddb-storage.test.js: contentHash present, deterministic, content-sensitive",
+      "The SDK headers amz-sdk-invocation-id and amz-sdk-request must appear explicitly — the x-amz-* wildcard does not cover them"
+    ]
+  },
   {
     "version": "1.12.4",
     "date": "2026-06-01",

@@ -24,6 +24,7 @@ import {
   loadResumeRecord,
   deleteResumeRecord,
   computeFileHash,
+  buildFileIdentityWithHash,
 } from '../src/lib/indexeddb.js';
 
 // ── Resume record lifecycle ───────────────────────────────────────────────────
@@ -133,5 +134,46 @@ describe('computeFileHash', () => {
     const blobB = new Blob([head, middleB, tail]);
     assert.equal(await computeFileHash(blobA), await computeFileHash(blobB),
       'files with identical head+tail but different middle must hash the same');
+  });
+});
+
+// ── buildFileIdentityWithHash (BUG-008) ───────────────────────────────────────
+
+describe('buildFileIdentityWithHash', () => {
+  // BUG-008: contentHash must be present in the identity saved to IndexedDB BEFORE
+  // any parts are uploaded. If it were added after the save, a crash between the
+  // save and the hash-write would leave a record without a hash, so a content-changed
+  // file would not be detected on resume.
+
+  test('returns name, size, and lastModified from the file', async () => {
+    const file = Object.assign(new Blob(['hello']), { name: 'hello.txt', lastModified: 1000 });
+    const id = await buildFileIdentityWithHash(file);
+    assert.equal(id.name, 'hello.txt');
+    assert.equal(id.size, 5);
+    assert.equal(id.lastModified, 1000);
+  });
+
+  test('contentHash is a 64-character hex string', async () => {
+    const file = Object.assign(new Blob([new Uint8Array(512).fill(42)]), { name: 'f.bin', lastModified: 0 });
+    const id = await buildFileIdentityWithHash(file);
+    assert.ok(id.contentHash, 'contentHash must be present');
+    assert.match(id.contentHash, /^[0-9a-f]{64}$/, 'contentHash must be a 64-char hex string');
+  });
+
+  test('same file content produces the same contentHash', async () => {
+    const data = new Uint8Array(256).fill(7);
+    const f1 = Object.assign(new Blob([data]), { name: 'a.bin', lastModified: 0 });
+    const f2 = Object.assign(new Blob([data]), { name: 'a.bin', lastModified: 0 });
+    const id1 = await buildFileIdentityWithHash(f1);
+    const id2 = await buildFileIdentityWithHash(f2);
+    assert.equal(id1.contentHash, id2.contentHash);
+  });
+
+  test('different content produces different contentHash', async () => {
+    const f1 = Object.assign(new Blob([new Uint8Array(256).fill(1)]), { name: 'a.bin', lastModified: 0 });
+    const f2 = Object.assign(new Blob([new Uint8Array(256).fill(2)]), { name: 'a.bin', lastModified: 0 });
+    const id1 = await buildFileIdentityWithHash(f1);
+    const id2 = await buildFileIdentityWithHash(f2);
+    assert.notEqual(id1.contentHash, id2.contentHash);
   });
 });
