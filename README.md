@@ -30,7 +30,7 @@ npm run serve   # dev build + local HTTP server at http://localhost:3000
 
 The output is a **single self-contained HTML file** with no external dependencies. This design allows it to be opened directly as a `file://` URL and deployed to any static host without a build step on the server.
 
-`dist/` is gitignored. You must run `npm run build` before deploying.
+`dist/index.html` and `dist/favicon.ico` are committed to the repo — the built file is tracked so the canonical hosted copy can be audited against the source without requiring a local build.
 
 ### Source layout
 
@@ -43,7 +43,7 @@ src/
   lib/                  # Shared utilities (S3 client, storage, formatting)
 build.mjs               # Build script (esbuild + inline)
 serve.mjs               # Dev server (builds then serves on localhost:3000)
-dist/index.html         # Build output (gitignored)
+dist/index.html         # Build output (committed for auditability)
 ```
 
 ---

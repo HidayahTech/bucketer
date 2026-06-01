@@ -5,6 +5,10 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.10.3] — 2026-06-01
+
+- Fixed README: `dist/index.html` and `dist/favicon.ico` are committed to the repo (not gitignored) — updated docs to reflect this and explain the rationale (auditability)
+
 ## [1.10.2] — 2026-05-31
 
 - Moved `@anthropic-ai/claude-code` out of project dependencies into a gitignored `.tools/` directory — it no longer appears in `package.json` or `package-lock.json`
