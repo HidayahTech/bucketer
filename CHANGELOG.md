@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.10.8] — 2026-06-01 — Add security model section to README
+
+- Added "Security model" section to README covering trust boundaries, credential storage, and the role of `connect-src` CSP as a mitigation against dependency exfiltration
+
 ## [1.10.7] — 2026-06-01 — Move internal planning docs to docs/
 
 - Moved `IMPROVEMENT-PLAN.md`, `SPEC-DRIFT.md`, `QUESTIONS.md`, `TODO.md`, and `s3-browser-spec-v0.15.md` from the repo root into `docs/`

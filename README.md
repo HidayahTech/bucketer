@@ -4,6 +4,18 @@ A browser-based tool for uploading, downloading, and managing objects in an S3-c
 
 ---
 
+## Security model
+
+Bucketer has no backend. The only network requests it makes are to your S3 endpoint and a same-origin poll to detect when a new build is available — there is no Bucketer-controlled server, no analytics, and no telemetry.
+
+**Trusts:** the browser, the host serving the HTML file, and every library bundled into it. A compromised host or a malicious dependency could read credentials from `sessionStorage`. The `connect-src` CSP in the deployment examples limits where the page can make requests, which constrains what a malicious dependency could exfiltrate — deploy with a tightly scoped `connect-src` for the strongest protection.
+
+**Does not trust:** the network. Your secret key never leaves the browser except as an HMAC signature (SigV4) on requests sent directly to your S3 endpoint over TLS.
+
+**Credentials:** the secret key is held in `sessionStorage` only — never written to disk, cleared on tab close. The key ID, endpoint, and bucket name persist in `localStorage` for convenience; these are not sensitive on their own. Use bucket-scoped, least-privilege keys to limit blast radius if credentials are ever exposed.
+
+---
+
 ## Build pipeline
 
 ### Prerequisites

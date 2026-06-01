@@ -1,8 +1,16 @@
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.10.7';
+export const CURRENT_VERSION = '1.10.8';
 
 export const CHANGELOG = [
+  {
+    "version": "1.10.8",
+    "date": "2026-06-01",
+    "title": "Add security model section to README",
+    "changes": [
+      "Added \"Security model\" section to README covering trust boundaries, credential storage, and the role of connect-src CSP as a mitigation against dependency exfiltration"
+    ]
+  },
   {
     "version": "1.10.7",
     "date": "2026-06-01",
