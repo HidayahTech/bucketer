@@ -1,8 +1,20 @@
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.10.9';
+export const CURRENT_VERSION = '1.11.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.11.0",
+    "date": "2026-06-01",
+    "title": "SVG favicon, drop favicon.ico",
+    "changes": [
+      "Favicon is now an inline SVG data URL — the same SVG already imported for the app logo is reused, adding zero bytes to the bundle",
+      "dist/favicon.ico removed from the repo; ImageMagick build dependency dropped",
+      "<link rel=\"icon\"> in the HTML shell carries a placeholder href=\"data:image/svg+xml,\" to suppress the browser's default /favicon.ico auto-request before JS runs",
+      "JS overwrites the placeholder with the real logo URL at module init; null-guarded to prevent a crash if the element is ever absent",
+      "Updated README: dist/favicon.ico is no longer committed"
+    ]
+  },
   {
     "version": "1.10.9",
     "date": "2026-06-01",

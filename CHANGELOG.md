@@ -7,6 +7,14 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.11.0] — 2026-06-01 — SVG favicon, drop favicon.ico
+
+- Favicon is now an inline SVG data URL — the same SVG already imported for the app logo is reused, adding zero bytes to the bundle
+- `dist/favicon.ico` removed from the repo; ImageMagick build dependency dropped
+- `<link rel="icon">` in the HTML shell carries a placeholder `href="data:image/svg+xml,"` to suppress the browser's default `/favicon.ico` auto-request before JS runs
+- JS overwrites the placeholder with the real logo URL at module init; null-guarded to prevent a crash if the element is ever absent
+- Updated README: `dist/favicon.ico` is no longer committed
+
 ## [1.10.9] — 2026-06-01 — Tighten Caddy CSP connect-src
 
 - Caddy deployment example now uses the same scoped `connect-src` provider list as the nginx example, replacing the permissive `connect-src https:` (any HTTPS host)

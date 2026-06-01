@@ -20,6 +20,9 @@ import { UpdateBanner } from './UpdateBanner.jsx';
 import { ChangelogModal } from './ChangelogModal.jsx';
 import { CURRENT_VERSION } from '../lib/changelog.js';
 
+const _iconLink = document.querySelector('link[rel="icon"]');
+if (_iconLink) _iconLink.href = logoUrl;
+
 // Session states: disconnected | connecting | connected | failed
 export function App() {
   const [session, setSession] = useState('disconnected');
