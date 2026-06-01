@@ -1,8 +1,16 @@
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.10.8';
+export const CURRENT_VERSION = '1.10.9';
 
 export const CHANGELOG = [
+  {
+    "version": "1.10.9",
+    "date": "2026-06-01",
+    "title": "Tighten Caddy CSP connect-src",
+    "changes": [
+      "Caddy deployment example now uses the same scoped connect-src provider list as the nginx example, replacing the permissive connect-src https: (any HTTPS host)"
+    ]
+  },
   {
     "version": "1.10.8",
     "date": "2026-06-01",

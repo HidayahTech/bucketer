@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.10.9] — 2026-06-01 — Tighten Caddy CSP connect-src
+
+- Caddy deployment example now uses the same scoped `connect-src` provider list as the nginx example, replacing the permissive `connect-src https:` (any HTTPS host)
+
 ## [1.10.8] — 2026-06-01 — Add security model section to README
 
 - Added "Security model" section to README covering trust boundaries, credential storage, and the role of `connect-src` CSP as a mitigation against dependency exfiltration

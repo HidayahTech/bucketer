@@ -102,7 +102,8 @@ server {
 bucketer.yourdomain.com {
     root * /var/www/bucketer
     file_server
-    header Content-Security-Policy "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src https:;"
+    # Tighten connect-src to only the providers you use, or use https: for any endpoint.
+    header Content-Security-Policy "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src https://*.backblazeb2.com https://*.r2.cloudflarestorage.com https://*.wasabisys.com https://*.amazonaws.com https://*.digitaloceanspaces.com https:;"
     header X-Content-Type-Options "nosniff"
     header X-Frame-Options "DENY"
     header Referrer-Policy "no-referrer"
