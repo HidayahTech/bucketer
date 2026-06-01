@@ -1,8 +1,22 @@
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.12.0';
+export const CURRENT_VERSION = '1.12.1';
 
 export const CHANGELOG = [
+  {
+    "version": "1.12.1",
+    "date": "2026-06-01",
+    "title": "Add storage.js tests",
+    "changes": [
+      "New test/storage.test.js: 23 tests covering the full credential and settings persistence layer",
+      "Security invariant: secretKey must go to sessionStorage, not localStorage; asserted at the storage-value level",
+      "Credential round-trip: all fields saved and loaded correctly; provider returns null (not empty string) when absent",
+      "clearCredentials wipes both stores; clearCapabilities resets to defaults",
+      "Settings round-trips for all settings functions: maxKeys, partConcurrency, partSizeMB, fileConcurrency",
+      "listingCacheTTL edge case: 0 (disable cache) must not be treated as falsy — checked explicitly",
+      "loadCapabilities returns defaults when storage is empty or contains corrupted JSON"
+    ]
+  },
   {
     "version": "1.12.0",
     "date": "2026-06-01",
