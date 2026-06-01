@@ -7,6 +7,11 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.12.10] — 2026-06-01 — Add copyright footer to app UI
+
+- Added a footer bar at the bottom of the app displaying "Copyright © 2026 HidayahTech, LLC"
+- Styled with `--text-muted` and a top border; adapts to dark mode automatically
+
 ## [1.12.9] — 2026-06-01 — Add copyright notices
 
 - Added `Copyright (C) 2026 HidayahTech, LLC` to the top of all 24 source files (`src/**/*.js`, `src/**/*.jsx`)

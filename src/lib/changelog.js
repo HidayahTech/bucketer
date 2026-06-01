@@ -1,9 +1,18 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.12.9';
+export const CURRENT_VERSION = '1.12.10';
 
 export const CHANGELOG = [
+  {
+    "version": "1.12.10",
+    "date": "2026-06-01",
+    "title": "Add copyright footer to app UI",
+    "changes": [
+      "Added a footer bar at the bottom of the app displaying \"Copyright © 2026 HidayahTech, LLC\"",
+      "Styled with --text-muted and a top border; adapts to dark mode automatically"
+    ]
+  },
   {
     "version": "1.12.9",
     "date": "2026-06-01",

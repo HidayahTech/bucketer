@@ -332,6 +332,9 @@ export function App() {
           </main>
         </div>
       )}
+      <footer class="app-footer">
+        Copyright &copy; 2026 HidayahTech, LLC
+      </footer>
     </div>
   );
 }
