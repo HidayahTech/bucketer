@@ -1,3 +1,5 @@
+import { ListPartsCommand } from '@aws-sdk/client-s3';
+
 // Bounded-concurrency task queue for file uploads (§4.6).
 // Spec default N=2; implemented as N=3 (D-3 — HTTP/2 multiplexing justification).
 // The concurrency value is read from the constructor argument at enqueue time, so
@@ -7,6 +9,23 @@
 // preferredBytes is honoured only when it is above the computed floor — we never go
 // below the floor because that would either violate the 5 MB minimum (last part excluded)
 // or push the part count over 10,000 for very large files.
+// Paginate ListParts to completion (BUG-007 fix). Each page returns up to 1000
+// parts. Stopping after the first page would miss ACK'd parts and re-upload them,
+// corrupting the multipart session. Caller passes the SDK client and upload params.
+export async function collectParts(client, { bucket, key, uploadId }) {
+  const parts = [];
+  let marker;
+  do {
+    const resp = await client.send(new ListPartsCommand({
+      Bucket: bucket, Key: key, UploadId: uploadId,
+      PartNumberMarker: marker,
+    }));
+    for (const p of (resp.Parts || [])) parts.push({ PartNumber: p.PartNumber, ETag: p.ETag });
+    marker = resp.IsTruncated ? resp.NextPartNumberMarker : undefined;
+  } while (marker);
+  return parts;
+}
+
 export function calcPartSize(fileSize, preferredBytes) {
   const floor = Math.max(5 * 1000 * 1000, Math.ceil(fileSize / 10000));
   return (preferredBytes && preferredBytes > floor) ? preferredBytes : floor;

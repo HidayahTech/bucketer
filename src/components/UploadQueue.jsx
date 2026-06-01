@@ -18,7 +18,7 @@
 // File concurrency: N=3 default (D-3, configurable). Part concurrency: 4 per file (configurable).
 // Peak RAM at defaults: 3 files × 4 parts × 5 MiB = 60 MiB.
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
-import { PutObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand, ListPartsCommand } from '@aws-sdk/client-s3';
+import { PutObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand } from '@aws-sdk/client-s3';
 import { formatBytes, formatSpeed, formatEta, isPermissionError, parseS3Error } from '../lib/format.js';
 import {
   saveResumeRecord, loadResumeRecord, deleteResumeRecord,
@@ -27,7 +27,7 @@ import {
   markUploadActive, markUploadInactive, isUploadActiveElsewhere,
   saveUploadLogEntry,
 } from '../lib/indexeddb.js';
-import { UploadQueue as Queue, calcPartSize } from '../lib/upload-queue.js';
+import { UploadQueue as Queue, calcPartSize, collectParts } from '../lib/upload-queue.js';
 import { loadPartConcurrency, loadPartSizeMB, loadFileConcurrency } from '../lib/storage.js';
 import { collectFileEntries } from '../lib/file-entries.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
@@ -320,17 +320,8 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     try {
       // ListParts is the authoritative source for which parts were ACK'd by the provider (§4.15).
       // We do not trust the local resume record's part list — the session may have continued
-      // in another browser or tab. Paginate fully: each page returns max 1000 parts.
-      const completedParts = [];
-      let partMarker;
-      do {
-        const listResp = await client.send(new ListPartsCommand({
-          Bucket: bucket, Key: destinationKey, UploadId: uploadId,
-          PartNumberMarker: partMarker,
-        }));
-        (listResp.Parts || []).forEach(p => completedParts.push({ PartNumber: p.PartNumber, ETag: p.ETag }));
-        partMarker = listResp.IsTruncated ? listResp.NextPartNumberMarker : undefined;
-      } while (partMarker);
+      // in another browser or tab.
+      const completedParts = await collectParts(client, { bucket, key: destinationKey, uploadId });
       const completedNums = new Set(completedParts.map(p => p.PartNumber));
 
       // Calculate total parts

@@ -7,6 +7,13 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.12.4] — 2026-06-01 — Extract collectParts and add BUG-007 tests
+
+- Extracted `collectParts(client, {bucket, key, uploadId})` from `UploadQueue.jsx` into `src/lib/upload-queue.js` (exported)
+- `ListPartsCommand` import moved from the component to the lib module
+- New `test/collect-parts.test.js`: 7 tests using a mock S3 client
+- BUG-007 regression tests: two-page and three-page pagination, stops on `IsTruncated=false`, handles missing `Parts` field, preserves ETag through pagination
+
 ## [1.12.3] — 2026-06-01 — Add s3-client.js tests
 
 - New `test/s3-client.test.js`: 12 tests for `createS3Client` region resolution and `forcePathStyle`
