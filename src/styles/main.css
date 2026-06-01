@@ -604,6 +604,14 @@ details[open] .upload-log-summary::before { transform: rotate(90deg); }
 .changelog-current-badge { font-size: .7rem; font-weight: 600; background: var(--accent); color: #fff; padding: .1rem .4rem; border-radius: 999px; }
 .changelog-entry-title { font-weight: 600; }
 .changelog-changes { padding-left: 1.25rem; display: flex; flex-direction: column; gap: .2rem; color: var(--text-muted); line-height: 1.5; }
+.changelog-upstream { padding-top: .75rem; border-top: 1px solid var(--border); font-size: .8rem; }
+.upstream-result { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.upstream-badge { height: 20px; vertical-align: middle; display: block; }
+.upstream-status { color: var(--text-muted); }
+.upstream-ok { color: var(--text-success); }
+.upstream-new { color: var(--accent); }
+.upstream-new a { color: inherit; text-decoration: underline; }
+.upstream-err { color: var(--text-danger); }
 .btn-version { background: none; border: none; color: rgba(255,255,255,.5); font-size: .72rem; cursor: pointer; padding: .2rem .4rem; border-radius: var(--radius); font-family: var(--mono); margin-left: .25rem; }
 .btn-version:hover { color: #fff; background: rgba(255,255,255,.1); }
 

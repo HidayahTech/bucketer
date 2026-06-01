@@ -7,6 +7,12 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.12.16] — 2026-06-01 — Upstream release check in changelog
+
+- Add "Check for upstream release" button to the changelog modal
+- Fetches the latest GitLab release via API and displays the release badge alongside a status line (up to date / update available with link)
+- Result is cached for the duration of the tab session
+
 ## [1.12.15] — 2026-06-01 — README badges
 
 - Add pipeline status, latest release, and AGPL v3 license badges to README

@@ -1,9 +1,19 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.12.15';
+export const CURRENT_VERSION = '1.12.16';
 
 export const CHANGELOG = [
+  {
+    "version": "1.12.16",
+    "date": "2026-06-01",
+    "title": "Upstream release check in changelog",
+    "changes": [
+      "Add \"Check for upstream release\" button to the changelog modal",
+      "Fetches the latest GitLab release via API and displays the release badge alongside a status line (up to date / update available with link)",
+      "Result is cached for the duration of the tab session"
+    ]
+  },
   {
     "version": "1.12.15",
     "date": "2026-06-01",
