@@ -1,8 +1,18 @@
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.10.5';
+export const CURRENT_VERSION = '1.10.6';
 
 export const CHANGELOG = [
+  {
+    "version": "1.10.6",
+    "date": "2026-06-01",
+    "title": "Drop full fetch from update checker",
+    "changes": [
+      "Update checker no longer pre-fetches the full page when a new build is detected",
+      "app-version is now extracted from the same 512-byte range fetch as build-id (both are within the range boundary guaranteed by the build invariant)",
+      "Polling stops as soon as a different build-id is confirmed; the user decides when to reload"
+    ]
+  },
   {
     "version": "1.10.5",
     "date": "2026-06-01",

@@ -4,11 +4,10 @@
 //   1. HEAD request — compare ETag/Last-Modified against a stored baseline.
 //      If they match, nothing has changed; reschedule without fetching any body.
 //   2. Range fetch (bytes 0–511) — if HEAD is inconclusive (no baseline yet, or
-//      headers changed/absent), fetch just enough bytes to extract the build-id
-//      and compare it with the running page's build-id.
-//   3. Full fetch — once a real version change is confirmed, fetch the whole page
-//      with the default cache mode so the browser can store it. The user's
-//      subsequent reload will be served from cache. Extract app-version for display.
+//      headers changed/absent), fetch just enough bytes to extract build-id and
+//      app-version (both are guaranteed within the first 512 bytes by the build
+//      invariant). If build-id differs from the running page, stop polling and
+//      show the update banner. No full fetch is performed.
 //
 // RANGE_BYTES must match UPDATE_CHECK_RANGE_BYTES in build.mjs.
 import { useState, useEffect } from 'preact/hooks';
@@ -44,7 +43,7 @@ async function tryHead(url) {
   } catch { return null; }
 }
 
-async function fetchRangeBuildId(url) {
+async function fetchRangeMetadata(url) {
   try {
     const res = await fetch(url, {
       cache: 'no-store',
@@ -52,20 +51,10 @@ async function fetchRangeBuildId(url) {
     });
     if (!res.ok) return null;
     const text = await res.text();
-    const m = text.match(/name="build-id"\s+content="([^"]+)"/);
-    return m ? m[1] : null;
-  } catch { return null; }
-}
-
-async function fetchFullVersion(url) {
-  try {
-    // No cache override — let the browser cache this response so the reload
-    // after the user clicks "Refresh to update" is served from cache.
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const text = await res.text();
-    const m = text.match(/name="app-version"\s+content="([^"]+)"/);
-    return m ? m[1] : null;
+    const buildIdMatch = text.match(/name="build-id"\s+content="([^"]+)"/);
+    if (!buildIdMatch) return null;
+    const versionMatch = text.match(/name="app-version"\s+content="([^"]+)"/);
+    return { buildId: buildIdMatch[1], appVersion: versionMatch ? versionMatch[1] : null };
   } catch { return null; }
 }
 
@@ -96,26 +85,23 @@ export function UpdateBanner() {
           }
         }
 
-        // Step 2: Range fetch — compare build-id
-        const fetchedBuildId = await fetchRangeBuildId(checkUrl);
-        if (fetchedBuildId === null) {
+        // Step 2: Range fetch — compare build-id, extract app-version
+        const metadata = await fetchRangeMetadata(checkUrl);
+        if (metadata === null) {
           timerId = setTimeout(check, nextDelay(++attempt));
           return;
         }
 
-        if (fetchedBuildId === currentId) {
-          // Same version — establish or refresh the HEAD baseline, then reschedule
+        if (metadata.buildId === currentId) {
+          // Same build — establish or refresh the HEAD baseline, then reschedule
           const hk = await tryHead(checkUrl);
           if (hk) headBaseline = hk;
           timerId = setTimeout(check, nextDelay(++attempt));
           return;
         }
 
-        // Step 3: Different build-id — confirmed update.
-        // Fetch the full page without cache override so the browser stores it.
-        const cacheUrl = window.location.pathname || '/';
-        const version = await fetchFullVersion(cacheUrl);
-        setNewVersion(version);
+        // Different build-id — confirmed update. Stop polling and show banner.
+        setNewVersion(metadata.appVersion);
         setHasUpdate(true);
         // Polling stops — an update has been found.
       } catch {
