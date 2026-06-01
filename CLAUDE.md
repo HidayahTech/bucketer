@@ -12,7 +12,7 @@ Built with Preact + esbuild. The build pipeline produces a single self-contained
 
 Always ask for confirmation before committing or pushing.
 
-Never include `@anthropic-ai/claude-code` in commits or pushes. It is a local development tool only and must never be deployed. If `package.json` or `package-lock.json` show changes to that package, exclude those files from the commit.
+`@anthropic-ai/claude-code` is not a project dependency and must never appear in `package.json`, `package-lock.json`, or any commit. It is installed separately in `.tools/` (gitignored). See **Claude Code Setup** below.
 
 ## Build Invariants
 
@@ -43,3 +43,27 @@ npm install
 npm run build   # → dist/index.html
 npm run serve   # dev build + localhost:3000
 ```
+
+## Claude Code Setup
+
+Claude Code is kept out of the main project dependencies to avoid polluting `package.json` and `package-lock.json`. It lives in a gitignored `.tools/` directory that each developer sets up locally after cloning.
+
+**First-time setup after cloning:**
+
+```bash
+mkdir .tools
+cd .tools
+npm init -y
+npm install @anthropic-ai/claude-code
+cd ..
+```
+
+**Invoke Claude Code from the project root:**
+
+```bash
+.tools/node_modules/.bin/claude
+```
+
+**Why `.tools/` and not a global install:**
+
+A global install makes `claude` available everywhere on the system. Keeping it in `.tools/` means it is only accessible when you are working in this project, which limits its reach to the intended directory. For stronger enforcement, wrap the invocation with Bubblewrap — see the Bubblewrap section in any session notes or ask Claude to walk you through it.

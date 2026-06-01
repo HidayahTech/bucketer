@@ -1,17 +1,17 @@
 {
   "type": "module",
-  "version": "1.10.1",
+  "version": "1.10.2",
   "scripts": {
     "build": "node build.mjs",
     "dev": "node build.mjs --dev",
-    "serve": "node serve.mjs"
+    "serve": "node serve.mjs",
+    "test": "node --test test/*.test.js"
   },
   "engines": {
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@anthropic-ai/claude-code": "^2.1.153",
-    "@aws-sdk/client-s3": "^3.1051.0",
+"@aws-sdk/client-s3": "^3.1051.0",
     "@aws-sdk/s3-request-presigner": "^3.1051.0",
     "preact": "^10.29.2"
   },

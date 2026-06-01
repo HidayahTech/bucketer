@@ -5,6 +5,12 @@ Versioning follows [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [1.10.2] — 2026-05-31
+
+- Moved `@anthropic-ai/claude-code` out of project dependencies into a gitignored `.tools/` directory — it no longer appears in `package.json` or `package-lock.json`
+- Added `.tools/` to `.gitignore`
+- Updated `CLAUDE.md` with Claude Code setup instructions and corrected the workflow note about the package
+
 ## [1.10.0] — 2026-05-28
 
 - Update check now uses a HEAD request as a fast first step — if ETag/Last-Modified headers match, no body is fetched at all
