@@ -24,6 +24,7 @@ import { detectProvider, PROVIDER_LABELS } from '../lib/provider.js';
 import {
   loadCredentials, saveCredentials, clearCredentials,
   loadCapabilities, saveCapabilities, clearCapabilities, defaultCapabilities,
+  loadUpdateCheckEnabled, saveUpdateCheckEnabled,
 } from '../lib/storage.js';
 import { readUrlParams, hasUrlParams, buildShareUrl } from '../lib/url-params.js';
 import { FileBanner } from './FileBanner.jsx';
@@ -57,6 +58,7 @@ export function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [updateCheckEnabled, setUpdateCheckEnabled] = useState(() => loadUpdateCheckEnabled());
   const addFilesRef = useRef(null);
   const urlParamsPresent = hasUrlParams();
 
@@ -200,7 +202,7 @@ export function App() {
         </button>
       </header>
 
-      <UpdateBanner />
+      <UpdateBanner enabled={updateCheckEnabled} />
       <FileBanner />
 
       {session === 'disconnected' || session === 'connecting' || session === 'failed' ? (
@@ -274,7 +276,11 @@ export function App() {
             <hr style={{ border: 'none', borderTop: '1px solid var(--border)' }} />
             <CapabilityPanel capabilities={capabilities} onRefresh={handleRefreshPermissions} />
             <hr style={{ border: 'none', borderTop: '1px solid var(--border)' }} />
-            <SettingsPanel provider={credentials.provider} />
+            <SettingsPanel
+              provider={credentials.provider}
+              updateCheckEnabled={updateCheckEnabled}
+              onUpdateCheckChange={(val) => { saveUpdateCheckEnabled(val); setUpdateCheckEnabled(val); }}
+            />
             <hr style={{ border: 'none', borderTop: '1px solid var(--border)' }} />
             <details class="s3-primer">
               <summary class="s3-primer-summary">About S3 buckets</summary>

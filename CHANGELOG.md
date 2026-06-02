@@ -7,6 +7,13 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.12.24] — 2026-06-02 — Make background update check toggleable in settings
+
+- Add `loadUpdateCheckEnabled` / `saveUpdateCheckEnabled` to `storage.js`
+- `UpdateBanner` accepts `enabled` prop; polling starts/stops reactively via `useEffect` dependency
+- `SettingsPanel` exposes a "Background update checks" checkbox with immediate effect (no Save needed)
+- Defaults to enabled — no behaviour change for existing users
+
 ## [1.12.23] — 2026-06-02 — Add live instance link and canonical repo note to README
 
 - Add "Try it live" link to bucketer.hidayahtech.net and canonical GitLab repo reference below the badges

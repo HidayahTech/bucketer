@@ -59,12 +59,13 @@ async function fetchRangeMetadata(url) {
   } catch { return null; }
 }
 
-export function UpdateBanner() {
+export function UpdateBanner({ enabled = true }) {
   const [hasUpdate, setHasUpdate] = useState(false);
   const [newVersion, setNewVersion] = useState(null);
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
+    if (!enabled) return;
     if (window.location.protocol === 'file:') return;
     const currentId = getCurrentBuildId();
     if (!currentId) return;
@@ -112,7 +113,7 @@ export function UpdateBanner() {
 
     timerId = setTimeout(check, nextDelay(attempt));
     return () => clearTimeout(timerId);
-  }, []);
+  }, [enabled]);
 
   if (!hasUpdate || dismissed) return null;
 

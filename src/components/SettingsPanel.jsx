@@ -1,7 +1,7 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // Application settings (page size, upload concurrency, part size) (§4.7)
 import { useState } from 'preact/hooks';
-import { loadMaxKeys, saveMaxKeys, loadPartConcurrency, savePartConcurrency, loadPartSizeMB, savePartSizeMB, loadFileConcurrency, saveFileConcurrency, loadListingCacheTTL, saveListingCacheTTL } from '../lib/storage.js';
+import { loadMaxKeys, saveMaxKeys, loadPartConcurrency, savePartConcurrency, loadPartSizeMB, savePartSizeMB, loadFileConcurrency, saveFileConcurrency, loadListingCacheTTL, saveListingCacheTTL, loadUpdateCheckEnabled, saveUpdateCheckEnabled } from '../lib/storage.js';
 import { defaultMaxKeys } from '../lib/provider.js';
 
 const DEFAULT_PART_CONCURRENCY  = 4;
@@ -9,7 +9,7 @@ const DEFAULT_PART_SIZE_MB      = 5;
 const DEFAULT_FILE_CONCURRENCY  = 3;
 const DEFAULT_LISTING_CACHE_TTL = 120;
 
-export function SettingsPanel({ provider }) {
+export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChange }) {
   const providerDefault = defaultMaxKeys(provider);
 
   const [maxKeysValue, setMaxKeysValue] = useState(() => {
@@ -170,6 +170,22 @@ export function SettingsPanel({ provider }) {
           {saved && <span style={{ fontSize: '.8rem', color: 'var(--text-success)' }}>Saved</span>}
         </div>
       </form>
+
+      <div class="form-group" style={{ marginTop: '.75rem' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={updateCheckEnabled}
+            onChange={e => onUpdateCheckChange(e.target.checked)}
+          />
+          Background update checks
+        </label>
+        <span class="hint">
+          Periodically polls this app's own URL to detect when a new version is available.
+          While minimal, repeated requests from an open tab are a minor information leak —
+          disable if you prefer no background requests.
+        </span>
+      </div>
     </div>
   );
 }

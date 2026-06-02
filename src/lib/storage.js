@@ -22,6 +22,7 @@ const LS_KEYS = {
   partSizeMB:      's3b_part_size_mb',
   fileConcurrency: 's3b_file_concurrency',
   listingCacheTTL: 's3b_listing_cache_ttl',
+  updateCheckEnabled: 's3b_update_check_enabled',
   capabilities: 's3b_capabilities',
 };
 const SS_KEY_SECRET = 's3b_secret_key';
@@ -109,6 +110,16 @@ export function loadListingCacheTTL() {
 
 export function saveListingCacheTTL(seconds) {
   safeSet(localStorage, LS_KEYS.listingCacheTTL, String(seconds));
+}
+
+// Default true — preserves existing behaviour for users who have never changed it.
+export function loadUpdateCheckEnabled() {
+  const v = safeGet(localStorage, LS_KEYS.updateCheckEnabled);
+  return v === '' ? true : v === 'true';
+}
+
+export function saveUpdateCheckEnabled(enabled) {
+  safeSet(localStorage, LS_KEYS.updateCheckEnabled, String(enabled));
 }
 
 // Per-operation permission state (§4.12). Each of { list, download, upload, delete }
