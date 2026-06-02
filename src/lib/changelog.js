@@ -1,9 +1,19 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.12.16';
+export const CURRENT_VERSION = '1.12.17';
 
 export const CHANGELOG = [
+  {
+    "version": "1.12.17",
+    "date": "2026-06-01",
+    "title": "Fix version tag push timing",
+    "changes": [
+      "Fix pre-push hook so version tags are pushed immediately rather than one commit late",
+      "Hook now explicitly pushes the new tag itself instead of relying on push.followTags",
+      "Tag-only recursive pushes skip the build/test cycle to avoid redundant work"
+    ]
+  },
   {
     "version": "1.12.16",
     "date": "2026-06-01",

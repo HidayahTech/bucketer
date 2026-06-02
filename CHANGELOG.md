@@ -7,6 +7,12 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.12.17] — 2026-06-01 — Fix version tag push timing
+
+- Fix pre-push hook so version tags are pushed immediately rather than one commit late
+- Hook now explicitly pushes the new tag itself instead of relying on push.followTags
+- Tag-only recursive pushes skip the build/test cycle to avoid redundant work
+
 ## [1.12.16] — 2026-06-01 — Upstream release check in changelog
 
 - Add "Check for upstream release" button to the changelog modal

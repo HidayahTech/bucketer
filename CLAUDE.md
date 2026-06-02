@@ -14,7 +14,7 @@ Always ask for confirmation before committing or pushing.
 
 **Tests must pass before every push.** The pre-push git hook enforces this automatically — it runs `npm run build` then `npm test`, and aborts the push if either fails. The only override is `git push --no-verify`, which must only be used by the human operator in genuine emergencies. Never use `--no-verify` to work around a failing test; fix the test or the code instead.
 
-**Version tags are created and pushed automatically.** After every version bump commit, the pre-push hook creates an annotated tag for the current `package.json` version if one does not already exist. The `push.followTags` git config (set by `npm install`) ensures the tag is pushed alongside the commit — no manual `git tag` or `git push --tags` needed. Every version bump that reaches the remote will have a corresponding tag.
+**Version tags are created and pushed automatically.** After every version bump commit, the pre-push hook creates an annotated tag for the current `package.json` version if one does not already exist, then immediately pushes it to the remote. No manual `git tag` or `git push --tags` is needed. Every version bump that reaches the remote will have a corresponding tag. The hook detects recursive tag-only pushes (its own inner push) via stdin and skips the build/test cycle for those to avoid redundant work.
 
 `@anthropic-ai/claude-code` is not a project dependency and must never appear in `package.json`, `package-lock.json`, or any commit. It is installed separately in `.tools/` (gitignored). See **Claude Code Setup** below.
 

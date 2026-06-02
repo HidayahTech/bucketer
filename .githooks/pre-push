@@ -1,7 +1,9 @@
 #!/bin/sh
 # Pre-push hook — builds, runs the full test suite, and ensures the current
-# version is tagged before pushing. The tag is pushed automatically via
-# push.followTags (configured by `npm install` via the prepare script).
+# version tag exists and is pushed to the remote immediately.
+#
+# Reads stdin to detect tag-only pushes (recursive calls when the hook pushes
+# the version tag itself) and skips the build/test cycle in those cases.
 #
 # To override in an emergency (human operator only):
 #   git push --no-verify
@@ -10,11 +12,18 @@
 
 set -e
 
-echo "Building..."
-npm run build
+push_input=$(cat)
+branch_refs=$(printf '%s\n' "$push_input" | grep -c 'refs/heads/' 2>/dev/null || true)
 
-echo "Running tests..."
-npm test
+if [ "$branch_refs" -gt 0 ]; then
+  echo "Building..."
+  npm run build
+
+  echo "Running tests..."
+  npm test
+
+  echo "Tests passed — push proceeding."
+fi
 
 VERSION=$(node -p "require('./package.json').version")
 TAG="v${VERSION}"
@@ -22,7 +31,7 @@ if git rev-parse "refs/tags/${TAG}" >/dev/null 2>&1; then
   echo "Tag ${TAG} already exists."
 else
   git tag -a "${TAG}" -m "${TAG}"
-  echo "Tag ${TAG} created — will be pushed automatically."
+  echo "Tag ${TAG} created."
+  git push origin "refs/tags/${TAG}"
+  echo "Tag ${TAG} pushed."
 fi
-
-echo "Tests passed — push proceeding."
