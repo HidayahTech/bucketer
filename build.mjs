@@ -14,6 +14,7 @@ import { readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'fs';
 const UPDATE_CHECK_RANGE_BYTES = 512;
 
 const dev = process.argv.includes('--dev');
+const appTitle = 'Bucketer — In-Browser S3-Compatible Bucket Manager';
 
 // Read package version up front — needed for changelog generation before esbuild.
 const appVersion = JSON.parse(readFileSync('package.json', 'utf8')).version;
@@ -97,6 +98,7 @@ const buildId = new Date().toISOString();
 const out = html
   .replace('<!-- BUILD_ID -->', buildId)
   .replace('<!-- APP_VERSION -->', appVersion)
+  .replace(/<!-- APP_TITLE -->/g, appTitle)
   .replace('<!-- BUNDLE_PLACEHOLDER -->', () => `<style>${css}</style><script>${js}</script>`);
 
 mkdirSync('dist', { recursive: true });

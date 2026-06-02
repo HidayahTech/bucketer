@@ -7,6 +7,11 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.12.21] — 2026-06-02 — Expand app title to full descriptive name
+
+- Set `appTitle` constant in `build.mjs` as single source for `<title>`, `og:title`, and `twitter:title`
+- Title is now "Bucketer — In-Browser S3-Compatible Bucket Manager" across all three tags
+
 ## [1.12.20] — 2026-06-02 — Add Open Graph meta tags and OG preview image
 
 - Add `og:title`, `og:description`, `og:image`, `og:url`, and Twitter Card meta tags to `src/index.html`

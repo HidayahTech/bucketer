@@ -1,9 +1,18 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.12.20';
+export const CURRENT_VERSION = '1.12.21';
 
 export const CHANGELOG = [
+  {
+    "version": "1.12.21",
+    "date": "2026-06-02",
+    "title": "Expand app title to full descriptive name",
+    "changes": [
+      "Set appTitle constant in build.mjs as single source for <title>, og:title, and twitter:title",
+      "Title is now \"Bucketer — In-Browser S3-Compatible Bucket Manager\" across all three tags"
+    ]
+  },
   {
     "version": "1.12.20",
     "date": "2026-06-02",
