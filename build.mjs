@@ -3,7 +3,7 @@
 // producing a single self-contained dist/index.html (required for file:// Chrome compat, §4.3).
 
 import * as esbuild from 'esbuild';
-import { readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'fs';
 
 // ── Build invariant: update-check metadata must fit within this byte range ──
 // UpdateBanner fetches Range: bytes=0-(UPDATE_CHECK_RANGE_BYTES-1) to detect
@@ -101,6 +101,7 @@ const out = html
 
 mkdirSync('dist', { recursive: true });
 writeFileSync('dist/index.html', out, 'utf8');
+copyFileSync('src/assets/og-image.png', 'dist/og-image.png');
 console.log(`Built dist/index.html (${(out.length / 1024).toFixed(1)} KB)`);
 
 // ── Enforce build invariant: update-check metadata within range boundary ────

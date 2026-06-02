@@ -7,6 +7,12 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.12.20] — 2026-06-02 — Add Open Graph meta tags and OG preview image
+
+- Add `og:title`, `og:description`, `og:image`, `og:url`, and Twitter Card meta tags to `src/index.html`
+- Add `src/assets/og-image.png` (1200×630, optimized with oxipng) for link preview cards
+- Update `build.mjs` to copy `og-image.png` to `dist/` on every build
+
 ## [1.12.19] — 2026-06-02 — Inline header logo as component
 
 - Convert header logo from static `<img>` to inline Preact component

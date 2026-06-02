@@ -2,3 +2,4 @@ node_modules/
 .tools/
 dist/*
 !dist/index.html
+!dist/og-image.png

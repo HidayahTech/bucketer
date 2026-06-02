@@ -1,9 +1,19 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.12.19';
+export const CURRENT_VERSION = '1.12.20';
 
 export const CHANGELOG = [
+  {
+    "version": "1.12.20",
+    "date": "2026-06-02",
+    "title": "Add Open Graph meta tags and OG preview image",
+    "changes": [
+      "Add og:title, og:description, og:image, og:url, and Twitter Card meta tags to src/index.html",
+      "Add src/assets/og-image.png (1200×630, optimized with oxipng) for link preview cards",
+      "Update build.mjs to copy og-image.png to dist/ on every build"
+    ]
+  },
   {
     "version": "1.12.19",
     "date": "2026-06-02",
