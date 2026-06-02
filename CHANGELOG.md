@@ -7,6 +7,11 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.12.18] — 2026-06-01 — Update footer with Bucketer repo link
+
+- Footer now reads "Bucketer — Copyright © 2026 HidayahTech, LLC"
+- "Bucketer" links to the canonical GitLab repo so visitors can find the source
+
 ## [1.12.17] — 2026-06-01 — Fix version tag push timing
 
 - Fix pre-push hook so version tags are pushed immediately rather than one commit late

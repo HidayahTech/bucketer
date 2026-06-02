@@ -1,9 +1,18 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.12.17';
+export const CURRENT_VERSION = '1.12.18';
 
 export const CHANGELOG = [
+  {
+    "version": "1.12.18",
+    "date": "2026-06-01",
+    "title": "Update footer with Bucketer repo link",
+    "changes": [
+      "Footer now reads \"Bucketer — Copyright © 2026 HidayahTech, LLC\"",
+      "\"Bucketer\" links to the canonical GitLab repo so visitors can find the source"
+    ]
+  },
   {
     "version": "1.12.17",
     "date": "2026-06-01",
