@@ -1,9 +1,18 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.12.18';
+export const CURRENT_VERSION = '1.12.19';
 
 export const CHANGELOG = [
+  {
+    "version": "1.12.19",
+    "date": "2026-06-02",
+    "title": "Inline header logo as component",
+    "changes": [
+      "Convert header logo from static <img> to inline Preact component",
+      "Bump logo size to 3rem for better visibility"
+    ]
+  },
   {
     "version": "1.12.18",
     "date": "2026-06-01",

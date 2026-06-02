@@ -7,6 +7,11 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.12.19] — 2026-06-02 — Inline header logo as component
+
+- Convert header logo from static `<img>` to inline Preact component
+- Bump logo size to 3rem for better visibility
+
 ## [1.12.18] — 2026-06-01 — Update footer with Bucketer repo link
 
 - Footer now reads "Bucketer — Copyright © 2026 HidayahTech, LLC"

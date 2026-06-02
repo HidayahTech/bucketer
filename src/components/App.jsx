@@ -18,6 +18,7 @@
 // flush its in-memory listing cache and force a fresh listing probe.
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import logoUrl from '../assets/bucketer-logo.svg';
+import { BucketerLogo } from './BucketerLogo.jsx';
 import { createS3Client } from '../lib/s3-client.js';
 import { detectProvider, PROVIDER_LABELS } from '../lib/provider.js';
 import {
@@ -167,7 +168,7 @@ export function App() {
             {sidebarOpen ? '✕' : '☰'}
           </button>
         )}
-        <img src={logoUrl} alt="Bucketer" class="app-logo" />
+        <BucketerLogo />
         <span class="spacer" />
         {providerLabel && session === 'connected' && (
           <span class="header-status">{providerLabel}</span>

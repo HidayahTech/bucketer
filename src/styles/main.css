@@ -66,7 +66,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
   gap: 1rem;
   box-shadow: 0 2px 4px rgba(0,0,0,.25);
 }
-.app-logo { height: 2rem; width: auto; display: block; }
+.app-logo { height: 3rem; width: auto; display: block; cursor: pointer; }
 .app-header .spacer { flex: 1; }
 .app-header .header-status { font-size: .8rem; opacity: .85; }
 
