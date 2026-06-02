@@ -2,7 +2,75 @@
 
 [![pipeline status](https://gitlab.com/hidayahtech/bucketer/badges/main/pipeline.svg)](https://gitlab.com/hidayahtech/bucketer/-/commits/main) [![Latest Release](https://gitlab.com/hidayahtech/bucketer/-/badges/release.svg)](https://gitlab.com/hidayahtech/bucketer/-/releases) [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
-A browser-based tool for uploading, downloading, and managing objects in an S3-compatible bucket. No backend — runs entirely in the browser. Primary target is Backblaze B2; also supports Cloudflare R2, Wasabi, AWS S3, DigitalOcean Spaces, MinIO, and generic S3-compatible endpoints.
+### ⚡ No install. No server. No backend. No third-party trust.
+
+Open a URL. Enter your credentials. You're managing your bucket. Close the tab when you're done — nothing lingers, nothing persists on a server you didn't ask for. There's no installation, no Docker container, no daemon to keep running. Just a URL.
+
+---
+
+### 🔒 The only thing you have to trust is your browser.
+
+There's no Bucketer backend. The webpage IS the app. The host serving it only knows you loaded it, and nothing else. It cannot observe which provider you're connecting to, which bucket you're in, or what credentials you used. Your secret key lives only in `sessionStorage` and is cleared when you close the tab. Every S3 request goes directly from your browser to your storage endpoint, signed in-browser with SigV4, over TLS.
+
+You already trust your browser. That's all Bucketer requires.
+
+---
+
+### 📄 One file. Runs anywhere a browser runs.
+
+The entire application — logic, styles, AWS SDK — ships as a single self-contained HTML file. Copy it to nginx. Drop it into the bucket you're managing. Deploy it to Cloudflare Pages, GitHub Pages, or a corporate intranet with no internet access. Open it directly as `file://` in Firefox. No build step on the server. No CDN calls at runtime. No external scripts fetched from anywhere.
+
+The file in the repository is the file that runs in your browser. You can audit it. You can build it yourself. What you deploy is exactly what you get.
+
+---
+
+### 🔄 Multipart upload resume — without a backend.
+
+Drop a 20 GB file. Your network drops. Your browser crashes. You close the tab by accident.
+
+Re-open the app. Re-add the file.
+
+Bucketer calls `ListParts` to ask your storage provider what was actually received, verifies the file by content hash, and continues uploading from the last confirmed part. No server. No daemon. No resume database to run. IndexedDB holds the session state across restarts, and the provider is the authoritative source on what landed.
+
+---
+
+### 🌐 Built for every S3-compatible API. Not just AWS.
+
+The AWS Console only works for AWS. Most third-party tools treat non-AWS providers as an afterthought. When MinIO stripped the management console from its community edition in 2025, users running self-hosted S3-compatible storage — MinIO, Garage, Ceph, SeaweedFS — were left without a web UI.
+
+Bucketer treats every S3-compatible API as first-class: Backblaze B2, Cloudflare R2, Wasabi, AWS S3, DigitalOcean Spaces, MinIO, and any generic endpoint. It auto-detects your provider from the endpoint URL and encodes per-provider differences where they actually matter — path-style vs. virtual-hosted routing, multipart session lifetimes, CORS setup, region handling. It even adjusts listing defaults based on billing: B2 charges per `ListObjects` call, so Bucketer pages at 200 results instead of 1000. No surprise bills.
+
+It's open source under AGPLv3. No console removal. No bait and switch.
+
+---
+
+**This is Bucketer** — an in-browser S3-compatible bucket manager. Not five tools. One.
+
+---
+
+Every S3 GUI tool asks you to make a trade. Desktop clients require installation and don't travel with you. SaaS browser tools skip the install but route your credentials through servers you don't control. Self-hosted web UIs solve the credential trust problem by asking you to run and maintain a backend. Something always gives.
+
+Bucketer doesn't make you choose.
+
+It runs entirely in the browser — no installation, no backend, no server to maintain. The whole application ships as a single self-contained HTML file you can serve from anywhere: nginx, Cloudflare Pages, a corporate intranet, the bucket you're actually browsing, or directly as `file://`. Your secret key never leaves your browser except as a SigV4 signature on requests sent over TLS directly to your storage endpoint. Close the tab; the credentials are gone.
+
+It's not minimal because of the constraints. Bucketer handles multipart uploads for files of any size, with cross-session resume via IndexedDB — the provider is asked what actually landed, a content hash confirms you have the right file, and the upload continues without a server to hold state between retries. It works first-class against Backblaze B2, Cloudflare R2, Wasabi, AWS S3, DigitalOcean Spaces, MinIO, and any S3-compatible API, with per-provider behavior encoded where it matters: routing, CORS requirements, multipart lifetimes, even billing (B2's listing costs are per-call; the default page size is 200 so you notice before you overspend). It manages versioned buckets, surfaces delete markers, and lets you undelete files. It shares state as deep-linkable URLs with parameters in the hash fragment so they never appear in server access logs.
+
+The entire app is one auditable file. No runtime CDN calls. No external scripts. What's in the repository is what runs in your browser.
+
+---
+
+## A note from the author
+
+*Crafted with ❤️ and [Claude Code](https://claude.ai/code) by Basil Mohamed Gohar @ [HidayahTech](https://hidayahtech.com).*
+
+I designed and implemented this over the course of a few weeks to solve a real problem I had and to be my first real deep dive into GenAI-assisted software development. At the time of this writing, I've been a software developer for over 20 years, but this is the first time I've used GenAI from start to finish in a complete application with real usability beyond my specific needs. I am grateful to say it's already found use by some people, so I decided to release it under the AGPL-3.0 license for others to benefit from it as well. I sincerely hope you find it useful or, at the very least, interesting. If you did, I'd welcome your honest, constructive feedback and I'll do my best to take it into consideration.
+
+---
+
+🇵🇸 **Free Palestine! End the Genocide and Occupation!** 🇵🇸
+
+As more and more brands are implicated in genocide and other massive ethics violations, I felt that any effort, even if little more than a "drop in the bucket" (haaaaa...), was worth it, if for nothing else but my own soul's well-being. Further among my goals in writing this is that, in an era where more and more agency is being taken away from individuals, privacy is bought and sold like a commodity, and technology companies grow ever more hostile, I wanted to provide a tool that, while not by itself completely eliminating a reliance on big tech providers, gives the user back some agency.
 
 ---
 

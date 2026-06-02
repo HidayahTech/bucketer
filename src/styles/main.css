@@ -74,6 +74,10 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 .app-footer { padding: .5rem 1rem; font-size: .75rem; color: var(--text-muted); text-align: center; border-top: 1px solid var(--border); }
 .app-footer a { color: inherit; text-decoration: underline; }
 .app-footer a:hover { color: var(--accent); }
+.footer-link-btn { background: none; border: none; padding: 0; cursor: pointer; color: inherit; text-decoration: underline; font-size: inherit; font-family: inherit; }
+.footer-link-btn:hover { color: var(--accent); }
+.splash-about-link { background: none; border: none; padding: 0; cursor: pointer; color: var(--accent); font-size: inherit; font-family: inherit; text-decoration: none; }
+.splash-about-link:hover { text-decoration: underline; }
 
 .sidebar {
   position: absolute;
@@ -593,6 +597,16 @@ details[open] .upload-log-summary::before { transform: rotate(90deg); }
 }
 .filter-input:focus { outline: none; border-color: var(--border-focus); }
 .filter-count { font-size: .78rem; color: var(--text-muted); white-space: nowrap; }
+
+/* ── About modal ─────────────────────────────────────────────────────────── */
+.about-dialog { max-width: 580px; max-height: 82vh; overflow: hidden; display: flex; flex-direction: column; }
+.about-body { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1.5rem; padding-right: .25rem; font-size: .875rem; }
+.about-section { display: flex; flex-direction: column; gap: .5rem; }
+.about-heading { font-weight: 700; font-size: .925rem; color: var(--text); }
+.about-body p { line-height: 1.65; color: var(--text-muted); margin: 0; }
+.about-body code { font-family: var(--mono); font-size: .8rem; background: var(--surface-raised); padding: .1rem .3rem; border-radius: 3px; }
+.about-tagline { font-size: .875rem; color: var(--text); border-top: 1px solid var(--border); padding-top: 1rem; }
+.about-author { border-top: 1px solid var(--border); padding-top: 1rem; }
 
 /* ── Changelog modal ─────────────────────────────────────────────────────── */
 .changelog-dialog { max-width: 540px; max-height: 80vh; overflow: hidden; display: flex; flex-direction: column; }

@@ -7,6 +7,14 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.12.22] — 2026-06-02 — Add About modal and expand README intro
+
+- Add `AboutModal` component with five-pitch product overview and personal author note
+- About modal accessible from footer "About" link and splash screen "Learn more →"
+- Splash screen "About Bucketer" section replaced with full narrative description
+- README intro rebuilt: five-pitch marketing section, narrative, author note with Palestine solidarity statement
+- Save prose narrative to `docs/narrative-description.md` for reuse elsewhere
+
 ## [1.12.21] — 2026-06-02 — Expand app title to full descriptive name
 
 - Set `appTitle` constant in `build.mjs` as single source for `<title>`, `og:title`, and `twitter:title`

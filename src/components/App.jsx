@@ -36,6 +36,7 @@ import { UploadLog } from './UploadLog.jsx';
 import { ErrorBlock } from './ErrorBlock.jsx';
 import { UpdateBanner } from './UpdateBanner.jsx';
 import { ChangelogModal } from './ChangelogModal.jsx';
+import { AboutModal } from './AboutModal.jsx';
 import { CURRENT_VERSION } from '../lib/changelog.js';
 
 const _iconLink = document.querySelector('link[rel="icon"]');
@@ -55,6 +56,7 @@ export function App() {
   const [linkCopied, setLinkCopied] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
   const addFilesRef = useRef(null);
   const urlParamsPresent = hasUrlParams();
 
@@ -158,6 +160,7 @@ export function App() {
   return (
     <div id="app">
       {changelogOpen && <ChangelogModal onClose={() => setChangelogOpen(false)} />}
+      {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}
       <header class="app-header">
         {session === 'connected' && (
           <button
@@ -230,12 +233,12 @@ export function App() {
 
             <div class="splash-info">
               <div class="splash-info-section">
-                <div class="splash-info-heading">Your data stays private</div>
-                <p>
-                  Bucketer runs entirely in your browser. Your files, credentials, and requests
-                  travel directly between your browser and your storage bucket — this server
-                  is never involved and never sees any of it.
-                </p>
+                <div class="splash-info-heading">About Bucketer</div>
+                <p>Every S3 GUI tool asks you to make a trade. Desktop clients require installation and don't travel with you. SaaS browser tools skip the install but route your credentials through servers you don't control. Self-hosted web UIs solve the credential trust problem by asking you to run and maintain a backend. Something always gives.</p>
+                <p><strong>Bucketer doesn't make you choose.</strong></p>
+                <p>It runs entirely in the browser — no installation, no backend, no server to maintain. The whole application ships as a single self-contained HTML file. Your secret key never leaves your browser except as a SigV4 signature on requests sent over TLS directly to your storage endpoint. Close the tab; the credentials are gone.</p>
+                <p>It handles multipart uploads of any size with cross-session resume, works first-class against B2, R2, Wasabi, AWS S3, MinIO, and any S3-compatible API, and shares state as deep-linkable URLs that never expose your bucket name in server logs.</p>
+                <p><button class="splash-about-link" onClick={() => setAboutOpen(true)}>Learn more →</button></p>
               </div>
 
               <div class="splash-info-section">
@@ -334,7 +337,11 @@ export function App() {
         </div>
       )}
       <footer class="app-footer">
-        <a href="https://gitlab.com/hidayahtech/bucketer" target="_blank" rel="noopener noreferrer">Bucketer</a> &mdash; Copyright &copy; 2026 <a href="https://hidayahtech.com" target="_blank" rel="noopener noreferrer">HidayahTech, LLC</a>
+        <a href="https://gitlab.com/hidayahtech/bucketer" target="_blank" rel="noopener noreferrer">Bucketer</a>
+        {' '}&mdash;{' '}
+        <button class="footer-link-btn" onClick={() => setAboutOpen(true)}>About</button>
+        {' '}&mdash;{' '}
+        Copyright &copy; 2026 <a href="https://hidayahtech.com" target="_blank" rel="noopener noreferrer">HidayahTech, LLC</a>
       </footer>
     </div>
   );
