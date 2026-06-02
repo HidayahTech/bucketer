@@ -2,6 +2,8 @@
 
 [![pipeline status](https://gitlab.com/hidayahtech/bucketer/badges/main/pipeline.svg)](https://gitlab.com/hidayahtech/bucketer/-/commits/main) [![Latest Release](https://gitlab.com/hidayahtech/bucketer/-/badges/release.svg)](https://gitlab.com/hidayahtech/bucketer/-/releases) [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
 
+**→ [Try it live](https://bucketer.hidayahtech.net/)** &nbsp;·&nbsp; Canonical repository: [gitlab.com/hidayahtech/bucketer](https://gitlab.com/hidayahtech/bucketer)
+
 ### ⚡ No install. No server. No backend. No third-party trust.
 
 Open a URL. Enter your credentials. You're managing your bucket. Close the tab when you're done — nothing lingers, nothing persists on a server you didn't ask for. There's no installation, no Docker container, no daemon to keep running. Just a URL.

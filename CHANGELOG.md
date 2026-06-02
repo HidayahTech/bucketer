@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.12.23] — 2026-06-02 — Add live instance link and canonical repo note to README
+
+- Add "Try it live" link to bucketer.hidayahtech.net and canonical GitLab repo reference below the badges
+
 ## [1.12.22] — 2026-06-02 — Add About modal and expand README intro
 
 - Add `AboutModal` component with five-pitch product overview and personal author note
