@@ -654,6 +654,10 @@ function BatchSummary({ items, provider, onResume, onRestart, onCancel, onRemove
     }
     let last = performance.now();
     function tick(now) {
+      if (document.visibilityState === 'hidden' || now - last < 66) {
+        animRef.current = requestAnimationFrame(tick);
+        return;
+      }
       const dt = (now - last) / 1000;
       last = now;
       setDisplayedBytes(prev =>
@@ -796,6 +800,10 @@ function UploadItem({ item, onResume, onRestart, onCancel, onRemove, onDismissLa
     }
     let last = performance.now();
     function tick(now) {
+      if (document.visibilityState === 'hidden' || now - last < 66) {
+        animRef.current = requestAnimationFrame(tick);
+        return;
+      }
       const dt = (now - last) / 1000;
       last = now;
       setDisplayedBytes(prev =>

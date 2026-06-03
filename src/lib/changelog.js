@@ -1,9 +1,17 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.13.15';
+export const CURRENT_VERSION = '1.13.16';
 
 export const CHANGELOG = [
+  {
+    "version": "1.13.16",
+    "date": "2026-06-03",
+    "title": "Throttle rAF animation loops to 15fps and skip when tab hidden",
+    "changes": [
+      "Both animation loops in UploadQueue.jsx (BatchSummary bytes counter and"
+    ]
+  },
   {
     "version": "1.13.15",
     "date": "2026-06-03",

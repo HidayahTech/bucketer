@@ -7,6 +7,13 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.13.16] — 2026-06-03 — Throttle rAF animation loops to 15fps and skip when tab hidden
+
+- Both animation loops in `UploadQueue.jsx` (BatchSummary bytes counter and
+  per-item progress) now skip state updates when `document.visibilityState`
+  is `'hidden'` and throttle to ~15fps (66ms gate) when visible; reduces
+  animation overhead by ~75% during long uploads and to zero when tab is hidden
+
 ## [1.13.15] — 2026-06-03 — Use version string as build-id for deterministic builds
 
 - `build-id` meta tag now contains the version string (e.g. `1.13.15`) instead
