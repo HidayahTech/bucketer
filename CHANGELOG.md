@@ -7,6 +7,12 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.13.22] — 2026-06-03 — Remove redundant preview button from file row actions
+
+- The filename is already clickable (accent colour, underline on hover) and opens
+  the preview modal; the separate ⊙ button in the actions column did the same thing
+- Removing it reduces the actions column from 5 buttons to 4
+
 ## [1.13.21] — 2026-06-03 — Fix preview modal layout jank with fixed-height content stage
 
 - Preview content area now has a fixed height (`clamp(300px, 70vh, 700px)`) so the

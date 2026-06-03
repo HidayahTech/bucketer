@@ -1323,14 +1323,6 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                       </button>
                       <button
                         class="btn btn-ghost btn-sm"
-                        onClick={() => handlePreview(obj)}
-                        title="Preview"
-                        style={{ marginRight: '.25rem' }}
-                      >
-                        ⊙
-                      </button>
-                      <button
-                        class="btn btn-ghost btn-sm"
                         onClick={e => { e.stopPropagation(); startRename(obj.Key); }}
                         title="Rename"
                         style={{ marginRight: '.25rem' }}
