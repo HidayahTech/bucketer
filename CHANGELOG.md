@@ -7,6 +7,15 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.13.9] — 2026-06-03 — Fix profile save capturing empty fields and clearing the form
+
+- `handleSaveProfile` was reading from `credentials` state (only updated
+  on Connect) instead of `liveFormData`. Result: saved profiles were empty
+  and the form cleared immediately after saving because the key-prop change
+  triggered a remount against the stale empty credentials.
+- Fix: build the profile from `liveFormData`; sync `credentials` after
+  saving so the remounted form retains the values the user entered.
+
 ## [1.13.8] — 2026-06-03 — Trim surrounding whitespace from pasted credential values
 
 - Pasting a value with leading or trailing whitespace into any credential

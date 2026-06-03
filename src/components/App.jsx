@@ -190,20 +190,25 @@ export function App() {
   }
 
   function handleSaveProfile(name) {
+    const ep = (liveFormData.endpoint || '').trim().replace(/\/$/, '');
     const profile = {
       id: Date.now(),
       name,
-      endpoint: credentials.endpoint,
-      bucket: credentials.bucket,
-      keyId: credentials.keyId,
-      provider: credentials.provider,
-      regionOverride: credentials.regionOverride,
+      endpoint: ep,
+      bucket: (liveFormData.bucket || '').trim(),
+      keyId: (liveFormData.keyId || '').trim(),
+      provider: liveFormData.providerOverride || detectProvider(ep),
+      regionOverride: (liveFormData.regionOverride || '').trim(),
     };
     saveProfile(profile);
     const updated = loadProfiles().profiles;
     setProfiles(updated);
     setSelectedProfileId(profile.id);
     saveLastProfileId(profile.id);
+    // Sync credentials so the form doesn't reset when it remounts on key change.
+    const creds = { ...profile, secretKey: liveFormData.secretKey || '' };
+    setCredentials(creds);
+    setLiveFormData(creds);
   }
 
   function handleDeleteProfile(id) {

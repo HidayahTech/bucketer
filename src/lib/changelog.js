@@ -1,9 +1,18 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.13.8';
+export const CURRENT_VERSION = '1.13.9';
 
 export const CHANGELOG = [
+  {
+    "version": "1.13.9",
+    "date": "2026-06-03",
+    "title": "Fix profile save capturing empty fields and clearing the form",
+    "changes": [
+      "handleSaveProfile was reading from credentials state (only updated",
+      "Fix: build the profile from liveFormData; sync credentials after"
+    ]
+  },
   {
     "version": "1.13.8",
     "date": "2026-06-03",
