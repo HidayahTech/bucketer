@@ -114,7 +114,7 @@ const rawCss = readFileSync('src/styles/main.css', 'utf8');
 const cssResult = await esbuild.transform(rawCss, { loader: 'css', minify: mode.minify });
 const css = cssResult.code;
 const html = readFileSync('src/index.html', 'utf8');
-const buildId = new Date().toISOString();
+const buildId = appVersion;
 const out = html
   .replace('<!-- BUILD_ID -->', buildId)
   .replace('<!-- APP_VERSION -->', appVersion)

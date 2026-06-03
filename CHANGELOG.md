@@ -7,6 +7,12 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.13.15] — 2026-06-03 — Use version string as build-id for deterministic builds
+
+- `build-id` meta tag now contains the version string (e.g. `1.13.15`) instead
+  of a build timestamp; repeated builds from the same source produce identical
+  output, eliminating the dirty `dist/index.html` left behind by the pre-push hook
+
 ## [1.13.14] — 2026-06-03 — Debounce setLogKey to eliminate dominant CPU hotspot
 
 - Debounced `onLogEntry` callback in `App.jsx` (fires at most every 500ms) to

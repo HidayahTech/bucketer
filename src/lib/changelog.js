@@ -1,9 +1,17 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.13.14';
+export const CURRENT_VERSION = '1.13.15';
 
 export const CHANGELOG = [
+  {
+    "version": "1.13.15",
+    "date": "2026-06-03",
+    "title": "Use version string as build-id for deterministic builds",
+    "changes": [
+      "build-id meta tag now contains the version string (e.g. 1.13.15) instead"
+    ]
+  },
   {
     "version": "1.13.14",
     "date": "2026-06-03",
