@@ -618,21 +618,27 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
 }
 
 function BatchSummary({ items, provider, onResume, onRestart, onCancel, onRemove, onDismissLargeWarn, onClearDone, onCancelAll, notifSuppressed, onToggleNotifs }) {
-  const doneItems     = items.filter(i => i.status === 'done');
-  const abortedItems  = items.filter(i => i.status === 'aborted');
-  const errorItems    = items.filter(i => i.status === 'error');
-  const pausedItems   = items.filter(i => i.status === 'paused');
-  const inFlightItems = items.filter(i => i.status === 'uploading' || i.status === 'resuming');
-  const queuedCount   = items.filter(i => i.status === 'queued').length;
+  // Single pass — replaces 8 separate filter/reduce calls over all items
+  let doneCount = 0, abortedCount = 0, queuedCount = 0, errorCount = 0;
+  let totalBytes = 0, confirmedBytes = 0;
+  const errorItems = [], pausedItems = [], inFlightItems = [];
+  for (const i of items) {
+    totalBytes += i.size;
+    confirmedBytes += i.status === 'done' ? i.size : i.bytesUploaded;
+    if      (i.status === 'done')                                  doneCount++;
+    else if (i.status === 'aborted')                               abortedCount++;
+    else if (i.status === 'queued')                                queuedCount++;
+    else if (i.status === 'error')    { errorCount++; errorItems.push(i); }
+    else if (i.status === 'paused')                                pausedItems.push(i);
+    else if (i.status === 'uploading' || i.status === 'resuming')  inFlightItems.push(i);
+  }
 
   const totalFiles     = items.length;
-  const completedCount = doneItems.length;
-  const totalBytes     = items.reduce((s, i) => s + i.size, 0);
-  const confirmedBytes = items.reduce((s, i) => s + (i.status === 'done' ? i.size : i.bytesUploaded), 0);
+  const completedCount = doneCount;
   const overallSpeed   = inFlightItems.reduce((s, i) => s + i.speed, 0);
 
   const isActive = inFlightItems.length > 0;
-  const hasClearable = !isActive && !queuedCount && !pausedItems.length && (doneItems.length + abortedItems.length > 0);
+  const hasClearable = !isActive && !queuedCount && !pausedItems.length && (doneCount + abortedCount > 0);
 
   const [displayedBytes, setDisplayedBytes] = useState(confirmedBytes);
   const animRef  = useRef(null);
@@ -671,7 +677,7 @@ function BatchSummary({ items, provider, onResume, onRestart, onCancel, onRemove
 
   const displayProgress = totalBytes > 0 ? Math.min((displayedBytes / totalBytes) * 100, 100) : 0;
   const liveEta = overallSpeed > 0 ? (totalBytes - displayedBytes) / overallSpeed : null;
-  const allDone = completedCount === totalFiles && errorItems.length === 0 && abortedItems.length === 0;
+  const allDone = completedCount === totalFiles && errorCount === 0 && abortedCount === 0;
 
   const actionItems = [...errorItems, ...pausedItems];
 
@@ -696,7 +702,7 @@ function BatchSummary({ items, provider, onResume, onRestart, onCancel, onRemove
         <span class="batch-summary-count">
           {completedCount} / {totalFiles} files
           {queuedCount > 0 && <span class="batch-queued"> · {queuedCount} queued</span>}
-          {errorItems.length > 0 && <span class="batch-errors"> · {errorItems.length} failed</span>}
+          {errorCount > 0 && <span class="batch-errors"> · {errorCount} failed</span>}
         </span>
         <span class="spacer" />
         {overallSpeed > 0 && <span class="batch-speed">{formatSpeed(overallSpeed)}</span>}

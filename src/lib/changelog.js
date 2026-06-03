@@ -1,9 +1,17 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.13.17';
+export const CURRENT_VERSION = '1.13.18';
 
 export const CHANGELOG = [
+  {
+    "version": "1.13.18",
+    "date": "2026-06-03",
+    "title": "Replace 8 filter/reduce passes in BatchSummary with a single loop",
+    "changes": [
+      "Replaced 8 separate filter/reduce calls in BatchSummary (run on every"
+    ]
+  },
   {
     "version": "1.13.17",
     "date": "2026-06-03",

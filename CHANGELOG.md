@@ -7,6 +7,14 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.13.18] — 2026-06-03 — Replace 8 filter/reduce passes in BatchSummary with a single loop
+
+- Replaced 8 separate `filter`/`reduce` calls in `BatchSummary` (run on every
+  `updateItem` call over all queued items) with a single `for...of` loop that
+  computes all counts and collects only the small renderable arrays (errorItems,
+  pausedItems, inFlightItems); `BatchSummary` self-time: 1143ms → 877ms (−23%)
+  at 1000 files; browser idle time increased from 390ms to 716ms
+
 ## [1.13.17] — 2026-06-03 — Cache formatted timestamps in UploadLog and raise bench default to 1000 files
 
 - Added module-level `Map` cache to `formatCompletedAt` in `UploadLog.jsx` so
