@@ -7,6 +7,20 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.13.21] — 2026-06-03 — Fix preview modal layout jank with fixed-height content stage
+
+- Preview content area now has a fixed height (`clamp(300px, 70vh, 700px)`) so the
+  modal opens at full size immediately — no reflow as media loads
+- Added `--surface-raised` background on the stage so the loading spinner and
+  "can't preview" state appear in a clearly defined area
+- Audio previews use a compact 140px stage instead of the full height; for files
+  with a recognised audio extension the compact height is applied immediately
+  (no intermediate expansion)
+- Image and video `max-height` changed from `72vh` to `100%` — container is now
+  the constraint
+- PDF `height` changed from `70vh` to `100%`; text preview fills and scrolls
+  within the container rather than relying on its own viewport-relative max-height
+
 ## [1.13.20] — 2026-06-03 — Parallelize DeleteObjectsCommand batches (3 concurrent)
 
 - Both batch-delete (selected files) and folder-delete now send up to 3

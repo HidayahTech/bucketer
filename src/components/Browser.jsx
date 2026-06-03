@@ -1064,7 +1064,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
       )}
 
       {previewItem && (() => {
-        const kind = resolvedKind;
+        const kind = resolvedKind ?? mediaKind(previewItem.Key);
         return (
           <div class="modal-overlay" onClick={closePreview}>
             <div class="modal-dialog preview-dialog" onClick={e => e.stopPropagation()}>
@@ -1080,7 +1080,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                 {previewableItems.length > 1 && previewIdx !== -1 && kind !== 'image' && (
                   <button class="preview-nav" onClick={() => navigatePreviewRef.current(-1)} disabled={!prevPreviewItem} aria-label="Previous">‹</button>
                 )}
-                <div class="preview-content">
+                <div class={`preview-content${kind === 'audio' ? ' preview-content--audio' : ''}`}>
                   {/* Transparent tap zones for image navigation (left/right half) */}
                   {previewableItems.length > 1 && previewIdx !== -1 && kind === 'image' && previewUrl && (
                     <>
