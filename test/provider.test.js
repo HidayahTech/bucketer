@@ -32,8 +32,11 @@ describe('extractRegion', () => {
   test('B2: different region', () =>
     assert.equal(extractRegion('https://s3.eu-central-003.backblazeb2.com', PROVIDERS.B2), 'eu-central-003'));
 
-  test('Wasabi: extracts region', () =>
+  test('Wasabi: extracts region from subdomain', () =>
     assert.equal(extractRegion('https://s3.us-east-1.wasabisys.com', PROVIDERS.WASABI), 'us-east-1'));
+
+  test('Wasabi: bare s3.wasabisys.com resolves to us-east-1 (legacy default endpoint)', () =>
+    assert.equal(extractRegion('https://s3.wasabisys.com', PROVIDERS.WASABI), 'us-east-1'));
 
   test('AWS: extracts region', () =>
     assert.equal(extractRegion('https://s3.ap-southeast-1.amazonaws.com', PROVIDERS.AWS), 'ap-southeast-1'));

@@ -59,6 +59,9 @@ export function extractRegion(endpoint, provider) {
         return m ? m[1] : null;
       }
       case PROVIDERS.WASABI: {
+        // s3.wasabisys.com (no region segment) is the legacy us-east-1 endpoint
+        // https://docs.wasabi.com/docs/what-are-the-service-urls-for-wasabi-s-different-storage-regions
+        if (/^s3\.wasabisys\.com$/i.test(host)) return 'us-east-1';
         // https://s3.{region}.wasabisys.com
         const m = host.match(/^s3\.([^.]+)\.wasabisys\.com$/i);
         return m ? m[1] : null;

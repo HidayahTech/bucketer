@@ -7,6 +7,13 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.13.6] — 2026-06-03 — Fix Wasabi bare endpoint region auto-detection
+
+- `s3.wasabisys.com` (no region segment) is Wasabi's documented legacy
+  endpoint for us-east-1. `extractRegion` now returns `'us-east-1'` for
+  this host instead of falling through to null and showing the manual
+  region input.
+
 ## [1.13.5] — 2026-06-03 — Add serve link to file:// banner and fix banner link color
 
 - Add a "Run `npm run serve` for a local server" link to the file://

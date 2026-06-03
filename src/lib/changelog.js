@@ -1,9 +1,17 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.13.5';
+export const CURRENT_VERSION = '1.13.6';
 
 export const CHANGELOG = [
+  {
+    "version": "1.13.6",
+    "date": "2026-06-03",
+    "title": "Fix Wasabi bare endpoint region auto-detection",
+    "changes": [
+      "s3.wasabisys.com (no region segment) is Wasabi's documented legacy"
+    ]
+  },
   {
     "version": "1.13.5",
     "date": "2026-06-03",
