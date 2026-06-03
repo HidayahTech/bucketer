@@ -7,6 +7,16 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.13.4] — 2026-06-03 — Require valid fields before saving a profile
+
+- Disable "Save as profile…" button unless endpoint is a valid URL,
+  bucket is present (no spaces, ≤ 63 chars), and key ID is present
+  (no spaces) — the minimum needed to make the profile useful.
+- Add `canSaveProfile()` to credential-validation.js (pure, tested).
+- Disabled button shows a tooltip explaining what is needed.
+- Add 13 new tests for canSaveProfile covering presence, URL validity,
+  bucket format, and key ID format.
+
 ## [1.13.3] — 2026-06-03 — Storage & Privacy viewer
 
 - Add "Storage & Privacy" modal (footer link, always accessible regardless of

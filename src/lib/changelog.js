@@ -1,9 +1,20 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.13.3';
+export const CURRENT_VERSION = '1.13.4';
 
 export const CHANGELOG = [
+  {
+    "version": "1.13.4",
+    "date": "2026-06-03",
+    "title": "Require valid fields before saving a profile",
+    "changes": [
+      "Disable \"Save as profile…\" button unless endpoint is a valid URL,",
+      "Add canSaveProfile() to credential-validation.js (pure, tested).",
+      "Disabled button shows a tooltip explaining what is needed.",
+      "Add 13 new tests for canSaveProfile covering presence, URL validity,"
+    ]
+  },
   {
     "version": "1.13.3",
     "date": "2026-06-03",

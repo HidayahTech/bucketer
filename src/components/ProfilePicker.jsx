@@ -1,14 +1,20 @@
 // Copyright (C) 2026 HidayahTech, LLC
 import { useState } from 'preact/hooks';
+import { canSaveProfile } from '../lib/credential-validation.js';
 
 export function ProfilePicker({ profiles, selectedId, onSelect, onDelete, onSave, currentFormData }) {
   const [saving, setSaving] = useState(false);
   const [saveName, setSaveName] = useState('');
 
+  const saveable = canSaveProfile(currentFormData);
+  const saveTitle = saveable ? undefined : 'Fill in endpoint, bucket, and key ID with valid values to save a profile';
+
   if (profiles.length === 0 && !saving) {
     return (
       <div class="profile-picker profile-picker-empty">
         <button class="btn btn-ghost btn-sm profile-save-trigger"
+          disabled={!saveable}
+          title={saveTitle}
           onClick={() => { setSaveName(defaultName(currentFormData)); setSaving(true); }}>
           Save as profile…
         </button>
@@ -65,6 +71,8 @@ export function ProfilePicker({ profiles, selectedId, onSelect, onDelete, onSave
         </form>
       ) : (
         <button class="btn btn-ghost btn-sm profile-save-trigger"
+          disabled={!saveable}
+          title={saveTitle}
           onClick={() => { setSaveName(defaultName(currentFormData)); setSaving(true); }}>
           Save current as profile…
         </button>

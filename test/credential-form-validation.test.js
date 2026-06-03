@@ -7,7 +7,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { credentialErrors } from '../src/lib/credential-validation.js';
+import { credentialErrors, canSaveProfile } from '../src/lib/credential-validation.js';
 
 const clean = { bucket: 'my-bucket', keyId: 'AKID123', secretKey: 'secret', regionOverride: '' };
 
@@ -86,5 +86,70 @@ describe('credentialErrors — regionOverride', () => {
 describe('credentialErrors — clean form returns no errors', () => {
   test('empty errors object for fully valid input', () => {
     assert.deepEqual(credentialErrors(clean), {});
+  });
+});
+
+const saveBase = { endpoint: 'https://s3.us-east-1.amazonaws.com', bucket: 'my-bucket', keyId: 'AKID123' };
+
+describe('canSaveProfile — valid input', () => {
+  test('returns true for fully valid profile fields', () => {
+    assert.equal(canSaveProfile(saveBase), true);
+  });
+
+  test('ignores secretKey — profiles never store it', () => {
+    assert.equal(canSaveProfile({ ...saveBase, secretKey: '' }), true);
+  });
+
+  test('ignores provider and regionOverride — both are optional', () => {
+    assert.equal(canSaveProfile({ ...saveBase, provider: '', regionOverride: '' }), true);
+  });
+});
+
+describe('canSaveProfile — missing required fields', () => {
+  test('returns false when endpoint is empty', () => {
+    assert.equal(canSaveProfile({ ...saveBase, endpoint: '' }), false);
+  });
+
+  test('returns false when bucket is empty', () => {
+    assert.equal(canSaveProfile({ ...saveBase, bucket: '' }), false);
+  });
+
+  test('returns false when keyId is empty', () => {
+    assert.equal(canSaveProfile({ ...saveBase, keyId: '' }), false);
+  });
+
+  test('returns false for null/undefined formData', () => {
+    assert.equal(canSaveProfile(null), false);
+    assert.equal(canSaveProfile(undefined), false);
+  });
+});
+
+describe('canSaveProfile — invalid endpoint', () => {
+  test('returns false for endpoint without scheme', () => {
+    assert.equal(canSaveProfile({ ...saveBase, endpoint: 's3.amazonaws.com' }), false);
+  });
+
+  test('returns false for completely malformed endpoint', () => {
+    assert.equal(canSaveProfile({ ...saveBase, endpoint: 'not a url' }), false);
+  });
+
+  test('accepts http:// endpoints (non-TLS local/MinIO)', () => {
+    assert.equal(canSaveProfile({ ...saveBase, endpoint: 'http://localhost:9000' }), true);
+  });
+});
+
+describe('canSaveProfile — invalid bucket', () => {
+  test('returns false when bucket contains a space', () => {
+    assert.equal(canSaveProfile({ ...saveBase, bucket: 'my bucket' }), false);
+  });
+
+  test('returns false when bucket exceeds 63 characters', () => {
+    assert.equal(canSaveProfile({ ...saveBase, bucket: 'a'.repeat(64) }), false);
+  });
+});
+
+describe('canSaveProfile — invalid keyId', () => {
+  test('returns false when key ID contains a space', () => {
+    assert.equal(canSaveProfile({ ...saveBase, keyId: 'AK ID 123' }), false);
   });
 });
