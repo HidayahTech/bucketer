@@ -1,9 +1,23 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.13.0';
+export const CURRENT_VERSION = '1.13.1';
 
 export const CHANGELOG = [
+  {
+    "version": "1.13.1",
+    "date": "2026-06-03",
+    "title": "Credential field validation and storage write-boundary enforcement (BUG-016)",
+    "changes": [
+      "Add repairStorageInvariants(): runs on every mount before migration; clears",
+      "loadCredentials(): sanitize provider on read — return null for any value that",
+      "saveCredentials(): sanitize provider on write — write '' if the value is",
+      "readUrlParams(): validate provider hash param before accepting — ignore any",
+      "CredentialForm: inline validation errors block submit when key ID, secret key,",
+      "Extract credentialErrors() to src/lib/credential-validation.js (pure, tested)",
+      "Add 27 new tests across storage, url-params, and credential-validation suites"
+    ]
+  },
   {
     "version": "1.13.0",
     "date": "2026-06-02",

@@ -7,6 +7,22 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.13.1] — 2026-06-03 — Credential field validation and storage write-boundary enforcement (BUG-016)
+
+- Add `repairStorageInvariants()`: runs on every mount before migration; clears
+  `s3b_provider` if it contains whitespace or exceeds 20 chars; repairs stored
+  profiles with corrupted provider field. Idempotent no-op once data is clean.
+- `loadCredentials()`: sanitize provider on read — return null for any value that
+  fails the identifier check, so corrupted data never enters app state
+- `saveCredentials()`: sanitize provider on write — write `''` if the value is
+  not a valid short identifier, so corruption cannot be re-persisted
+- `readUrlParams()`: validate provider hash param before accepting — ignore any
+  value containing whitespace or exceeding 20 chars
+- `CredentialForm`: inline validation errors block submit when key ID, secret key,
+  bucket, or region contain whitespace; warn when bucket exceeds 63 characters
+- Extract `credentialErrors()` to `src/lib/credential-validation.js` (pure, tested)
+- Add 27 new tests across storage, url-params, and credential-validation suites
+
 ## [1.13.0] — 2026-06-02 — Multi-profile credential management
 
 - Add named profile storage: save N connection profiles (endpoint, bucket, key ID,

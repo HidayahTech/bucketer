@@ -20,7 +20,13 @@ export function readUrlParams() {
   const out = {};
   if (p.has('endpoint')) out.endpoint = p.get('endpoint');
   if (p.has('bucket'))   out.bucket   = p.get('bucket');
-  if (p.has('provider')) out.provider = p.get('provider');
+  if (p.has('provider')) {
+    const v = p.get('provider');
+    // Provider must be a short identifier with no whitespace — same rule as storage.js.
+    // Reject anything that looks like free text to prevent URL params from becoming
+    // a vector for corrupting the provider field.
+    if (v && v.length <= 20 && !/\s/.test(v)) out.provider = v;
+  }
   if (p.has('region'))   out.regionOverride = p.get('region');
   return out;
 }

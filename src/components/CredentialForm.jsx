@@ -1,6 +1,7 @@
 // Copyright (C) 2026 HidayahTech, LLC
 import { useState } from 'preact/hooks';
 import { detectProvider, extractRegion, PROVIDERS, PROVIDER_LABELS } from '../lib/provider.js';
+import { credentialErrors } from '../lib/credential-validation.js';
 import { SetupGuide } from './SetupGuide.jsx';
 
 // Credential entry form (REQ-1, §4.5, §4.8).
@@ -36,6 +37,9 @@ export function CredentialForm({ initial, onSave, loading }) {
 
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
 
+  const errors = credentialErrors(form);
+  const hasErrors = Object.keys(errors).length > 0;
+
   // Auto-detect provider label for display
   const detected = form.endpoint ? detectProvider(form.endpoint) : null;
   const detectedLabel = detected ? PROVIDER_LABELS[detected] : null;
@@ -45,6 +49,7 @@ export function CredentialForm({ initial, onSave, loading }) {
 
   function handleSubmit(e) {
     e.preventDefault();
+    if (hasErrors) return;
     const provider = form.providerOverride || detected || PROVIDERS.GENERIC;
     onSave({
       endpoint: form.endpoint.trim().replace(/\/$/, ''),
@@ -87,6 +92,7 @@ export function CredentialForm({ initial, onSave, loading }) {
           autocomplete="off"
           spellcheck={false}
         />
+        {errors.bucket && <span class="field-error">{errors.bucket}</span>}
       </div>
 
       <div class="form-group">
@@ -100,6 +106,7 @@ export function CredentialForm({ initial, onSave, loading }) {
           autocomplete="username"
           spellcheck={false}
         />
+        {errors.keyId && <span class="field-error">{errors.keyId}</span>}
       </div>
 
       <div class="form-group">
@@ -112,6 +119,7 @@ export function CredentialForm({ initial, onSave, loading }) {
           required
           autocomplete="current-password"
         />
+        {errors.secretKey && <span class="field-error">{errors.secretKey}</span>}
         <span class="hint">Stored in sessionStorage — cleared on tab close.</span>
       </div>
 
@@ -139,6 +147,7 @@ export function CredentialForm({ initial, onSave, loading }) {
             spellcheck={false}
           />
           <span class="hint">Cannot be auto-detected for this endpoint. For R2, use "auto".</span>
+          {errors.regionOverride && <span class="field-error">{errors.regionOverride}</span>}
         </div>
       )}
 
@@ -157,7 +166,7 @@ export function CredentialForm({ initial, onSave, loading }) {
       />
 
       <div class="btn-row">
-        <button type="submit" class="btn btn-primary" disabled={loading}>
+        <button type="submit" class="btn btn-primary" disabled={loading || hasErrors}>
           {loading ? <><span class="spinner" /> Connecting…</> : 'Connect'}
         </button>
       </div>

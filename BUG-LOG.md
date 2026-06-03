@@ -361,3 +361,54 @@ Provider-specific behavior was not confirmed before implementation. The assumpti
 Assert `uploadExpiryWarningMs('b2') === null`. Assert `uploadExpiryWarningMs('r2') === 7 * 24 * 60 * 60 * 1000`. Assert `uploadExpiryWarningMs('generic')` returns the same 7-day value as R2.
 
 **Coverage:** `test/indexeddb-pure.test.js` — "uploadExpiryWarningMs" suite.
+
+---
+
+## BUG-016 — Corrupted `s3b_provider` promoted into profile name; credential pipeline had no write-boundary enforcement
+
+**Date:** 2026-06-03
+**Commit:** (v1.13.1)
+
+**Symptom:**
+After upgrading to v1.13.0, the profile picker on the connect screen displayed a garbled profile name containing credential text (key ID, secret key value, and instructional prose including "Use the above credentials to login. Navigate to Week 7.") instead of a normal connection name like "B2 — anwar-al-tafsir-storage".
+
+**Root cause:**
+`s3b_provider` in localStorage contained the string `"b2Key ID: <key-id>Secret Key: [REDACTED]Use the above credentials to login. Navigate to Week 7."` — credentials text that had been concatenated onto the provider identifier at some prior point (most likely a paste accident from a B2 dashboard credentials page, or residue from an older version of the app).
+
+This corruption had three compounding effects:
+
+1. **Perpetuation.** Every app load read the corrupted value via `loadCredentials()` with no validation, passed it through `handleConnect()`, and wrote it straight back via `saveCredentials()`. The corruption was self-reinforcing — it could never be auto-corrected.
+
+2. **URL propagation.** `buildShareUrl()` included `credentials.provider` in the hash fragment verbatim. Any share link generated while the corruption was present would have embedded the credentials text in the URL.
+
+3. **Migration amplification.** The v1.13.0 `migrateProfilesFromLegacy()` read `s3b_provider`, called `.toUpperCase()` on it to produce the `providerLabel`, and concatenated it into the profile `name` field: `"B2KEY ID: <KEY-ID>SECRET KEY: [REDACTED]USE THE ABOVE CREDENTIALS TO LOGIN. NAVIGATE TO WEEK 7. — anwar-al-tafsir-storage"`. The profile `provider` field was also stored verbatim. What had been a hidden corruption became a prominently displayed one.
+
+The `provider` field is purely an internal enum (`'b2'`, `'r2'`, `'aws'`, `'wasabi'`, `'do_spaces'`, `'minio'`, `'generic'`). It has only seven valid states. No code anywhere in the pipeline enforced this.
+
+**Fix (five layers):**
+
+1. `repairStorageInvariants()` — retroactive cleanup: clears `s3b_provider` if it contains whitespace or exceeds 20 chars; repairs stored profiles with a corrupted `provider` field by setting `provider: null` and regenerating the name from bucket. Runs on every mount; idempotent no-op once data is clean.
+
+2. `loadCredentials()` — sanitize on read: validates `provider` against `isValidProvider()`; returns `null` for any value that fails so corrupted data is never placed into app state.
+
+3. `saveCredentials()` — sanitize on write: validates `provider` before writing; writes `''` if the value is invalid so the corruption cannot be re-persisted.
+
+4. `readUrlParams()` — validates `provider` from the URL hash before accepting it; ignores any value containing whitespace or exceeding 20 chars, closing the URL propagation vector.
+
+5. `CredentialForm` — inline validation errors shown as the user types: blocks submit if key ID, secret key, or bucket contain whitespace; warns if bucket exceeds 63 characters. Machine-generated S3 credentials never contain spaces; a space in any of these fields is unambiguous evidence of a paste error.
+
+**Why it wasn't caught earlier:**
+The `provider` field is set by a `<select>` dropdown in the UI, so it was implicitly assumed to always be one of the known enum values. This assumption did not account for: URL hash params (which accept free text), older app versions (which may have stored things differently), or direct localStorage access. No invariant was enforced at any layer — not at the read boundary, not at the write boundary, and not in the migration. The app treated localStorage as a trusted store rather than as external, potentially-corrupted input.
+
+The broader principle: any data read from localStorage, URL params, or user input must be validated at the boundary where it enters the system. Trusting stored values because the code that wrote them was "our code" is a form of confused deputy — the store outlives any individual code version.
+
+**Test cases:**
+- `repairStorageInvariants` clears a corrupted `s3b_provider` value
+- `repairStorageInvariants` fixes a profile whose `provider` field contains spaces
+- `loadCredentials` returns `null` for provider when stored value fails the identifier check
+- `saveCredentials` writes `''` for provider when passed an invalid value; round-trip returns `null`
+- `readUrlParams` ignores a `provider` hash param that contains spaces or exceeds 20 chars
+- CredentialForm `credentialErrors` returns an error for key ID containing a space
+- CredentialForm `credentialErrors` returns an error for bucket containing a space or exceeding 63 chars
+
+**Coverage:** `test/storage.test.js` — "repairStorageInvariants", "saveCredentials / loadCredentials" suites; `test/url-params.test.js` — "readUrlParams" suite. CredentialForm validation is a pure function tested inline.

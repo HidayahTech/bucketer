@@ -45,12 +45,13 @@ function safeRemove(storage, key) {
 }
 
 export function loadCredentials() {
+  const rawProvider = safeGet(localStorage, LS_KEYS.provider);
   return {
     endpoint:       safeGet(localStorage, LS_KEYS.endpoint),
     bucket:         safeGet(localStorage, LS_KEYS.bucket),
     keyId:          safeGet(localStorage, LS_KEYS.keyId),
     secretKey:      safeGet(sessionStorage, SS_KEY_SECRET),
-    provider:       safeGet(localStorage, LS_KEYS.provider) || null,
+    provider:       (rawProvider && isValidProvider(rawProvider)) ? rawProvider : null,
     regionOverride: safeGet(localStorage, LS_KEYS.regionOverride),
   };
 }
@@ -59,7 +60,7 @@ export function saveCredentials({ endpoint, bucket, keyId, secretKey, provider, 
   safeSet(localStorage, LS_KEYS.endpoint, endpoint);
   safeSet(localStorage, LS_KEYS.bucket, bucket);
   safeSet(localStorage, LS_KEYS.keyId, keyId);
-  safeSet(localStorage, LS_KEYS.provider, provider || '');
+  safeSet(localStorage, LS_KEYS.provider, isValidProvider(provider) ? provider : '');
   safeSet(localStorage, LS_KEYS.regionOverride, regionOverride || '');
   safeSet(sessionStorage, SS_KEY_SECRET, secretKey);
 }
@@ -154,6 +155,37 @@ export function defaultCapabilities() {
   return { list: 'unknown', download: 'unknown', upload: 'unknown', delete: 'unknown' };
 }
 
+// Valid providers are short alphanumeric identifiers. The longest known value is
+// 'do_spaces' (9 chars); 20 is a safe ceiling. Anything with whitespace or beyond
+// that length is corrupted data (e.g. credentials text pasted into the wrong field).
+function isValidProvider(p) {
+  return typeof p === 'string' && p.length <= 20 && !/\s/.test(p);
+}
+
+// Repairs storage invariants that can be violated by corrupted legacy data.
+// Idempotent — once values are clean this is a fast read-only no-op. Called on
+// every mount before migrateProfilesFromLegacy() so migration sees clean data.
+export function repairStorageInvariants() {
+  const storedProvider = safeGet(localStorage, LS_KEYS.provider);
+  if (storedProvider && !isValidProvider(storedProvider)) {
+    safeRemove(localStorage, LS_KEYS.provider);
+  }
+
+  // Repair profiles whose provider field is corrupted. The name is regenerated
+  // from bucket only — if provider was wrong the name was almost certainly wrong too.
+  const data = loadProfiles();
+  if (!data.profiles.length) return;
+  let dirty = false;
+  for (const profile of data.profiles) {
+    if (profile.provider && !isValidProvider(profile.provider)) {
+      profile.provider = null;
+      profile.name = profile.bucket || 'Default';
+      dirty = true;
+    }
+  }
+  if (dirty) saveProfilesData(data);
+}
+
 // Profile storage — keys are OUTSIDE LS_KEYS so clearCredentials() does not wipe them.
 const LS_KEY_PROFILES        = 's3b_profiles';
 const LS_KEY_LAST_PROFILE_ID = 's3b_last_profile_id';
@@ -227,6 +259,11 @@ export function migrateProfilesFromLegacy() {
   const regionOverride = safeGet(localStorage, LS_KEYS.regionOverride);
 
   if (!endpoint && !bucket && !keyId) return; // nothing to migrate
+
+  // Guard against stale/corrupted localStorage data. S3 bucket names are 3–63 chars
+  // max; a longer value means the field was never a real bucket name and migrating it
+  // would create a visually broken profile. Skip silently — the user can save manually.
+  if (bucket.length > 63) return;
 
   const providerLabel = provider ? provider.toUpperCase() : '';
   const name = providerLabel && bucket

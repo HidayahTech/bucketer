@@ -22,6 +22,7 @@ global.sessionStorage = makeStore(ss);
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  repairStorageInvariants,
   loadCredentials, saveCredentials, clearCredentials,
   loadMaxKeys, saveMaxKeys,
   loadPartConcurrency, savePartConcurrency,
@@ -105,6 +106,53 @@ describe('clearCredentials', () => {
     assert.equal(loaded.endpoint,  '');
     assert.equal(loaded.secretKey, '');
     assert.equal(loaded.keyId,     '');
+  });
+});
+
+// ── Provider field validation (BUG-016) ───────────────────────────────────────
+
+describe('saveCredentials — provider write-boundary validation', () => {
+  test('writes a valid provider identifier normally', () => {
+    saveCredentials({ endpoint: 'https://s3.example.com', bucket: 'b', keyId: 'k', secretKey: 's', provider: 'b2', regionOverride: '' });
+    assert.equal(loadCredentials().provider, 'b2');
+  });
+
+  test('writes empty string when provider contains spaces (corrupted paste)', () => {
+    saveCredentials({ endpoint: 'https://s3.example.com', bucket: 'b', keyId: 'k', secretKey: 's', provider: 'b2Key ID: abc Secret Key: xyz', regionOverride: '' });
+    assert.equal(ls['s3b_provider'], '');
+    assert.equal(loadCredentials().provider, null);
+  });
+
+  test('writes empty string when provider exceeds 20 chars', () => {
+    saveCredentials({ endpoint: 'https://s3.example.com', bucket: 'b', keyId: 'k', secretKey: 's', provider: 'a_very_long_provider_identifier', regionOverride: '' });
+    assert.equal(ls['s3b_provider'], '');
+  });
+
+  test('writes empty string for null/undefined provider', () => {
+    saveCredentials({ endpoint: 'https://s3.example.com', bucket: 'b', keyId: 'k', secretKey: 's', provider: null, regionOverride: '' });
+    assert.equal(ls['s3b_provider'], '');
+  });
+});
+
+describe('loadCredentials — provider read-boundary validation', () => {
+  test('returns null when stored provider contains spaces', () => {
+    ls['s3b_provider'] = 'b2Key ID: 000a8794834eb7c000000001cSecret Key: [REDACTED]Use the above credentials to login.';
+    assert.equal(loadCredentials().provider, null);
+  });
+
+  test('returns null when stored provider exceeds 20 chars', () => {
+    ls['s3b_provider'] = 'this_provider_name_is_way_too_long';
+    assert.equal(loadCredentials().provider, null);
+  });
+
+  test('returns the provider when it is a valid short identifier', () => {
+    ls['s3b_provider'] = 'do_spaces';
+    assert.equal(loadCredentials().provider, 'do_spaces');
+  });
+
+  test('returns null when provider is empty', () => {
+    ls['s3b_provider'] = '';
+    assert.equal(loadCredentials().provider, null);
   });
 });
 
@@ -209,6 +257,53 @@ describe('clearCapabilities', () => {
 });
 
 // ── Profiles ──────────────────────────────────────────────────────────────────
+
+describe('repairStorageInvariants', () => {
+  test('clears corrupted s3b_provider (contains spaces)', () => {
+    ls['s3b_provider'] = 'b2Key ID: 000a8794834eb7c000000001cSecret Key: abc123Use the above credentials to login.';
+    repairStorageInvariants();
+    assert.equal(safeGetLS('s3b_provider'), '');
+  });
+
+  test('leaves valid provider untouched', () => {
+    ls['s3b_provider'] = 'b2';
+    repairStorageInvariants();
+    assert.equal(ls['s3b_provider'], 'b2');
+  });
+
+  test('is a no-op when provider is empty', () => {
+    repairStorageInvariants(); // should not throw
+    assert.ok(!Object.prototype.hasOwnProperty.call(ls, 's3b_provider'));
+  });
+
+  test('repairs corrupted provider field inside a stored profile', () => {
+    saveProfile({ id: 1, name: 'B2KEY ID: CORRUPTED — my-bucket', endpoint: 'https://s3.example.com', bucket: 'my-bucket', keyId: 'k', provider: 'b2Key ID: 000a8794834eb7c000000001cSecret Key: abc', regionOverride: '' });
+    repairStorageInvariants();
+    const { profiles } = loadProfiles();
+    assert.equal(profiles[0].provider, null);
+    assert.equal(profiles[0].name, 'my-bucket');
+  });
+
+  test('leaves profiles with valid provider untouched', () => {
+    saveProfile({ id: 1, name: 'B2 — my-bucket', endpoint: 'https://s3.example.com', bucket: 'my-bucket', keyId: 'k', provider: 'b2', regionOverride: '' });
+    repairStorageInvariants();
+    const { profiles } = loadProfiles();
+    assert.equal(profiles[0].provider, 'b2');
+    assert.equal(profiles[0].name, 'B2 — my-bucket');
+  });
+
+  test('is idempotent — running twice produces the same result', () => {
+    ls['s3b_provider'] = 'b2Key ID: corrupted data here';
+    repairStorageInvariants();
+    repairStorageInvariants();
+    assert.equal(safeGetLS('s3b_provider'), '');
+  });
+});
+
+// Helper visible only to this describe block
+function safeGetLS(key) {
+  return Object.prototype.hasOwnProperty.call(ls, key) ? ls[key] : '';
+}
 
 describe('loadProfiles', () => {
   test('returns empty profiles array when nothing stored', () => {
@@ -332,6 +427,14 @@ describe('migrateProfilesFromLegacy', () => {
   });
 
   test('does nothing when no flat credentials exist', () => {
+    migrateProfilesFromLegacy();
+    assert.deepEqual(loadProfiles().profiles, []);
+  });
+
+  test('skips migration when bucket is longer than 63 chars (corrupted data)', () => {
+    ls['s3b_endpoint'] = 'https://s3.example.com';
+    ls['s3b_bucket']   = 'KEY ID: 000A8794834EB7C000000001CSECRET KEY: K000RH9J5DROULDCCJ1CK88TZPETN5QUSE THE ABOVE CREDENTIALS TO LOGIN.';
+    ls['s3b_key_id']   = 'AKID';
     migrateProfilesFromLegacy();
     assert.deepEqual(loadProfiles().profiles, []);
   });

@@ -20,7 +20,7 @@ const result = await esbuild.build({
   sourcemap: 'inline',
   jsx: 'automatic',
   jsxImportSource: 'preact',
-  loader: { '.png': 'dataurl' },
+  loader: { '.png': 'dataurl', '.svg': 'dataurl' },
   define: { 'process.env.NODE_ENV': '"development"' },
   logLevel: 'info',
 });

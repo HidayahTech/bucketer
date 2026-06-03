@@ -69,9 +69,19 @@ describe('readUrlParams', () => {
     assert.equal(readUrlParams().regionOverride, 'us-east-1');
   });
 
-  test('reads provider param', () => {
+  test('reads provider param when it is a valid identifier', () => {
     loc.hash = '#provider=b2';
     assert.equal(readUrlParams().provider, 'b2');
+  });
+
+  test('ignores provider param containing spaces (BUG-016)', () => {
+    loc.hash = '#provider=b2Key+ID%3A+000abc+Secret+Key%3A+xyz';
+    assert.equal(readUrlParams().provider, undefined);
+  });
+
+  test('ignores provider param exceeding 20 chars (BUG-016)', () => {
+    loc.hash = '#provider=this_is_a_very_long_provider_name';
+    assert.equal(readUrlParams().provider, undefined);
   });
 
   test('returns empty object when hash is empty', () => {

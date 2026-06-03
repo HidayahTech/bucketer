@@ -26,7 +26,7 @@ import {
   loadCapabilities, saveCapabilities, clearCapabilities, defaultCapabilities,
   loadUpdateCheckEnabled, saveUpdateCheckEnabled,
   loadProfiles, saveProfile, deleteProfile, loadLastProfileId, saveLastProfileId,
-  migrateProfilesFromLegacy,
+  migrateProfilesFromLegacy, repairStorageInvariants,
 } from '../lib/storage.js';
 import { readUrlParams, hasUrlParams, buildShareUrl } from '../lib/url-params.js';
 import { FileBanner } from './FileBanner.jsx';
@@ -132,6 +132,7 @@ export function App() {
   // from the URL override stored values (secret key never comes from URL).
   // Migration runs first so the profile list is populated before state reads it.
   useEffect(() => {
+    repairStorageInvariants();
     migrateProfilesFromLegacy();
     setProfiles(loadProfiles().profiles);
     const stored = loadCredentials();
