@@ -562,6 +562,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         ref={fileInputRef}
         type="file"
         multiple
+        data-testid="file-input"
         style={{ display: 'none' }}
         onChange={(e) => {
           addFiles(Array.from(e.target.files).map(f => ({ file: f, relativePath: f.name })));
@@ -728,7 +729,7 @@ function BatchSummary({ items, provider, onResume, onRestart, onCancel, onRemove
 
       <div class="batch-summary-meta">
         <span>{formatBytes(displayedBytes)} / {formatBytes(totalBytes)}</span>
-        {allDone && <span class="batch-all-done">✓ All complete</span>}
+        {allDone && <span class="batch-all-done" data-testid="queue-complete">✓ All complete</span>}
       </div>
 
       {inFlightItems.length > 0 && (

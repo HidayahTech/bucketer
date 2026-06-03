@@ -1,9 +1,22 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.13.12';
+export const CURRENT_VERSION = '1.13.13';
 
 export const CHANGELOG = [
+  {
+    "version": "1.13.13",
+    "date": "2026-06-03",
+    "title": "Add performance benchmarking harness and unify build modes",
+    "changes": [
+      "Added npm run perftest — full browser benchmark using Playwright + CDP profiling",
+      "Added npm run bench — fast algorithmic microbenchmarks (no browser required)",
+      "Unified build configuration in build.mjs with explicit --mode=prod|dev|perf;",
+      "Simplified serve.mjs to delegate build logic to build.mjs --mode=dev",
+      "Perf builds write to perf/index.html; dist/ is never touched by benchmarks",
+      "Added data-testid attributes to upload queue file input and completion indicator"
+    ]
+  },
   {
     "version": "1.13.12",
     "date": "2026-06-03",

@@ -3,3 +3,5 @@ node_modules/
 dist/*
 !dist/index.html
 !dist/og-image.png
+perf/output/
+perf/index.html

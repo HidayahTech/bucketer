@@ -7,6 +7,20 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.13.13] — 2026-06-03 — Add performance benchmarking harness and unify build modes
+
+- Added `npm run perftest` — full browser benchmark using Playwright + CDP profiling
+  against a local mock S3 server; saves `.cpuprofile` to `perf/output/`
+- Added `npm run bench` — fast algorithmic microbenchmarks (no browser required)
+- Unified build configuration in `build.mjs` with explicit `--mode=prod|dev|perf`;
+  each mode determines destination directory, minification, source maps, and whether
+  production invariants run
+- Simplified `serve.mjs` to delegate build logic to `build.mjs --mode=dev`
+- Perf builds write to `perf/index.html`; `dist/` is never touched by benchmarks
+- Added `data-testid` attributes to upload queue file input and completion indicator
+
+---
+
 ## [1.13.12] — 2026-06-03 — Add design-intent documentation for all components and libraries
 
 - Added `docs/intent/` documentation set (baseline v1.11.3): architecture overview,

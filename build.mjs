@@ -1,25 +1,45 @@
 #!/usr/bin/env node
-// Bundles src/main.jsx with esbuild and inlines the result into src/index.html,
-// producing a single self-contained dist/index.html (required for file:// Chrome compat, §4.3).
+// Bundles src/main.jsx with esbuild and inlines the result into src/index.html.
+// Produces a single self-contained HTML file at the mode's destination directory.
+//
+// Usage: node build.mjs [--mode prod|dev|perf]
+//   prod (default) — minified, no source maps, production invariants → dist/
+//   dev            — unminified, inline source maps, no invariants   → dist/
+//   perf           — unminified, inline source maps, no invariants   → perf/
+//
+// Legacy: --dev is accepted as an alias for --mode dev.
 
 import * as esbuild from 'esbuild';
 import { readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'fs';
 
-// ── Build invariant: update-check metadata must fit within this byte range ──
-// UpdateBanner fetches Range: bytes=0-(UPDATE_CHECK_RANGE_BYTES-1) to detect
-// the version of a newer build without downloading the full page. Both
-// build-id and app-version meta tags must end before this boundary.
-// The assertion below enforces this on every build and will fail loudly if
-// a structural change pushes them past it.
+// ── Build invariant constant (prod only) ─────────────────────────────────────
+// UpdateBanner uses Range: bytes=0-(UPDATE_CHECK_RANGE_BYTES-1) to detect a
+// newer version without fetching the full page. Both build-id and app-version
+// meta tags must end before this boundary.
 const UPDATE_CHECK_RANGE_BYTES = 512;
 
-const dev = process.argv.includes('--dev');
+// ── Mode definitions ──────────────────────────────────────────────────────────
+const MODES = {
+  prod: { dest: 'dist', minify: true,  sourcemap: false,    nodeEnv: 'production',  invariants: true  },
+  dev:  { dest: 'dist', minify: false, sourcemap: 'inline', nodeEnv: 'development', invariants: false },
+  perf: { dest: 'perf', minify: false, sourcemap: 'inline', nodeEnv: 'development', invariants: false },
+};
+
+const modeKey = process.argv.find(a => a.startsWith('--mode='))?.slice(7)
+  ?? (process.argv.includes('--dev') ? 'dev' : 'prod');
+
+if (!MODES[modeKey]) {
+  console.error(`Unknown build mode: ${modeKey}. Valid modes: ${Object.keys(MODES).join(', ')}`);
+  process.exit(1);
+}
+
+const mode     = MODES[modeKey];
 const appTitle = 'Bucketer — In-Browser S3-Compatible Bucket Manager';
 
 // Read package version up front — needed for changelog generation before esbuild.
 const appVersion = JSON.parse(readFileSync('package.json', 'utf8')).version;
 
-// ── Generate src/lib/changelog.js from CHANGELOG.md ───────────────────────
+// ── Generate src/lib/changelog.js from CHANGELOG.md ─────────────────────────
 // CHANGELOG.md is the single source of truth for version history. This step
 // parses it into structured data and writes changelog.js before esbuild runs,
 // so the in-app changelog modal always reflects exactly what is in CHANGELOG.md.
@@ -48,14 +68,16 @@ function parseChangelog(src) {
 
 const changelog = parseChangelog(readFileSync('CHANGELOG.md', 'utf8'));
 
-// Build invariant: top CHANGELOG.md entry must match package.json version.
-if (!changelog.length || changelog[0].version !== appVersion) {
-  const found = changelog[0]?.version ?? '(none)';
-  console.error(
-    `\nBuild invariant FAILED: CHANGELOG.md top entry is v${found} but package.json is v${appVersion}.\n` +
-    `Add a ## [${appVersion}] — date — Title entry to the top of CHANGELOG.md before building.`
-  );
-  process.exit(1);
+// Build invariant: top CHANGELOG.md entry must match package.json version (prod only).
+if (mode.invariants) {
+  if (!changelog.length || changelog[0].version !== appVersion) {
+    const found = changelog[0]?.version ?? '(none)';
+    console.error(
+      `\nBuild invariant FAILED: CHANGELOG.md top entry is v${found} but package.json is v${appVersion}.\n` +
+      `Add a ## [${appVersion}] — date — Title entry to the top of CHANGELOG.md before building.`
+    );
+    process.exit(1);
+  }
 }
 
 const changelogJs = [
@@ -70,66 +92,66 @@ const changelogJs = [
 writeFileSync('src/lib/changelog.js', changelogJs, 'utf8');
 console.log(`  ✓ Generated src/lib/changelog.js from CHANGELOG.md (${changelog.length} entries, v${appVersion})`);
 
-// ── Bundle with esbuild (picks up the freshly generated changelog.js) ─────
+// ── Bundle with esbuild (picks up the freshly generated changelog.js) ────────
 const result = await esbuild.build({
   entryPoints: ['src/main.jsx'],
   bundle: true,
   write: false,
   format: 'iife',
-  minify: !dev,
-  sourcemap: dev ? 'inline' : false,
-  // Use Preact's automatic JSX runtime — no React import needed in each file
+  minify: mode.minify,
+  sourcemap: mode.sourcemap,
   jsx: 'automatic',
   jsxImportSource: 'preact',
   loader: { '.png': 'dataurl', '.svg': 'dataurl' },
   define: {
-    'process.env.NODE_ENV': dev ? '"development"' : '"production"',
+    'process.env.NODE_ENV': JSON.stringify(mode.nodeEnv),
   },
   logLevel: 'info',
 });
 
 const js = result.outputFiles[0].text;
 const rawCss = readFileSync('src/styles/main.css', 'utf8');
-const cssResult = await esbuild.transform(rawCss, { loader: 'css', minify: !dev });
+const cssResult = await esbuild.transform(rawCss, { loader: 'css', minify: mode.minify });
 const css = cssResult.code;
 const html = readFileSync('src/index.html', 'utf8');
 const buildId = new Date().toISOString();
-// Use a function to avoid $ special replacement patterns in the JS/CSS content
 const out = html
   .replace('<!-- BUILD_ID -->', buildId)
   .replace('<!-- APP_VERSION -->', appVersion)
   .replace(/<!-- APP_TITLE -->/g, appTitle)
   .replace('<!-- BUNDLE_PLACEHOLDER -->', () => `<style>${css}</style><script>${js}</script>`);
 
-mkdirSync('dist', { recursive: true });
-writeFileSync('dist/index.html', out, 'utf8');
-copyFileSync('src/assets/og-image.png', 'dist/og-image.png');
-console.log(`Built dist/index.html (${(out.length / 1024).toFixed(1)} KB)`);
+mkdirSync(mode.dest, { recursive: true });
+writeFileSync(`${mode.dest}/index.html`, out, 'utf8');
+console.log(`Built ${mode.dest}/index.html (${(out.length / 1024).toFixed(1)} KB) [mode: ${modeKey}]`);
 
-// ── Enforce build invariant: update-check metadata within range boundary ────
-const invariantTags = ['build-id', 'app-version'];
-let invariantFailed = false;
-for (const tag of invariantTags) {
-  const searchStr = `name="${tag}"`;
-  const idx = out.indexOf(searchStr);
-  if (idx === -1) {
-    console.error(`\nBuild invariant FAILED: <meta name="${tag}"> not found in output.`);
-    invariantFailed = true;
-    continue;
+// ── Production-only: copy assets and enforce invariants ──────────────────────
+if (mode.invariants) {
+  copyFileSync('src/assets/og-image.png', `${mode.dest}/og-image.png`);
+
+  const invariantTags = ['build-id', 'app-version'];
+  let invariantFailed = false;
+  for (const tag of invariantTags) {
+    const searchStr = `name="${tag}"`;
+    const idx = out.indexOf(searchStr);
+    if (idx === -1) {
+      console.error(`\nBuild invariant FAILED: <meta name="${tag}"> not found in output.`);
+      invariantFailed = true;
+      continue;
+    }
+    const closeIdx = out.indexOf('>', idx);
+    const endByte = Buffer.byteLength(out.slice(0, closeIdx + 1), 'utf8');
+    if (endByte >= UPDATE_CHECK_RANGE_BYTES) {
+      console.error(
+        `\nBuild invariant FAILED: <meta name="${tag}"> ends at byte ${endByte}, ` +
+        `which exceeds the update-check range boundary of ${UPDATE_CHECK_RANGE_BYTES} bytes.\n` +
+        `Move the tag earlier in <head> or increase UPDATE_CHECK_RANGE_BYTES in build.mjs ` +
+        `and UpdateBanner.jsx (keeping them in sync).`
+      );
+      invariantFailed = true;
+    } else {
+      console.log(`  ✓ ${tag} ends at byte ${endByte} (limit: ${UPDATE_CHECK_RANGE_BYTES})`);
+    }
   }
-  const closeIdx = out.indexOf('>', idx);
-  const endByte = Buffer.byteLength(out.slice(0, closeIdx + 1), 'utf8');
-  if (endByte >= UPDATE_CHECK_RANGE_BYTES) {
-    console.error(
-      `\nBuild invariant FAILED: <meta name="${tag}"> ends at byte ${endByte}, ` +
-      `which exceeds the update-check range boundary of ${UPDATE_CHECK_RANGE_BYTES} bytes.\n` +
-      `Move the tag earlier in <head> or increase UPDATE_CHECK_RANGE_BYTES in build.mjs ` +
-      `and UpdateBanner.jsx (keeping them in sync).`
-    );
-    invariantFailed = true;
-  } else {
-    console.log(`  ✓ ${tag} ends at byte ${endByte} (limit: ${UPDATE_CHECK_RANGE_BYTES})`);
-  }
+  if (invariantFailed) process.exit(1);
 }
-if (invariantFailed) process.exit(1);
-
