@@ -58,7 +58,10 @@ export function FileBanner() {
           {caveats.map((c, i) => <li key={i}>{c}</li>)}
         </ul>
         <div style={{ marginTop: '.4rem' }}>
-          For the most reliable experience, serve via <code>http://localhost</code> instead.
+          For the most reliable experience, serve via <code>http://localhost</code> instead.{' '}
+          <a href="https://gitlab.com/hidayahtech/bucketer#setup" target="_blank" rel="noopener noreferrer">
+            Run <code>npm run serve</code> for a local server.
+          </a>
         </div>
       </div>
       <button class="banner-close" onClick={() => { sessionStorage.setItem(DISMISS_KEY, '1'); setDismissed(true); }} aria-label="Dismiss">✕</button>

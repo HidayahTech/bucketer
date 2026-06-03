@@ -7,6 +7,13 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.13.5] — 2026-06-03 — Add serve link to file:// banner and fix banner link color
+
+- Add a "Run `npm run serve` for a local server" link to the file://
+  warning banner, pointing to the GitLab README setup section.
+- Set `.banner a` color to `--accent` so links in banners are readable
+  against both light and dark banner backgrounds.
+
 ## [1.13.4] — 2026-06-03 — Require valid fields before saving a profile
 
 - Disable "Save as profile…" button unless endpoint is a valid URL,

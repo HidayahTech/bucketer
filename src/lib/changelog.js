@@ -1,9 +1,18 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.13.4';
+export const CURRENT_VERSION = '1.13.5';
 
 export const CHANGELOG = [
+  {
+    "version": "1.13.5",
+    "date": "2026-06-03",
+    "title": "Add serve link to file:// banner and fix banner link color",
+    "changes": [
+      "Add a \"Run npm run serve for a local server\" link to the file://",
+      "Set .banner a color to --accent so links in banners are readable"
+    ]
+  },
   {
     "version": "1.13.4",
     "date": "2026-06-03",

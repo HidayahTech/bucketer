@@ -136,6 +136,8 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 .banner-success { background: var(--success-bg); border: 1px solid #8ce99a; color: var(--text-success); }
 .banner .banner-body { flex: 1; }
 .banner .banner-title { font-weight: 600; margin-bottom: .2rem; }
+.banner a { color: var(--accent); }
+.banner a:hover { color: var(--accent-hover); }
 .banner .banner-close {
   background: none; border: none; cursor: pointer; padding: 0 .25rem;
   color: inherit; opacity: .6; font-size: 1rem; line-height: 1;
