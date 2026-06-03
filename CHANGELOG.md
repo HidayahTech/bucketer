@@ -7,6 +7,16 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.13.20] — 2026-06-03 — Parallelize DeleteObjectsCommand batches (3 concurrent)
+
+- Both batch-delete (selected files) and folder-delete now send up to 3
+  `DeleteObjectsCommand` requests concurrently instead of sequentially;
+  each request still deletes up to 1000 objects (S3 API limit)
+- For a 10,000-object delete this reduces round-trips from 10 serial requests
+  to 4 parallel groups — roughly 3× faster at typical provider latencies
+- Folder-delete uses per-batch `.catch()` so a single failing request does
+  not abort the remaining batches; errors are still collected and reported
+
 ## [1.13.19] — 2026-06-03 — Batch rAF-aligned updateItem calls; add slow-mock latency option
 
 - Extracted `createUpdateBatcher` (`src/lib/update-batcher.js`) — coalesces

@@ -1,9 +1,19 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.13.19';
+export const CURRENT_VERSION = '1.13.20';
 
 export const CHANGELOG = [
+  {
+    "version": "1.13.20",
+    "date": "2026-06-03",
+    "title": "Parallelize DeleteObjectsCommand batches (3 concurrent)",
+    "changes": [
+      "Both batch-delete (selected files) and folder-delete now send up to 3",
+      "For a 10,000-object delete this reduces round-trips from 10 serial requests",
+      "Folder-delete uses per-batch .catch() so a single failing request does"
+    ]
+  },
   {
     "version": "1.13.19",
     "date": "2026-06-03",

@@ -25,6 +25,7 @@ let _sessionFirstMount = true;
 // 1 hour: long enough for interactive use (preview, copy-link) but short enough that
 // a leaked presigned URL expires overnight without manual rotation.
 const PRESIGN_EXPIRES = 3600;
+const DELETE_BATCH_CONCURRENCY = 3; // parallel DeleteObjectsCommand requests (each deletes up to 1000 objects)
 
 // Range-limited to 100 KB to prevent loading multi-GB log files into browser memory.
 // Response status 206 (Partial Content) indicates truncation — the UI shows a warning.
@@ -463,9 +464,14 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     setBatchDeleteError(null);
     const keys = [...selectedKeys];
     try {
-      for (let i = 0; i < keys.length; i += 1000) {
-        const batch = keys.slice(i, i + 1000).map(Key => ({ Key }));
-        await client.send(new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: batch, Quiet: true } }));
+      const batches = [];
+      for (let i = 0; i < keys.length; i += 1000) batches.push(keys.slice(i, i + 1000).map(Key => ({ Key })));
+      for (let i = 0; i < batches.length; i += DELETE_BATCH_CONCURRENCY) {
+        await Promise.all(
+          batches.slice(i, i + DELETE_BATCH_CONCURRENCY).map(batch =>
+            client.send(new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: batch, Quiet: true } }))
+          )
+        );
       }
       onCapabilityChange('delete', 'permitted');
       invalidateCache(prefix);
@@ -756,17 +762,23 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
 
     const errors = [];
     let deleted = 0;
-    for (let i = 0; i < keys.length; i += 1000) {
-      const batch = keys.slice(i, i + 1000).map(Key => ({ Key }));
-      try {
-        const resp = await client.send(new DeleteObjectsCommand({
-          Bucket: bucket, Delete: { Objects: batch, Quiet: true },
-        }));
-        const batchErrors = resp.Errors || [];
-        errors.push(...batchErrors.map(e => ({ key: e.Key, message: e.Message || e.Code })));
-        deleted += batch.length - batchErrors.length;
-      } catch (err) {
-        batch.forEach(o => errors.push({ key: o.Key, message: err.message }));
+    const batches = [];
+    for (let i = 0; i < keys.length; i += 1000) batches.push(keys.slice(i, i + 1000).map(Key => ({ Key })));
+    for (let i = 0; i < batches.length; i += DELETE_BATCH_CONCURRENCY) {
+      const results = await Promise.all(
+        batches.slice(i, i + DELETE_BATCH_CONCURRENCY).map(batch =>
+          client.send(new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: batch, Quiet: true } }))
+            .then(resp => ({ batch, respErrors: resp.Errors || [] }))
+            .catch(err => ({ batch, networkError: err }))
+        )
+      );
+      for (const { batch, respErrors = [], networkError } of results) {
+        if (networkError) {
+          batch.forEach(o => errors.push({ key: o.Key, message: networkError.message }));
+        } else {
+          errors.push(...respErrors.map(e => ({ key: e.Key, message: e.Message || e.Code })));
+          deleted += batch.length - respErrors.length;
+        }
       }
       setFolderDelete(prev => ({ ...prev, deleted }));
     }
