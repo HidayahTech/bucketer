@@ -25,6 +25,8 @@ import {
   loadCredentials, saveCredentials, clearCredentials,
   loadCapabilities, saveCapabilities, clearCapabilities, defaultCapabilities,
   loadUpdateCheckEnabled, saveUpdateCheckEnabled,
+  loadProfiles, saveProfile, deleteProfile, loadLastProfileId, saveLastProfileId,
+  migrateProfilesFromLegacy,
 } from '../lib/storage.js';
 import { readUrlParams, hasUrlParams, buildShareUrl } from '../lib/url-params.js';
 import { FileBanner } from './FileBanner.jsx';
@@ -38,6 +40,7 @@ import { ErrorBlock } from './ErrorBlock.jsx';
 import { UpdateBanner } from './UpdateBanner.jsx';
 import { ChangelogModal } from './ChangelogModal.jsx';
 import { AboutModal } from './AboutModal.jsx';
+import { ProfilePicker } from './ProfilePicker.jsx';
 import { CURRENT_VERSION } from '../lib/changelog.js';
 
 const _iconLink = document.querySelector('link[rel="icon"]');
@@ -59,6 +62,8 @@ export function App() {
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [updateCheckEnabled, setUpdateCheckEnabled] = useState(() => loadUpdateCheckEnabled());
+  const [profiles, setProfiles] = useState(() => loadProfiles().profiles);
+  const [selectedProfileId, setSelectedProfileId] = useState(() => loadLastProfileId());
   const addFilesRef = useRef(null);
   const urlParamsPresent = hasUrlParams();
 
@@ -125,7 +130,10 @@ export function App() {
 
   // Auto-connect if credentials are stored. Merge URL params so endpoint/bucket
   // from the URL override stored values (secret key never comes from URL).
+  // Migration runs first so the profile list is populated before state reads it.
   useEffect(() => {
+    migrateProfilesFromLegacy();
+    setProfiles(loadProfiles().profiles);
     const stored = loadCredentials();
     const merged = { ...stored, ...readUrlParams() };
     if (merged.endpoint && merged.bucket && merged.keyId && merged.secretKey) {
@@ -148,6 +156,40 @@ export function App() {
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
     } catch { /* clipboard API unavailable */ }
+  }
+
+  function handleSelectProfile(id) {
+    const profile = profiles.find(p => p.id === id);
+    if (!profile) return;
+    setSelectedProfileId(id);
+    saveLastProfileId(id);
+    setCredentials({ ...profile, secretKey: '' });
+  }
+
+  function handleSaveProfile(name) {
+    const profile = {
+      id: Date.now(),
+      name,
+      endpoint: credentials.endpoint,
+      bucket: credentials.bucket,
+      keyId: credentials.keyId,
+      provider: credentials.provider,
+      regionOverride: credentials.regionOverride,
+    };
+    saveProfile(profile);
+    const updated = loadProfiles().profiles;
+    setProfiles(updated);
+    setSelectedProfileId(profile.id);
+    saveLastProfileId(profile.id);
+  }
+
+  function handleDeleteProfile(id) {
+    deleteProfile(id);
+    setProfiles(loadProfiles().profiles);
+    if (selectedProfileId === id) {
+      setSelectedProfileId(null);
+      saveLastProfileId(null);
+    }
   }
 
   const providerLabel = credentials.provider ? PROVIDER_LABELS[credentials.provider] : null;
@@ -209,6 +251,14 @@ export function App() {
         <div class="main-content">
           <div class="splash">
             <h2>Connect to a bucket</h2>
+            <ProfilePicker
+              profiles={profiles}
+              selectedId={selectedProfileId}
+              onSelect={handleSelectProfile}
+              onDelete={handleDeleteProfile}
+              onSave={handleSaveProfile}
+              currentFormData={credentials}
+            />
             {urlParamsPresent && (
               <div class="banner banner-info" style={{ marginBottom: '1rem' }}>
                 <div class="banner-body">
@@ -217,6 +267,7 @@ export function App() {
               </div>
             )}
             <CredentialForm
+              key={selectedProfileId ?? 'manual'}
               initial={credentials}
               onSave={handleConnect}
               loading={session === 'connecting'}
@@ -268,6 +319,11 @@ export function App() {
         <div class="app-body">
           {sidebarOpen && <div class="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
           <aside class={`sidebar${sidebarOpen ? ' sidebar-open' : ''}`}>
+            {selectedProfileId && profiles.find(p => p.id === selectedProfileId) && (
+              <div class="profile-active-name">
+                {profiles.find(p => p.id === selectedProfileId).name}
+              </div>
+            )}
             <CredentialForm
               initial={credentials}
               onSave={(creds) => handleConnect(creds, { reconnect: true })}

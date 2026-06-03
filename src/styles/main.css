@@ -741,3 +741,34 @@ details[open] .upload-log-summary::before { transform: rotate(90deg); }
 .s3-primer-body { display: flex; flex-direction: column; gap: .6rem; margin-top: .75rem; line-height: 1.55; }
 .s3-primer-body ul { padding-left: 1.25rem; display: flex; flex-direction: column; gap: .3rem; }
 .s3-primer-body code { font-family: var(--mono); font-size: .78rem; background: var(--surface-raised); padding: .1rem .3rem; border-radius: 3px; }
+
+/* ── Profile picker (splash screen) ──────────────────────────────────────── */
+.profile-picker { margin-bottom: 1.25rem; }
+.profile-picker-empty { display: flex; justify-content: flex-end; }
+.profile-picker-heading { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin-bottom: .5rem; }
+.profile-list { list-style: none; padding: 0; margin: 0 0 .75rem 0; display: flex; flex-direction: column; gap: .25rem; }
+.profile-row {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .4rem .6rem; border-radius: var(--radius);
+  border: 1px solid var(--border); background: var(--surface-raised);
+  cursor: pointer; font-size: .85rem; transition: background var(--transition);
+}
+.profile-row:hover { background: var(--surface-hover, var(--border)); }
+.profile-row-selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface-raised)); }
+.profile-row-name { flex: 1; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.profile-row-hint { font-size: .75rem; color: var(--text-muted); white-space: nowrap; }
+.profile-row-delete {
+  background: none; border: none; cursor: pointer; padding: .1rem .3rem;
+  font-size: .8rem; color: var(--text-muted); border-radius: 3px; line-height: 1;
+  flex-shrink: 0;
+}
+.profile-row-delete:hover { color: var(--danger, #c0392b); background: color-mix(in srgb, var(--danger, #c0392b) 12%, transparent); }
+.profile-save-trigger { font-size: .8rem; color: var(--text-muted); }
+.profile-save-form { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.profile-save-form .input { flex: 1; min-width: 140px; font-size: .85rem; padding: .3rem .5rem; }
+.profile-active-name {
+  font-size: .78rem; font-weight: 600; color: var(--accent);
+  padding: .2rem .5rem; background: color-mix(in srgb, var(--accent) 8%, var(--surface-raised));
+  border-radius: var(--radius); border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border));
+  margin-bottom: .75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}

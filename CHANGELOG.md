@@ -7,6 +7,20 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.13.0] — 2026-06-02 — Multi-profile credential management
+
+- Add named profile storage: save N connection profiles (endpoint, bucket, key ID,
+  provider) to localStorage; secret key is never stored
+- Profile picker on connect screen: select a saved profile to pre-fill the form
+- "Save as profile" explicit action with user-defined display name
+- Delete profile from picker
+- Silent migration: existing credentials become a named default profile on first load
+- Current profile name shown in connected sidebar
+- Storage layer: versioned envelope (`{ version: 1, profiles: [] }`), upsert primitive,
+  tolerant loading (unknown fields preserved for forward compatibility)
+- Profile keys stored outside `LS_KEYS` so `clearCredentials()` does not wipe them
+  on disconnect
+
 ## [1.12.24] — 2026-06-02 — Make background update check toggleable in settings
 
 - Add `loadUpdateCheckEnabled` / `saveUpdateCheckEnabled` to `storage.js`

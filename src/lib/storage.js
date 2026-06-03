@@ -1,11 +1,16 @@
 // Copyright (C) 2026 HidayahTech, LLC
-// Credential and settings persistence (REQ-6, §4.5).
+// Credential, settings, and profile persistence (REQ-6, §4.5).
 //
 // Dual-storage model: non-sensitive fields (endpoint, bucket, keyId, provider,
 // regionOverride) go to localStorage and survive tab close. The secret key goes
 // to sessionStorage only — cleared when the tab closes so it is never written to
 // disk. This is the core credential security posture: users must re-enter their
 // secret key each session, but are not burdened with re-entering endpoint/bucket.
+//
+// Profiles extend this model to N saved connections. Profile data uses separate
+// storage keys (LS_KEY_PROFILES, LS_KEY_LAST_PROFILE_ID) that are deliberately
+// outside LS_KEYS so clearCredentials() does not remove them on disconnect.
+// Secret keys are never stored in profiles.
 //
 // All storage calls go through safe wrappers that swallow errors from private
 // browsing mode and other restrictive contexts. The app degrades gracefully
@@ -147,4 +152,96 @@ export function clearCapabilities() {
 
 export function defaultCapabilities() {
   return { list: 'unknown', download: 'unknown', upload: 'unknown', delete: 'unknown' };
+}
+
+// Profile storage — keys are OUTSIDE LS_KEYS so clearCredentials() does not wipe them.
+const LS_KEY_PROFILES        = 's3b_profiles';
+const LS_KEY_LAST_PROFILE_ID = 's3b_last_profile_id';
+const PROFILES_VERSION = 1;
+
+function emptyProfileData() {
+  return { version: PROFILES_VERSION, profiles: [] };
+}
+
+export function loadProfiles() {
+  try {
+    const raw = localStorage.getItem(LS_KEY_PROFILES);
+    if (!raw) return emptyProfileData();
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.profiles)) return emptyProfileData();
+    return parsed; // unknown fields preserved — caller gets the full envelope
+  } catch {
+    return emptyProfileData();
+  }
+}
+
+function saveProfilesData(data) {
+  safeSet(localStorage, LS_KEY_PROFILES, JSON.stringify(data));
+}
+
+// Upsert by id — replaces existing profile if id matches, appends if new.
+// Unknown fields on the incoming profile object are preserved as-is.
+// secretKey is deliberately stripped — it is never persisted in profiles.
+export function saveProfile(profile) {
+  // eslint-disable-next-line no-unused-vars
+  const { secretKey: _dropped, ...safeProfile } = profile;
+  const data = loadProfiles();
+  const idx = data.profiles.findIndex(p => p.id === safeProfile.id);
+  if (idx >= 0) {
+    data.profiles[idx] = { ...data.profiles[idx], ...safeProfile };
+  } else {
+    data.profiles.push({ ...safeProfile });
+  }
+  saveProfilesData(data);
+}
+
+export function deleteProfile(id) {
+  const data = loadProfiles();
+  data.profiles = data.profiles.filter(p => p.id !== id);
+  saveProfilesData(data);
+}
+
+export function loadLastProfileId() {
+  const v = safeGet(localStorage, LS_KEY_LAST_PROFILE_ID);
+  return v ? Number(v) : null;
+}
+
+export function saveLastProfileId(id) {
+  if (id == null) {
+    safeRemove(localStorage, LS_KEY_LAST_PROFILE_ID);
+  } else {
+    safeSet(localStorage, LS_KEY_LAST_PROFILE_ID, String(id));
+  }
+}
+
+// Idempotent — reads legacy flat keys and creates a default profile if no profiles
+// exist yet. Safe to call on every mount; does nothing if profiles already exist.
+export function migrateProfilesFromLegacy() {
+  const data = loadProfiles();
+  if (data.profiles.length > 0) return; // already migrated
+
+  const endpoint       = safeGet(localStorage, LS_KEYS.endpoint);
+  const bucket         = safeGet(localStorage, LS_KEYS.bucket);
+  const keyId          = safeGet(localStorage, LS_KEYS.keyId);
+  const provider       = safeGet(localStorage, LS_KEYS.provider) || null;
+  const regionOverride = safeGet(localStorage, LS_KEYS.regionOverride);
+
+  if (!endpoint && !bucket && !keyId) return; // nothing to migrate
+
+  const providerLabel = provider ? provider.toUpperCase() : '';
+  const name = providerLabel && bucket
+    ? `${providerLabel} — ${bucket}`
+    : bucket || 'Default';
+
+  const profile = {
+    id: Date.now(),
+    name,
+    endpoint,
+    bucket,
+    keyId,
+    provider,
+    regionOverride,
+  };
+  saveProfilesData({ version: PROFILES_VERSION, profiles: [profile] });
+  saveLastProfileId(profile.id);
 }

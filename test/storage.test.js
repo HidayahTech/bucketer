@@ -30,6 +30,9 @@ import {
   loadListingCacheTTL, saveListingCacheTTL,
   loadCapabilities, saveCapabilities, clearCapabilities,
   defaultCapabilities,
+  loadProfiles, saveProfile, deleteProfile,
+  loadLastProfileId, saveLastProfileId,
+  migrateProfilesFromLegacy,
 } from '../src/lib/storage.js';
 
 // Clear both stores before each test to prevent cross-test contamination.
@@ -202,5 +205,144 @@ describe('clearCapabilities', () => {
     saveCapabilities({ list: 'denied', download: 'denied', upload: 'denied', delete: 'denied' });
     clearCapabilities();
     assert.deepEqual(loadCapabilities(), defaultCapabilities());
+  });
+});
+
+// ── Profiles ──────────────────────────────────────────────────────────────────
+
+describe('loadProfiles', () => {
+  test('returns empty profiles array when nothing stored', () => {
+    const data = loadProfiles();
+    assert.deepEqual(data.profiles, []);
+    assert.equal(data.version, 1);
+  });
+
+  test('returns safe defaults on corrupt JSON', () => {
+    ls['s3b_profiles'] = '{bad json';
+    const data = loadProfiles();
+    assert.deepEqual(data.profiles, []);
+  });
+
+  test('returns safe defaults when profiles field is missing', () => {
+    ls['s3b_profiles'] = JSON.stringify({ version: 1 });
+    const data = loadProfiles();
+    assert.deepEqual(data.profiles, []);
+  });
+});
+
+describe('saveProfile / loadProfiles (upsert)', () => {
+  const profile = { id: 1000, name: 'B2 — test', endpoint: 'https://s3.example.com', bucket: 'b', keyId: 'k', provider: 'b2', regionOverride: '' };
+
+  test('appends a new profile', () => {
+    saveProfile(profile);
+    const { profiles } = loadProfiles();
+    assert.equal(profiles.length, 1);
+    assert.equal(profiles[0].id, 1000);
+    assert.equal(profiles[0].name, 'B2 — test');
+  });
+
+  test('updates existing profile by id', () => {
+    saveProfile(profile);
+    saveProfile({ ...profile, name: 'Updated name' });
+    const { profiles } = loadProfiles();
+    assert.equal(profiles.length, 1);
+    assert.equal(profiles[0].name, 'Updated name');
+  });
+
+  test('preserves unknown fields on round-trip', () => {
+    ls['s3b_profiles'] = JSON.stringify({ version: 1, profiles: [{ ...profile, futureField: 'keep-me' }] });
+    saveProfile({ ...profile, name: 'Updated' });
+    const { profiles } = loadProfiles();
+    assert.equal(profiles[0].futureField, 'keep-me');
+  });
+
+  test('secret key is never stored in profiles', () => {
+    saveProfile({ ...profile, secretKey: 'should-not-persist' });
+    const raw = ls['s3b_profiles'];
+    assert.ok(!raw.includes('should-not-persist'));
+  });
+});
+
+describe('deleteProfile', () => {
+  test('removes the profile by id', () => {
+    saveProfile({ id: 1, name: 'A', endpoint: '', bucket: '', keyId: '', provider: null, regionOverride: '' });
+    saveProfile({ id: 2, name: 'B', endpoint: '', bucket: '', keyId: '', provider: null, regionOverride: '' });
+    deleteProfile(1);
+    const { profiles } = loadProfiles();
+    assert.equal(profiles.length, 1);
+    assert.equal(profiles[0].id, 2);
+  });
+
+  test('no-op when id does not exist', () => {
+    saveProfile({ id: 1, name: 'A', endpoint: '', bucket: '', keyId: '', provider: null, regionOverride: '' });
+    deleteProfile(999);
+    assert.equal(loadProfiles().profiles.length, 1);
+  });
+});
+
+describe('clearCredentials does not remove profiles', () => {
+  test('profile data survives clearCredentials', () => {
+    saveProfile({ id: 1, name: 'A', endpoint: 'https://s3.example.com', bucket: 'b', keyId: 'k', provider: null, regionOverride: '' });
+    saveCredentials({ endpoint: 'https://s3.example.com', bucket: 'b', keyId: 'k', secretKey: 's', provider: null, regionOverride: '' });
+    clearCredentials();
+    const { profiles } = loadProfiles();
+    assert.equal(profiles.length, 1, 'profiles must survive clearCredentials');
+  });
+});
+
+describe('loadLastProfileId / saveLastProfileId', () => {
+  test('round-trips a numeric id', () => {
+    saveLastProfileId(42);
+    assert.equal(loadLastProfileId(), 42);
+  });
+
+  test('returns null when not set', () => {
+    assert.equal(loadLastProfileId(), null);
+  });
+
+  test('removes the key when saved as null', () => {
+    saveLastProfileId(42);
+    saveLastProfileId(null);
+    assert.equal(loadLastProfileId(), null);
+    assert.ok(!Object.prototype.hasOwnProperty.call(ls, 's3b_last_profile_id'));
+  });
+});
+
+describe('migrateProfilesFromLegacy', () => {
+  test('creates a profile from flat credential keys', () => {
+    ls['s3b_endpoint']  = 'https://s3.example.com';
+    ls['s3b_bucket']    = 'my-bucket';
+    ls['s3b_key_id']    = 'AKID';
+    ls['s3b_provider']  = 'b2';
+    migrateProfilesFromLegacy();
+    const { profiles } = loadProfiles();
+    assert.equal(profiles.length, 1);
+    assert.equal(profiles[0].endpoint, 'https://s3.example.com');
+    assert.equal(profiles[0].bucket, 'my-bucket');
+    assert.equal(profiles[0].name, 'B2 — my-bucket');
+  });
+
+  test('is idempotent — does not create a second profile on re-run', () => {
+    ls['s3b_endpoint'] = 'https://s3.example.com';
+    ls['s3b_bucket']   = 'my-bucket';
+    ls['s3b_key_id']   = 'AKID';
+    migrateProfilesFromLegacy();
+    migrateProfilesFromLegacy();
+    assert.equal(loadProfiles().profiles.length, 1);
+  });
+
+  test('does nothing when no flat credentials exist', () => {
+    migrateProfilesFromLegacy();
+    assert.deepEqual(loadProfiles().profiles, []);
+  });
+
+  test('does nothing when profiles already exist', () => {
+    saveProfile({ id: 1, name: 'Existing', endpoint: 'x', bucket: 'b', keyId: 'k', provider: null, regionOverride: '' });
+    ls['s3b_endpoint'] = 'https://s3.example.com';
+    ls['s3b_bucket']   = 'my-bucket';
+    ls['s3b_key_id']   = 'AKID';
+    migrateProfilesFromLegacy();
+    assert.equal(loadProfiles().profiles.length, 1);
+    assert.equal(loadProfiles().profiles[0].name, 'Existing');
   });
 });

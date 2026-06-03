@@ -1,9 +1,55 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.12.21';
+export const CURRENT_VERSION = '1.13.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.13.0",
+    "date": "2026-06-02",
+    "title": "Multi-profile credential management",
+    "changes": [
+      "Add named profile storage: save N connection profiles (endpoint, bucket, key ID,",
+      "Profile picker on connect screen: select a saved profile to pre-fill the form",
+      "\"Save as profile\" explicit action with user-defined display name",
+      "Delete profile from picker",
+      "Silent migration: existing credentials become a named default profile on first load",
+      "Current profile name shown in connected sidebar",
+      "Storage layer: versioned envelope ({ version: 1, profiles: [] }), upsert primitive,",
+      "Profile keys stored outside LS_KEYS so clearCredentials() does not wipe them"
+    ]
+  },
+  {
+    "version": "1.12.24",
+    "date": "2026-06-02",
+    "title": "Make background update check toggleable in settings",
+    "changes": [
+      "Add loadUpdateCheckEnabled / saveUpdateCheckEnabled to storage.js",
+      "UpdateBanner accepts enabled prop; polling starts/stops reactively via useEffect dependency",
+      "SettingsPanel exposes a \"Background update checks\" checkbox with immediate effect (no Save needed)",
+      "Defaults to enabled — no behaviour change for existing users"
+    ]
+  },
+  {
+    "version": "1.12.23",
+    "date": "2026-06-02",
+    "title": "Add live instance link and canonical repo note to README",
+    "changes": [
+      "Add \"Try it live\" link to bucketer.hidayahtech.net and canonical GitLab repo reference below the badges"
+    ]
+  },
+  {
+    "version": "1.12.22",
+    "date": "2026-06-02",
+    "title": "Add About modal and expand README intro",
+    "changes": [
+      "Add AboutModal component with five-pitch product overview and personal author note",
+      "About modal accessible from footer \"About\" link and splash screen \"Learn more →\"",
+      "Splash screen \"About Bucketer\" section replaced with full narrative description",
+      "README intro rebuilt: five-pitch marketing section, narrative, author note with Palestine solidarity statement",
+      "Save prose narrative to docs/narrative-description.md for reuse elsewhere"
+    ]
+  },
   {
     "version": "1.12.21",
     "date": "2026-06-02",
