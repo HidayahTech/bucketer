@@ -1,9 +1,18 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.13.10';
+export const CURRENT_VERSION = '1.13.11';
 
 export const CHANGELOG = [
+  {
+    "version": "1.13.11",
+    "date": "2026-06-03",
+    "title": "Fix file concurrency setting not taking effect mid-queue",
+    "changes": [
+      "Changing the file concurrency setting while uploads are in progress had",
+      "Fix: re-read loadFileConcurrency() in runUpload's finally block,"
+    ]
+  },
   {
     "version": "1.13.10",
     "date": "2026-06-03",

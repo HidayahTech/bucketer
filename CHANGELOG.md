@@ -7,6 +7,16 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.13.11] — 2026-06-03 — Fix file concurrency setting not taking effect mid-queue
+
+- Changing the file concurrency setting while uploads are in progress had
+  no effect because `queueRef.current.concurrency` was only updated in
+  `enqueueUpload` (called when adding files). The Queue's `_drain()` kept
+  reading the original value on every completion.
+- Fix: re-read `loadFileConcurrency()` in `runUpload`'s `finally` block,
+  which executes immediately before the Queue's own `.finally()` calls
+  `_drain()` — so the new value is in place at exactly the right moment.
+
 ## [1.13.10] — 2026-06-03 — Add per-queue desktop notification mute toggle
 
 - Add "Notifs on / Notifs off" toggle button to the batch summary header.

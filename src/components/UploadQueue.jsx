@@ -210,6 +210,9 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     } finally {
       delete activeUploadsRef.current[id];
       markUploadInactive(destinationKey);
+      // Re-read concurrency so a setting change mid-queue takes effect on the
+      // next _drain() call, which fires immediately after this finally block.
+      queueRef.current.concurrency = loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY;
     }
   }
 
