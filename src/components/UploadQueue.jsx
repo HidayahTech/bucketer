@@ -32,6 +32,7 @@ import { UploadQueue as Queue, calcPartSize, collectParts, preparePutBody } from
 import { loadPartConcurrency, loadPartSizeMB, loadFileConcurrency } from '../lib/storage.js';
 import { collectFileEntries } from '../lib/file-entries.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
+import { createUpdateBatcher } from '../lib/update-batcher.js';
 
 const MULTIPART_THRESHOLD       = 5 * 1024 * 1024;   // 5 MiB — internal threshold, above the 5 MB spec minimum
 const LARGE_FILE_WARN           = 50 * 1024 * 1024 * 1024; // 50 GB — recommend native tools (§4.6)
@@ -75,8 +76,17 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     hadActiveRef.current = hasActive;
   }, [items, onUploadsComplete]);
 
-  const updateItem = useCallback((id, patch) => {
-    setItems(prev => prev.map(it => it.id === id ? { ...it, ...patch } : it));
+  const batcherRef = useRef(null);
+  if (batcherRef.current === null) {
+    batcherRef.current = createUpdateBatcher(
+      setItems,
+      fn => requestAnimationFrame(fn),
+      cancelAnimationFrame,
+    );
+  }
+
+  const updateItem = useCallback((id, patch, urgent = false) => {
+    batcherRef.current.update(id, patch, urgent);
   }, []);
 
   // Expose addFiles to parent (e.g. for drop zones outside this component)
@@ -126,7 +136,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     } catch { /* IndexedDB may be unavailable */ }
 
     if (existingRecord) {
-      updateItem(item.id, { status: 'paused', resumeRecord: existingRecord });
+      updateItem(item.id, { status: 'paused', resumeRecord: existingRecord }, true);
       return; // User must explicitly choose Resume or Restart
     }
 
@@ -140,12 +150,12 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       updateItem(id, {
         status: 'error',
         error: { message: `Another browser tab appears to be uploading to "${destinationKey}". Close the other tab or wait for it to finish before retrying.` },
-      });
+      }, true);
       return;
     }
     markUploadActive(destinationKey);
 
-    updateItem(id, { status: 'uploading', error: null });
+    updateItem(id, { status: 'uploading', error: null }, true);
     const startTime = Date.now();
 
     function updateProgress(loaded, total) {
@@ -173,7 +183,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
 
       const completedAt = Date.now();
       const durationSec = (completedAt - startTime) / 1000;
-      updateItem(id, { status: 'done', progress: 100 });
+      updateItem(id, { status: 'done', progress: 100 }, true);
       onCapabilityChange('upload', 'permitted');
       saveUploadLogEntry({
         fileName: file.name, destinationKey, fileSize: file.size,
@@ -187,7 +197,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       }
     } catch (err) {
       if (err.name === 'AbortError' || err.message === 'Upload aborted') return;
-      updateItem(id, { status: 'error', error: err });
+      updateItem(id, { status: 'error', error: err }, true);
       const completedAt = Date.now();
       saveUploadLogEntry({
         fileName: file.name, destinationKey, fileSize: file.size,
@@ -299,7 +309,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     const item = items.find(it => it.id === id);
     if (!item || !item.resumeRecord) return;
 
-    updateItem(id, { status: 'resuming', error: null });
+    updateItem(id, { status: 'resuming', error: null }, true);
 
     const { uploadId, partSize, fileIdentity, destinationKey } = item.resumeRecord;
 
@@ -309,7 +319,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       updateItem(id, {
         status: 'error',
         error: { message: 'File does not match the resume record (name, size, or modification time differs). Please restart the upload.' },
-      });
+      }, true);
       return;
     }
 
@@ -320,7 +330,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         updateItem(id, {
           status: 'error',
           error: { message: 'File content hash does not match the resume record. The file may have changed since the upload was started. Please restart the upload.' },
-        });
+        }, true);
         return;
       }
     }
@@ -339,7 +349,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         if (!completedNums.has(i)) remainingParts.push(i);
       }
 
-      updateItem(id, { status: 'uploading', progress: (completedParts.length / totalParts) * 100 });
+      updateItem(id, { status: 'uploading', progress: (completedParts.length / totalParts) * 100 }, true);
 
       const newParts = [...completedParts];
       const abortController = new AbortController();
@@ -369,7 +379,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       }));
 
       await deleteResumeRecord({ provider, endpoint: credentials.endpoint, bucket, destinationKey }).catch(() => {});
-      updateItem(id, { status: 'done', progress: 100, resumeRecord: null });
+      updateItem(id, { status: 'done', progress: 100, resumeRecord: null }, true);
       onCapabilityChange('upload', 'permitted');
 
     } catch (err) {
@@ -381,9 +391,9 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
           status: 'error',
           resumeRecord: null,
           error: { message: 'Upload session has expired and cannot be resumed. Please restart the upload.' },
-        });
+        }, true);
       } else {
-        updateItem(id, { status: 'error', error: err });
+        updateItem(id, { status: 'error', error: err }, true);
       }
     }
   }
@@ -401,7 +411,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       await deleteResumeRecord({ provider, endpoint: credentials.endpoint, bucket, destinationKey: item.destinationKey }).catch(() => {});
     }
 
-    updateItem(id, { status: 'queued', resumeRecord: null, error: null, progress: 0 });
+    updateItem(id, { status: 'queued', resumeRecord: null, error: null, progress: 0 }, true);
     queueRef.current.concurrency = loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY;
     queueRef.current.enqueue(() => runUpload(id, item.file, item.destinationKey));
   }
@@ -445,7 +455,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         updateItem(id, {
           status: 'error',
           error: { message: `Cancelled, but abort failed: ${err.message}. Incomplete parts may remain and accrue storage charges.` },
-        });
+        }, true);
         return;
       }
       await deleteResumeRecord({ provider, endpoint: credentials.endpoint, bucket, destinationKey }).catch(() => {});
@@ -594,7 +604,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
               onRestart={() => handleRestart(items[0].id)}
               onCancel={() => handleCancel(items[0].id)}
               onRemove={() => handleRemove(items[0].id)}
-              onDismissLargeWarn={() => updateItem(items[0].id, { largeFileWarningDismissed: true })}
+              onDismissLargeWarn={() => updateItem(items[0].id, { largeFileWarningDismissed: true }, true)}
             />
           ) : (
             <BatchSummary
@@ -604,7 +614,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
               onRestart={handleRestart}
               onCancel={handleCancel}
               onRemove={handleRemove}
-              onDismissLargeWarn={(id) => updateItem(id, { largeFileWarningDismissed: true })}
+              onDismissLargeWarn={(id) => updateItem(id, { largeFileWarningDismissed: true }, true)}
               onClearDone={handleClearDone}
               onCancelAll={handleCancelAll}
               notifSuppressed={notifSuppressed}

@@ -1,7 +1,12 @@
 #!/usr/bin/env node
 import http from 'http';
 
-const PORT = parseInt(process.env.MOCK_S3_PORT ?? '9090', 10);
+const PORT       = parseInt(process.env.MOCK_S3_PORT      ?? '9090', 10);
+const LATENCY_MS = parseInt(process.env.MOCK_S3_LATENCY_MS ?? '0',    10);
+
+const delay = LATENCY_MS > 0
+  ? () => new Promise(r => setTimeout(r, LATENCY_MS))
+  : () => Promise.resolve();
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -47,6 +52,7 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === 'POST' && url.searchParams.has('uploads')) {
     await drain(req);
+    await delay();
     const key = url.pathname.split('/').slice(2).join('/');
     xml(res, 200, `<?xml version="1.0" encoding="UTF-8"?>
 <InitiateMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
@@ -58,6 +64,7 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === 'POST' && url.searchParams.has('uploadId')) {
     await drain(req);
+    await delay();
     const key = url.pathname.split('/').slice(2).join('/');
     xml(res, 200, `<?xml version="1.0" encoding="UTF-8"?>
 <CompleteMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
@@ -70,6 +77,7 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === 'PUT') {
     await drain(req);
+    await delay();
     res.writeHead(200, { ...CORS, ETag: `"mock-${Date.now()}"` });
     res.end();
     return;

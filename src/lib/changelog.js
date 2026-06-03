@@ -1,9 +1,21 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.13.18';
+export const CURRENT_VERSION = '1.13.19';
 
 export const CHANGELOG = [
+  {
+    "version": "1.13.19",
+    "date": "2026-06-03",
+    "title": "Batch rAF-aligned updateItem calls; add slow-mock latency option",
+    "changes": [
+      "Extracted createUpdateBatcher (src/lib/update-batcher.js) — coalesces",
+      "All 14 status-change updateItem call sites in UploadQueue.jsx now pass",
+      "Added 14 unit tests covering merge semantics, urgent/non-urgent paths, and",
+      "Added MOCK_S3_LATENCY_MS env var to perf/mock-s3.mjs for realistic",
+      "BatchSummary self-time: 877ms → 724ms (−17%) at 1000 files, 0ms latency"
+    ]
+  },
   {
     "version": "1.13.18",
     "date": "2026-06-03",

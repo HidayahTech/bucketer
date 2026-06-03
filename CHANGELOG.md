@@ -7,6 +7,21 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.13.19] — 2026-06-03 — Batch rAF-aligned updateItem calls; add slow-mock latency option
+
+- Extracted `createUpdateBatcher` (`src/lib/update-batcher.js`) — coalesces
+  non-urgent progress patches into one `setItems` call per animation frame;
+  urgent status transitions (done, error, paused, etc.) flush immediately and
+  preserve any accumulated bytes for the same item
+- All 14 status-change `updateItem` call sites in `UploadQueue.jsx` now pass
+  `urgent = true`; the two high-frequency `updateProgress` calls remain
+  non-urgent and are coalesced per frame
+- Added 14 unit tests covering merge semantics, urgent/non-urgent paths, and
+  the pending-bytes-preserved invariant (`test/update-batcher.test.js`)
+- Added `MOCK_S3_LATENCY_MS` env var to `perf/mock-s3.mjs` for realistic
+  benchmark conditions (e.g. `MOCK_S3_LATENCY_MS=20 npm run perftest`)
+- `BatchSummary` self-time: 877ms → 724ms (−17%) at 1000 files, 0ms latency
+
 ## [1.13.18] — 2026-06-03 — Replace 8 filter/reduce passes in BatchSummary with a single loop
 
 - Replaced 8 separate `filter`/`reduce` calls in `BatchSummary` (run on every
