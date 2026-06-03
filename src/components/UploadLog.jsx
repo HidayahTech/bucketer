@@ -17,12 +17,16 @@ function formatDuration(sec) {
   return `${h}h ${m}m`;
 }
 
+const completedAtCache = new Map();
 function formatCompletedAt(ts) {
   if (!ts) return '—';
+  if (completedAtCache.has(ts)) return completedAtCache.get(ts);
   try {
-    return new Date(ts).toLocaleString(undefined, {
+    const result = new Date(ts).toLocaleString(undefined, {
       dateStyle: 'short', timeStyle: 'medium',
     });
+    completedAtCache.set(ts, result);
+    return result;
   } catch { return '—'; }
 }
 

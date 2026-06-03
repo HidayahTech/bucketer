@@ -7,6 +7,14 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.13.17] — 2026-06-03 — Cache formatted timestamps in UploadLog and raise bench default to 1000 files
+
+- Added module-level `Map` cache to `formatCompletedAt` in `UploadLog.jsx` so
+  each timestamp is passed through `toLocaleString()` exactly once; subsequent
+  renders and IndexedDB reloads are O(1) map lookups — reduced self-time from
+  ~1378ms to ~90ms (−93%) at 1000 files
+- Changed default `BENCH_FILES` from 200 to 1000 in `perf/bench-browser.mjs`
+
 ## [1.13.16] — 2026-06-03 — Throttle rAF animation loops to 15fps and skip when tab hidden
 
 - Both animation loops in `UploadQueue.jsx` (BatchSummary bytes counter and

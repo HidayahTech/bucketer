@@ -11,7 +11,7 @@ import { dirname, join } from 'path';
 
 const __dirname  = dirname(fileURLToPath(import.meta.url));
 const OUTPUT_DIR = join(__dirname, 'output');
-const FILE_COUNT = parseInt(process.env.BENCH_FILES  ?? '200',                    10);
+const FILE_COUNT = parseInt(process.env.BENCH_FILES  ?? '1000',                   10);
 const APP_URL    = process.env.APP_URL    ?? 'http://localhost:3000';
 const S3_URL     = process.env.MOCK_S3_URL ?? 'http://localhost:9090';
 

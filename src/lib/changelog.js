@@ -1,9 +1,18 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.13.16';
+export const CURRENT_VERSION = '1.13.17';
 
 export const CHANGELOG = [
+  {
+    "version": "1.13.17",
+    "date": "2026-06-03",
+    "title": "Cache formatted timestamps in UploadLog and raise bench default to 1000 files",
+    "changes": [
+      "Added module-level Map cache to formatCompletedAt in UploadLog.jsx so",
+      "Changed default BENCH_FILES from 200 to 1000 in perf/bench-browser.mjs"
+    ]
+  },
   {
     "version": "1.13.16",
     "date": "2026-06-03",
