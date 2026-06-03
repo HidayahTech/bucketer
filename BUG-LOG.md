@@ -452,3 +452,77 @@ The state initialization ordering issue only manifests after a disconnect (which
 A source-level assertion: `selectedProfileId` must appear before `credentials` in the `useState` declarations in App.jsx. If the order is ever reversed, the credentials initializer silently loses access to the saved profile and the form loads empty.
 
 **Coverage:** `test/source-invariants.test.js` — "App.jsx — selectedProfileId declared before credentials (BUG-017)". Reads App.jsx source, finds the character offset of both state declarations, and asserts the profile ID declaration comes first.
+
+---
+
+## BUG-018 — "Save as profile…" button stayed disabled even with all fields filled
+
+**Date:** 2026-06-03
+**Commit:** v1.13.7
+
+**Symptom:**
+The "Save as profile…" button remained disabled no matter what values were typed into the credential form, preventing profile creation without first connecting.
+
+**Root cause:**
+`canSaveProfile` in `ProfilePicker` was called with `currentFormData={credentials}`, where `credentials` is App-level state that only updates when the user submits the form via Connect. While the user was typing, `CredentialForm` held all values in its own local `useState` and never propagated them to App. `ProfilePicker` always saw the stale pre-connection (often empty) credentials, so `canSaveProfile` always returned `false`.
+
+**Fix:**
+Add an `onFormChange` prop to `CredentialForm` that fires on every field input with the current form values. In `App.jsx`, introduce `liveFormData` state (initialized from `credentials`) updated by `onFormChange`. Pass `liveFormData` to `ProfilePicker` instead of `credentials`. Also sync `liveFormData` in `handleSelectProfile` so selecting a profile immediately enables the button.
+
+**Why it wasn't caught earlier:**
+The profile save button was added alongside `canSaveProfile` in the same commit (v1.13.4). The validation logic was correct but the data source was wrong — testing against a live browser would have revealed it immediately, but the issue was not caught in code review because `credentials` being stale before Connect was not an obvious invariant to check.
+
+**Test case:**
+A DOM-level integration test would be needed to fully cover this (render the form, type into fields, assert button enables). Not currently practical without a test renderer. The fix is covered by code inspection: `ProfilePicker` must receive `liveFormData`, not `credentials`.
+
+**Coverage:** No automated test (DOM-dependent). Fix is structural — `currentFormData` prop on `ProfilePicker` is now always `liveFormData` in App.jsx.
+
+---
+
+## BUG-019 — Wasabi bare endpoint `s3.wasabisys.com` not auto-detected as us-east-1
+
+**Date:** 2026-06-03
+**Commit:** v1.13.6
+
+**Symptom:**
+Entering `https://s3.wasabisys.com` as the endpoint (Wasabi's legacy default endpoint) showed "Cannot be auto-detected for this endpoint" and displayed an empty region input, forcing the user to type the region manually.
+
+**Root cause:**
+`extractRegion` for Wasabi matched only the pattern `^s3\.([^.]+)\.wasabisys\.com$` (region embedded in subdomain, e.g. `s3.us-east-1.wasabisys.com`). The bare legacy hostname `s3.wasabisys.com` has no region segment, so the regex returned `null`. Wasabi's official documentation lists `s3.wasabisys.com` as the primary endpoint for US East 1 (Virginia), equivalent to `s3.us-east-1.wasabisys.com`.
+
+**Fix:**
+Add a special case before the regex: if the host is exactly `s3.wasabisys.com`, return `'us-east-1'`. Source: https://docs.wasabi.com/docs/what-are-the-service-urls-for-wasabi-s-different-storage-regions
+
+**Why it wasn't caught earlier:**
+The existing Wasabi test only exercised the region-in-subdomain form (`s3.us-east-1.wasabisys.com`). The bare legacy endpoint was not in the test suite and was only discovered when a user tried it in practice.
+
+**Test case:**
+`extractRegion('https://s3.wasabisys.com', PROVIDERS.WASABI)` must return `'us-east-1'`.
+
+**Coverage:** `test/provider.test.js` — "Wasabi: bare s3.wasabisys.com resolves to us-east-1 (legacy default endpoint)".
+
+---
+
+## BUG-020 — Saving a profile before connecting stored empty values and cleared the form
+
+**Date:** 2026-06-03
+**Commit:** v1.13.9
+
+**Symptom:**
+Filling in the credential form and clicking "Save as profile…" appeared to work (a profile was created with the chosen name), but the saved profile contained no data. Immediately after saving, all form fields cleared, as if the form had been reset.
+
+**Root cause:**
+`handleSaveProfile` in `App.jsx` built the profile object from `credentials` state, not `liveFormData`. Since `credentials` only updates when the user connects, it was empty for a user who hadn't connected yet. The profile was saved with blank endpoint, bucket, and key ID.
+
+The form clearing was a second consequence of the same bug: saving the profile called `setSelectedProfileId(profile.id)`, changing the `key` prop on `<CredentialForm key={selectedProfileId}>`. Preact treated this as a new component instance and remounted it with `initial={credentials}` — which was still empty — wiping everything the user had typed.
+
+**Fix:**
+`handleSaveProfile` now reads from `liveFormData` to build the profile (mapping `providerOverride` → `provider` and applying the same trim/trailing-slash cleanup as `handleSubmit`). After saving, `credentials` and `liveFormData` are both synced to the saved profile data (plus secretKey from `liveFormData`) so the remount that follows the key change initializes with the correct values.
+
+**Why it wasn't caught earlier:**
+The profile save flow was only tested in the connected state in earlier development (where `credentials` is already populated). The pre-connect save path — added in v1.13.4 when the save button was gated on `canSaveProfile` — was not exercised before shipping.
+
+**Test case:**
+A DOM-level integration test would be needed (fill form, save profile, assert profile contains correct values and form is not cleared). Not currently practical without a test renderer.
+
+**Coverage:** No automated test (DOM-dependent). Fix verified by manual testing.
