@@ -1,9 +1,18 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.13.9';
+export const CURRENT_VERSION = '1.13.10';
 
 export const CHANGELOG = [
+  {
+    "version": "1.13.10",
+    "date": "2026-06-03",
+    "title": "Add per-queue desktop notification mute toggle",
+    "changes": [
+      "Add \"Notifs on / Notifs off\" toggle button to the batch summary header.",
+      "State is queue-scoped (resets when the queue is cleared) and does not"
+    ]
+  },
   {
     "version": "1.13.9",
     "date": "2026-06-03",

@@ -50,6 +50,14 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   const fileInputRef = useRef(null);
   const folderInputRef = useRef(null);
   const notifAskedRef = useRef(false);
+  const notifSuppressedRef = useRef(false);
+  const [notifSuppressed, setNotifSuppressed] = useState(false);
+
+  function toggleNotifSuppressed() {
+    const next = !notifSuppressedRef.current;
+    notifSuppressedRef.current = next;
+    setNotifSuppressed(next);
+  }
 
   const canUpload = capabilities.upload !== 'denied';
   const hadActiveRef = useRef(false);
@@ -174,7 +182,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         errorMessage: null,
       }).then(() => onLogEntry?.()).catch(() => {});
 
-      if ('Notification' in window && Notification.permission === 'granted') {
+      if ('Notification' in window && Notification.permission === 'granted' && !notifSuppressedRef.current) {
         new Notification('Upload complete', { body: `${file.name} → ${destinationKey}` });
       }
     } catch (err) {
@@ -595,6 +603,8 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
               onDismissLargeWarn={(id) => updateItem(id, { largeFileWarningDismissed: true })}
               onClearDone={handleClearDone}
               onCancelAll={handleCancelAll}
+              notifSuppressed={notifSuppressed}
+              onToggleNotifs={toggleNotifSuppressed}
             />
           )}
         </div>
@@ -603,7 +613,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   );
 }
 
-function BatchSummary({ items, provider, onResume, onRestart, onCancel, onRemove, onDismissLargeWarn, onClearDone, onCancelAll }) {
+function BatchSummary({ items, provider, onResume, onRestart, onCancel, onRemove, onDismissLargeWarn, onClearDone, onCancelAll, notifSuppressed, onToggleNotifs }) {
   const doneItems     = items.filter(i => i.status === 'done');
   const abortedItems  = items.filter(i => i.status === 'aborted');
   const errorItems    = items.filter(i => i.status === 'error');
@@ -695,6 +705,16 @@ function BatchSummary({ items, provider, onResume, onRestart, onCancel, onRemove
         {hasClearable && (
           <button class="btn btn-ghost btn-sm" style={{ marginLeft: '.4rem' }} onClick={onClearDone}>
             Clear done
+          </button>
+        )}
+        {'Notification' in window && Notification.permission === 'granted' && (
+          <button
+            class="btn btn-ghost btn-sm"
+            style={{ marginLeft: '.4rem', color: notifSuppressed ? 'var(--text-muted)' : undefined }}
+            title={notifSuppressed ? 'Desktop notifications muted — click to unmute' : 'Mute desktop notifications for this queue'}
+            onClick={onToggleNotifs}
+          >
+            {notifSuppressed ? 'Notifs off' : 'Notifs on'}
           </button>
         )}
       </div>

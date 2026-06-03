@@ -7,6 +7,15 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.13.10] — 2026-06-03 — Add per-queue desktop notification mute toggle
+
+- Add "Notifs on / Notifs off" toggle button to the batch summary header.
+  Only shown when Notification permission has been granted. Takes effect
+  immediately on the next completed upload — a ref is checked at fire time
+  so toggling mid-queue requires no async coordination.
+- State is queue-scoped (resets when the queue is cleared) and does not
+  affect the notification permission grant itself.
+
 ## [1.13.9] — 2026-06-03 — Fix profile save capturing empty fields and clearing the form
 
 - `handleSaveProfile` was reading from `credentials` state (only updated
