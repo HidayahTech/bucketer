@@ -246,6 +246,37 @@ export function saveLastProfileId(id) {
   }
 }
 
+// Removes every localStorage and sessionStorage key the app has ever written.
+// Does NOT touch IndexedDB — call deleteDatabase() from indexeddb.js separately.
+// After calling this, window.location.reload() is required to reset in-memory state.
+export function wipeAllAppData() {
+  const allLSKeys = [
+    ...Object.values(LS_KEYS),
+    LS_KEY_PROFILES,
+    LS_KEY_LAST_PROFILE_ID,
+    's3b_active_uploads',
+  ];
+  allLSKeys.forEach(k => safeRemove(localStorage, k));
+  safeRemove(sessionStorage, SS_KEY_SECRET);
+  safeRemove(sessionStorage, 's3b_file_banner_dismissed');
+}
+
+// Removes only the six user-configurable settings keys. Credentials and profiles
+// are left intact. Settings revert to their defaults on the next render.
+export function resetSettings() {
+  const settingsKeys = [
+    LS_KEYS.maxKeys, LS_KEYS.partConcurrency, LS_KEYS.partSizeMB,
+    LS_KEYS.fileConcurrency, LS_KEYS.listingCacheTTL, LS_KEYS.updateCheckEnabled,
+  ];
+  settingsKeys.forEach(k => safeRemove(localStorage, k));
+}
+
+// Removes all saved profiles and the last-selected profile ID in one operation.
+export function deleteAllProfiles() {
+  safeRemove(localStorage, LS_KEY_PROFILES);
+  safeRemove(localStorage, LS_KEY_LAST_PROFILE_ID);
+}
+
 // Idempotent — reads legacy flat keys and creates a default profile if no profiles
 // exist yet. Safe to call on every mount; does nothing if profiles already exist.
 export function migrateProfilesFromLegacy() {

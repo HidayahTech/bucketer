@@ -162,6 +162,52 @@ export function isUploadActiveElsewhere(destinationKey) {
   } catch { return false; }
 }
 
+export function loadActiveUploads() {
+  return getActiveUploads();
+}
+
+export function clearActiveUploads() {
+  try { localStorage.removeItem(ACTIVE_KEY); } catch { /* */ }
+}
+
+// ── Resume record bulk operations ─────────────────────────────────────────────
+
+export async function loadAllResumeRecords() {
+  try {
+    const db = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, 'readonly');
+      const req = tx.objectStore(STORE).getAll();
+      req.onsuccess = () => resolve(req.result ?? []);
+      req.onerror = () => reject(req.error);
+    });
+  } catch { return []; }
+}
+
+export async function clearAllResumeRecords() {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE, 'readwrite');
+    tx.objectStore(STORE).clear();
+    tx.oncomplete = resolve;
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+// Deletes the entire IndexedDB database. Closes the cached connection first so
+// the delete is not blocked by an open handle. If another tab has the database
+// open, resolves immediately rather than waiting — the database will be deleted
+// when that tab's connection is released.
+export async function deleteDatabase() {
+  if (_db) { _db.close(); _db = null; }
+  return new Promise(resolve => {
+    const req = indexedDB.deleteDatabase(DB_NAME);
+    req.onsuccess = resolve;
+    req.onerror   = resolve;
+    req.onblocked = resolve;
+  });
+}
+
 // ── Upload log (persisted history) ────────────────────────────────────────────
 // Each entry: { fileName, destinationKey, fileSize, status, startedAt,
 //               completedAt, durationSec, avgSpeedBps, errorMessage }

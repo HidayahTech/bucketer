@@ -7,6 +7,22 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.13.3] — 2026-06-03 — Storage & Privacy viewer
+
+- Add "Storage & Privacy" modal (footer link, always accessible regardless of
+  session state) showing a live snapshot of every value the app stores.
+- Six collapsible sections: Connection, Saved Profiles, Upload History,
+  Incomplete Uploads, Settings, Runtime State — each with a scoped clear action.
+- Secret key shown as presence indicator only ("Present (session only)" /
+  "Not stored") — the value is never rendered.
+- "Clear All App Data" removes every localStorage, sessionStorage, and IndexedDB
+  entry the app has ever written, then reloads to a fresh state.
+- New `wipeAllAppData()`, `resetSettings()`, `deleteAllProfiles()` in storage.js.
+- New `loadAllResumeRecords()`, `clearAllResumeRecords()`, `deleteDatabase()`,
+  `loadActiveUploads()`, `clearActiveUploads()` in indexeddb.js.
+- Storage catalog documented in `docs/storage-catalog.md`; feature design in
+  `docs/design-storage-viewer.md`.
+
 ## [1.13.2] — 2026-06-03 — Fix saved profile not populating form fields on load
 
 - Fix: selecting a saved profile after disconnect left the credential form blank.

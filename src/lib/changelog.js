@@ -1,9 +1,23 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.13.2';
+export const CURRENT_VERSION = '1.13.3';
 
 export const CHANGELOG = [
+  {
+    "version": "1.13.3",
+    "date": "2026-06-03",
+    "title": "Storage & Privacy viewer",
+    "changes": [
+      "Add \"Storage & Privacy\" modal (footer link, always accessible regardless of",
+      "Six collapsible sections: Connection, Saved Profiles, Upload History,",
+      "Secret key shown as presence indicator only (\"Present (session only)\" /",
+      "\"Clear All App Data\" removes every localStorage, sessionStorage, and IndexedDB",
+      "New wipeAllAppData(), resetSettings(), deleteAllProfiles() in storage.js.",
+      "New loadAllResumeRecords(), clearAllResumeRecords(), deleteDatabase(),",
+      "Storage catalog documented in docs/storage-catalog.md; feature design in"
+    ]
+  },
   {
     "version": "1.13.2",
     "date": "2026-06-03",

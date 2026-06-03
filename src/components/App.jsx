@@ -41,6 +41,7 @@ import { UpdateBanner } from './UpdateBanner.jsx';
 import { ChangelogModal } from './ChangelogModal.jsx';
 import { AboutModal } from './AboutModal.jsx';
 import { ProfilePicker } from './ProfilePicker.jsx';
+import { StorageModal } from './StorageModal.jsx';
 import { CURRENT_VERSION } from '../lib/changelog.js';
 
 const _iconLink = document.querySelector('link[rel="icon"]');
@@ -72,6 +73,7 @@ export function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
+  const [storageOpen, setStorageOpen] = useState(false);
   const [updateCheckEnabled, setUpdateCheckEnabled] = useState(() => loadUpdateCheckEnabled());
   const [profiles, setProfiles] = useState(() => loadProfiles().profiles);
   const addFilesRef = useRef(null);
@@ -223,6 +225,7 @@ export function App() {
     <div id="app">
       {changelogOpen && <ChangelogModal onClose={() => setChangelogOpen(false)} />}
       {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}
+      {storageOpen && <StorageModal onClose={() => setStorageOpen(false)} isConnected={session === 'connected'} />}
       <header class="app-header">
         {session === 'connected' && (
           <button
@@ -420,6 +423,8 @@ export function App() {
         <a href="https://gitlab.com/hidayahtech/bucketer" target="_blank" rel="noopener noreferrer">Bucketer</a>
         {' '}&mdash;{' '}
         <button class="footer-link-btn" onClick={() => setAboutOpen(true)}>About</button>
+        {' '}&mdash;{' '}
+        <button class="footer-link-btn" onClick={() => setStorageOpen(true)}>Storage &amp; Privacy</button>
         {' '}&mdash;{' '}
         Copyright &copy; 2026 <a href="https://hidayahtech.com" target="_blank" rel="noopener noreferrer">HidayahTech, LLC</a>
       </footer>
