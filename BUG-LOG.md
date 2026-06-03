@@ -110,6 +110,8 @@ The JSX looked correct and raised no errors. The failure was silent — the pick
 **Test case:**
 Integration/smoke test: mount `UploadQueue`, query the folder input element, and assert `el.webkitdirectory === true`. Verifies that the property reaches the DOM regardless of JSX handling.
 
+**Coverage:** None — requires DOM/jsdom environment to query real element properties. No automated test exists; the fix is verified by manual interaction with the folder picker.
+
 ---
 
 ## BUG-005 — Click conflicts between upload buttons and drop zone
@@ -132,6 +134,8 @@ The initial structure seemed logical — upload controls grouped visually with t
 **Test case:**
 Verify DOM structure: assert that the "Choose files" and "Choose folder" buttons are not descendants of the drop zone element.
 
+**Coverage:** None — requires DOM/jsdom to inspect element ancestry. No automated test exists; the fix is verified by code review of the component structure.
+
 ---
 
 ## BUG-006 — Copy button in SetupGuide submitted parent credential form
@@ -153,6 +157,8 @@ The default `type="submit"` behavior is easy to miss because buttons look and fe
 
 **Test case:**
 Assert that every `<button>` element inside `SetupGuide` has an explicit `type` attribute. No button inside a form should rely on the default.
+
+**Coverage:** `test/source-invariants.test.js` — "SetupGuide — every `<button>` has explicit type (BUG-006)". Reads SetupGuide.jsx source directly and fails if any `<button>` is missing a `type=` attribute.
 
 ---
 
@@ -224,6 +230,8 @@ The happy path (successful upload) and the transient failure path (network error
 **Test case:**
 Mock a multipart upload that fails with a 403 on `UploadPartCommand`. Assert that `AbortMultipartUploadCommand` is sent and that the IndexedDB resume record is deleted.
 
+**Coverage:** None — requires a Preact component harness with a mock S3 client and fake-indexeddb wired through component props. The logic is embedded in the `UploadQueue` component's error handler. No automated test exists; verified by code review and the `isPermissionError` function is unit-tested indirectly via `test/format.test.js`.
+
 ---
 
 ## BUG-010 — Batch uploads triggered `NS_BINDING_ABORTED` cascade
@@ -246,6 +254,8 @@ Single-file uploads worked correctly. The cascade only appeared with batches of 
 **Test case:**
 Simulate N rapid calls to `onUploadsComplete` within a short window. Assert that `browserKey` is incremented only once (or at most twice) rather than N times.
 
+**Coverage:** None — the debounce timer is internal to `App.jsx` component state. Requires mounting Preact components in jsdom. No automated test exists; verified by manual batch upload testing.
+
 ---
 
 ## BUG-011 — Listing refreshed per-file during batch, causing flickering
@@ -267,6 +277,8 @@ Single-file uploads behaved identically under both implementations. The differen
 
 **Test case:**
 Simulate a queue of three files completing sequentially. Assert `onUploadsComplete` is called exactly once — after the third file, not after each one.
+
+**Coverage:** None — `hadActiveRef` drain detection is internal to the `UploadQueue` component. Requires mounting Preact components in jsdom. No automated test exists; verified by manual batch upload testing.
 
 ---
 
@@ -336,7 +348,9 @@ Add `useRef` to the import: `import { useState, useEffect, useCallback, useRef }
 No static analysis or linting configured to catch missing imports. The blank screen is a total failure but gives no actionable UI feedback.
 
 **Test case:**
-This class of bug is best caught by a linter (ESLint with `no-undef` or TypeScript). As a test: a smoke test that mounts `<App />` in a jsdom environment and asserts it renders without throwing would catch this immediately.
+This class of bug is best caught by a linter (ESLint with `no-undef` or TypeScript). As a test: a smoke test that mounts `<App />` in a jsdom environment and asserts it renders without throwing would catch this immediately. Alternatively, assert at the source level that all hooks used in App.jsx are present in the preact/hooks import statement.
+
+**Coverage:** `test/source-invariants.test.js` — "App.jsx — required hooks imported from preact/hooks (BUG-014)". Reads App.jsx source and asserts that `useState`, `useEffect`, `useCallback`, and `useRef` are all present in the import.
 
 ---
 
@@ -411,4 +425,30 @@ The broader principle: any data read from localStorage, URL params, or user inpu
 - CredentialForm `credentialErrors` returns an error for key ID containing a space
 - CredentialForm `credentialErrors` returns an error for bucket containing a space or exceeding 63 chars
 
-**Coverage:** `test/storage.test.js` — "repairStorageInvariants", "saveCredentials / loadCredentials" suites; `test/url-params.test.js` — "readUrlParams" suite. CredentialForm validation is a pure function tested inline.
+**Coverage:** `test/storage.test.js` — "repairStorageInvariants", "saveCredentials — provider write-boundary validation", "loadCredentials — provider read-boundary validation", "migrateProfilesFromLegacy" suites. `test/url-params.test.js` — "readUrlParams" suite (provider with spaces ignored, provider > 20 chars ignored). `test/credential-form-validation.test.js` — full `credentialErrors` coverage for bucket, keyId, secretKey, regionOverride.
+
+---
+
+## BUG-017 — Saved profile did not pre-fill credential form after disconnect
+
+**Date:** 2026-06-03
+**Commit:** (v1.13.2)
+
+**Symptom:**
+After disconnecting and returning to the connect screen, the profile picker correctly highlighted the last-used profile (shown in blue), but clicking it did not populate any form fields — all inputs remained blank. The user had to type all credentials manually despite having saved them.
+
+**Root cause:**
+In `App.jsx`, `credentials` was declared as the second `useState` call and `selectedProfileId` as the sixteenth. JavaScript executes `useState` initializers in declaration order. The `credentials` initializer called `loadCredentials()`, which returns empty strings after `clearCredentials()` runs on disconnect. Because `selectedProfileId` hadn't been initialized yet at that point, the initializer had no way to look up and seed the form from the saved profile.
+
+When the user clicked the already-selected profile, `handleSelectProfile` called `setCredentials({...profile})` and `setSelectedProfileId(id)` with the same ID. Since the key on `<CredentialForm>` is `selectedProfileId`, and the ID didn't change, Preact did not remount the form — so its internal `useState` (seeded from `initial` only on mount) remained empty.
+
+**Fix:**
+Move `selectedProfileId` declaration before `credentials`. Update the credentials initializer to call `loadLastProfileId()`, find the matching profile in `loadProfiles()`, and use it as the base if found. Update the mount `useEffect` to use the same lookup order for the auto-connect check.
+
+**Why it wasn't caught earlier:**
+The state initialization ordering issue only manifests after a disconnect (which calls `clearCredentials()`). In a fresh session where credentials are still in localStorage, `loadCredentials()` returns the full credential set and the form populates normally. The multi-profile feature was new in v1.13.0 and this specific post-disconnect path was not exercised during testing.
+
+**Test case:**
+A source-level assertion: `selectedProfileId` must appear before `credentials` in the `useState` declarations in App.jsx. If the order is ever reversed, the credentials initializer silently loses access to the saved profile and the form loads empty.
+
+**Coverage:** `test/source-invariants.test.js` — "App.jsx — selectedProfileId declared before credentials (BUG-017)". Reads App.jsx source, finds the character offset of both state declarations, and asserts the profile ID declaration comes first.

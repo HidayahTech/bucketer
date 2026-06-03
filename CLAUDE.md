@@ -60,9 +60,13 @@ Tests live in `test/` and run with `node --test` (no framework). The suite has t
 - `file-entries.test.js` — `collectFileEntries` traversal and >100-file pagination; uses a pure-JS FileSystemEntry mock
 - `s3-client.test.js` — `createS3Client` region resolution and `forcePathStyle`
 - `cors-config.test.js` — `corsJson` structure, AllowedMethods (BUG-012), required SDK headers
+- `credential-form-validation.test.js` — `credentialErrors` for bucket, keyId, secretKey, regionOverride (BUG-016)
+
+**Source-level structural assertions — no build step needed:**
+- `source-invariants.test.js` — SetupGuide buttons have explicit type (BUG-006), App.jsx hook imports (BUG-014), selectedProfileId declared before credentials (BUG-017)
 
 **Build output assertions — require `npm run build` first:**
-- `build.test.js` — placeholder removal (BUG-001), Preact JSX transform (BUG-002), version consistency, CORS DELETE (BUG-012), single-bundle structure
+- `build.test.js` — placeholder replacement (BUG-001), Preact JSX transform (BUG-002), version consistency, CORS DELETE (BUG-012), single-bundle structure
 
 **Adding new tests:** Write `test/<name>.test.js`. The test command (`node --test test/*.test.js`) picks it up automatically. For browser globals, set `global.<name>` before the module import. For IndexedDB, use `fake-indexeddb`.
 

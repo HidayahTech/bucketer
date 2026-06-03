@@ -7,6 +7,15 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.13.2] — 2026-06-03 — Fix saved profile not populating form fields on load
+
+- Fix: selecting a saved profile after disconnect left the credential form blank.
+  Root cause: `credentials` state was initialized before `selectedProfileId`, so
+  the initializer had no profile to draw from. Fix: declare `selectedProfileId`
+  first, then seed `credentials` from the matched profile when one is restored.
+- Mount `useEffect` now uses profile data as the base for auto-connect, matching
+  the same lookup order as the initializer.
+
 ## [1.13.1] — 2026-06-03 — Credential field validation and storage write-boundary enforcement (BUG-016)
 
 - Add `repairStorageInvariants()`: runs on every mount before migration; clears

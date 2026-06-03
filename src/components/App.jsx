@@ -49,8 +49,19 @@ if (_iconLink) _iconLink.href = logoUrl;
 // Session states: disconnected | connecting | connected | failed
 export function App() {
   const [session, setSession] = useState('disconnected');
-  // Merge URL params over stored credentials so the form is pre-filled on load
-  const [credentials, setCredentials] = useState(() => ({ ...loadCredentials(), ...readUrlParams() }));
+  // selectedProfileId must be declared before credentials so the credentials
+  // initializer can pre-fill the form from the saved profile on first load.
+  const [selectedProfileId, setSelectedProfileId] = useState(() => loadLastProfileId());
+  const [credentials, setCredentials] = useState(() => {
+    const stored = loadCredentials();
+    const fromUrl = readUrlParams();
+    const lastId = loadLastProfileId();
+    if (lastId) {
+      const profile = loadProfiles().profiles.find(p => p.id === lastId);
+      if (profile) return { ...profile, secretKey: stored.secretKey || '', ...fromUrl };
+    }
+    return { ...stored, ...fromUrl };
+  });
   const [client, setClient] = useState(null);
   const [connectionError, setConnectionError] = useState(null);
   const [capabilities, setCapabilities] = useState(() => loadCapabilities());
@@ -63,7 +74,6 @@ export function App() {
   const [aboutOpen, setAboutOpen] = useState(false);
   const [updateCheckEnabled, setUpdateCheckEnabled] = useState(() => loadUpdateCheckEnabled());
   const [profiles, setProfiles] = useState(() => loadProfiles().profiles);
-  const [selectedProfileId, setSelectedProfileId] = useState(() => loadLastProfileId());
   const addFilesRef = useRef(null);
   const urlParamsPresent = hasUrlParams();
 
@@ -134,9 +144,16 @@ export function App() {
   useEffect(() => {
     repairStorageInvariants();
     migrateProfilesFromLegacy();
-    setProfiles(loadProfiles().profiles);
+    const updatedProfiles = loadProfiles().profiles;
+    setProfiles(updatedProfiles);
+    const lastId = loadLastProfileId();
+    if (lastId) setSelectedProfileId(lastId);
+
     const stored = loadCredentials();
-    const merged = { ...stored, ...readUrlParams() };
+    const fromUrl = readUrlParams();
+    const profile = lastId ? updatedProfiles.find(p => p.id === lastId) : null;
+    const base = profile ? { ...profile, secretKey: stored.secretKey || '' } : stored;
+    const merged = { ...base, ...fromUrl };
     if (merged.endpoint && merged.bucket && merged.keyId && merged.secretKey) {
       handleConnect(merged);
     }
