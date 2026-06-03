@@ -25,7 +25,7 @@ const PROVIDER_OPTIONS = [
   ...Object.entries(PROVIDER_LABELS).map(([v, l]) => ({ value: v, label: l })),
 ];
 
-export function CredentialForm({ initial, onSave, loading }) {
+export function CredentialForm({ initial, onSave, onFormChange, loading }) {
   const [form, setForm] = useState({
     endpoint: initial.endpoint || '',
     bucket: initial.bucket || '',
@@ -35,7 +35,11 @@ export function CredentialForm({ initial, onSave, loading }) {
     regionOverride: initial.regionOverride || '',
   });
 
-  const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
+  const set = (k) => (e) => setForm(f => {
+    const next = { ...f, [k]: e.target.value };
+    onFormChange?.(next);
+    return next;
+  });
 
   const errors = credentialErrors(form);
   const hasErrors = Object.keys(errors).length > 0;

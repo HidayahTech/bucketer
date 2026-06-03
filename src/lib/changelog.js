@@ -1,9 +1,17 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.13.6';
+export const CURRENT_VERSION = '1.13.7';
 
 export const CHANGELOG = [
+  {
+    "version": "1.13.7",
+    "date": "2026-06-03",
+    "title": "Fix profile save button not enabling as form is filled",
+    "changes": [
+      "\"Save as profile…\" was always disabled while typing because ProfilePicker"
+    ]
+  },
   {
     "version": "1.13.6",
     "date": "2026-06-03",

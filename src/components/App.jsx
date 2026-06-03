@@ -74,6 +74,7 @@ export function App() {
   const [changelogOpen, setChangelogOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [storageOpen, setStorageOpen] = useState(false);
+  const [liveFormData, setLiveFormData] = useState(credentials);
   const [updateCheckEnabled, setUpdateCheckEnabled] = useState(() => loadUpdateCheckEnabled());
   const [profiles, setProfiles] = useState(() => loadProfiles().profiles);
   const addFilesRef = useRef(null);
@@ -183,7 +184,9 @@ export function App() {
     if (!profile) return;
     setSelectedProfileId(id);
     saveLastProfileId(id);
-    setCredentials({ ...profile, secretKey: '' });
+    const creds = { ...profile, secretKey: '' };
+    setCredentials(creds);
+    setLiveFormData(creds);
   }
 
   function handleSaveProfile(name) {
@@ -278,7 +281,7 @@ export function App() {
               onSelect={handleSelectProfile}
               onDelete={handleDeleteProfile}
               onSave={handleSaveProfile}
-              currentFormData={credentials}
+              currentFormData={liveFormData}
             />
             {urlParamsPresent && (
               <div class="banner banner-info" style={{ marginBottom: '1rem' }}>
@@ -291,6 +294,7 @@ export function App() {
               key={selectedProfileId ?? 'manual'}
               initial={credentials}
               onSave={handleConnect}
+              onFormChange={setLiveFormData}
               loading={session === 'connecting'}
             />
             {session === 'failed' && connectionError && (

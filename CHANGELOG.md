@@ -7,6 +7,13 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.13.7] — 2026-06-03 — Fix profile save button not enabling as form is filled
+
+- "Save as profile…" was always disabled while typing because ProfilePicker
+  checked App's `credentials` state, which only updates on Connect — not as
+  the user types. Fix: CredentialForm fires `onFormChange` on every keystroke;
+  App tracks `liveFormData` and passes it to ProfilePicker instead.
+
 ## [1.13.6] — 2026-06-03 — Fix Wasabi bare endpoint region auto-detection
 
 - `s3.wasabisys.com` (no region segment) is Wasabi's documented legacy
