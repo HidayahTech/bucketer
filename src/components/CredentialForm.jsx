@@ -41,6 +41,27 @@ export function CredentialForm({ initial, onSave, onFormChange, loading }) {
     return next;
   });
 
+  // Trim leading/trailing whitespace from pasted values. Paste-introduced
+  // whitespace is a common copy/paste artifact; for all credential fields it is
+  // never meaningful, so trimming is unambiguously safe. Only intercepts when
+  // the pasted text actually contains surrounding whitespace — normal typing
+  // and clean pastes fall through to the default handler unchanged.
+  const onPaste = (k) => (e) => {
+    const text = e.clipboardData?.getData('text');
+    if (!text || text === text.trim()) return;
+    e.preventDefault();
+    const trimmed = text.trim();
+    const el = e.currentTarget;
+    const start = el.selectionStart ?? 0;
+    const end   = el.selectionEnd   ?? el.value.length;
+    setForm(f => {
+      const cur  = f[k] || '';
+      const next = { ...f, [k]: cur.slice(0, start) + trimmed + cur.slice(end) };
+      onFormChange?.(next);
+      return next;
+    });
+  };
+
   const errors = credentialErrors(form);
   const hasErrors = Object.keys(errors).length > 0;
 
@@ -75,6 +96,7 @@ export function CredentialForm({ initial, onSave, onFormChange, loading }) {
           type="url"
           value={form.endpoint}
           onInput={set('endpoint')}
+          onPaste={onPaste('endpoint')}
           placeholder="https://s3.us-west-004.backblazeb2.com"
           required
           autocomplete="off"
@@ -91,6 +113,7 @@ export function CredentialForm({ initial, onSave, onFormChange, loading }) {
           type="text"
           value={form.bucket}
           onInput={set('bucket')}
+          onPaste={onPaste('bucket')}
           placeholder="my-bucket"
           required
           autocomplete="off"
@@ -105,6 +128,7 @@ export function CredentialForm({ initial, onSave, onFormChange, loading }) {
           type="text"
           value={form.keyId}
           onInput={set('keyId')}
+          onPaste={onPaste('keyId')}
           placeholder="Access Key ID"
           required
           autocomplete="username"
@@ -119,6 +143,7 @@ export function CredentialForm({ initial, onSave, onFormChange, loading }) {
           type="password"
           value={form.secretKey}
           onInput={set('secretKey')}
+          onPaste={onPaste('secretKey')}
           placeholder="Secret Access Key"
           required
           autocomplete="current-password"
@@ -146,6 +171,7 @@ export function CredentialForm({ initial, onSave, onFormChange, loading }) {
             type="text"
             value={form.regionOverride}
             onInput={set('regionOverride')}
+            onPaste={onPaste('regionOverride')}
             placeholder="us-east-1"
             autocomplete="off"
             spellcheck={false}

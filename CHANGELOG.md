@@ -7,6 +7,15 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.13.8] — 2026-06-03 — Trim surrounding whitespace from pasted credential values
+
+- Pasting a value with leading or trailing whitespace into any credential
+  field (endpoint, bucket, key ID, secret key, region) now automatically
+  strips the whitespace. Only intercepts pastes that actually contain
+  surrounding whitespace — normal typing and clean pastes are unaffected.
+  Handles partial-field paste (selection replaced) correctly via cursor
+  position tracking.
+
 ## [1.13.7] — 2026-06-03 — Fix profile save button not enabling as form is filled
 
 - "Save as profile…" was always disabled while typing because ProfilePicker

@@ -1,9 +1,17 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.13.7';
+export const CURRENT_VERSION = '1.13.8';
 
 export const CHANGELOG = [
+  {
+    "version": "1.13.8",
+    "date": "2026-06-03",
+    "title": "Trim surrounding whitespace from pasted credential values",
+    "changes": [
+      "Pasting a value with leading or trailing whitespace into any credential"
+    ]
+  },
   {
     "version": "1.13.7",
     "date": "2026-06-03",
