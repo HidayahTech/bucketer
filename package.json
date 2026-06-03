@@ -1,11 +1,13 @@
 {
   "type": "module",
-  "version": "1.13.11",
+  "version": "1.13.12",
   "scripts": {
     "build": "node build.mjs",
-    "dev": "node build.mjs --dev",
+    "dev": "node build.mjs --mode=dev",
     "serve": "node serve.mjs",
     "test": "node --test test/*.test.js",
+    "bench": "node perf/bench-algorithms.mjs",
+    "perftest": "node perf/run.mjs",
     "prepare": "git config core.hooksPath .githooks 2>/dev/null; git config push.followTags true 2>/dev/null; true"
   },
   "engines": {
@@ -18,6 +20,7 @@
   },
   "devDependencies": {
     "esbuild": "^0.28.0",
-    "fake-indexeddb": "^6.2.5"
+    "fake-indexeddb": "^6.2.5",
+    "playwright": "^1.60.0"
   }
 }

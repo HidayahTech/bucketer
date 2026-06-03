@@ -1,9 +1,17 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.13.11';
+export const CURRENT_VERSION = '1.13.12';
 
 export const CHANGELOG = [
+  {
+    "version": "1.13.12",
+    "date": "2026-06-03",
+    "title": "Add design-intent documentation for all components and libraries",
+    "changes": [
+      "Added docs/intent/ documentation set (baseline v1.11.3): architecture overview,"
+    ]
+  },
   {
     "version": "1.13.11",
     "date": "2026-06-03",

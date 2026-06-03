@@ -7,6 +7,14 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.13.12] — 2026-06-03 — Add design-intent documentation for all components and libraries
+
+- Added `docs/intent/` documentation set (baseline v1.11.3): architecture overview,
+  data flow, storage model, design principles, and per-module intent for all
+  `src/lib/` modules, `Browser.jsx`, and all other components
+
+---
+
 ## [1.13.11] — 2026-06-03 — Fix file concurrency setting not taking effect mid-queue
 
 - Changing the file concurrency setting while uploads are in progress had
