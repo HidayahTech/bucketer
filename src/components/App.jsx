@@ -78,6 +78,7 @@ export function App() {
   const [updateCheckEnabled, setUpdateCheckEnabled] = useState(() => loadUpdateCheckEnabled());
   const [profiles, setProfiles] = useState(() => loadProfiles().profiles);
   const addFilesRef = useRef(null);
+  const logKeyDebounceRef = useRef(null);
   const urlParamsPresent = hasUrlParams();
 
   // Capability state is updated reactively as operations fail (§4.12).
@@ -405,7 +406,13 @@ export function App() {
               onCapabilityChange={handleCapabilityChange}
               capabilities={capabilities}
               onUploadsComplete={() => setBrowserKey(k => k + 1)}
-              onLogEntry={() => setLogKey(k => k + 1)}
+              onLogEntry={() => {
+                if (logKeyDebounceRef.current) return;
+                logKeyDebounceRef.current = setTimeout(() => {
+                  setLogKey(k => k + 1);
+                  logKeyDebounceRef.current = null;
+                }, 500);
+              }}
               onMount={({ addFiles }) => { addFilesRef.current = addFiles; }}
             />
 

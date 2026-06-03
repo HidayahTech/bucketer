@@ -7,6 +7,13 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.13.14] — 2026-06-03 — Debounce setLogKey to eliminate dominant CPU hotspot
+
+- Debounced `onLogEntry` callback in `App.jsx` (fires at most every 500ms) to
+  eliminate O(N²) `toLocaleString()` calls in `UploadLog`; wall-clock time for
+  a 200-file upload dropped 30% (3862ms → 2705ms), `formatCompletedAt` CPU
+  self-time dropped from ~24% to ~5%
+
 ## [1.13.13] — 2026-06-03 — Add performance benchmarking harness and unify build modes
 
 - Added `npm run perftest` — full browser benchmark using Playwright + CDP profiling

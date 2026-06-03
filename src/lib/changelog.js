@@ -1,9 +1,17 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.13.13';
+export const CURRENT_VERSION = '1.13.14';
 
 export const CHANGELOG = [
+  {
+    "version": "1.13.14",
+    "date": "2026-06-03",
+    "title": "Debounce setLogKey to eliminate dominant CPU hotspot",
+    "changes": [
+      "Debounced onLogEntry callback in App.jsx (fires at most every 500ms) to"
+    ]
+  },
   {
     "version": "1.13.13",
     "date": "2026-06-03",
