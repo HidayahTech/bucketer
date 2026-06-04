@@ -106,7 +106,7 @@ winget install Amazon.AWSCLI`}</Code>
       <Step n="2" title="Configure a B2 profile">
         <p class="cors-note">
           Use an application key — <strong>not</strong> your master key. Create one in the B2 console
-          under <em>App Keys</em> with access to this bucket.
+          under <em>App Keys</em> with access to this bucket. Enable the <strong>List All Bucket Names</strong> (<code>listAllBucketNames</code>) capability — the AWS SDK calls ListBuckets on initialisation and will fail entirely without it.
         </p>
         <Code>{`aws configure --profile bucketer
 # AWS Access Key ID:     ${keyId || '<your-key-id>'}
@@ -171,7 +171,10 @@ brew install awscli`}</Code>
 
       <Step n="2" title="Configure an R2 profile">
         <p class="cors-note">
-          Get your R2 API token from the Cloudflare dashboard → R2 → Manage R2 API Tokens.
+          Your <strong>Account ID</strong> is shown in the Cloudflare dashboard sidebar — use it to construct the endpoint above.
+          Get your R2 API token from the dashboard → R2 → Manage R2 API Tokens.
+          A <strong>payment method</strong> (credit card) must be on file even to use the free tier.
+          Use <strong>account-scoped</strong> token scope for full access, or bucket-scoped if you prefer to restrict to a single bucket.
           Use <code>auto</code> as the region.
         </p>
         <Code>{`aws configure --profile bucketer
@@ -299,6 +302,9 @@ function GuideMinIO({ endpoint, bucket, keyId }) {
 
   return (
     <div class="setup-steps">
+      <p class="cors-note cors-note-warn">
+        <strong>HTTPS required.</strong> Browsers block mixed-content requests — if your MinIO server uses <code>http://</code> and Bucketer is served over <code>https://</code>, all requests will be silently blocked. Use TLS or run MinIO behind an HTTPS reverse proxy.
+      </p>
       <Step n="1" title="Configure AWS CLI for MinIO">
         <p class="cors-note">
           Use your MinIO access key and secret. Set the region to whatever your MinIO

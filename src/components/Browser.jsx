@@ -1320,7 +1320,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
         </div>
       )}
 
-      <HiddenVersions key={prefix} client={client} bucket={bucket} prefix={prefix} />
+      <HiddenVersions key={prefix} client={client} bucket={bucket} prefix={prefix} provider={provider} />
     </div>
   );
 }

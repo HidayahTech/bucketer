@@ -41,7 +41,7 @@ function collectHidden(resp) {
   return hidden;
 }
 
-export function HiddenVersions({ client, bucket, prefix }) {
+export function HiddenVersions({ client, bucket, prefix, provider }) {
   const [rows, setRows] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -52,6 +52,19 @@ export function HiddenVersions({ client, bucket, prefix }) {
   const [pendingDelete, setPendingDelete] = useState(null); // row object | 'all'
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
+
+  // Cloudflare R2 does not support versioning — gate early to avoid a confusing empty panel.
+  if (provider === 'r2') {
+    return (
+      <div class="hidden-versions">
+        <div class="hidden-versions-bar">
+          <span style={{ color: 'var(--text-muted)' }}>
+            R2 does not support versioning — the hidden versions panel is not available for Cloudflare R2 buckets.
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   async function fetchPage(keyMarker, versionIdMarker, replace) {
     setLoading(true);
@@ -179,6 +192,11 @@ export function HiddenVersions({ client, bucket, prefix }) {
                   <p class="modal-caveat">
                     Any delete markers in this set will also be removed, which will undelete those files — their previous versions will reappear in the listing.
                   </p>
+                  {provider === 'wasabi' && (
+                    <p class="modal-caveat">
+                      Wasabi has a 90-day minimum retention period. Versions deleted before 90 days are still billed for the remainder of that window.
+                    </p>
+                  )}
                 </>
               ) : (
                 <>

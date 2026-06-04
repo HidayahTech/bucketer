@@ -7,6 +7,15 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.14.3] — 2026-06-04 — Provider-specific fixes: Wasabi billing warnings, R2 versioning gate, AWS region patterns, SetupGuide improvements
+
+- **T3-1:** Delete confirmation dialogs now show a Wasabi-specific 90-day minimum retention warning when `provider === 'wasabi'` — both `DeleteQueue` (file/folder delete) and `HiddenVersions` purge-all confirmation. Prevents silent billing surprises for deleted test data.
+- **T3-2:** `HiddenVersions` now accepts a `provider` prop (threaded from `Browser`). Cloudflare R2 buckets render a "versioning not supported" message instead of a confusing empty panel, because R2 does not implement `ListObjectVersions`.
+- **T3-3:** `extractRegion()` for AWS S3 now handles virtual-hosted bucket URLs (`bucket.s3.region.amazonaws.com`), dualstack endpoints (`s3.dualstack.region.amazonaws.com`), FIPS endpoints (`s3-fips.region.amazonaws.com`), and legacy dash-style endpoints (`s3-region.amazonaws.com`). Pasting a URL from the AWS Console no longer silently falls back to `us-east-1`.
+- **T3-4:** `GuideMinIO` in `SetupGuide` now includes an explicit mixed-content warning: browsers block HTTP requests from an HTTPS-served Bucketer to an HTTP MinIO server, and the error only appears in DevTools.
+- **T3-5:** `GuideB2` now mentions that application keys must have the `listAllBucketNames` capability — a single-bucket key without it causes AWS SDK v3 initialisation to fail entirely.
+- **T3-6:** `GuideR2` now tells users where to find their Account ID (dashboard sidebar), that a payment method is required even on the free tier, and the difference between account-scoped and bucket-scoped token scope.
+
 ## [1.14.2] — 2026-06-04 — Correctness and security fixes: settings preservation, resume parallelism, purge-all error recovery, endpoint URL guard, CSP docs
 
 - **T2-1:** `clearCredentials()` now only removes credential fields (endpoint, bucket, keyId, provider, regionOverride). Settings keys (partSize, concurrency, etc.) survive disconnect — split `LS_KEYS` into `CREDENTIAL_KEYS` and `SETTINGS_KEYS`; `resetSettings()` now uses the canonical `SETTINGS_KEYS` set.

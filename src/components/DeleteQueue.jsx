@@ -11,6 +11,8 @@ export function DeleteQueue({ ops, onConfirm, onDismiss, onCollapse, provider })
 
   const versioningCaveat = provider === 'b2'
     ? 'Backblaze B2 may retain older versions. The current version will be hidden but not immediately purged from storage.'
+    : provider === 'wasabi'
+    ? 'Wasabi has a 90-day minimum retention period. Objects deleted before 90 days are still billed for the remainder of that window.'
     : 'If versioning is enabled, this creates a delete marker — the object is hidden but recoverable. If versioning is off, deletion is permanent.';
 
   return (

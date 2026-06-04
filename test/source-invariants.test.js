@@ -130,6 +130,131 @@ describe('App.jsx — selectedProfileId declared before credentials (BUG-017)', 
   });
 });
 
+// ── T3-1: Wasabi billing warning must appear in delete confirmation dialogs ───────────
+// Wasabi charges for a minimum of 90 days per object. A user who deletes test data
+// minutes after uploading is billed for the remainder of the retention window.
+
+describe('DeleteQueue.jsx — Wasabi 90-day billing warning present (T3-1)', () => {
+  const source = src('components/DeleteQueue.jsx');
+
+  test('warning text mentions Wasabi and 90 days', () => {
+    assert.ok(
+      /[Ww]asabi/.test(source) && /90.day/.test(source),
+      'DeleteQueue.jsx must include Wasabi 90-day retention warning — users deleting ' +
+      'test objects will be billed for up to 89 more days after deletion'
+    );
+  });
+});
+
+describe('HiddenVersions.jsx — Wasabi 90-day billing warning in purge-all (T3-1)', () => {
+  const source = src('components/HiddenVersions.jsx');
+
+  test('warning text mentions Wasabi and 90 days', () => {
+    assert.ok(
+      /[Ww]asabi/.test(source) && /90.day/.test(source),
+      'HiddenVersions.jsx must include Wasabi 90-day retention warning in purge-all confirmation'
+    );
+  });
+});
+
+// ── T3-2: HiddenVersions must gate on provider versioning support ─────────────────────
+// Cloudflare R2 does not implement ListObjectVersions — panel returns empty with no
+// explanation, making users think their versions disappeared.
+
+describe('HiddenVersions.jsx — R2 versioning not-supported gate (T3-2)', () => {
+  const source = src('components/HiddenVersions.jsx');
+
+  test('component accepts provider prop', () => {
+    assert.ok(
+      /HiddenVersions\s*\(\s*\{[^}]*provider/.test(source),
+      'HiddenVersions must accept a provider prop to gate R2 users'
+    );
+  });
+
+  test('renders not-supported message for R2', () => {
+    assert.ok(
+      /R2[^}]*not support|not support[^}]*R2|versioning.*not.*support|R2.*versioning/i.test(source),
+      'HiddenVersions must render a "versioning not supported" message for Cloudflare R2'
+    );
+  });
+});
+
+// ── T3-4: MinIO SetupGuide must warn about HTTPS mixed-content ───────────────────────
+// Default MinIO is HTTP on localhost:9000. When Bucketer is deployed over HTTPS,
+// the browser silently blocks all HTTP requests (mixed-content policy).
+
+describe('SetupGuide.jsx — MinIO HTTPS mixed-content warning (T3-4)', () => {
+  const source = src('components/SetupGuide.jsx');
+
+  test('GuideMinIO has explicit mixed-content warning paragraph', () => {
+    // Look within GuideMinIO function body (from its definition to the next function)
+    const guideStart = source.indexOf('function GuideMinIO');
+    const guideEnd   = source.indexOf('\nfunction ', guideStart + 1);
+    const guide = source.slice(guideStart, guideEnd > guideStart ? guideEnd : undefined);
+    // Must contain an explicit warning about mixed-content or the HTTPS requirement,
+    // NOT just incidentally contain "https" in a URL placeholder.
+    assert.ok(
+      /mixed.content|HTTPS.*required|must.*HTTPS|HTTP.*block|TLS.*required|mixed content/i.test(guide),
+      'GuideMinIO must include an explicit mixed-content warning — HTTPS Bucketer cannot ' +
+      'make requests to an HTTP MinIO server; the error appears only in DevTools'
+    );
+  });
+});
+
+// ── T3-5: B2 SetupGuide must mention listAllBucketNames capability ────────────────────
+// AWS SDK v3 calls ListBuckets during init. A B2 key scoped to one bucket without
+// listAllBucketNames causes init to fail entirely.
+
+describe('SetupGuide.jsx — B2 listAllBucketNames capability mentioned (T3-5)', () => {
+  const source = src('components/SetupGuide.jsx');
+
+  test('GuideB2 mentions listAllBucketNames or List All Bucket Names', () => {
+    const guideStart = source.indexOf('function GuideB2');
+    const guideEnd   = source.indexOf('\nfunction ', guideStart + 1);
+    const guide = source.slice(guideStart, guideEnd > guideStart ? guideEnd : undefined);
+    assert.ok(
+      /listAllBucketNames|List All Bucket Names/i.test(guide),
+      'GuideB2 must mention listAllBucketNames — a single-bucket key without this capability ' +
+      'causes AWS SDK v3 initialisation to fail entirely'
+    );
+  });
+});
+
+// ── T3-6: R2 SetupGuide must mention Account ID location, payment method, token scope ──
+// Users don't know where to find Account ID, that a payment method is required at
+// free tier, or the difference between bucket-scoped and account-scoped tokens.
+
+describe('SetupGuide.jsx — R2 guide completeness (T3-6)', () => {
+  const source = src('components/SetupGuide.jsx');
+
+  function r2Guide() {
+    const guideStart = source.indexOf('function GuideR2');
+    const guideEnd   = source.indexOf('\nfunction ', guideStart + 1);
+    return source.slice(guideStart, guideEnd > guideStart ? guideEnd : undefined);
+  }
+
+  test('GuideR2 mentions Account ID location', () => {
+    assert.ok(
+      /[Aa]ccount\s+ID/i.test(r2Guide()),
+      'GuideR2 must tell users where to find their Account ID (Cloudflare dashboard sidebar)'
+    );
+  });
+
+  test('GuideR2 mentions payment method requirement', () => {
+    assert.ok(
+      /payment|billing|credit card|free tier/i.test(r2Guide()),
+      'GuideR2 must note that a payment method is required even on the free tier'
+    );
+  });
+
+  test('GuideR2 mentions token scope (bucket-scoped vs account-scoped)', () => {
+    assert.ok(
+      /bucket.scoped|account.scoped|token scope|scope/i.test(r2Guide()),
+      'GuideR2 must explain token scope: bucket-scoped for single-bucket, account-scoped for multi-bucket'
+    );
+  });
+});
+
 // ── T2-6: handleDeleteConfirm must wrap runDeleteOperation in try/catch ──────────────
 // An uncaught throw from runDeleteOperation leaves the delete panel stuck in 'discovering'
 // or 'deleting' phase with no dismiss path — the user is locked out until reload.

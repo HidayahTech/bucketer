@@ -38,8 +38,23 @@ describe('extractRegion', () => {
   test('Wasabi: bare s3.wasabisys.com resolves to us-east-1 (legacy default endpoint)', () =>
     assert.equal(extractRegion('https://s3.wasabisys.com', PROVIDERS.WASABI), 'us-east-1'));
 
-  test('AWS: extracts region', () =>
+  test('AWS: extracts region from service endpoint', () =>
     assert.equal(extractRegion('https://s3.ap-southeast-1.amazonaws.com', PROVIDERS.AWS), 'ap-southeast-1'));
+
+  // T3-3: AWS Console shows virtual-hosted bucket URLs — users paste them directly.
+  // Without these patterns, extractRegion returns null → falls back to us-east-1 →
+  // SignatureDoesNotMatch for any bucket outside us-east-1.
+  test('AWS: virtual-hosted bucket URL (T3-3)', () =>
+    assert.equal(extractRegion('https://mybucket.s3.us-west-2.amazonaws.com', PROVIDERS.AWS), 'us-west-2'));
+
+  test('AWS: dualstack endpoint (T3-3)', () =>
+    assert.equal(extractRegion('https://s3.dualstack.eu-central-1.amazonaws.com', PROVIDERS.AWS), 'eu-central-1'));
+
+  test('AWS: FIPS endpoint (T3-3)', () =>
+    assert.equal(extractRegion('https://s3-fips.us-gov-west-1.amazonaws.com', PROVIDERS.AWS), 'us-gov-west-1'));
+
+  test('AWS: legacy dash-style endpoint (T3-3)', () =>
+    assert.equal(extractRegion('https://s3-ap-southeast-1.amazonaws.com', PROVIDERS.AWS), 'ap-southeast-1'));
 
   test('DO Spaces: extracts region from subdomain', () =>
     assert.equal(extractRegion('https://nyc3.digitaloceanspaces.com', PROVIDERS.DO_SPACES), 'nyc3'));

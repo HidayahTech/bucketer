@@ -67,7 +67,19 @@ export function extractRegion(endpoint, provider) {
         return m ? m[1] : null;
       }
       case PROVIDERS.AWS: {
-        // https://s3.{region}.amazonaws.com
+        // Virtual-hosted: {bucket}.s3.{region}.amazonaws.com
+        const vh = host.match(/^[^.]+\.s3\.([^.]+)\.amazonaws\.com$/i);
+        if (vh) return vh[1];
+        // Dualstack: s3.dualstack.{region}.amazonaws.com
+        const ds = host.match(/^s3\.dualstack\.([^.]+)\.amazonaws\.com$/i);
+        if (ds) return ds[1];
+        // FIPS: s3-fips.{region}.amazonaws.com
+        const fips = host.match(/^s3-fips\.([^.]+)\.amazonaws\.com$/i);
+        if (fips) return fips[1];
+        // Legacy dash: s3-{region}.amazonaws.com
+        const dash = host.match(/^s3-([^.]+)\.amazonaws\.com$/i);
+        if (dash) return dash[1];
+        // Standard: s3.{region}.amazonaws.com
         const m = host.match(/^s3\.([^.]+)\.amazonaws\.com$/i);
         return m ? m[1] : null;
       }
