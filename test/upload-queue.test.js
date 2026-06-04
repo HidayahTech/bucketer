@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { UploadQueue } from '../src/lib/upload-queue.js';
+import { UploadQueue, uploadPartsWithPool } from '../src/lib/upload-queue.js';
 
 // Helper: a task that resolves after `ms` milliseconds
 function delayed(ms, value) {
@@ -111,6 +111,50 @@ describe('UploadQueue error handling', () => {
 
     assert.ok(results.includes('b'), 'b should run');
     assert.ok(results.includes('c'), 'c should run');
+  });
+});
+
+// ── uploadPartsWithPool (T2-2) ────────────────────────────────────────────────
+// Resume path must use the same worker-pool as fresh uploads. A serial for-loop
+// runs 1 part at a time — ~4× slower than the configured PART_CONCURRENCY default.
+
+describe('uploadPartsWithPool', () => {
+  test('processes all parts exactly once', async () => {
+    const processed = new Set();
+    await uploadPartsWithPool([1, 2, 3, 4, 5], async (n) => {
+      processed.add(n);
+    }, 2);
+    assert.deepEqual([...processed].sort((a, b) => a - b), [1, 2, 3, 4, 5]);
+  });
+
+  test('respects concurrency limit — peak in-flight equals concurrency', async () => {
+    let inFlight = 0;
+    let peakInFlight = 0;
+
+    await uploadPartsWithPool([1, 2, 3, 4, 5, 6, 7, 8], async () => {
+      inFlight++;
+      peakInFlight = Math.max(peakInFlight, inFlight);
+      await new Promise(resolve => setTimeout(resolve, 5));
+      inFlight--;
+    }, 3);
+
+    assert.ok(peakInFlight > 1,
+      `pool must upload more than 1 part at a time (was serial: peak=${peakInFlight})`);
+    assert.ok(peakInFlight <= 3,
+      `pool must not exceed concurrency=3 (peak=${peakInFlight})`);
+  });
+
+  test('concurrency=1 processes parts serially in order', async () => {
+    const order = [];
+    await uploadPartsWithPool([3, 1, 2], async (n) => { order.push(n); }, 1);
+    assert.deepEqual(order, [3, 1, 2]);
+  });
+
+  test('propagates errors from workFn', async () => {
+    await assert.rejects(
+      uploadPartsWithPool([1], async () => { throw new Error('part failed'); }, 1),
+      { message: 'part failed' }
+    );
   });
 });
 

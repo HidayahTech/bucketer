@@ -16,22 +16,29 @@
 // browsing mode and other restrictive contexts. The app degrades gracefully
 // (credentials are not persisted) rather than crashing.
 
-const LS_KEYS = {
-  endpoint: 's3b_endpoint',
-  bucket: 's3b_bucket',
-  keyId: 's3b_key_id',
-  provider: 's3b_provider',
+// Credential fields — wiped by clearCredentials() on disconnect.
+const CREDENTIAL_KEYS = {
+  endpoint:       's3b_endpoint',
+  bucket:         's3b_bucket',
+  keyId:          's3b_key_id',
+  provider:       's3b_provider',
   regionOverride: 's3b_region_override',
-  maxKeys: 's3b_max_keys',
-  partConcurrency: 's3b_part_concurrency',
-  partSizeMB:      's3b_part_size_mb',
-  fileConcurrency: 's3b_file_concurrency',
-  listingCacheTTL: 's3b_listing_cache_ttl',
-  updateCheckEnabled: 's3b_update_check_enabled',
+};
+
+// Settings fields — user preferences that survive disconnect. Only wiped by resetSettings().
+const SETTINGS_KEYS = {
+  maxKeys:               's3b_max_keys',
+  partConcurrency:       's3b_part_concurrency',
+  partSizeMB:            's3b_part_size_mb',
+  fileConcurrency:       's3b_file_concurrency',
+  listingCacheTTL:       's3b_listing_cache_ttl',
+  updateCheckEnabled:    's3b_update_check_enabled',
   prefetchSizeLimit:     's3b_prefetch_size_limit',
   uploadExpandThreshold: 's3b_upload_expand_threshold',
-  capabilities: 's3b_capabilities',
 };
+
+// Convenience: all keyed storage keys (excludes capabilities, which has its own clear path).
+const LS_KEYS = { ...CREDENTIAL_KEYS, ...SETTINGS_KEYS, capabilities: 's3b_capabilities' };
 const SS_KEY_SECRET = 's3b_secret_key';
 
 // Wrap storage access — private browsing throws on every read/write.
@@ -67,10 +74,11 @@ export function saveCredentials({ endpoint, bucket, keyId, secretKey, provider, 
   safeSet(sessionStorage, SS_KEY_SECRET, secretKey);
 }
 
-// Called on disconnect AND on credential change. Does not clear capability
-// state — caller must call clearCapabilities() separately.
+// Called on disconnect AND on credential change. Only removes credential fields —
+// settings survive so the user's preferences are intact after reconnect.
+// Does not clear capability state — caller must call clearCapabilities() separately.
 export function clearCredentials() {
-  Object.values(LS_KEYS).forEach(k => safeRemove(localStorage, k));
+  Object.values(CREDENTIAL_KEYS).forEach(k => safeRemove(localStorage, k));
   safeRemove(sessionStorage, SS_KEY_SECRET);
 }
 
@@ -287,15 +295,10 @@ export function wipeAllAppData() {
   safeRemove(sessionStorage, 's3b_file_banner_dismissed');
 }
 
-// Removes only the six user-configurable settings keys. Credentials and profiles
-// are left intact. Settings revert to their defaults on the next render.
+// Removes all user-configurable settings keys. Credentials and profiles are left intact.
+// Settings revert to their defaults on the next render.
 export function resetSettings() {
-  const settingsKeys = [
-    LS_KEYS.maxKeys, LS_KEYS.partConcurrency, LS_KEYS.partSizeMB,
-    LS_KEYS.fileConcurrency, LS_KEYS.listingCacheTTL, LS_KEYS.updateCheckEnabled,
-    LS_KEYS.prefetchSizeLimit, LS_KEYS.uploadExpandThreshold,
-  ];
-  settingsKeys.forEach(k => safeRemove(localStorage, k));
+  Object.values(SETTINGS_KEYS).forEach(k => safeRemove(localStorage, k));
 }
 
 // Removes all saved profiles and the last-selected profile ID in one operation.

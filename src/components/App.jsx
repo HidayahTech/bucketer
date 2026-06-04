@@ -198,22 +198,30 @@ export function App() {
   async function handleDeleteConfirm(id) {
     const op = deleteOps.find(o => o.id === id);
     if (!op) return;
-    await runDeleteOperation(client, op.bucket, op, (update) => {
-      if (update.deletedKeys?.length) {
-        browserActionsRef.current?.removeItems(update.deletedKeys, []);
-      }
-      if (update.phase === 'done') {
-        if (update.deletedPrefixes?.length) {
-          browserActionsRef.current?.removeItems([], update.deletedPrefixes);
+    try {
+      await runDeleteOperation(client, op.bucket, op, (update) => {
+        if (update.deletedKeys?.length) {
+          browserActionsRef.current?.removeItems(update.deletedKeys, []);
         }
-        browserActionsRef.current?.invalidateCache(op.capturedPrefix);
-        handleCapabilityChange('delete', 'permitted');
-        if (update.errors.length === 0) {
-          setTimeout(() => setDeleteOps(prev => prev.filter(o => o.id !== id)), 3000);
+        if (update.phase === 'done') {
+          if (update.deletedPrefixes?.length) {
+            browserActionsRef.current?.removeItems([], update.deletedPrefixes);
+          }
+          browserActionsRef.current?.invalidateCache(op.capturedPrefix);
+          handleCapabilityChange('delete', 'permitted');
+          if (update.errors.length === 0) {
+            setTimeout(() => setDeleteOps(prev => prev.filter(o => o.id !== id)), 3000);
+          }
         }
-      }
-      updateDeleteOp(id, update);
-    });
+        updateDeleteOp(id, update);
+      });
+    } catch (err) {
+      updateDeleteOp(id, {
+        phase: 'done',
+        errors: [{ key: '(unexpected)', message: err.message || String(err) }],
+        deletedPrefixes: [],
+      });
+    }
   }
 
   function handleDeleteDismiss(id) {

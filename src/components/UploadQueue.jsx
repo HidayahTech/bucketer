@@ -28,7 +28,7 @@ import {
   markUploadActive, markUploadInactive, isUploadActiveElsewhere,
   saveUploadLogEntry,
 } from '../lib/indexeddb.js';
-import { UploadQueue as Queue, calcPartSize, collectParts, preparePutBody } from '../lib/upload-queue.js';
+import { UploadQueue as Queue, calcPartSize, collectParts, preparePutBody, uploadPartsWithPool } from '../lib/upload-queue.js';
 import { loadPartConcurrency, loadPartSizeMB, loadFileConcurrency, loadUploadExpandThreshold } from '../lib/storage.js';
 import { collectFileEntries } from '../lib/file-entries.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
@@ -368,7 +368,8 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       const abortController = new AbortController();
       activeUploadsRef.current[id] = { abort: () => abortController.abort() };
 
-      for (const partNumber of remainingParts) {
+      const concurrency = Math.max(1, loadPartConcurrency() ?? PART_CONCURRENCY);
+      await uploadPartsWithPool(remainingParts, async (partNumber) => {
         if (abortController.signal.aborted) throw new Error('Upload aborted');
         const start = (partNumber - 1) * partSize;
         const end = Math.min(start + partSize, item.file.size);
@@ -380,9 +381,9 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         }), { abortSignal: abortController.signal });
 
         newParts.push({ PartNumber: partNumber, ETag: partResp.ETag });
-        const uploaded = Math.min((partNumber) * partSize, item.file.size);
+        const uploaded = Math.min(partNumber * partSize, item.file.size);
         updateItem(id, { progress: (uploaded / item.file.size) * 100, bytesUploaded: uploaded });
-      }
+      }, concurrency);
 
       // Complete
       newParts.sort((a, b) => a.PartNumber - b.PartNumber);

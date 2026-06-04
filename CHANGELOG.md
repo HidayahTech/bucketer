@@ -7,6 +7,15 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.14.2] — 2026-06-04 — Correctness and security fixes: settings preservation, resume parallelism, purge-all error recovery, endpoint URL guard, CSP docs
+
+- **T2-1:** `clearCredentials()` now only removes credential fields (endpoint, bucket, keyId, provider, regionOverride). Settings keys (partSize, concurrency, etc.) survive disconnect — split `LS_KEYS` into `CREDENTIAL_KEYS` and `SETTINGS_KEYS`; `resetSettings()` now uses the canonical `SETTINGS_KEYS` set.
+- **T2-2:** Multipart resume path now uses the same `uploadPartsWithPool` worker pool as fresh uploads, matching the configured `PART_CONCURRENCY`. Extracted helper exported from `src/lib/upload-queue.js` with unit tests asserting concurrency.
+- **T2-3:** `HiddenVersions.handlePurgeAllConfirm` now continues through all batches on S3 `Errors` entries instead of throwing on the first — reports aggregate failure count in the dialog rather than abandoning remaining batches silently.
+- **T2-4:** `readUrlParams()` now validates the `endpoint` parameter (must be a parseable `http:` or `https:` URL) and the `bucket` parameter (no slashes or `..` traversal sequences). Prevents crafted share links from pre-filling the credential form with attacker-controlled values.
+- **T2-5:** Fixed `README.md` nginx and Caddy CSP examples to include `img-src data: https:; media-src https:; frame-src https:;`. Previous `img-src data:` only directive silently blocked all presigned S3 preview URLs. Added note about `unsafe-inline` being structurally required and a future hash-based alternative.
+- **T2-6:** `handleDeleteConfirm` in `App.jsx` now wraps `runDeleteOperation` in try/catch. An uncaught throw previously left the delete panel stuck in `discovering` or `deleting` phase indefinitely with no dismiss path.
+
 ## [1.14.1] — 2026-06-04 — Fix rename: add missing DeleteObjectCommand import; add Command import invariant
 
 - **Bug fix (T1-1):** `Browser.jsx` was missing `DeleteObjectCommand` from its `@aws-sdk/client-s3` import. Every rename threw `ReferenceError` after the copy step succeeded, leaving a duplicate file. Lost during the v1.14.0 unified-delete refactor.

@@ -118,24 +118,36 @@ export function HiddenVersions({ client, bucket, prefix }) {
         vim = resp.NextVersionIdMarker || null;
       }
 
-      // Batch delete in chunks of 1000 (S3 API limit)
+      // Batch delete in chunks of 1000 (S3 API limit).
+      // Continue through every batch even if some fail — accumulate errors so the
+      // user sees an aggregate count rather than losing the remaining batches silently.
+      const allErrors = [];
       for (let i = 0; i < all.length; i += 1000) {
         const batch = all.slice(i, i + 1000);
-        const resp = await client.send(new DeleteObjectsCommand({
-          Bucket: bucket,
-          Delete: { Objects: batch.map(r => ({ Key: r.key, VersionId: r.versionId })), Quiet: true },
-        }));
-        if (resp.Errors && resp.Errors.length > 0) {
-          const e = resp.Errors[0];
-          throw new Error(`Failed to delete ${e.Key}: ${e.Message}`);
+        try {
+          const resp = await client.send(new DeleteObjectsCommand({
+            Bucket: bucket,
+            Delete: { Objects: batch.map(r => ({ Key: r.key, VersionId: r.versionId })), Quiet: true },
+          }));
+          if (resp.Errors) allErrors.push(...resp.Errors);
+        } catch (batchErr) {
+          allErrors.push({ Key: '(network)', Message: batchErr.message || String(batchErr) });
         }
       }
 
-      setRows([]);
-      setIsTruncated(false);
-      setNextKeyMarker(null);
-      setNextVersionIdMarker(null);
-      setPendingDelete(null);
+      if (allErrors.length > 0) {
+        const first = allErrors[0];
+        setDeleteError(new Error(
+          `${allErrors.length} version${allErrors.length !== 1 ? 's' : ''} failed to delete. ` +
+          `First error — ${first.Key}: ${first.Message}`
+        ));
+      } else {
+        setRows([]);
+        setIsTruncated(false);
+        setNextKeyMarker(null);
+        setNextVersionIdMarker(null);
+        setPendingDelete(null);
+      }
     } catch (err) {
       setDeleteError(err);
     } finally {

@@ -99,13 +99,26 @@ describe('saveCredentials / loadCredentials', () => {
 });
 
 describe('clearCredentials', () => {
-  test('removes all fields from both stores', () => {
+  test('removes all credential fields from both stores', () => {
     saveCredentials({ endpoint: 'https://s3.example.com', bucket: 'b', keyId: 'k', secretKey: 's', provider: 'r2', regionOverride: '' });
     clearCredentials();
     const loaded = loadCredentials();
     assert.equal(loaded.endpoint,  '');
     assert.equal(loaded.secretKey, '');
     assert.equal(loaded.keyId,     '');
+  });
+
+  // T2-1: clearCredentials must not wipe settings. A user who clicks "Disconnect"
+  // should not silently lose their partSize, concurrency, and other config preferences.
+  test('does not erase settings keys (T2-1)', () => {
+    savePartSizeMB(50);
+    savePartConcurrency(8);
+    saveCredentials({ endpoint: 'https://s3.example.com', bucket: 'b', keyId: 'k', secretKey: 's', provider: null, regionOverride: '' });
+    clearCredentials();
+    assert.equal(loadPartSizeMB(), 50,
+      'clearCredentials must not wipe partSizeMB — user loses config on every disconnect');
+    assert.equal(loadPartConcurrency(), 8,
+      'clearCredentials must not wipe partConcurrency — user loses config on every disconnect');
   });
 });
 

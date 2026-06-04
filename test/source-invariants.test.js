@@ -130,6 +130,90 @@ describe('App.jsx — selectedProfileId declared before credentials (BUG-017)', 
   });
 });
 
+// ── T2-6: handleDeleteConfirm must wrap runDeleteOperation in try/catch ──────────────
+// An uncaught throw from runDeleteOperation leaves the delete panel stuck in 'discovering'
+// or 'deleting' phase with no dismiss path — the user is locked out until reload.
+
+describe('App.jsx — handleDeleteConfirm wraps runDeleteOperation in try/catch (T2-6)', () => {
+  const source = src('components/App.jsx');
+
+  test('handleDeleteConfirm contains a try/catch block around runDeleteOperation', () => {
+    // Find handleDeleteConfirm and assert try{ exists before the next function declaration
+    const fnStart = source.indexOf('async function handleDeleteConfirm');
+    assert.ok(fnStart !== -1, 'handleDeleteConfirm must exist in App.jsx');
+    const fnBody = source.slice(fnStart, fnStart + 900);
+    assert.ok(
+      /\btry\s*\{/.test(fnBody),
+      'handleDeleteConfirm must wrap runDeleteOperation in try/catch — an uncaught throw ' +
+      'leaves the delete panel permanently stuck with no dismiss path'
+    );
+    assert.ok(
+      /\bcatch\s*\(/.test(fnBody),
+      'handleDeleteConfirm must have a catch clause to recover from unexpected errors'
+    );
+  });
+});
+
+// ── T2-5: README.md CSP examples must include media-src and frame-src ───────────────
+// The nginx and Caddy examples used img-src data: only. Presigned S3 preview URLs are
+// https: URLs — image, audio, video, and PDF previews silently break for anyone deploying
+// with this example CSP verbatim.
+
+describe('README.md — CSP examples include media-src and frame-src (T2-5)', () => {
+  const readme = readFileSync(resolve(ROOT, 'README.md'), 'utf8');
+
+  test('CSP includes media-src https: for audio/video previews', () => {
+    assert.ok(
+      /media-src https:/.test(readme),
+      'README.md CSP examples must include media-src https: — presigned audio/video preview ' +
+      'URLs are https:, not data: URIs; without this directive previews are silently blocked'
+    );
+  });
+
+  test('CSP includes frame-src https: for PDF previews', () => {
+    assert.ok(
+      /frame-src https:/.test(readme),
+      'README.md CSP examples must include frame-src https: — PDF previews use an <iframe> ' +
+      'with a presigned https: URL; without this directive PDF previews are silently blocked'
+    );
+  });
+
+  test('CSP includes img-src https: for remote image previews', () => {
+    assert.ok(
+      /img-src data: https:/.test(readme),
+      'README.md CSP examples must include img-src data: https: — presigned image preview ' +
+      'URLs are https:, not data: URIs'
+    );
+  });
+});
+
+// ── T2-3: HiddenVersions purge-all must accumulate errors, not abort on first ────────
+// Throwing on the first resp.Errors entry abandons all remaining batches. A 2500-version
+// purge that fails on batch 2 permanently deletes the first 1000 with no indication.
+// Fix: collect errors into allErrors[], continue through every batch, report aggregate.
+
+describe('HiddenVersions — purge-all accumulates errors across all batches (T2-3)', () => {
+  const source = src('components/HiddenVersions.jsx');
+
+  test('uses error accumulation pattern (allErrors) instead of throwing on first error', () => {
+    assert.ok(
+      /allErrors\.push/.test(source),
+      'HiddenVersions.jsx must accumulate errors into allErrors[] — throwing on the ' +
+      'first error abandons remaining batches and silently leaves versions undeleted'
+    );
+  });
+
+  test('does not throw on the first resp.Errors entry inside the batch loop', () => {
+    // The old pattern: if (resp.Errors ...) { throw new Error(...) }
+    // After fix, errors are collected, not thrown mid-loop.
+    assert.ok(
+      !/if\s*\(resp\.Errors[^}]*throw/.test(source),
+      'HiddenVersions.jsx must not throw inside the batch loop on resp.Errors — ' +
+      'this stops all remaining batches and leaves a partial purge with no error summary'
+    );
+  });
+});
+
 // ── T1-2: every new XCommand() call must have a matching @aws-sdk/client-s3 import ──
 // When a Command identifier is used without being imported, JS throws ReferenceError at
 // runtime. This is exactly how T1-1 (rename leaving a duplicate) manifested: the copy

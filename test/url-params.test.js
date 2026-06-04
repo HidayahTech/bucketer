@@ -92,6 +92,48 @@ describe('readUrlParams', () => {
     loc.hash = '#foo=bar&baz=qux';
     assert.deepEqual(readUrlParams(), {});
   });
+
+  // T2-4: endpoint must be validated against http/https — an attacker-controlled
+  // share link with endpoint=javascript:... or endpoint=ftp:// would silently
+  // pre-fill the credential form with a malicious URL.
+  test('rejects endpoint with javascript: scheme (T2-4)', () => {
+    loc.hash = '#endpoint=javascript%3Aalert(1)';
+    assert.equal(readUrlParams().endpoint, undefined,
+      'endpoint with javascript: scheme must be silently ignored');
+  });
+
+  test('rejects endpoint with ftp: scheme (T2-4)', () => {
+    loc.hash = '#endpoint=ftp%3A%2F%2Fattacker.example.com';
+    assert.equal(readUrlParams().endpoint, undefined,
+      'endpoint with ftp: scheme must be silently ignored');
+  });
+
+  test('accepts endpoint with https: scheme (T2-4)', () => {
+    loc.hash = '#endpoint=https%3A%2F%2Fs3.us-west-2.amazonaws.com';
+    assert.equal(readUrlParams().endpoint, 'https://s3.us-west-2.amazonaws.com');
+  });
+
+  test('accepts endpoint with http: scheme (T2-4)', () => {
+    loc.hash = '#endpoint=http%3A%2F%2Flocalhost%3A9000';
+    assert.equal(readUrlParams().endpoint, 'http://localhost:9000');
+  });
+
+  test('rejects bucket containing path traversal sequences (T2-4)', () => {
+    loc.hash = '#bucket=..%2F..%2F..%2Fetc%2Fpasswd';
+    assert.equal(readUrlParams().bucket, undefined,
+      'bucket with .. path traversal must be silently ignored');
+  });
+
+  test('rejects bucket containing forward slashes (T2-4)', () => {
+    loc.hash = '#bucket=legit%2Finjected-path';
+    assert.equal(readUrlParams().bucket, undefined,
+      'bucket with / must be silently ignored — S3 bucket names never contain slashes');
+  });
+
+  test('accepts a valid bucket name (T2-4)', () => {
+    loc.hash = '#bucket=my-valid-bucket-123';
+    assert.equal(readUrlParams().bucket, 'my-valid-bucket-123');
+  });
 });
 
 describe('hasUrlParams', () => {

@@ -158,9 +158,11 @@ server {
     location / {
         try_files $uri /index.html;
 
-        # Because all JS and CSS are inlined, 'unsafe-inline' is required.
+        # Because all JS and CSS are inlined, 'unsafe-inline' is required for script-src and style-src.
+        # A future hash-based approach (script-src 'sha256-<hash>') would remove the need for 'unsafe-inline'.
+        # img-src/media-src/frame-src need https: because presigned preview URLs are https: (not data: URIs).
         # Tighten connect-src to only the providers you use, or use https: for any endpoint.
-        add_header Content-Security-Policy "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src https://*.backblazeb2.com https://*.r2.cloudflarestorage.com https://*.wasabisys.com https://*.amazonaws.com https://*.digitaloceanspaces.com https:;" always;
+        add_header Content-Security-Policy "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: https:; media-src https:; frame-src https:; connect-src https://*.backblazeb2.com https://*.r2.cloudflarestorage.com https://*.wasabisys.com https://*.amazonaws.com https://*.digitaloceanspaces.com https:;" always;
         add_header X-Content-Type-Options "nosniff" always;
         add_header X-Frame-Options "DENY" always;
         add_header Referrer-Policy "no-referrer" always;
@@ -174,8 +176,10 @@ server {
 bucketer.yourdomain.com {
     root * /var/www/bucketer
     file_server
+    # Because all JS and CSS are inlined, 'unsafe-inline' is required for script-src and style-src.
+    # img-src/media-src/frame-src need https: because presigned preview URLs are https: (not data: URIs).
     # Tighten connect-src to only the providers you use, or use https: for any endpoint.
-    header Content-Security-Policy "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src https://*.backblazeb2.com https://*.r2.cloudflarestorage.com https://*.wasabisys.com https://*.amazonaws.com https://*.digitaloceanspaces.com https:;"
+    header Content-Security-Policy "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: https:; media-src https:; frame-src https:; connect-src https://*.backblazeb2.com https://*.r2.cloudflarestorage.com https://*.wasabisys.com https://*.amazonaws.com https://*.digitaloceanspaces.com https:;"
     header X-Content-Type-Options "nosniff"
     header X-Frame-Options "DENY"
     header Referrer-Policy "no-referrer"

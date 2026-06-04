@@ -18,8 +18,18 @@ function hashParams() {
 export function readUrlParams() {
   const p = hashParams();
   const out = {};
-  if (p.has('endpoint')) out.endpoint = p.get('endpoint');
-  if (p.has('bucket'))   out.bucket   = p.get('bucket');
+  if (p.has('endpoint')) {
+    const v = p.get('endpoint');
+    try {
+      const u = new URL(v);
+      if (u.protocol === 'https:' || u.protocol === 'http:') out.endpoint = v;
+    } catch { /* unparseable — ignore */ }
+  }
+  if (p.has('bucket')) {
+    const v = p.get('bucket');
+    // S3 bucket names never contain slashes or path-traversal sequences.
+    if (v && !v.includes('/') && !v.includes('\\') && !v.includes('..')) out.bucket = v;
+  }
   if (p.has('provider')) {
     const v = p.get('provider');
     // Provider must be a short identifier with no whitespace — same rule as storage.js.

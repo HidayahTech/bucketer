@@ -39,6 +39,21 @@ export function calcPartSize(fileSize, preferredBytes) {
   return (preferredBytes && preferredBytes > floor) ? preferredBytes : floor;
 }
 
+// Uploads parts concurrently up to `concurrency` workers in-flight at a time.
+// workFn(partNumber) must return a Promise. Used by both fresh multipart uploads
+// and the resume path so both benefit from the same PART_CONCURRENCY setting.
+export async function uploadPartsWithPool(partNumbers, workFn, concurrency) {
+  const queue = [...partNumbers];
+  async function worker() {
+    for (;;) {
+      const partNumber = queue.shift();
+      if (partNumber === undefined) break;
+      await workFn(partNumber);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.max(1, concurrency) }, worker));
+}
+
 export class UploadQueue {
   constructor(concurrency = 2) {
     this.concurrency = concurrency;
