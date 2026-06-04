@@ -45,3 +45,22 @@ export function isPermissionError(err) {
   const status = err?.$metadata?.httpStatusCode;
   return code === 'AccessDenied' || status === 403 || status === 401;
 }
+
+// Detects when a fetch was silently blocked before reaching the network —
+// the signature of a browser extension (uBlock Origin, etc.) intercepting the
+// request. All three browsers surface this as a TypeError with no HTTP metadata:
+//   Firefox: "NetworkError when attempting to fetch resource."
+//   Chrome:  "Failed to fetch"
+//   Safari:  "Load failed"
+// A genuine network outage produces the same TypeError, so the hint is
+// phrased as "may have been blocked" rather than a definitive diagnosis.
+export function isBlockedByExtension(err) {
+  if (err?.name !== 'TypeError') return false;
+  if (err?.$metadata?.httpStatusCode) return false; // got an HTTP response — not a block
+  const msg = err?.message || '';
+  return (
+    msg.includes('NetworkError when attempting to fetch resource') ||
+    msg.includes('Failed to fetch') ||
+    msg.includes('Load failed')
+  );
+}

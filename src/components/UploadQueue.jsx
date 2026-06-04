@@ -20,7 +20,7 @@
 // Peak RAM at defaults: 3 files × 4 parts × 5 MiB = 60 MiB.
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import { PutObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand } from '@aws-sdk/client-s3';
-import { formatBytes, formatSpeed, formatEta, isPermissionError, parseS3Error } from '../lib/format.js';
+import { formatBytes, formatSpeed, formatEta, isPermissionError, isBlockedByExtension, parseS3Error } from '../lib/format.js';
 import {
   saveResumeRecord, loadResumeRecord, deleteResumeRecord,
   buildFileIdentityWithHash, fileIdentityMatches, computeFileHash,
@@ -29,7 +29,7 @@ import {
   saveUploadLogEntry,
 } from '../lib/indexeddb.js';
 import { UploadQueue as Queue, calcPartSize, collectParts, preparePutBody } from '../lib/upload-queue.js';
-import { loadPartConcurrency, loadPartSizeMB, loadFileConcurrency } from '../lib/storage.js';
+import { loadPartConcurrency, loadPartSizeMB, loadFileConcurrency, loadUploadExpandThreshold } from '../lib/storage.js';
 import { collectFileEntries } from '../lib/file-entries.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
 import { createUpdateBatcher } from '../lib/update-batcher.js';
@@ -46,18 +46,19 @@ function newId() { return ++_idCounter; }
 export function UploadQueue({ client, bucket, provider, currentPrefix, credentials, onCapabilityChange, capabilities, onUploadsComplete, onLogEntry, onMount }) {
   const [items, setItems] = useState([]);
   const [dragOver, setDragOver] = useState(false);
+  const [collapsedBatches, setCollapsedBatches] = useState({});
   const queueRef = useRef(new Queue(loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY));
   const activeUploadsRef = useRef({}); // id → { abort, uploadInstance }
+  const cancelledBatchesRef = useRef(new Set());
   const fileInputRef = useRef(null);
   const folderInputRef = useRef(null);
   const notifAskedRef = useRef(false);
-  const notifSuppressedRef = useRef(false);
   const [notifSuppressed, setNotifSuppressed] = useState(false);
+  const [cancelAllPrimed, setCancelAllPrimed] = useState(false);
+  const cancelAllPrimedTimerRef = useRef(null);
 
   function toggleNotifSuppressed() {
-    const next = !notifSuppressedRef.current;
-    notifSuppressedRef.current = next;
-    setNotifSuppressed(next);
+    setNotifSuppressed(prev => !prev);
   }
 
   const canUpload = capabilities.upload !== 'denied';
@@ -96,8 +97,10 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   // relativePath preserves folder structure (e.g. "photos/2024/img.jpg").
   // For plain file picks it equals file.name.
   function addFiles(fileEntries) {
+    const batchId = String(Date.now() + Math.random());
     const newItems = fileEntries.map(({ file, relativePath }) => ({
       id: newId(),
+      batchId,
       file,
       name: relativePath,
       size: file.size,
@@ -112,6 +115,10 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       largeFileWarningDismissed: false,
     }));
     setItems(prev => [...newItems, ...prev]);
+
+    // Batches at or below the threshold start expanded; larger ones start collapsed.
+    const threshold = loadUploadExpandThreshold() ?? 5;
+    setCollapsedBatches(prev => ({ ...prev, [batchId]: fileEntries.length > threshold }));
 
     // Request Notification API permission on first batch (Q4 in QUESTIONS.md)
     if (!notifAskedRef.current && 'Notification' in window) {
@@ -135,13 +142,22 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       });
     } catch { /* IndexedDB may be unavailable */ }
 
+    // Guard: batch may have been cancelled while loadResumeRecord was in flight
+    if (cancelledBatchesRef.current.has(item.batchId)) return;
+
     if (existingRecord) {
       updateItem(item.id, { status: 'paused', resumeRecord: existingRecord }, true);
       return; // User must explicitly choose Resume or Restart
     }
 
     queueRef.current.concurrency = loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY;
-    queueRef.current.enqueue(() => runUpload(item.id, item.file, item.destinationKey));
+    queueRef.current.enqueue(async () => {
+      if (cancelledBatchesRef.current.has(item.batchId)) {
+        updateItem(item.id, { status: 'aborted' }, true);
+        return;
+      }
+      return runUpload(item.id, item.file, item.destinationKey);
+    });
   }
 
   async function runUpload(id, file, destinationKey) {
@@ -192,9 +208,6 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         errorMessage: null,
       }).then(() => onLogEntry?.()).catch(() => {});
 
-      if ('Notification' in window && Notification.permission === 'granted' && !notifSuppressedRef.current) {
-        new Notification('Upload complete', { body: `${file.name} → ${destinationKey}` });
-      }
     } catch (err) {
       if (err.name === 'AbortError' || err.message === 'Upload aborted') return;
       updateItem(id, { status: 'error', error: err }, true);
@@ -416,24 +429,27 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     queueRef.current.enqueue(() => runUpload(id, item.file, item.destinationKey));
   }
 
-  function handleCancelAll() {
-    // Abort all in-flight requests
-    Object.values(activeUploadsRef.current).forEach(active => active?.abort?.());
-    // Drop everything still waiting in the queue
-    queueRef.current.clear();
-    // Best-effort multipart cleanup (fire-and-forget)
-    items.forEach(item => {
-      const uploadId = activeUploadsRef.current[item.id]?.uploadId ?? item.resumeRecord?.uploadId;
+  function handleCancelBatch(batchId) {
+    cancelledBatchesRef.current.add(batchId);
+    const batchItemIds = new Set(items.filter(i => i.batchId === batchId).map(i => i.id));
+    // Abort in-flight uploads for this batch
+    Object.entries(activeUploadsRef.current).forEach(([id, active]) => {
+      if (batchItemIds.has(Number(id))) active?.abort?.();
+    });
+    // Best-effort multipart cleanup — abort the S3 session and delete the
+    // resume record so a re-drag of the same folder does not show files as paused
+    items.filter(i => i.batchId === batchId).forEach(item => {
+      const active = activeUploadsRef.current[item.id];
+      const uploadId = active?.uploadId ?? item.resumeRecord?.uploadId;
       if (uploadId) {
-        client.send(new AbortMultipartUploadCommand({
-          Bucket: bucket, Key: item.destinationKey, UploadId: uploadId,
-        })).catch(() => {});
+        client.send(new AbortMultipartUploadCommand({ Bucket: bucket, Key: item.destinationKey, UploadId: uploadId })).catch(() => {});
+        deleteResumeRecord({ provider, endpoint: credentials.endpoint, bucket, destinationKey: item.destinationKey }).catch(() => {});
       }
     });
-    setItems(prev => prev.map(it =>
-      (it.status === 'queued' || it.status === 'uploading' || it.status === 'resuming')
-        ? { ...it, status: 'aborted' }
-        : it
+    setItems(prev => prev.map(i =>
+      i.batchId === batchId && (i.status === 'queued' || i.status === 'uploading' || i.status === 'resuming')
+        ? { ...i, status: 'aborted' }
+        : i
     ));
   }
 
@@ -468,8 +484,73 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     setItems(prev => prev.filter(it => it.id !== id));
   }
 
-  function handleClearDone() {
-    setItems(prev => prev.filter(it => it.status !== 'done' && it.status !== 'aborted'));
+  function dismissBatch(batchId) {
+    setItems(prev => prev.filter(i => i.batchId !== batchId));
+    setCollapsedBatches(prev => { const next = { ...prev }; delete next[batchId]; return next; });
+    cancelledBatchesRef.current.delete(batchId);
+  }
+
+  function toggleBatchCollapse(batchId) {
+    setCollapsedBatches(prev => ({ ...prev, [batchId]: !prev[batchId] }));
+  }
+
+  function collapseBatch(batchId) {
+    setCollapsedBatches(prev => ({ ...prev, [batchId]: true }));
+  }
+
+  function expandBatch(batchId) {
+    setCollapsedBatches(prev => ({ ...prev, [batchId]: false }));
+  }
+
+  function dismissAllSettled() {
+    const activeOrQueued = new Set(
+      items.filter(i => i.status === 'uploading' || i.status === 'resuming' || i.status === 'queued' || i.status === 'paused')
+           .map(i => i.batchId)
+    );
+    const toRemove = new Set([...new Set(items.map(i => i.batchId))].filter(id => !activeOrQueued.has(id)));
+    setItems(prev => prev.filter(i => !toRemove.has(i.batchId)));
+    setCollapsedBatches(prev => { const next = { ...prev }; toRemove.forEach(id => delete next[id]); return next; });
+    toRemove.forEach(id => cancelledBatchesRef.current.delete(id));
+  }
+
+  function retryAllFailed() {
+    items.filter(i => i.status === 'error').forEach(item => handleRestart(item.id));
+  }
+
+  function cancelAll() {
+    const activeBatchIds = new Set(
+      items.filter(i => i.status === 'uploading' || i.status === 'resuming' || i.status === 'queued')
+           .map(i => i.batchId)
+    );
+    activeBatchIds.forEach(batchId => handleCancelBatch(batchId));
+  }
+
+  function handleCancelAllClick() {
+    if (!cancelAllPrimed) {
+      setCancelAllPrimed(true);
+      clearTimeout(cancelAllPrimedTimerRef.current);
+      cancelAllPrimedTimerRef.current = setTimeout(() => setCancelAllPrimed(false), 3000);
+    } else {
+      clearTimeout(cancelAllPrimedTimerRef.current);
+      setCancelAllPrimed(false);
+      cancelAll();
+    }
+  }
+
+  function collapseAll() {
+    setCollapsedBatches(prev => {
+      const next = { ...prev };
+      for (const i of items) next[i.batchId] = true;
+      return next;
+    });
+  }
+
+  function expandAll() {
+    setCollapsedBatches(prev => {
+      const next = { ...prev };
+      for (const i of items) next[i.batchId] = false;
+      return next;
+    });
   }
 
   // beforeunload guard while any upload is active (§4.6)
@@ -519,6 +600,31 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       if (files?.length) addFiles(Array.from(files).map(f => ({ file: f, relativePath: f.name })));
     }
   }
+
+  // Group items by batchId, preserving insertion order (newest batch first)
+  const batches = [];
+  const batchMap = new Map();
+  for (const item of items) {
+    if (!batchMap.has(item.batchId)) {
+      const batchItems = [];
+      batchMap.set(item.batchId, batchItems);
+      batches.push([item.batchId, batchItems]);
+    }
+    batchMap.get(item.batchId).push(item);
+  }
+
+  // Global action bar availability flags
+  const settledBatchCount = batches.filter(([, bi]) =>
+    !bi.some(i => i.status === 'uploading' || i.status === 'resuming' || i.status === 'queued' || i.status === 'paused')
+  ).length;
+  const hasAnyFailed  = items.some(i => i.status === 'error');
+  const hasAnyActive  = items.some(i => i.status === 'uploading' || i.status === 'resuming' || i.status === 'queued');
+  const expandedCount = batches.filter(([id]) => !collapsedBatches[id]).length;
+  const collapsedCount = batches.filter(([id]) => !!collapsedBatches[id]).length;
+  const showGlobalActions = batches.length > 0 && (
+    settledBatchCount >= 2 || hasAnyFailed || hasAnyActive ||
+    (batches.length >= 2 && (expandedCount >= 2 || collapsedCount >= 2))
+  );
 
   return (
     <div>
@@ -593,41 +699,61 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         }}
       />
 
-      {items.length > 0 && (
+      {showGlobalActions && (
+        <div class="queue-global-actions">
+          <span class="queue-global-actions-label">All queues:</span>
+          {settledBatchCount >= 2 && (
+            <button type="button" class="btn btn-ghost btn-sm" onClick={dismissAllSettled}>Dismiss all done</button>
+          )}
+          {hasAnyFailed && (
+            <button type="button" class="btn btn-ghost btn-sm" onClick={retryAllFailed}>Retry all failed</button>
+          )}
+          {hasAnyActive && (
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              style={{ color: cancelAllPrimed ? 'var(--text-danger)' : undefined }}
+              onClick={handleCancelAllClick}
+            >{cancelAllPrimed ? 'Sure?' : 'Cancel all'}</button>
+          )}
+          {batches.length >= 2 && expandedCount >= 2 && (
+            <button type="button" class="btn btn-ghost btn-sm" onClick={collapseAll}>Collapse all</button>
+          )}
+          {batches.length >= 2 && collapsedCount >= 2 && (
+            <button type="button" class="btn btn-ghost btn-sm" onClick={expandAll}>Expand all</button>
+          )}
+        </div>
+      )}
+
+      {batches.length > 0 && (
         <div class="upload-queue" style={{ marginTop: '.75rem' }}>
-          {items.length === 1 ? (
-            <UploadItem
-              key={items[0].id}
-              item={items[0]}
-              provider={provider}
-              onResume={() => handleResume(items[0].id)}
-              onRestart={() => handleRestart(items[0].id)}
-              onCancel={() => handleCancel(items[0].id)}
-              onRemove={() => handleRemove(items[0].id)}
-              onDismissLargeWarn={() => updateItem(items[0].id, { largeFileWarningDismissed: true }, true)}
-            />
-          ) : (
+          {batches.map(([batchId, batchItems]) => (
             <BatchSummary
-              items={items}
+              key={batchId}
+              items={batchItems}
               provider={provider}
+              collapsed={collapsedBatches[batchId] ?? false}
+              onToggleCollapse={() => toggleBatchCollapse(batchId)}
+              onCollapse={() => collapseBatch(batchId)}
+              onExpand={() => expandBatch(batchId)}
+              onDismiss={() => dismissBatch(batchId)}
+              onCancelBatch={() => handleCancelBatch(batchId)}
               onResume={handleResume}
               onRestart={handleRestart}
               onCancel={handleCancel}
               onRemove={handleRemove}
               onDismissLargeWarn={(id) => updateItem(id, { largeFileWarningDismissed: true }, true)}
-              onClearDone={handleClearDone}
-              onCancelAll={handleCancelAll}
               notifSuppressed={notifSuppressed}
               onToggleNotifs={toggleNotifSuppressed}
             />
-          )}
+          ))}
         </div>
       )}
     </div>
   );
 }
 
-function BatchSummary({ items, provider, onResume, onRestart, onCancel, onRemove, onDismissLargeWarn, onClearDone, onCancelAll, notifSuppressed, onToggleNotifs }) {
+function BatchSummary({ items, provider, collapsed, onToggleCollapse, onCollapse, onExpand, onDismiss, onCancelBatch, onResume, onRestart, onCancel, onRemove, onDismissLargeWarn, notifSuppressed, onToggleNotifs }) {
   // Single pass — replaces 8 separate filter/reduce calls over all items
   let doneCount = 0, abortedCount = 0, queuedCount = 0, errorCount = 0;
   let totalBytes = 0, confirmedBytes = 0;
@@ -645,17 +771,62 @@ function BatchSummary({ items, provider, onResume, onRestart, onCancel, onRemove
 
   const totalFiles     = items.length;
   const completedCount = doneCount;
-  const overallSpeed   = inFlightItems.reduce((s, i) => s + i.speed, 0);
 
-  const isActive = inFlightItems.length > 0;
-  const hasClearable = !isActive && !queuedCount && !pausedItems.length && (doneCount + abortedCount > 0);
+  const isActive   = inFlightItems.length > 0;
+  const allDone    = completedCount === totalFiles && errorCount === 0 && abortedCount === 0;
+  const isSettled  = !isActive && queuedCount === 0 && pausedItems.length === 0;
+
+  // Auto-collapse 3 s after batch completes cleanly
+  const prevAllDoneRef = useRef(false);
+  useEffect(() => {
+    if (allDone && !prevAllDoneRef.current) {
+      prevAllDoneRef.current = true;
+      const timer = setTimeout(() => onCollapse?.(), 3000);
+      return () => clearTimeout(timer);
+    }
+    if (!allDone) prevAllDoneRef.current = false;
+  }, [allDone]);
+
+  // One summary notification when the batch settles (all items done/failed/cancelled)
+  const prevIsSettledRef = useRef(false);
+  useEffect(() => {
+    if (isSettled && !prevIsSettledRef.current) {
+      prevIsSettledRef.current = true;
+      if ('Notification' in window && Notification.permission === 'granted' && !notifSuppressed) {
+        let body;
+        if (allDone) {
+          body = `${doneCount} file${doneCount !== 1 ? 's' : ''} uploaded`;
+        } else {
+          const parts = [];
+          if (doneCount > 0)    parts.push(`${doneCount} uploaded`);
+          if (errorCount > 0)   parts.push(`${errorCount} failed`);
+          if (abortedCount > 0) parts.push(`${abortedCount} cancelled`);
+          body = parts.join(' · ');
+        }
+        new Notification(errorCount === 0 ? 'Upload complete' : 'Upload finished', { body });
+      }
+    }
+    if (!isSettled) prevIsSettledRef.current = false;
+  }, [isSettled]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Force-expand when the first error appears so failures are never hidden
+  const hadErrorsRef = useRef(false);
+  useEffect(() => {
+    if (errorCount > 0 && !hadErrorsRef.current) onExpand?.();
+    hadErrorsRef.current = errorCount > 0;
+  }, [errorCount]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Float error items to the top so they're immediately visible without scrolling
+  const displayItems = errorCount > 0
+    ? [...items].sort((a, b) => (a.status === 'error' ? -1 : b.status === 'error' ? 1 : 0))
+    : items;
 
   const [displayedBytes, setDisplayedBytes] = useState(confirmedBytes);
-  const animRef  = useRef(null);
-  const speedRef = useRef(overallSpeed);
-  const floorRef = useRef(confirmedBytes);
-
-  useEffect(() => { speedRef.current = overallSpeed; }, [overallSpeed]);
+  const [batchSpeed, setBatchSpeed] = useState(0);
+  const animRef        = useRef(null);
+  const speedRef       = useRef(0);
+  const floorRef       = useRef(confirmedBytes);
+  const samplesRef     = useRef([]); // rolling-window samples: [{t: ms, bytes: number}]
 
   useEffect(() => {
     floorRef.current = confirmedBytes;
@@ -665,19 +836,36 @@ function BatchSummary({ items, provider, onResume, onRestart, onCancel, onRemove
   useEffect(() => {
     if (!isActive) {
       cancelAnimationFrame(animRef.current);
+      samplesRef.current = [];
+      speedRef.current = 0;
+      setBatchSpeed(0);
       setDisplayedBytes(confirmedBytes);
       return;
     }
+    samplesRef.current = [];
     let last = performance.now();
     function tick(now) {
       if (document.visibilityState === 'hidden' || now - last < 66) {
         animRef.current = requestAnimationFrame(tick);
         return;
       }
+      // Rolling 6-second window — works for both small (discrete jumps) and
+      // large (continuous part updates) files
+      const samples = samplesRef.current;
+      samples.push({ t: now, bytes: floorRef.current });
+      while (samples.length > 1 && samples[0].t < now - 6000) samples.shift();
+      let rollingSpeed = 0;
+      if (samples.length >= 2) {
+        const span = (samples[samples.length - 1].t - samples[0].t) / 1000;
+        const gained = samples[samples.length - 1].bytes - samples[0].bytes;
+        if (span >= 0.5) rollingSpeed = Math.max(0, gained / span);
+      }
+      speedRef.current = rollingSpeed;
+      setBatchSpeed(rollingSpeed);
       const dt = (now - last) / 1000;
       last = now;
       setDisplayedBytes(prev =>
-        Math.min(Math.max(prev + speedRef.current * dt, floorRef.current), totalBytes)
+        Math.min(Math.max(prev + rollingSpeed * dt, floorRef.current), totalBytes)
       );
       animRef.current = requestAnimationFrame(tick);
     }
@@ -686,15 +874,12 @@ function BatchSummary({ items, provider, onResume, onRestart, onCancel, onRemove
   }, [isActive, totalBytes]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const displayProgress = totalBytes > 0 ? Math.min((displayedBytes / totalBytes) * 100, 100) : 0;
-  const liveEta = overallSpeed > 0 ? (totalBytes - displayedBytes) / overallSpeed : null;
-  const allDone = completedCount === totalFiles && errorCount === 0 && abortedCount === 0;
-
-  const actionItems = [...errorItems, ...pausedItems];
+  const liveEta = batchSpeed > 0 ? (totalBytes - displayedBytes) / batchSpeed : null;
 
   const [cancelPrimed, setCancelPrimed] = useState(false);
   const cancelPrimedTimer = useRef(null);
 
-  function handleCancelAllClick() {
+  function handleCancelBatchClick() {
     if (!cancelPrimed) {
       setCancelPrimed(true);
       clearTimeout(cancelPrimedTimer.current);
@@ -702,46 +887,63 @@ function BatchSummary({ items, provider, onResume, onRestart, onCancel, onRemove
     } else {
       clearTimeout(cancelPrimedTimer.current);
       setCancelPrimed(false);
-      onCancelAll();
+      onCancelBatch();
     }
   }
 
+  const summaryTop = (
+    <div class="batch-summary-top">
+      {isActive  && <span class="spinner" style={{ flexShrink: 0 }} />}
+      {!isActive && allDone                           && <span class="batch-status-icon batch-status-ok">✓</span>}
+      {!isActive && !allDone && (errorCount > 0 || abortedCount > 0) && <span class="batch-status-icon batch-status-err">✕</span>}
+      <span class="batch-summary-count">
+        {completedCount} / {totalFiles} file{totalFiles !== 1 ? 's' : ''}
+        {queuedCount > 0 && <span class="batch-queued"> · {queuedCount} queued</span>}
+        {errorCount  > 0 && <span class="batch-errors"> · {errorCount} failed</span>}
+        {abortedCount > 0 && errorCount === 0 && <span class="batch-queued"> · {abortedCount} cancelled</span>}
+      </span>
+      <span class="batch-spacer" />
+      {batchSpeed > 0 && <span class="batch-speed">{formatSpeed(batchSpeed)}</span>}
+      {liveEta !== null  && <span class="batch-eta"> · {formatEta(liveEta)}</span>}
+      {(isActive || queuedCount > 0) && (
+        <button
+          class="btn btn-ghost btn-sm"
+          style={{ flexShrink: 0, color: 'var(--text-danger)' }}
+          onClick={handleCancelBatchClick}
+        >
+          {cancelPrimed ? 'Sure?' : 'Cancel all'}
+        </button>
+      )}
+      {'Notification' in window && Notification.permission === 'granted' && !collapsed && (
+        <button
+          class="btn btn-ghost btn-sm"
+          style={{ flexShrink: 0, color: notifSuppressed ? 'var(--text-muted)' : undefined }}
+          title={notifSuppressed ? 'Desktop notifications muted — click to unmute' : 'Mute desktop notifications for this queue'}
+          onClick={onToggleNotifs}
+        >
+          {notifSuppressed ? 'Notifs off' : 'Notifs on'}
+        </button>
+      )}
+      <button class="btn btn-ghost btn-sm" style={{ flexShrink: 0 }} onClick={onToggleCollapse}>
+        {collapsed ? 'Show' : 'Hide'}
+      </button>
+      {isSettled && (
+        <button class="btn btn-ghost btn-sm" style={{ flexShrink: 0 }} onClick={onDismiss}>
+          Dismiss
+        </button>
+      )}
+    </div>
+  );
+
+  const errorClass = errorCount > 0 ? ' batch-summary--errors' : '';
+
+  if (collapsed) {
+    return <div class={`batch-summary${errorClass}`}>{summaryTop}</div>;
+  }
+
   return (
-    <div class="batch-summary">
-      <div class="batch-summary-top">
-        <span class="batch-summary-count">
-          {completedCount} / {totalFiles} files
-          {queuedCount > 0 && <span class="batch-queued"> · {queuedCount} queued</span>}
-          {errorCount > 0 && <span class="batch-errors"> · {errorCount} failed</span>}
-        </span>
-        <span class="spacer" />
-        {overallSpeed > 0 && <span class="batch-speed">{formatSpeed(overallSpeed)}</span>}
-        {liveEta !== null && <span class="batch-eta"> · ETA {formatEta(liveEta)}</span>}
-        {(isActive || queuedCount > 0) && (
-          <button
-            class="btn btn-ghost btn-sm"
-            style={{ marginLeft: '.4rem', color: 'var(--text-danger)' }}
-            onClick={handleCancelAllClick}
-          >
-            {cancelPrimed ? 'Sure?' : 'Cancel all'}
-          </button>
-        )}
-        {hasClearable && (
-          <button class="btn btn-ghost btn-sm" style={{ marginLeft: '.4rem' }} onClick={onClearDone}>
-            Clear done
-          </button>
-        )}
-        {'Notification' in window && Notification.permission === 'granted' && (
-          <button
-            class="btn btn-ghost btn-sm"
-            style={{ marginLeft: '.4rem', color: notifSuppressed ? 'var(--text-muted)' : undefined }}
-            title={notifSuppressed ? 'Desktop notifications muted — click to unmute' : 'Mute desktop notifications for this queue'}
-            onClick={onToggleNotifs}
-          >
-            {notifSuppressed ? 'Notifs off' : 'Notifs on'}
-          </button>
-        )}
-      </div>
+    <div class={`batch-summary${errorClass}`}>
+      {summaryTop}
 
       <div class="progress-bar-wrap">
         <div class="progress-bar" style={{ width: `${displayProgress.toFixed(2)}%` }} />
@@ -752,39 +954,20 @@ function BatchSummary({ items, provider, onResume, onRestart, onCancel, onRemove
         {allDone && <span class="batch-all-done" data-testid="queue-complete">✓ All complete</span>}
       </div>
 
-      {inFlightItems.length > 0 && (
-        <div class="batch-inflight">
-          {inFlightItems.map(item => (
-            <UploadItem
-              key={item.id}
-              item={item}
-              provider={provider}
-              onResume={() => onResume(item.id)}
-              onRestart={() => onRestart(item.id)}
-              onCancel={() => onCancel(item.id)}
-              onRemove={() => onRemove(item.id)}
-              onDismissLargeWarn={() => onDismissLargeWarn(item.id)}
-            />
-          ))}
-        </div>
-      )}
-
-      {actionItems.length > 0 && (
-        <div class="batch-inflight">
-          {actionItems.map(item => (
-            <UploadItem
-              key={item.id}
-              item={item}
-              provider={provider}
-              onResume={() => onResume(item.id)}
-              onRestart={() => onRestart(item.id)}
-              onCancel={() => onCancel(item.id)}
-              onRemove={() => onRemove(item.id)}
-              onDismissLargeWarn={() => onDismissLargeWarn(item.id)}
-            />
-          ))}
-        </div>
-      )}
+      <div class="batch-inflight">
+        {displayItems.map(item => (
+          <UploadItem
+            key={item.id}
+            item={item}
+            provider={provider}
+            onResume={() => onResume(item.id)}
+            onRestart={() => onRestart(item.id)}
+            onCancel={() => onCancel(item.id)}
+            onRemove={() => onRemove(item.id)}
+            onDismissLargeWarn={() => onDismissLargeWarn(item.id)}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -892,7 +1075,7 @@ function UploadItem({ item, onResume, onRestart, onCancel, onRemove, onDismissLa
             {status === 'uploading' && speed > 0 && (
               <span>{formatSpeed(speed)} · ETA {formatEta(liveEta)}</span>
             )}
-            {status === 'done' && <span>✓ Complete</span>}
+            {status === 'done' && <span>✓ Complete{speed > 0 ? ` · ${formatSpeed(speed)}` : ''}</span>}
           </div>
         </>
       )}
@@ -925,6 +1108,18 @@ function UploadItem({ item, onResume, onRestart, onCancel, onRemove, onDismissLa
 
       {error && (
         <div class="upload-error-detail">
+          {isBlockedByExtension(error) && (
+            <div class="banner banner-warn" style={{ marginBottom: '.4rem', padding: '.4rem .6rem', fontSize: '.78rem' }}>
+              <div class="banner-body">
+                <strong>Request may have been blocked by a browser extension.</strong>{' '}
+                Ad and content blockers (such as uBlock Origin) can intercept uploads
+                to URLs matching their filter rules — common targets include filenames
+                like <code>analytics.js</code>, <code>tracking.js</code>, and similar.
+                Try disabling the extension for this page, or adding the destination
+                domain to its allowlist.
+              </div>
+            </div>
+          )}
           <details open>
             <summary>Error details</summary>
             <pre>{JSON.stringify(parseS3Error(error), null, 2)}</pre>

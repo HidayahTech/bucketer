@@ -6,7 +6,7 @@
 // Notifies App when the initial listing probe fails via onInitialListFailed (§4.14).
 // Coordinates with UploadQueue via onUploadTargetChange (upload destination = current prefix).
 import { useState, useEffect, useRef } from 'preact/hooks';
-import { ListObjectsV2Command, GetObjectCommand, DeleteObjectCommand, DeleteObjectsCommand, HeadObjectCommand, PutObjectCommand, CopyObjectCommand } from '@aws-sdk/client-s3';
+import { ListObjectsV2Command, GetObjectCommand, HeadObjectCommand, PutObjectCommand, CopyObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { formatBytes, leafName, isPermissionError } from '../lib/format.js';
 import { defaultMaxKeys } from '../lib/provider.js';
@@ -25,7 +25,6 @@ let _sessionFirstMount = true;
 // 1 hour: long enough for interactive use (preview, copy-link) but short enough that
 // a leaked presigned URL expires overnight without manual rotation.
 const PRESIGN_EXPIRES = 3600;
-const DELETE_BATCH_CONCURRENCY = 3; // parallel DeleteObjectsCommand requests (each deletes up to 1000 objects)
 
 // Range-limited to 100 KB to prevent loading multi-GB log files into browser memory.
 // Response status 206 (Partial Content) indicates truncation — the UI shows a warning.
@@ -217,11 +216,10 @@ function SortTh({ col, sortCol, sortDir, onSort, align, children }) {
 }
 
 // State is organized by concern — each interactive feature has its own slice.
-// selectedKeys is a Set for O(1) has() checks per row (not an Array).
-// folderDelete is a single state object with a phase field ('confirm'|'listing'|'deleting'|'done')
-// to make the multi-step state machine explicit and prevent invalid combinations.
+// selectedKeys and selectedPrefixes are Sets for O(1) has() checks per row.
+// Delete operations are owned by App.jsx (via onDeleteRequest) so they survive navigation.
 // cacheRef and abortRef are Refs (not state) to avoid triggering re-renders.
-export function Browser({ client, bucket, provider, credentials, onCapabilityChange, capabilities, onUploadTargetChange, onInitialListFailed, onExternalDrop }) {
+export function Browser({ client, bucket, provider, credentials, onCapabilityChange, capabilities, onUploadTargetChange, onInitialListFailed, onExternalDrop, onDeleteRequest, onMount, prefetchSizeLimit }) {
   const [prefix, setPrefix] = useState(() => {
     if (_sessionFirstMount) {
       _sessionFirstMount = false;
@@ -239,11 +237,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const [downloadingKey, setDownloadingKey] = useState(null);
   const [sortCol, setSortCol] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
-  const [pendingDelete, setPendingDelete] = useState(null); // object to confirm
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState(null);
-  // folderDelete: null | { prefix, phase: 'confirm'|'listing'|'deleting'|'done', total, deleted, errors }
-  const [folderDelete, setFolderDelete] = useState(null);
+  const [selectedPrefixes, setSelectedPrefixes] = useState(new Set());
   const [previewItem, setPreviewItem] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [previewError, setPreviewError] = useState(null);
@@ -252,11 +246,9 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const [detectedContentType, setDetectedContentType] = useState(null);
   const [previewText, setPreviewText] = useState(null);
   const [previewTruncated, setPreviewTruncated] = useState(false);
+  const [previewPixelated, setPreviewPixelated] = useState(false);
   const [filterQuery, setFilterQuery] = useState('');
   const [selectedKeys, setSelectedKeys] = useState(new Set());
-  const [batchDeletePending, setBatchDeletePending] = useState(false);
-  const [batchDeleting, setBatchDeleting] = useState(false);
-  const [batchDeleteError, setBatchDeleteError] = useState(null);
   const [batchCopyOpen, setBatchCopyOpen] = useState(false);
   const [batchCopied, setBatchCopied] = useState(null);
   const [tableDragOver, setTableDragOver] = useState(false);
@@ -279,6 +271,9 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const [previewCopied, setPreviewCopied] = useState(false);
   const abortRef = useRef(null);
   const cacheRef = useRef(new Map());
+  const previewUrlCacheRef = useRef(new Map()); // key → { url, expiresAt, kind, contentType, text?, truncated? }
+  const prefetchGenRef     = useRef(0);          // incremented on each prefetch call to abandon stale runs
+  const prevNextRef        = useRef({ prev: null, next: null }); // kept current during render for the prefetch effect
   const tableCopyWrapRef = useRef(null);
   const previewCopyWrapRef = useRef(null);
   const batchCopyWrapRef = useRef(null);
@@ -300,6 +295,8 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
       setSortDir('asc');
     }
   }
+
+  useEffect(() => { onMount?.({ removeItems, invalidateCache }); }, []);
 
   // Notify parent of current prefix so upload queue knows where to target
   useEffect(() => {
@@ -324,8 +321,10 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     setDownloadError(null);
     setFilterQuery('');
     setSelectedKeys(new Set());
+    setSelectedPrefixes(new Set());
     setBatchCopyOpen(false);
     setBatchCopied(null);
+    previewUrlCacheRef.current.clear();
     fetchPage(newPrefix, null, true);
   }
   navigateRef.current = navigateTo;
@@ -454,35 +453,36 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     });
   }
 
-  function toggleSelectAll(visItems) {
-    const allSelected = visItems.length > 0 && visItems.every(o => selectedKeys.has(o.Key));
-    setSelectedKeys(allSelected ? new Set() : new Set(visItems.map(o => o.Key)));
+  function toggleSelectAll(visFolders, visFiles) {
+    const allSelected =
+      (visFiles.length > 0 || visFolders.length > 0) &&
+      visFiles.every(o => selectedKeys.has(o.Key)) &&
+      visFolders.every(cp => selectedPrefixes.has(cp));
+    if (allSelected) {
+      setSelectedKeys(new Set());
+      setSelectedPrefixes(new Set());
+    } else {
+      setSelectedKeys(new Set(visFiles.map(o => o.Key)));
+      setSelectedPrefixes(new Set(visFolders));
+    }
   }
 
-  async function handleBatchDelete() {
-    setBatchDeleting(true);
-    setBatchDeleteError(null);
-    const keys = [...selectedKeys];
-    try {
-      const batches = [];
-      for (let i = 0; i < keys.length; i += 1000) batches.push(keys.slice(i, i + 1000).map(Key => ({ Key })));
-      for (let i = 0; i < batches.length; i += DELETE_BATCH_CONCURRENCY) {
-        await Promise.all(
-          batches.slice(i, i + DELETE_BATCH_CONCURRENCY).map(batch =>
-            client.send(new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: batch, Quiet: true } }))
-          )
-        );
-      }
-      onCapabilityChange('delete', 'permitted');
-      invalidateCache(prefix);
-      setItems(prev => prev.filter(o => !selectedKeys.has(o.Key)));
-      setSelectedKeys(new Set());
-      setBatchDeletePending(false);
-    } catch (err) {
-      setBatchDeleteError(err);
-    } finally {
-      setBatchDeleting(false);
-    }
+  function toggleSelectPrefix(cp, e) {
+    e.stopPropagation();
+    setSelectedPrefixes(prev => {
+      const next = new Set(prev);
+      if (next.has(cp)) next.delete(cp); else next.add(cp);
+      return next;
+    });
+  }
+
+  function removeItems(keys, prefixes) {
+    const keySet    = new Set(keys);
+    const prefixSet = new Set(prefixes);
+    if (keySet.size)    setItems(prev => prev.filter(o => !keySet.has(o.Key)));
+    if (prefixSet.size) setCommonPrefixes(prev => prev.filter(p => !prefixSet.has(p)));
+    if (keySet.size)    setSelectedKeys(prev => prev.size ? new Set([...prev].filter(k => !keySet.has(k))) : prev);
+    if (prefixSet.size) setSelectedPrefixes(prev => prev.size ? new Set([...prev].filter(p => !prefixSet.has(p))) : prev);
   }
 
   // dragCounterRef debounces nested dragenter/dragleave. The HTML5 spec fires dragenter for
@@ -608,16 +608,6 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     }
   }
 
-  function handleDeleteClick(obj) {
-    setDeleteError(null);
-    setPendingDelete(obj);
-  }
-
-  function handleDeleteCancel() {
-    setPendingDelete(null);
-    setDeleteError(null);
-  }
-
   // Preview: detects kind via HeadObject → ContentType first, extension second.
   // SECURITY: text previews always use ResponseContentType='text/plain; charset=utf-8'
   // regardless of the stored ContentType. This prevents an uploaded HTML or JS file from
@@ -627,6 +617,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     setPreviewUrl(null);
     setPreviewText(null);
     setPreviewTruncated(false);
+    setPreviewPixelated(false);
     setPreviewError(null);
     setResolvedKind(null);
     setNotPreviewable(false);
@@ -634,6 +625,26 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     setPreviewCopyOpen(false);
     setPreviewCopied(false);
     try {
+      // Check signed-URL cache first. URLs are valid for PRESIGN_EXPIRES seconds;
+      // we treat entries as stale 5 minutes early to avoid serving nearly-expired URLs.
+      const cached = previewUrlCacheRef.current.get(obj.Key);
+      if (cached && Date.now() < cached.expiresAt) {
+        setResolvedKind(cached.kind);
+        if (cached.kind === 'text') {
+          if (cached.text !== undefined) {
+            setPreviewText(cached.text);
+            setPreviewTruncated(cached.truncated ?? false);
+          } else {
+            const resp = await fetch(cached.url, { headers: { Range: `bytes=0-${TEXT_PREVIEW_LIMIT - 1}` } });
+            setPreviewText(await resp.text());
+            setPreviewTruncated(resp.status === 206);
+          }
+        } else {
+          setPreviewUrl(cached.url);
+        }
+        return;
+      }
+
       let kind, contentType;
       try {
         const head = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: obj.Key }));
@@ -655,6 +666,8 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
       }
       setResolvedKind(kind);
 
+      const expiresAt = Date.now() + (PRESIGN_EXPIRES - 300) * 1000;
+
       if (kind === 'text') {
         // Force text/plain regardless of stored ContentType — prevents HTML/JS execution
         const url = await getSignedUrl(
@@ -666,6 +679,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
           }),
           { expiresIn: PRESIGN_EXPIRES },
         );
+        previewUrlCacheRef.current.set(obj.Key, { url, expiresAt, kind, contentType });
         const resp = await fetch(url, { headers: { Range: `bytes=0-${TEXT_PREVIEW_LIMIT - 1}` } });
         setPreviewText(await resp.text());
         setPreviewTruncated(resp.status === 206);
@@ -679,6 +693,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
           }),
           { expiresIn: PRESIGN_EXPIRES },
         );
+        previewUrlCacheRef.current.set(obj.Key, { url, expiresAt, kind, contentType });
         setPreviewUrl(url);
       }
     } catch (err) {
@@ -691,6 +706,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     setPreviewUrl(null);
     setPreviewText(null);
     setPreviewTruncated(false);
+    setPreviewPixelated(false);
     setPreviewError(null);
     setResolvedKind(null);
     setNotPreviewable(false);
@@ -710,87 +726,71 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     return () => window.removeEventListener('keydown', onKey);
   }, [previewItem]);
 
-  async function handleDeleteConfirm() {
-    if (!pendingDelete) return;
-    setDeleting(true);
-    setDeleteError(null);
-    try {
-      await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: pendingDelete.Key }));
-      onCapabilityChange('delete', 'permitted');
-      invalidateCache(prefix);
-      setItems(prev => prev.filter(o => o.Key !== pendingDelete.Key));
-      setPendingDelete(null);
-    } catch (err) {
-      setDeleteError(err);
-      if (isPermissionError(err)) onCapabilityChange('delete', 'denied');
-    } finally {
-      setDeleting(false);
-    }
-  }
+  // Prefetch adjacent items after the current one is ready.
+  // prevNextRef is updated during render so the effect always sees the latest neighbours
+  // without needing them as deps (which would cause spurious re-runs on every listing change).
+  useEffect(() => {
+    if (!previewUrl && !previewText) return;
+    prefetchAdjacent(prevNextRef.current.prev, prevNextRef.current.next);
+  }, [previewUrl, previewText, prefetchSizeLimit]);
 
-  function handleFolderDeleteClick(cp, e) {
-    e.stopPropagation();
-    setFolderDelete({ prefix: cp, phase: 'confirm', total: null, deleted: 0, errors: [] });
-  }
+  async function prefetchAdjacent(prev, next) {
+    const gen = ++prefetchGenRef.current;
 
-  async function handleFolderDeleteConfirm() {
-    const fp = folderDelete.prefix;
-    setFolderDelete(prev => ({ ...prev, phase: 'listing' }));
+    for (const item of [prev, next].filter(Boolean)) {
+      if (gen !== prefetchGenRef.current) return;
 
-    const keys = [];
-    let token;
-    try {
-      do {
-        const resp = await client.send(new ListObjectsV2Command({
-          Bucket: bucket, Prefix: fp, MaxKeys: 1000, ContinuationToken: token,
-        }));
-        (resp.Contents || []).forEach(o => keys.push(o.Key));
-        token = resp.IsTruncated ? resp.NextContinuationToken : undefined;
-      } while (token);
-    } catch (err) {
-      setFolderDelete(prev => ({ ...prev, phase: 'done', errors: [{ key: '(listing)', message: err.message }] }));
-      return;
-    }
+      const cached = previewUrlCacheRef.current.get(item.Key);
+      if (cached && Date.now() < cached.expiresAt) continue;
 
-    if (keys.length === 0) {
-      setCommonPrefixes(prev => prev.filter(p => p !== fp));
-      setFolderDelete(null);
-      return;
-    }
+      // Level 1: HeadObject + signed URL
+      let kind, contentType, contentLength;
+      try {
+        const head = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: item.Key }));
+        contentType  = head.ContentType || '';
+        contentLength = head.ContentLength ?? null;
+        kind = mimeKind(contentType) || mediaKind(item.Key);
+        if (!mimeKind(contentType) && mediaKind(item.Key)) contentType = mimeType(item.Key) || contentType;
+      } catch {
+        contentType   = mimeType(item.Key) || '';
+        contentLength = null;
+        kind          = mediaKind(item.Key);
+      }
+      if (!kind) continue;
+      if (gen !== prefetchGenRef.current) return;
 
-    setFolderDelete(prev => ({ ...prev, phase: 'deleting', total: keys.length }));
+      const expiresAt = Date.now() + (PRESIGN_EXPIRES - 300) * 1000;
 
-    const errors = [];
-    let deleted = 0;
-    const batches = [];
-    for (let i = 0; i < keys.length; i += 1000) batches.push(keys.slice(i, i + 1000).map(Key => ({ Key })));
-    for (let i = 0; i < batches.length; i += DELETE_BATCH_CONCURRENCY) {
-      const results = await Promise.all(
-        batches.slice(i, i + DELETE_BATCH_CONCURRENCY).map(batch =>
-          client.send(new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: batch, Quiet: true } }))
-            .then(resp => ({ batch, respErrors: resp.Errors || [] }))
-            .catch(err => ({ batch, networkError: err }))
-        )
-      );
-      for (const { batch, respErrors = [], networkError } of results) {
-        if (networkError) {
-          batch.forEach(o => errors.push({ key: o.Key, message: networkError.message }));
-        } else {
-          errors.push(...respErrors.map(e => ({ key: e.Key, message: e.Message || e.Code })));
-          deleted += batch.length - respErrors.length;
+      if (kind === 'text') {
+        const url = await getSignedUrl(
+          client,
+          new GetObjectCommand({ Bucket: bucket, Key: item.Key, ResponseContentDisposition: 'inline', ResponseContentType: 'text/plain; charset=utf-8' }),
+          { expiresIn: PRESIGN_EXPIRES },
+        );
+        const entry = { url, expiresAt, kind, contentType };
+        previewUrlCacheRef.current.set(item.Key, entry);
+        // Level 2: fetch text body (range-limited, always cheap)
+        if (gen !== prefetchGenRef.current) return;
+        try {
+          const resp = await fetch(url, { headers: { Range: `bytes=0-${TEXT_PREVIEW_LIMIT - 1}` } });
+          if (gen !== prefetchGenRef.current) return;
+          previewUrlCacheRef.current.set(item.Key, { ...entry, text: await resp.text(), truncated: resp.status === 206 });
+        } catch { /* silent — cache hit already has the URL */ }
+      } else {
+        const url = await getSignedUrl(
+          client,
+          new GetObjectCommand({ Bucket: bucket, Key: item.Key, ResponseContentDisposition: 'inline', ...(contentType ? { ResponseContentType: contentType } : {}) }),
+          { expiresIn: PRESIGN_EXPIRES },
+        );
+        previewUrlCacheRef.current.set(item.Key, { url, expiresAt, kind, contentType });
+        // Level 2: trigger image download if within size limit
+        if (kind === 'image' && prefetchSizeLimit > 0 && (contentLength === null || contentLength <= prefetchSizeLimit)) {
+          if (gen !== prefetchGenRef.current) return;
+          const img = new Image();
+          img.src = url;
         }
       }
-      setFolderDelete(prev => ({ ...prev, deleted }));
     }
-
-    onCapabilityChange('delete', 'permitted');
-    invalidateCache(prefix);
-    setFolderDelete(prev => ({ ...prev, phase: 'done', deleted, errors }));
-    fetchPage(prefix, null, true);
-  }
-
-  function closeFolderDeleteModal() {
-    setFolderDelete(null);
   }
 
   function invalidateCache(p) {
@@ -872,12 +872,14 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     : sortedItems;
 
   const isEmpty = !listing && visibleItems.length === 0 && visibleFolders.length === 0 && !listError;
-  const allVisibleSelected = visibleItems.length > 0 && visibleItems.every(o => selectedKeys.has(o.Key));
-  const someVisibleSelected = !allVisibleSelected && visibleItems.some(o => selectedKeys.has(o.Key));
-
-  const versioningCaveat = provider === 'b2'
-    ? 'Backblaze B2 may retain older versions of this file. The current version will be hidden but not immediately purged from storage.'
-    : 'If versioning is enabled on this bucket, this creates a delete marker — the object is hidden but recoverable. If versioning is off, deletion is permanent and cannot be undone.';
+  const allVisibleSelected =
+    (visibleItems.length > 0 || visibleFolders.length > 0) &&
+    visibleItems.every(o => selectedKeys.has(o.Key)) &&
+    visibleFolders.every(cp => selectedPrefixes.has(cp));
+  const someVisibleSelected = !allVisibleSelected && (
+    visibleItems.some(o => selectedKeys.has(o.Key)) ||
+    visibleFolders.some(cp => selectedPrefixes.has(cp))
+  );
 
   // Preview navigation — ordered to match the current display sort.
   // Includes extension-less files since they may have a previewable ContentType.
@@ -885,6 +887,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const previewIdx = previewItem ? previewableItems.findIndex(o => o.Key === previewItem.Key) : -1;
   const prevPreviewItem = previewIdx > 0 ? previewableItems[previewIdx - 1] : null;
   const nextPreviewItem = previewIdx >= 0 && previewIdx < previewableItems.length - 1 ? previewableItems[previewIdx + 1] : null;
+  prevNextRef.current = { prev: prevPreviewItem, next: nextPreviewItem };
   navigatePreviewRef.current = (delta) => {
     const target = delta < 0 ? prevPreviewItem : nextPreviewItem;
     if (target) handlePreview(target);
@@ -914,95 +917,6 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
       {tableDragOver && (
         <div class="browser-drop-overlay">Drop files to upload to this folder</div>
       )}
-      {pendingDelete && (
-        <div class="modal-overlay" onClick={handleDeleteCancel}>
-          <div class="modal-dialog" onClick={e => e.stopPropagation()}>
-            <div class="modal-title">Delete file?</div>
-            <div class="modal-body">
-              <p class="modal-filename" title={pendingDelete.Key}>{leafName(pendingDelete.Key)}</p>
-              <p class="modal-caveat">{versioningCaveat}</p>
-              {deleteError && (
-                <div class="modal-error">
-                  Delete failed: {deleteError.message || String(deleteError)}
-                </div>
-              )}
-            </div>
-            <div class="modal-actions">
-              <button class="btn btn-ghost btn-sm" onClick={handleDeleteCancel} disabled={deleting}>Cancel</button>
-              <button class="btn btn-danger btn-sm" onClick={handleDeleteConfirm} disabled={deleting}>
-                {deleting ? <span class="spinner" /> : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {folderDelete && (
-        <div class="modal-overlay" onClick={folderDelete.phase === 'confirm' ? closeFolderDeleteModal : undefined}>
-          <div class="modal-dialog" onClick={e => e.stopPropagation()}>
-            {folderDelete.phase === 'confirm' && (<>
-              <div class="modal-title">Delete folder?</div>
-              <div class="modal-body">
-                <p class="modal-filename">{folderDelete.prefix.slice(prefix.length)}</p>
-                <p class="modal-caveat">All objects inside will be permanently deleted. {versioningCaveat}</p>
-              </div>
-              <div class="modal-actions">
-                <button class="btn btn-ghost btn-sm" onClick={closeFolderDeleteModal}>Cancel</button>
-                <button class="btn btn-danger btn-sm" onClick={handleFolderDeleteConfirm}>Delete folder</button>
-              </div>
-            </>)}
-            {(folderDelete.phase === 'listing' || folderDelete.phase === 'deleting') && (<>
-              <div class="modal-title">Deleting folder…</div>
-              <div class="modal-body">
-                <p class="modal-filename">{folderDelete.prefix.slice(prefix.length)}</p>
-                {folderDelete.phase === 'listing'
-                  ? <p class="modal-caveat"><span class="spinner" style={{ marginRight: '.4rem' }} />Listing objects…</p>
-                  : <p class="modal-caveat"><span class="spinner" style={{ marginRight: '.4rem' }} />Deleting {folderDelete.deleted} / {folderDelete.total} objects…</p>
-                }
-              </div>
-            </>)}
-            {folderDelete.phase === 'done' && (<>
-              <div class="modal-title">{folderDelete.errors.length === 0 ? 'Folder deleted' : 'Deleted with errors'}</div>
-              <div class="modal-body">
-                <p class="modal-filename">{folderDelete.prefix.slice(prefix.length)}</p>
-                <p class="modal-caveat">{folderDelete.deleted} object{folderDelete.deleted !== 1 ? 's' : ''} deleted.</p>
-                {folderDelete.errors.length > 0 && (
-                  <div class="modal-error">
-                    {folderDelete.errors.slice(0, 5).map((e, i) => (
-                      <div key={i}>{e.key}: {e.message}</div>
-                    ))}
-                    {folderDelete.errors.length > 5 && <div>…and {folderDelete.errors.length - 5} more</div>}
-                  </div>
-                )}
-              </div>
-              <div class="modal-actions">
-                <button class="btn btn-ghost btn-sm" onClick={closeFolderDeleteModal}>Close</button>
-              </div>
-            </>)}
-          </div>
-        </div>
-      )}
-
-      {batchDeletePending && (
-        <div class="modal-overlay" onClick={() => setBatchDeletePending(false)}>
-          <div class="modal-dialog" onClick={e => e.stopPropagation()}>
-            <div class="modal-title">Delete {selectedKeys.size} file{selectedKeys.size !== 1 ? 's' : ''}?</div>
-            <div class="modal-body">
-              <p class="modal-caveat">{versioningCaveat}</p>
-              {batchDeleteError && (
-                <div class="modal-error">Delete failed: {batchDeleteError.message || String(batchDeleteError)}</div>
-              )}
-            </div>
-            <div class="modal-actions">
-              <button class="btn btn-ghost btn-sm" onClick={() => setBatchDeletePending(false)} disabled={batchDeleting}>Cancel</button>
-              <button class="btn btn-danger btn-sm" onClick={handleBatchDelete} disabled={batchDeleting}>
-                {batchDeleting ? <span class="spinner" /> : `Delete ${selectedKeys.size}`}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {newFolderOpen && (
         <div class="modal-overlay" onClick={() => setNewFolderOpen(false)}>
           <div class="modal-dialog" onClick={e => e.stopPropagation()}>
@@ -1110,7 +1024,12 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                     <div class="modal-error">Preview failed: {previewError.message || String(previewError)}</div>
                   )}
                   {previewUrl && kind === 'image' && (
-                    <img src={previewUrl} alt={leafName(previewItem.Key)} class="preview-media" />
+                    <img
+                      src={previewUrl}
+                      alt={leafName(previewItem.Key)}
+                      class={`preview-media${previewPixelated ? ' preview-media--pixelated' : ''}`}
+                      onLoad={e => setPreviewPixelated(e.target.naturalWidth < 128 && e.target.naturalHeight < 128)}
+                    />
                   )}
                   {previewUrl && kind === 'audio' && (
                     <audio controls src={previewUrl} class="preview-audio" />
@@ -1187,28 +1106,36 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
         </div>
       </div>
 
-      {selectedKeys.size > 0 && (
+      {(selectedKeys.size > 0 || selectedPrefixes.size > 0) && (
         <div class="batch-bar">
-          <span class="batch-count">{selectedKeys.size} selected</span>
-          <button class="btn btn-ghost btn-sm" onClick={() => setSelectedKeys(new Set())}>Clear</button>
-          <div class="copy-link-wrap" ref={batchCopyOpen ? batchCopyWrapRef : undefined} style={{ marginLeft: 'auto' }}>
-            <button class="btn btn-ghost btn-sm" onClick={() => setBatchCopyOpen(v => !v)} disabled={!canDownload}>
-              {batchCopied !== null ? `✓ ${batchCopied} link${batchCopied !== 1 ? 's' : ''} copied` : 'Copy links'}
-            </button>
-            {batchCopyOpen && (
-              <BatchCopyLinkPopover
-                client={client} bucket={bucket} keys={[...selectedKeys]}
-                onClose={() => setBatchCopyOpen(false)}
-                onCopied={(count) => { setBatchCopied(count); setTimeout(() => setBatchCopied(null), 2000); }}
-              />
-            )}
-          </div>
+          <span class="batch-count">
+            {[
+              selectedKeys.size > 0 && `${selectedKeys.size} file${selectedKeys.size !== 1 ? 's' : ''}`,
+              selectedPrefixes.size > 0 && `${selectedPrefixes.size} folder${selectedPrefixes.size !== 1 ? 's' : ''}`,
+            ].filter(Boolean).join(', ')} selected
+          </span>
+          <button class="btn btn-ghost btn-sm" onClick={() => { setSelectedKeys(new Set()); setSelectedPrefixes(new Set()); }}>Clear</button>
+          {selectedKeys.size > 0 && (
+            <div class="copy-link-wrap" ref={batchCopyOpen ? batchCopyWrapRef : undefined} style={{ marginLeft: 'auto' }}>
+              <button class="btn btn-ghost btn-sm" onClick={() => setBatchCopyOpen(v => !v)} disabled={!canDownload}>
+                {batchCopied !== null ? `✓ ${batchCopied} link${batchCopied !== 1 ? 's' : ''} copied` : 'Copy links'}
+              </button>
+              {batchCopyOpen && (
+                <BatchCopyLinkPopover
+                  client={client} bucket={bucket} keys={[...selectedKeys]}
+                  onClose={() => setBatchCopyOpen(false)}
+                  onCopied={(count) => { setBatchCopied(count); setTimeout(() => setBatchCopied(null), 2000); }}
+                />
+              )}
+            </div>
+          )}
           <button
             class="btn btn-danger btn-sm"
-            onClick={() => { setBatchDeleteError(null); setBatchDeletePending(true); }}
+            style={selectedKeys.size === 0 ? { marginLeft: 'auto' } : undefined}
+            onClick={() => onDeleteRequest({ files: [...selectedKeys], prefixes: [...selectedPrefixes], capturedPrefix: prefix })}
             disabled={!canDelete}
           >
-            Delete {selectedKeys.size}
+            Delete {selectedKeys.size + selectedPrefixes.size}
           </button>
         </div>
       )}
@@ -1240,7 +1167,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                     type="checkbox"
                     checked={allVisibleSelected}
                     ref={el => { if (el) el.indeterminate = someVisibleSelected; }}
-                    onChange={() => toggleSelectAll(visibleItems)}
+                    onChange={() => toggleSelectAll(visibleFolders, visibleItems)}
                     title="Select all"
                   />
                 </th>
@@ -1251,26 +1178,31 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
               </tr>
             </thead>
             <tbody>
-              {visibleFolders.map(cp => (
-                <tr key={cp} class="file-row" onClick={() => navigateTo(cp)} style={{ cursor: 'pointer' }}>
-                  <td class="col-check" />
-                  <td class="col-name">
-                    <span class="file-icon">📁</span>
-                    <span class="file-dir">{cp.slice(prefix.length).replace(/\/$/, '')}</span>
-                  </td>
-                  <td class="col-size">—</td>
-                  <td class="col-modified"></td>
-                  <td class="col-actions">
-                    <button
-                      class="btn btn-ghost btn-sm"
-                      style={{ color: 'var(--text-danger)', borderColor: 'transparent' }}
-                      onClick={e => handleFolderDeleteClick(cp, e)}
-                      disabled={!canDelete}
-                      title={!canDelete ? 'Delete not permitted with current credentials' : 'Delete folder and all contents'}
-                    >✕</button>
-                  </td>
-                </tr>
-              ))}
+              {visibleFolders.map(cp => {
+                const isFolderSelected = selectedPrefixes.has(cp);
+                return (
+                  <tr key={cp} class={`file-row${isFolderSelected ? ' file-row-selected' : ''}`} onClick={() => navigateTo(cp)} style={{ cursor: 'pointer' }}>
+                    <td class="col-check" onClick={e => toggleSelectPrefix(cp, e)}>
+                      <input type="checkbox" checked={isFolderSelected} onChange={e => toggleSelectPrefix(cp, e)} onClick={e => e.stopPropagation()} />
+                    </td>
+                    <td class="col-name">
+                      <span class="file-icon">📁</span>
+                      <span class="file-dir">{cp.slice(prefix.length).replace(/\/$/, '')}</span>
+                    </td>
+                    <td class="col-size">—</td>
+                    <td class="col-modified"></td>
+                    <td class="col-actions">
+                      <button
+                        class="btn btn-ghost btn-sm"
+                        style={{ color: 'var(--text-danger)', borderColor: 'transparent' }}
+                        onClick={e => { e.stopPropagation(); onDeleteRequest({ files: [], prefixes: [cp], capturedPrefix: prefix }); }}
+                        disabled={!canDelete}
+                        title={!canDelete ? 'Delete not permitted with current credentials' : 'Delete folder and all contents'}
+                      >✕</button>
+                    </td>
+                  </tr>
+                );
+              })}
 
               {visibleItems.map(obj => {
                 const display = obj.Key.slice(prefix.length);
@@ -1361,7 +1293,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                       <button
                         class="btn btn-ghost btn-sm"
                         style={{ color: 'var(--text-danger)', borderColor: 'transparent', marginLeft: '.25rem' }}
-                        onClick={() => handleDeleteClick(obj)}
+                        onClick={() => onDeleteRequest({ files: [obj.Key], prefixes: [], capturedPrefix: prefix })}
                         disabled={!canDelete}
                         title={!canDelete ? 'Delete not permitted with current credentials' : 'Delete'}
                       >

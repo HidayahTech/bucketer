@@ -25,6 +25,7 @@ import {
   loadCredentials, saveCredentials, clearCredentials,
   loadCapabilities, saveCapabilities, clearCapabilities, defaultCapabilities,
   loadUpdateCheckEnabled, saveUpdateCheckEnabled,
+  loadPrefetchSizeLimit, savePrefetchSizeLimit,
   loadProfiles, saveProfile, deleteProfile, loadLastProfileId, saveLastProfileId,
   migrateProfilesFromLegacy, repairStorageInvariants,
 } from '../lib/storage.js';
@@ -33,6 +34,8 @@ import { FileBanner } from './FileBanner.jsx';
 import { CredentialForm } from './CredentialForm.jsx';
 import { Browser } from './Browser.jsx';
 import { UploadQueue } from './UploadQueue.jsx';
+import { DeleteQueue } from './DeleteQueue.jsx';
+import { runDeleteOperation } from '../lib/delete-queue.js';
 import { CapabilityPanel } from './CapabilityPanel.jsx';
 import { SettingsPanel } from './SettingsPanel.jsx';
 import { UploadLog } from './UploadLog.jsx';
@@ -76,8 +79,11 @@ export function App() {
   const [storageOpen, setStorageOpen] = useState(false);
   const [liveFormData, setLiveFormData] = useState(credentials);
   const [updateCheckEnabled, setUpdateCheckEnabled] = useState(() => loadUpdateCheckEnabled());
+  const [prefetchSizeLimit, setPrefetchSizeLimit] = useState(() => loadPrefetchSizeLimit());
   const [profiles, setProfiles] = useState(() => loadProfiles().profiles);
+  const [deleteOps, setDeleteOps] = useState([]);
   const addFilesRef = useRef(null);
+  const browserActionsRef = useRef(null);
   const logKeyDebounceRef = useRef(null);
   const urlParamsPresent = hasUrlParams();
 
@@ -169,6 +175,56 @@ export function App() {
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, [sidebarOpen]);
+
+  function handleDeleteRequest({ files, prefixes, capturedPrefix }) {
+    setDeleteOps(prev => [...prev, {
+      id: String(Date.now() + Math.random()),
+      phase: 'confirm',
+      files,
+      prefixes,
+      capturedPrefix,
+      bucket: credentials.bucket,
+      total: null,
+      deleted: 0,
+      errors: [],
+      collapsed: false,
+    }]);
+  }
+
+  function updateDeleteOp(id, update) {
+    setDeleteOps(prev => prev.map(op => op.id === id ? { ...op, ...update } : op));
+  }
+
+  async function handleDeleteConfirm(id) {
+    const op = deleteOps.find(o => o.id === id);
+    if (!op) return;
+    await runDeleteOperation(client, op.bucket, op, (update) => {
+      if (update.deletedKeys?.length) {
+        browserActionsRef.current?.removeItems(update.deletedKeys, []);
+      }
+      if (update.phase === 'done') {
+        if (update.deletedPrefixes?.length) {
+          browserActionsRef.current?.removeItems([], update.deletedPrefixes);
+        }
+        browserActionsRef.current?.invalidateCache(op.capturedPrefix);
+        handleCapabilityChange('delete', 'permitted');
+        if (update.errors.length === 0) {
+          setTimeout(() => setDeleteOps(prev => prev.filter(o => o.id !== id)), 3000);
+        }
+      }
+      updateDeleteOp(id, update);
+    });
+  }
+
+  function handleDeleteDismiss(id) {
+    setDeleteOps(prev => prev.filter(o => o.id !== id));
+  }
+
+  function handleDeleteCollapse(id) {
+    setDeleteOps(prev => prev.map(op =>
+      op.id === id ? { ...op, collapsed: !op.collapsed } : op
+    ));
+  }
 
   async function handleCopyLink() {
     const url = buildShareUrl(credentials);
@@ -367,6 +423,8 @@ export function App() {
               provider={credentials.provider}
               updateCheckEnabled={updateCheckEnabled}
               onUpdateCheckChange={(val) => { saveUpdateCheckEnabled(val); setUpdateCheckEnabled(val); }}
+              prefetchSizeLimit={prefetchSizeLimit}
+              onPrefetchSizeLimitChange={(val) => { savePrefetchSizeLimit(val); setPrefetchSizeLimit(val); }}
             />
             <hr style={{ border: 'none', borderTop: '1px solid var(--border)' }} />
             <details class="s3-primer">
@@ -416,6 +474,14 @@ export function App() {
               onMount={({ addFiles }) => { addFilesRef.current = addFiles; }}
             />
 
+            <DeleteQueue
+              ops={deleteOps}
+              onConfirm={handleDeleteConfirm}
+              onDismiss={handleDeleteDismiss}
+              onCollapse={handleDeleteCollapse}
+              provider={credentials.provider}
+            />
+
             <UploadLog refreshKey={logKey} />
 
             <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '1rem 0' }} />
@@ -431,6 +497,9 @@ export function App() {
               onInitialListFailed={(err) => { setSession('failed'); setConnectionError(err); }}
               onUploadTargetChange={setCurrentPrefix}
               onExternalDrop={(entries) => addFilesRef.current?.(entries)}
+              onDeleteRequest={handleDeleteRequest}
+              onMount={(actions) => { browserActionsRef.current = actions; }}
+              prefetchSizeLimit={prefetchSizeLimit}
             />
           </main>
         </div>

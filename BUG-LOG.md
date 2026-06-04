@@ -526,3 +526,135 @@ The profile save flow was only tested in the connected state in earlier developm
 A DOM-level integration test would be needed (fill form, save profile, assert profile contains correct values and form is not cleared). Not currently practical without a test renderer.
 
 **Coverage:** No automated test (DOM-dependent). Fix verified by manual testing.
+
+---
+
+## BUG-021 — Page completely frozen: Firefox terminated Preact VDOM diff of 15 000+ UploadLog rows
+
+**Date:** 2026-06-03
+**Commit:** v1.14.0
+
+**Symptom:**
+After a large upload session (15 521 files in upload history), the entire page became unresponsive. Buttons did not respond. Dragging files caused the browser to try to open them instead of uploading. The tab appeared fully loaded (no spinner). Firefox DevTools console showed: `Script terminated by timeout` with a stack trace rooted in Preact's VDOM diff functions (`diffElementNodes`, `diffChildren`, `diff`) repeating dozens of frames deep, entered from the `UploadQueue` task runner (`_drain`).
+
+**Root cause:**
+`UploadQueue._drain()` dispatches upload tasks as microtasks. Each task completion called `updateItem` → `setItems` → Preact state flush. Preact flushes synchronously from within a microtask, running a full VDOM diff of the entire component tree before yielding. With 15 521 `<tr>` rows × 7 cells = 108 647 virtual nodes, each diff took several seconds of wall-clock time. Firefox's script timeout (not CPU-based, fires after ~10 s of wall-clock JS execution) fired during the diff and terminated the script. Because Preact's event delegation was in a crashed state, all subsequent clicks and drags were silently lost at the DOM level.
+
+Compounding factor: `UploadLog` used `key={i}` (array index). When a new entry was prepended, all keys shifted by 1, forcing Preact to patch every row instead of inserting one node.
+
+**Fix:**
+- Cap `UploadLog` to render at most `MAX_DISPLAY = 200` rows (newest first). Summary stats (total bytes, error count) still computed from all loaded entries.
+- Changed row key from `key={i}` (array index) to `key={e.completedAt != null ? \`${e.completedAt}_${i}\` : i}` so Preact can add/remove a single node per new entry instead of re-keying the entire list.
+- Added truncation notice: "Showing most recent 200 of N uploads. Clear the log to reset."
+
+**Why it wasn't caught earlier:**
+The freeze only manifests at scale (thousands of entries). Normal testing involved small upload batches. The symptom (frozen page, browser opens files on drag) did not point to a Preact rendering issue — it looked like an event-handling or queue bug. The stack trace was the key diagnostic.
+
+**Test case:**
+Render performance regressions of this kind are not mechanically testable in the current unit suite. The cap itself is an implicit safeguard: the rendered node count is now bounded at `MAX_DISPLAY × 7` regardless of history size.
+
+**Coverage:** No automated test. Mitigated by `MAX_DISPLAY` cap. Stable key fix is a correctness improvement that also helps.
+
+---
+
+## BUG-022 — UploadLog panel popped in and out during active uploads
+
+**Date:** 2026-06-03
+**Commit:** v1.14.0
+
+**Symptom:**
+While uploads were in progress, the Upload History section repeatedly disappeared and reappeared, causing the page to jump. Each time a new upload completed, the panel would flash out then back in.
+
+**Root cause:**
+`UploadLog` had a `loading` boolean state initialised to `true`. Every time `refreshKey` incremented (triggered by each upload completion via `onLogEntry`), the `useEffect` set `loading = true` before fetching from IndexedDB. The render guard `if (loading || entries.length === 0) return null` caused the component to unmount on every refresh cycle, even though entries already existed. The panel disappeared for the round-trip to IndexedDB and reappeared once data loaded.
+
+**Fix:**
+Replaced `loading` with `initialLoadDone` (starts `false`, set to `true` once on first load, never reset). The render guard became `if (!initialLoadDone || entries.length === 0) return null`. Subsequent refreshes update `entries` in place; the component stays mounted and its contents update without any unmount/remount.
+
+**Why it wasn't caught earlier:**
+Observed only when upload history was large enough to be visible while uploads were still in progress. In early testing, uploads finished before the log section rendered.
+
+**Test case:**
+A DOM-level integration test: render `UploadLog` with an initial `refreshKey`, simulate two increments in quick succession, assert the component never returns `null` between increments if entries are already present.
+
+**Coverage:** No automated test (DOM-dependent). Fix verified by manual testing.
+
+---
+
+## BUG-023 — Re-dragging a cancelled folder showed all files as "Paused"
+
+**Date:** 2026-06-03
+**Commit:** v1.14.0
+
+**Symptom:**
+After cancelling an in-progress folder upload and dragging the same folder into the upload zone again, every file immediately appeared with status "Paused — resume record found" rather than starting fresh. The user had to manually click Restart on each file.
+
+**Root cause:**
+`handleCancelBatch` aborted in-flight multipart sessions via `AbortMultipartUploadCommand` but did not call `deleteResumeRecord`. The IndexedDB resume records from the original (now-cancelled) upload survived. On the re-drag, `enqueueUpload` found those stale records for each file and set status to `paused` to prompt the user for a Resume/Restart choice — the correct behaviour for a genuine interrupted session, but wrong when the session was intentionally cancelled.
+
+**Fix:**
+Added `deleteResumeRecord(...)` calls inside `handleCancelBatch` alongside the existing `AbortMultipartUploadCommand` calls — one per item that had an active or paused multipart session. Both calls are fire-and-forget (`.catch(() => {})`); failure to delete a record is non-fatal and the user can still Restart.
+
+**Why it wasn't caught earlier:**
+The cancel path was tested for single-file cancels (`handleCancel`) which always called `deleteResumeRecord`. The batch-cancel path (`handleCancelBatch`) was added later and the resume-record cleanup was not carried over.
+
+**Test case:**
+Unit test for `handleCancelBatch`: mock an item with a `resumeRecord`, call cancel, assert `deleteResumeRecord` was called. Not currently in the suite.
+
+**Coverage:** No automated test. Fix verified by manual testing.
+
+---
+
+## BUG-024 — Cancel during `loadResumeRecord` async gap overwrote "aborted" status with "paused"
+
+**Date:** 2026-06-03
+**Commit:** v1.14.0
+
+**Symptom:**
+Cancelling a batch immediately after dropping files could leave some items stuck in "Paused" status even though the cancel appeared to have fired. Affected items were those where `enqueueUpload` was suspended awaiting `loadResumeRecord` at the moment `handleCancelBatch` ran.
+
+**Root cause:**
+`enqueueUpload` calls `await loadResumeRecord(...)` before checking `cancelledBatchesRef`. The function is suspended at this `await`. If `handleCancelBatch` fires during this gap — adding `batchId` to `cancelledBatchesRef` and setting in-queue items to `aborted` — the items are correctly marked. But when `loadResumeRecord` resolves, the continuation of `enqueueUpload` ran past the cancellation check (which only existed further down, inside `queueRef.current.enqueue`), reached `if (existingRecord) { updateItem(..., { status: 'paused' }) }`, and overwrote the `aborted` status set by the cancel.
+
+**Fix:**
+Added a guard immediately after the `await loadResumeRecord(...)` line:
+```js
+if (cancelledBatchesRef.current.has(item.batchId)) return;
+```
+This mirrors the guard already present inside the queued task and covers the async gap before it.
+
+**Why it wasn't caught earlier:**
+The race window is narrow (only items that happen to be suspended in the `await` at the exact moment of cancel). Reproducing it required cancelling very quickly after drop, before the IndexedDB lookup resolved.
+
+**Test case:**
+Unit test: call `enqueueUpload` with a mock `loadResumeRecord` that delays, fire `handleCancelBatch` during the delay, assert the item remains `aborted` after the delay resolves. Not currently in the suite.
+
+**Coverage:** No automated test. Fix verified by manual testing.
+
+---
+
+## BUG-025 — Upload silently fails with cryptic network error when blocked by a browser extension
+
+**Date:** 2026-06-03
+**Commit:** v1.14.0
+
+**Symptom:**
+Uploading a file whose destination path matched an ad-block filter rule (e.g., `server/analytics/analytics.js`) failed immediately with status 0, time 0, and no response headers. The error displayed in Bucketer was a raw `TypeError` ("NetworkError when attempting to fetch resource.") with no indication of the cause. The user had uBlock Origin active in Firefox.
+
+Note: this is not a bug in Bucketer's logic — the request was legitimate and correctly formed. The failure is external. It is recorded here because the UX consequence (opaque error, no recovery path surfaced) was indistinguishable from a genuine network failure.
+
+**Root cause:**
+Browser content-blocking extensions (uBlock Origin, AdBlock Plus, etc.) intercept `fetch()` calls at the browser `webRequest` API level, before the request reaches the network. The interception is silent: no CORS preflight fires, no HTTP response is returned, and the browser raises a `TypeError` with a browser-specific message. In Firefox this is "NetworkError when attempting to fetch resource."; Chrome produces "Failed to fetch"; Safari produces "Load failed". The AWS SDK receives this as an unclassified network error and rethrows it. Bucketer's error display showed the raw JSON-serialised error with no context.
+
+The filter match that triggered this was the filename `analytics.js` in the upload path, which is a common target in EasyPrivacy and similar filter lists.
+
+**Fix:**
+Added `isBlockedByExtension(err)` to `src/lib/format.js`. It returns `true` when: the error is a `TypeError`, it has no `$metadata.httpStatusCode` (ruling out genuine HTTP responses), and its message matches one of the three browser-specific strings. When the check passes, `UploadItem` renders a yellow warning banner above the technical error detail explaining that a browser extension may have blocked the request and offering two concrete remedies: disable the extension for the page, or add the destination domain to its allowlist.
+
+**Why it wasn't caught earlier:**
+Requires both a content blocker and a file whose upload URL matches a filter rule — a combination unlikely to appear in normal development testing. The failure mode is also easy to misread as a network or CORS issue.
+
+**Test case:**
+`isBlockedByExtension` has unit tests in `format.test.js` covering the Firefox, Chrome, and Safari error strings, a TypeError with an HTTP metadata response (must not trigger), a non-TypeError with the same message (must not trigger), a real S3 error (must not trigger), and null/undefined inputs.
+
+**Coverage:** `isBlockedByExtension` fully covered by unit tests. The banner render is DOM-dependent and verified by manual testing.

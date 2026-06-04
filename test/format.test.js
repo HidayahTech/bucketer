@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatBytes, formatSpeed, formatEta, leafName, isPermissionError, parseS3Error } from '../src/lib/format.js';
+import { formatBytes, formatSpeed, formatEta, leafName, isPermissionError, parseS3Error, isBlockedByExtension } from '../src/lib/format.js';
 
 describe('formatBytes', () => {
   test('zero', () => assert.equal(formatBytes(0), '0 B'));
@@ -89,4 +89,39 @@ describe('parseS3Error', () => {
     const parsed = parseS3Error({ message: 'x', Code: 'AccessDenied', name: 'SomethingElse', $metadata: {} });
     assert.equal(parsed.code, 'AccessDenied');
   });
+});
+
+describe('isBlockedByExtension (BUG-025)', () => {
+  // Firefox
+  test('Firefox NetworkError TypeError', () => assert.equal(
+    isBlockedByExtension(Object.assign(new TypeError('NetworkError when attempting to fetch resource.'), { name: 'TypeError' })),
+    true
+  ));
+  // Chrome
+  test('Chrome Failed to fetch TypeError', () => assert.equal(
+    isBlockedByExtension(Object.assign(new TypeError('Failed to fetch'), { name: 'TypeError' })),
+    true
+  ));
+  // Safari
+  test('Safari Load failed TypeError', () => assert.equal(
+    isBlockedByExtension(Object.assign(new TypeError('Load failed'), { name: 'TypeError' })),
+    true
+  ));
+  // Not a block — got an HTTP response
+  test('TypeError with HTTP metadata is not a block', () => assert.equal(
+    isBlockedByExtension(Object.assign(new TypeError('Failed to fetch'), { $metadata: { httpStatusCode: 500 } })),
+    false
+  ));
+  // Not a block — different error type
+  test('non-TypeError network error is not a block', () => assert.equal(
+    isBlockedByExtension({ name: 'Error', message: 'Failed to fetch' }),
+    false
+  ));
+  // S3 errors are not blocks
+  test('S3 AccessDenied is not a block', () => assert.equal(
+    isBlockedByExtension({ name: 'AccessDenied', message: 'Access Denied', $metadata: { httpStatusCode: 403 } }),
+    false
+  ));
+  test('null', () => assert.equal(isBlockedByExtension(null), false));
+  test('undefined', () => assert.equal(isBlockedByExtension(undefined), false));
 });

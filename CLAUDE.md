@@ -47,7 +47,7 @@ Real bugs are the highest-value source of test cases. A test derived from a bug 
 Tests live in `test/` and run with `node --test` (no framework). The suite has two layers:
 
 **Unit tests — pure Node, no build step needed:**
-- `format.test.js` — `formatBytes`, `formatSpeed`, `formatEta`, `leafName`, `parseS3Error`, `isPermissionError`
+- `format.test.js` — `formatBytes`, `formatSpeed`, `formatEta`, `leafName`, `parseS3Error`, `isPermissionError`, `isBlockedByExtension` (BUG-025)
 - `media.test.js` — `mediaKind`, `mimeKind`, `mimeType`
 - `provider.test.js` — `detectProvider`, `extractRegion`, `requiresPathStyle`, `defaultMaxKeys`, `needsCorsConfig`
 - `upload-queue.test.js` — `UploadQueue` concurrency, clear, error handling
@@ -63,7 +63,7 @@ Tests live in `test/` and run with `node --test` (no framework). The suite has t
 - `credential-form-validation.test.js` — `credentialErrors` for bucket, keyId, secretKey, regionOverride (BUG-016)
 
 **Source-level structural assertions — no build step needed:**
-- `source-invariants.test.js` — SetupGuide buttons have explicit type (BUG-006), App.jsx hook imports (BUG-014), selectedProfileId declared before credentials (BUG-017)
+- `source-invariants.test.js` — SetupGuide buttons have explicit type (BUG-006), App.jsx hook imports (BUG-014), selectedProfileId declared before credentials (BUG-017), UploadLog MAX_DISPLAY cap (BUG-021)
 
 **Build output assertions — require `npm run build` first:**
 - `build.test.js` — placeholder replacement (BUG-001), Preact JSX transform (BUG-002), version consistency, CORS DELETE (BUG-012), single-bundle structure

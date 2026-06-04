@@ -281,6 +281,14 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 .upload-zone.drag-over { border-color: var(--accent); background: var(--info-bg); color: var(--accent); }
 
 /* ── Upload queue ─────────────────────────────────────────────────────────── */
+.queue-global-actions {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .35rem;
+  margin-top: .5rem; padding: .35rem .5rem;
+  background: var(--surface-raised); border-radius: var(--radius);
+  font-size: .8rem;
+}
+.queue-global-actions-label { color: var(--text-muted); margin-right: .1rem; white-space: nowrap; }
+
 .upload-queue { display: flex; flex-direction: column; gap: .5rem; }
 .upload-item {
   background: var(--surface);
@@ -325,6 +333,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
   flex-direction: column;
   gap: .35rem;
 }
+.batch-summary--errors { box-shadow: inset 3px 0 0 var(--text-danger); }
 .batch-summary-top { display: flex; align-items: center; flex-wrap: wrap; gap: .2rem; }
 .batch-summary-count { font-weight: 500; }
 .batch-queued { color: var(--text-muted); }
@@ -333,7 +342,58 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 .batch-eta    { color: var(--text-muted); font-size: .8rem; white-space: nowrap; }
 .batch-summary-meta { display: flex; justify-content: space-between; color: var(--text-muted); font-size: .75rem; }
 .batch-all-done { color: var(--text-success); }
+.batch-spacer   { flex: 1; }
+.batch-status-icon { font-size: .85rem; flex-shrink: 0; }
+.batch-status-ok   { color: var(--text-success); }
+.batch-status-err  { color: var(--text-danger); }
 .batch-inflight { display: flex; flex-direction: column; gap: .4rem; border-top: 1px solid var(--border); padding-top: .4rem; margin-top: .1rem; }
+
+/* ── Delete queue ─────────────────────────────────────────────────────────── */
+.delete-queue { display: flex; flex-direction: column; gap: .5rem; }
+.delete-op {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: .6rem .75rem;
+  font-size: .85rem;
+}
+.delete-op-expanded { padding-bottom: .5rem; }
+.delete-op-header { display: flex; align-items: center; gap: .5rem; }
+.delete-op-summary { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.delete-op-icon { font-size: .9rem; flex-shrink: 0; }
+.delete-op-ok  { color: var(--text-success); }
+.delete-op-err { color: var(--text-danger); }
+.delete-op-errors {
+  margin-top: .4rem;
+  border-top: 1px solid var(--border);
+  padding-top: .4rem;
+  display: flex;
+  flex-direction: column;
+  gap: .2rem;
+}
+.delete-op-error-row {
+  display: flex;
+  gap: .5rem;
+  font-size: .78rem;
+  align-items: baseline;
+}
+.delete-op-error-key {
+  color: var(--text-muted);
+  min-width: 0;
+  flex-shrink: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+}
+.delete-op-error-msg { color: var(--text-danger); flex-shrink: 0; }
+.delete-op-error-more { color: var(--text-muted); font-style: italic; }
+.delete-confirm-prefixes {
+  display: flex;
+  flex-direction: column;
+  gap: .2rem;
+  margin: .3rem 0 .5rem;
+}
 
 /* ── Capability badges ────────────────────────────────────────────────────── */
 .cap-list { display: flex; flex-direction: column; gap: .3rem; font-size: .8rem; }
@@ -536,9 +596,12 @@ details[open] .upload-log-summary::before { transform: rotate(90deg); }
 }
 .preview-truncated { font-size: .75rem; color: var(--text-muted); text-align: center; }
 .preview-media {
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
+}
+.preview-media--pixelated {
+  image-rendering: pixelated;
   border-radius: var(--radius);
   display: block;
 }
@@ -717,6 +780,10 @@ details[open] .sv-summary::before { transform: rotate(90deg); }
 .changelog-current-badge { font-size: .7rem; font-weight: 600; background: var(--accent); color: #fff; padding: .1rem .4rem; border-radius: 999px; }
 .changelog-entry-title { font-weight: 600; }
 .changelog-changes { padding-left: 1.25rem; display: flex; flex-direction: column; gap: .2rem; color: var(--text-muted); line-height: 1.5; }
+.changelog-group { list-style: none; margin-left: -1.25rem; margin-top: .35rem; }
+.changelog-group:first-child { margin-top: 0; }
+.changelog-group-label { display: block; font-weight: 500; color: var(--text); margin-bottom: .2rem; }
+.changelog-group ul { padding-left: 1.25rem; display: flex; flex-direction: column; gap: .2rem; }
 .changelog-upstream { padding-top: .75rem; border-top: 1px solid var(--border); font-size: .8rem; }
 .upstream-result { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
 .upstream-badge { height: 20px; vertical-align: middle; display: block; }

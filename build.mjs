@@ -57,10 +57,23 @@ function parseChangelog(src) {
     const m = header.match(/^\[([^\]]+)\]\s+—\s+(\d{4}-\d{2}-\d{2})(?:\s+—\s+(.+))?$/);
     if (!m) continue;
     const [, version, date, title] = m;
-    const changes = lines
-      .slice(1)
-      .filter(l => l.trimStart().startsWith('- '))
-      .map(l => l.trimStart().slice(2).trim().replace(/`([^`]+)`/g, '$1'));
+    // Two-level parse: **Bold lines** become group labels; following bullet lines
+    // are nested under them. Bullet lines before any group remain plain strings.
+    // Older entries with no bold headers produce a flat string array (unchanged).
+    const changes = [];
+    let currentGroup = null;
+    for (const line of lines.slice(1)) {
+      const t = line.trim();
+      const groupMatch = t.match(/^\*\*(.+)\*\*$/);
+      if (groupMatch) {
+        currentGroup = { group: groupMatch[1], items: [] };
+        changes.push(currentGroup);
+      } else if (t.startsWith('- ')) {
+        const text = t.slice(2).trim().replace(/`([^`]+)`/g, '$1');
+        if (currentGroup) currentGroup.items.push(text);
+        else changes.push(text);
+      }
+    }
     entries.push({ version, date, ...(title ? { title: title.trim() } : {}), changes });
   }
   return entries;

@@ -28,6 +28,8 @@ const LS_KEYS = {
   fileConcurrency: 's3b_file_concurrency',
   listingCacheTTL: 's3b_listing_cache_ttl',
   updateCheckEnabled: 's3b_update_check_enabled',
+  prefetchSizeLimit:     's3b_prefetch_size_limit',
+  uploadExpandThreshold: 's3b_upload_expand_threshold',
   capabilities: 's3b_capabilities',
 };
 const SS_KEY_SECRET = 's3b_secret_key';
@@ -116,6 +118,30 @@ export function loadListingCacheTTL() {
 
 export function saveListingCacheTTL(seconds) {
   safeSet(localStorage, LS_KEYS.listingCacheTTL, String(seconds));
+}
+
+// Default 5 MB. 0 = off.
+export function loadPrefetchSizeLimit() {
+  const v = safeGet(localStorage, LS_KEYS.prefetchSizeLimit);
+  if (v === '') return 5 * 1024 * 1024;
+  const n = parseInt(v, 10);
+  return isNaN(n) || n < 0 ? 5 * 1024 * 1024 : n;
+}
+
+export function savePrefetchSizeLimit(n) {
+  safeSet(localStorage, LS_KEYS.prefetchSizeLimit, String(n));
+}
+
+// Batches at or below this count start expanded; larger batches start collapsed. Default 5.
+export function loadUploadExpandThreshold() {
+  const v = safeGet(localStorage, LS_KEYS.uploadExpandThreshold);
+  if (v === '') return 5;
+  const n = parseInt(v, 10);
+  return isNaN(n) || n < 0 ? 5 : n;
+}
+
+export function saveUploadExpandThreshold(n) {
+  safeSet(localStorage, LS_KEYS.uploadExpandThreshold, String(n));
 }
 
 // Default true — preserves existing behaviour for users who have never changed it.
@@ -267,6 +293,7 @@ export function resetSettings() {
   const settingsKeys = [
     LS_KEYS.maxKeys, LS_KEYS.partConcurrency, LS_KEYS.partSizeMB,
     LS_KEYS.fileConcurrency, LS_KEYS.listingCacheTTL, LS_KEYS.updateCheckEnabled,
+    LS_KEYS.prefetchSizeLimit, LS_KEYS.uploadExpandThreshold,
   ];
   settingsKeys.forEach(k => safeRemove(localStorage, k));
 }

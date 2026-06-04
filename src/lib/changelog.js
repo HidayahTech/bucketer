@@ -1,9 +1,135 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.13.20';
+export const CURRENT_VERSION = '1.14.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.14.0",
+    "date": "2026-06-03",
+    "title": "Unified delete, preview prefetch, collapsible upload queue, global queue actions",
+    "changes": [
+      {
+        "group": "Unified delete workflow",
+        "items": [
+          "Replaced three separate delete code paths (single-file, multi-file, multi-folder) with a single unified flow",
+          "All delete requests — one file, many files, one folder, many folders, or any mix — go through the same confirm → discover → delete → done pipeline",
+          "Folder checkboxes added to the file listing; select-all now covers both files and folders",
+          "Batch bar counts files and folders separately (\"X files, Y folders selected\")",
+          "Non-blocking execution: the confirm modal starts the operation then dismisses; progress appears in a panel in App.jsx that survives folder navigation (same pattern as UploadQueue)",
+          "Each delete operation shows spinner during discover/delete phases, ✓ on clean completion (auto-dismisses after 3 s), ✕ with expandable error detail on failure",
+          "Delete batches run at CONCURRENCY=8 (up from 3) with exponential-backoff retry on 503/429/SlowDown throttling responses",
+          "Fixed: selection bar (\"X files, Y folders selected\") now clears as items are removed from the listing after a successful delete",
+          "src/lib/delete-queue.js — new execution module",
+          "src/components/DeleteQueue.jsx — new UI component: confirm modal overlay + collapsible progress entries"
+        ]
+      },
+      {
+        "group": "Preview signed-URL cache",
+        "items": [
+          "Signed URLs for previewed items are cached for 55 minutes (5-minute buffer before the 1-hour expiry); re-opening the same file within that window skips the HeadObject and URL-signing round-trip entirely and lets the browser serve the image from its own HTTP cache",
+          "Cache is cleared on folder navigation to prevent unbounded growth"
+        ]
+      },
+      {
+        "group": "Preview prefetch",
+        "items": [
+          "After the current preview item loads, the next and previous items are prefetched in the background so navigation feels instant",
+          "Level 1 (all previewable types): HeadObject + signed URL generated and cached — eliminates the \"thinking\" delay on navigation",
+          "Level 2 (images and text): image content downloaded via a hidden Image element if within the configured size limit; text fetched via the existing range request and stored in the cache so navigation requires zero network activity",
+          "Audio, video, and PDF: Level 1 only — URL cached, no content download",
+          "New setting \"Preview prefetch\" in Settings: Off / 1 MB / 5 MB (default) / 10 MB / 25 MB — takes effect immediately without a page reload"
+        ]
+      },
+      {
+        "group": "Small image preview",
+        "items": [
+          "Images smaller than 128×128 px now fill the preview container (object-fit: contain at 100% width/height) so they are no longer uselessly tiny",
+          "Images detected as pixel art (natural size < 128×128) get image-rendering: pixelated so they scale up crisply without blurring"
+        ]
+      },
+      {
+        "group": "Collapsible upload queue",
+        "items": [
+          "Each batch of dropped/selected files is now a collapsible row in the upload panel, independent of other batches",
+          "Batches with few files start expanded; larger batches start collapsed — configurable via new \"Upload queue expand threshold\" setting in Settings (default: 5)",
+          "Collapsed view shows a one-liner summary (file count, progress, speed, ETA)",
+          "Batches auto-collapse 3 seconds after all files complete",
+          "A Dismiss button appears once a batch is fully settled (no active or queued items); removes it from the panel",
+          "Cancel button is now per-batch rather than clearing the entire queue",
+          "Desktop notifications changed from per-file to one summary notification per batch when it settles (\"3 files uploaded\", \"2 uploaded · 1 failed\", etc.)"
+        ]
+      },
+      {
+        "group": "Global queue actions bar",
+        "items": [
+          "A compact action bar appears above the batch list when multiple batches are present or when actions span batches",
+          "\"Dismiss all done\" — removes all settled batches in one click (shown when 2+ batches are fully settled)",
+          "\"Retry all failed\" — re-queues every failed item across all batches (shown when any item has error status)",
+          "\"Cancel all\" — cancels all active and queued batches; uses the same two-click confirm pattern as per-batch cancel (shown when any upload is active or queued)",
+          "\"Collapse all\" / \"Expand all\" — toggle visibility of all batch rows at once (shown when 2+ batches exist with at least 2 in the same state)"
+        ]
+      },
+      {
+        "group": "Upload speed display improvements",
+        "items": [
+          "Batch transfer rate now uses a rolling 6-second derivative of confirmed bytes rather than summing per-item speeds; small files (single PutObject, no progress events) contribute the same as large files (continuous multipart updates), so the rate is accurate and uniform regardless of file size",
+          "Completed items in the per-file list now show their measured average upload speed (\"✓ Complete · 2.1 MB/s\"), giving a consistent display between in-progress large files and finished small files"
+        ]
+      },
+      {
+        "group": "Browser extension upload blocking detection",
+        "items": [
+          "Uploads blocked by ad/content blockers (uBlock Origin, etc.) now show an actionable warning rather than a cryptic network error: \"Request may have been blocked by a browser extension\" with guidance to disable the extension for the page or allowlist the destination domain",
+          "Detection covers all three browsers: Firefox (\"NetworkError when attempting to fetch resource\"), Chrome (\"Failed to fetch\"), Safari (\"Load failed\"); correctly ignored when an HTTP response was received (genuine server errors are unaffected)"
+        ]
+      },
+      {
+        "group": "Failed upload visibility",
+        "items": [
+          "Batches containing failed items now show a red left accent border, making them immediately scannable across a long queue without expanding anything",
+          "Failed items float to the top of their batch's expanded list so they are visible without scrolling",
+          "Batches are force-expanded the first time an error appears, so failures are never hidden behind a collapsed \"Show\" button"
+        ]
+      },
+      {
+        "group": "In-app changelog grouping",
+        "items": [
+          "The changelog modal now renders a second level of hierarchy: **Bold section headers** in CHANGELOG.md become labelled groups with their items nested beneath them; entries without headers render as a flat list as before (no change to older releases)"
+        ]
+      },
+      {
+        "group": "Upload queue bug fixes",
+        "items": [
+          "Fixed page freeze (Firefox \"Script terminated by timeout\") caused by Preact diffing 15 000+ UploadLog rows on every queue update; upload history now renders at most 200 rows (all entries still counted for summary stats)",
+          "Fixed upload history panel popping in and out during active uploads; the panel no longer hides after initial load",
+          "Fixed re-dragging a previously cancelled folder showing files as \"paused\"; cancel now deletes the IndexedDB resume record",
+          "Fixed race condition where cancelling a batch during the resume-record lookup could set cancelled items back to \"paused\""
+        ]
+      }
+    ]
+  },
+  {
+    "version": "1.13.22",
+    "date": "2026-06-03",
+    "title": "Remove redundant preview button from file row actions",
+    "changes": [
+      "The filename is already clickable (accent colour, underline on hover) and opens",
+      "Removing it reduces the actions column from 5 buttons to 4"
+    ]
+  },
+  {
+    "version": "1.13.21",
+    "date": "2026-06-03",
+    "title": "Fix preview modal layout jank with fixed-height content stage",
+    "changes": [
+      "Preview content area now has a fixed height (clamp(300px, 70vh, 700px)) so the",
+      "Added --surface-raised background on the stage so the loading spinner and",
+      "Audio previews use a compact 140px stage instead of the full height; for files",
+      "Image and video max-height changed from 72vh to 100% — container is now",
+      "PDF height changed from 70vh to 100%; text preview fills and scrolls"
+    ]
+  },
   {
     "version": "1.13.20",
     "date": "2026-06-03",

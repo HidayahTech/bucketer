@@ -67,7 +67,16 @@ export function ChangelogModal({ onClose }) {
               </div>
               {entry.title && <div class="changelog-entry-title">{entry.title}</div>}
               <ul class="changelog-changes">
-                {entry.changes.map((c, i) => <li key={i}>{c}</li>)}
+                {entry.changes.map((c, i) =>
+                  typeof c === 'string'
+                    ? <li key={i}>{c}</li>
+                    : (
+                        <li key={i} class="changelog-group">
+                          <span class="changelog-group-label">{c.group}</span>
+                          <ul>{c.items.map((item, j) => <li key={j}>{item}</li>)}</ul>
+                        </li>
+                      )
+                )}
               </ul>
             </div>
           ))}

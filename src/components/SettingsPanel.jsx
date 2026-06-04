@@ -1,15 +1,16 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // Application settings (page size, upload concurrency, part size) (§4.7)
 import { useState } from 'preact/hooks';
-import { loadMaxKeys, saveMaxKeys, loadPartConcurrency, savePartConcurrency, loadPartSizeMB, savePartSizeMB, loadFileConcurrency, saveFileConcurrency, loadListingCacheTTL, saveListingCacheTTL, loadUpdateCheckEnabled, saveUpdateCheckEnabled } from '../lib/storage.js';
+import { loadMaxKeys, saveMaxKeys, loadPartConcurrency, savePartConcurrency, loadPartSizeMB, savePartSizeMB, loadFileConcurrency, saveFileConcurrency, loadListingCacheTTL, saveListingCacheTTL, loadUpdateCheckEnabled, saveUpdateCheckEnabled, loadPrefetchSizeLimit, savePrefetchSizeLimit, loadUploadExpandThreshold, saveUploadExpandThreshold } from '../lib/storage.js';
 import { defaultMaxKeys } from '../lib/provider.js';
 
-const DEFAULT_PART_CONCURRENCY  = 4;
-const DEFAULT_PART_SIZE_MB      = 5;
-const DEFAULT_FILE_CONCURRENCY  = 3;
-const DEFAULT_LISTING_CACHE_TTL = 120;
+const DEFAULT_PART_CONCURRENCY     = 4;
+const DEFAULT_PART_SIZE_MB         = 5;
+const DEFAULT_FILE_CONCURRENCY     = 3;
+const DEFAULT_LISTING_CACHE_TTL    = 120;
+const DEFAULT_UPLOAD_EXPAND_THRESHOLD = 5;
 
-export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChange }) {
+export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChange, prefetchSizeLimit, onPrefetchSizeLimitChange }) {
   const providerDefault = defaultMaxKeys(provider);
 
   const [maxKeysValue, setMaxKeysValue] = useState(() => {
@@ -27,6 +28,9 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
   const [cacheTTLValue, setCacheTTLValue] = useState(() => {
     const v = loadListingCacheTTL(); return String(v ?? DEFAULT_LISTING_CACHE_TTL);
   });
+  const [uploadExpandThresholdValue, setUploadExpandThresholdValue] = useState(() => {
+    return String(loadUploadExpandThreshold() ?? DEFAULT_UPLOAD_EXPAND_THRESHOLD);
+  });
 
   // Tracks what's actually persisted — updated on every successful save
   const [activeConcurrency, setActiveConcurrency] = useState(() => loadPartConcurrency() ?? DEFAULT_PART_CONCURRENCY);
@@ -41,21 +45,24 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
     setError(null);
 
     // Empty maxKeysValue → use provider default (not an error)
-    const n = maxKeysValue ? parseInt(maxKeysValue, 10) : providerDefault;
-    const c = parseInt(concurrencyValue, 10);
-    const p = parseInt(partSizeValue, 10);
-    const f = parseInt(fileConcurrencyValue, 10);
+    const n  = maxKeysValue ? parseInt(maxKeysValue, 10) : providerDefault;
+    const c  = parseInt(concurrencyValue, 10);
+    const p  = parseInt(partSizeValue, 10);
+    const f  = parseInt(fileConcurrencyValue, 10);
+    const et = parseInt(uploadExpandThresholdValue, 10);
 
-    if (isNaN(n) || n <= 0 || n > 100000) { setError('Page size must be 1–100,000.'); return; }
-    if (isNaN(c) || c < 1 || c > 16)      { setError('Upload part concurrency must be 1–16.'); return; }
-    if (isNaN(p) || p < 5 || p > 512)     { setError('Part size must be 5–512 MB.'); return; }
-    if (isNaN(f) || f < 1 || f > 16)      { setError('File concurrency must be 1–16.'); return; }
+    if (isNaN(n)  || n < 1   || n > 100000) { setError('Page size must be 1–100,000.'); return; }
+    if (isNaN(c)  || c < 1   || c > 16)     { setError('Upload part concurrency must be 1–16.'); return; }
+    if (isNaN(p)  || p < 5   || p > 512)    { setError('Part size must be 5–512 MB.'); return; }
+    if (isNaN(f)  || f < 1   || f > 16)     { setError('File concurrency must be 1–16.'); return; }
+    if (isNaN(et) || et < 0  || et > 1000)  { setError('Upload expand threshold must be 0–1000.'); return; }
 
     saveMaxKeys(n);
     savePartConcurrency(c);
     savePartSizeMB(p);
     saveFileConcurrency(f);
     saveListingCacheTTL(parseInt(cacheTTLValue, 10));
+    saveUploadExpandThreshold(et);
 
     setActiveConcurrency(c);
     setActivePartSize(p);
@@ -71,11 +78,15 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
     setPartSizeValue(String(DEFAULT_PART_SIZE_MB));
     setFileConcurrencyValue(String(DEFAULT_FILE_CONCURRENCY));
     setCacheTTLValue(String(DEFAULT_LISTING_CACHE_TTL));
+    setUploadExpandThresholdValue(String(DEFAULT_UPLOAD_EXPAND_THRESHOLD));
     saveMaxKeys(providerDefault);
     savePartConcurrency(DEFAULT_PART_CONCURRENCY);
     savePartSizeMB(DEFAULT_PART_SIZE_MB);
     saveFileConcurrency(DEFAULT_FILE_CONCURRENCY);
     saveListingCacheTTL(DEFAULT_LISTING_CACHE_TTL);
+    saveUploadExpandThreshold(DEFAULT_UPLOAD_EXPAND_THRESHOLD);
+    savePrefetchSizeLimit(5 * 1024 * 1024);
+    onPrefetchSizeLimitChange(5 * 1024 * 1024);
     setActiveConcurrency(DEFAULT_PART_CONCURRENCY);
     setActivePartSize(DEFAULT_PART_SIZE_MB);
     setActiveFileConcurrency(DEFAULT_FILE_CONCURRENCY);
@@ -163,6 +174,20 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
             Active: <strong>{activeFileConcurrency}</strong>
           </span>
         </div>
+        <div class="form-group">
+          <label>Upload queue expand threshold</label>
+          <input
+            type="number"
+            value={uploadExpandThresholdValue}
+            onInput={e => setUploadExpandThresholdValue(e.target.value)}
+            min="0"
+            max="1000"
+          />
+          <span class="hint">
+            Batches with this many files or fewer start expanded; larger batches start collapsed.
+            0 = always start collapsed. Default: {DEFAULT_UPLOAD_EXPAND_THRESHOLD}.
+          </span>
+        </div>
         {error && <span style={{ fontSize: '.8rem', color: 'var(--text-danger)' }}>{error}</span>}
         <div style={{ display: 'flex', gap: '.4rem', alignItems: 'center' }}>
           <button type="submit" class="btn btn-ghost btn-sm">Save</button>
@@ -170,6 +195,23 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
           {saved && <span style={{ fontSize: '.8rem', color: 'var(--text-success)' }}>Saved</span>}
         </div>
       </form>
+
+      <div class="form-group" style={{ marginTop: '.75rem' }}>
+        <label>Preview prefetch</label>
+        <select value={String(prefetchSizeLimit)} onChange={e => onPrefetchSizeLimitChange(Number(e.target.value))}>
+          <option value="0">Off</option>
+          <option value={String(1 * 1024 * 1024)}>Up to 1 MB</option>
+          <option value={String(5 * 1024 * 1024)}>Up to 5 MB (default)</option>
+          <option value={String(10 * 1024 * 1024)}>Up to 10 MB</option>
+          <option value={String(25 * 1024 * 1024)}>Up to 25 MB</option>
+        </select>
+        <span class="hint">
+          Pre-loads the next and previous items while viewing a preview so navigation
+          feels instant. Images within the size limit and text files are fetched in
+          the background; audio and video are never prefetched. Increases egress —
+          reduce or disable on metered connections.
+        </span>
+      </div>
 
       <div class="form-group" style={{ marginTop: '.75rem' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', cursor: 'pointer' }}>

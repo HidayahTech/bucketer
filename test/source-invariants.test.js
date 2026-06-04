@@ -70,6 +70,41 @@ describe('App.jsx — required hooks imported from preact/hooks (BUG-014)', () =
   }
 });
 
+// ── BUG-021: UploadLog must cap rendered rows to prevent Preact VDOM freeze ────
+// With tens of thousands of entries, Preact's synchronous VDOM diff of all rows
+// on every state update took several seconds of wall-clock time, triggering
+// Firefox's script timeout and freezing the page entirely. The MAX_DISPLAY
+// constant caps the rendered row count regardless of how many entries exist in
+// IndexedDB. If the constant is raised too high or removed, the freeze returns.
+
+describe('UploadLog — MAX_DISPLAY cap is present and bounded (BUG-021)', () => {
+  const source = src('components/UploadLog.jsx');
+
+  test('MAX_DISPLAY constant is declared', () => {
+    assert.ok(
+      /const\s+MAX_DISPLAY\s*=/.test(source),
+      'UploadLog.jsx must declare MAX_DISPLAY — removing it re-exposes the Preact VDOM freeze on large upload histories'
+    );
+  });
+
+  test('MAX_DISPLAY value is at most 500', () => {
+    const m = source.match(/const\s+MAX_DISPLAY\s*=\s*(\d+)/);
+    assert.ok(m, 'MAX_DISPLAY must be a numeric literal');
+    const value = Number(m[1]);
+    assert.ok(
+      value <= 500,
+      `MAX_DISPLAY is ${value}, which is dangerously high — keep it at or below 500 to prevent VDOM diffing thousands of rows`
+    );
+  });
+
+  test('displayEntries slices using MAX_DISPLAY', () => {
+    assert.ok(
+      /slice\s*\(\s*0\s*,\s*MAX_DISPLAY\s*\)/.test(source),
+      'UploadLog.jsx must slice entries to MAX_DISPLAY rows before rendering'
+    );
+  });
+});
+
 // ── BUG-017: selectedProfileId must be declared before credentials ─────────────
 // The credentials useState initializer pre-fills the form from the last-used
 // profile by calling loadLastProfileId() and matching it against loadProfiles().

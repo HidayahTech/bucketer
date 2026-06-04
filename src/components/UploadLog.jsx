@@ -4,9 +4,15 @@
 // refreshKey prop: incremented by App whenever uploads complete. The useEffect dependency
 // on refreshKey is the signal to re-read from IndexedDB — avoids prop-drilling individual
 // upload results through the component tree.
+//
+// Display is capped at MAX_DISPLAY rows (newest first). All entries are still loaded for
+// accurate summary stats. Stable keys (completedAt timestamp) let Preact add/remove one
+// node per new entry instead of reconciling the entire list on every refresh.
 import { useState, useEffect } from 'preact/hooks';
 import { loadUploadLog, clearUploadLog } from '../lib/indexeddb.js';
 import { formatBytes, formatSpeed } from '../lib/format.js';
+
+const MAX_DISPLAY = 200;
 
 function formatDuration(sec) {
   if (!isFinite(sec) || sec < 0) return '—';
@@ -32,14 +38,13 @@ function formatCompletedAt(ts) {
 
 export function UploadLog({ refreshKey }) {
   const [entries, setEntries] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
 
   useEffect(() => {
-    setLoading(true);
     loadUploadLog()
       .then(setEntries)
       .catch(() => setEntries([]))
-      .finally(() => setLoading(false));
+      .finally(() => setInitialLoadDone(true));
   }, [refreshKey]);
 
   async function handleClear() {
@@ -47,11 +52,14 @@ export function UploadLog({ refreshKey }) {
     setEntries([]);
   }
 
-  if (loading || entries.length === 0) return null;
+  if (!initialLoadDone || entries.length === 0) return null;
 
   const totalBytes = entries.reduce((s, e) => s + (e.fileSize || 0), 0);
   const errorCount = entries.filter(e => e.status !== 'done').length;
   const summary = `${entries.length} file${entries.length !== 1 ? 's' : ''} · ${formatBytes(totalBytes)}${errorCount > 0 ? ` · ${errorCount} failed` : ''}`;
+
+  const displayEntries = entries.length > MAX_DISPLAY ? entries.slice(0, MAX_DISPLAY) : entries;
+  const truncated = entries.length > MAX_DISPLAY;
 
   return (
     <details class="upload-log">
@@ -63,6 +71,12 @@ export function UploadLog({ refreshKey }) {
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '.5rem' }}>
         <button class="btn btn-ghost btn-sm" onClick={handleClear}>Clear</button>
       </div>
+
+      {truncated && (
+        <p class="hint" style={{ marginBottom: '.5rem' }}>
+          Showing most recent {MAX_DISPLAY} of {entries.length} uploads. Clear the log to reset.
+        </p>
+      )}
 
       <table class="file-table">
         <thead>
@@ -77,8 +91,8 @@ export function UploadLog({ refreshKey }) {
           </tr>
         </thead>
         <tbody>
-          {entries.map((e, i) => (
-            <tr key={i} class="file-row">
+          {displayEntries.map((e, i) => (
+            <tr key={e.completedAt != null ? `${e.completedAt}_${i}` : i} class="file-row">
               <td class="log-status">
                 {e.status === 'done'
                   ? <span class="log-done">✓</span>
