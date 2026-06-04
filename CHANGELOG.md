@@ -7,6 +7,11 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.14.1] — 2026-06-04 — Fix rename: add missing DeleteObjectCommand import; add Command import invariant
+
+- **Bug fix (T1-1):** `Browser.jsx` was missing `DeleteObjectCommand` from its `@aws-sdk/client-s3` import. Every rename threw `ReferenceError` after the copy step succeeded, leaving a duplicate file. Lost during the v1.14.0 unified-delete refactor.
+- **Test invariant (T1-2):** Added source-level assertion to `test/source-invariants.test.js` that scans every `src/` file importing from `@aws-sdk/client-s3` and asserts every `new XCommand()` usage has a matching named import. Prevents this class of bug from silently shipping again.
+
 ## [1.14.0] — 2026-06-03 — Unified delete, preview prefetch, collapsible upload queue, global queue actions
 
 **Unified delete workflow**

@@ -9,7 +9,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve, dirname } from 'node:path';
 
@@ -128,4 +128,58 @@ describe('App.jsx — selectedProfileId declared before credentials (BUG-017)', 
       'if credentials is first, the profile lookup is impossible and the form loads empty'
     );
   });
+});
+
+// ── T1-2: every new XCommand() call must have a matching @aws-sdk/client-s3 import ──
+// When a Command identifier is used without being imported, JS throws ReferenceError at
+// runtime. This is exactly how T1-1 (rename leaving a duplicate) manifested: the copy
+// step succeeded but the delete step threw because DeleteObjectCommand was removed from
+// the Browser.jsx import during the v1.14.0 unified-delete refactor.
+
+function allSrcFiles(dir) {
+  const abs = resolve(ROOT, dir);
+  const entries = readdirSync(abs, { withFileTypes: true });
+  const files = [];
+  for (const e of entries) {
+    if (e.isDirectory()) {
+      files.push(...allSrcFiles(`${dir}/${e.name}`));
+    } else if (e.name.endsWith('.js') || e.name.endsWith('.jsx')) {
+      files.push(`${dir}/${e.name}`);
+    }
+  }
+  return files;
+}
+
+const SDK_IMPORT = '@aws-sdk/client-s3';
+const sdkFiles = allSrcFiles('src').filter(f =>
+  readFileSync(resolve(ROOT, f), 'utf8').includes(SDK_IMPORT)
+);
+
+describe('every new XCommand() has a matching @aws-sdk/client-s3 import (T1-2)', () => {
+  for (const relPath of sdkFiles) {
+    test(`${relPath} — all used Commands are imported`, () => {
+      const source = readFileSync(resolve(ROOT, relPath), 'utf8');
+
+      // Named imports from @aws-sdk/client-s3
+      const importMatch = source.match(/import\s*\{([^}]+)\}\s*from\s*['"]@aws-sdk\/client-s3['"]/);
+      const imported = new Set(
+        importMatch ? importMatch[1].split(',').map(s => s.trim().replace(/\s+as\s+\S+$/, '')).filter(Boolean) : []
+      );
+
+      // All `new XyzCommand(` usages in the file
+      const usagePattern = /new\s+([A-Z][A-Za-z]+Command)\s*\(/g;
+      const used = new Set();
+      let m;
+      while ((m = usagePattern.exec(source)) !== null) {
+        used.add(m[1]);
+      }
+
+      const missing = [...used].filter(cmd => !imported.has(cmd));
+      assert.deepEqual(
+        missing, [],
+        `${relPath} uses Commands not present in its @aws-sdk/client-s3 import: ` +
+        `${missing.join(', ')} — add them to prevent ReferenceError at runtime`
+      );
+    });
+  }
 });
