@@ -17,11 +17,6 @@ import { collectFileEntries } from '../lib/file-entries.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
 import { HiddenVersions } from './HiddenVersions.jsx';
 
-// Read the URL prefix exactly once per page session. Subsequent mounts (reconnects)
-// always start at root — only the very first mount restores the URL-specified path.
-// Module-level (not component state) so it persists across remounts without resetting.
-let _sessionFirstMount = true;
-
 // 1 hour: long enough for interactive use (preview, copy-link) but short enough that
 // a leaked presigned URL expires overnight without manual rotation.
 const PRESIGN_EXPIRES = 3600;
@@ -219,10 +214,9 @@ function SortTh({ col, sortCol, sortDir, onSort, align, children }) {
 // selectedKeys and selectedPrefixes are Sets for O(1) has() checks per row.
 // Delete operations are owned by App.jsx (via onDeleteRequest) so they survive navigation.
 // cacheRef and abortRef are Refs (not state) to avoid triggering re-renders.
-export function Browser({ client, bucket, provider, credentials, onCapabilityChange, capabilities, onUploadTargetChange, onInitialListFailed, onExternalDrop, onDeleteRequest, onMount, prefetchSizeLimit }) {
+export function Browser({ client, bucket, provider, credentials, onCapabilityChange, capabilities, onUploadTargetChange, onInitialListFailed, onExternalDrop, onDeleteRequest, onMount, prefetchSizeLimit, isFirstMount }) {
   const [prefix, setPrefix] = useState(() => {
-    if (_sessionFirstMount) {
-      _sessionFirstMount = false;
+    if (isFirstMount) {
       return new URLSearchParams(window.location.hash.slice(1)).get('prefix') || '';
     }
     return '';
@@ -1157,7 +1151,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
       )}
 
       {isEmpty
-        ? <div class="empty-state">{filterQ ? 'No files match the filter.' : 'This prefix is empty.'}</div>
+        ? <div class="empty-state">{filterQ ? 'No files match the filter.' : !prefix ? 'This bucket is empty. Upload files to get started.' : 'This prefix is empty.'}</div>
         : (
           <table class="file-table">
             <thead>

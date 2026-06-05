@@ -17,7 +17,7 @@
 // that users must re-run CORS setup with a real origin after deploying to a domain.
 import { useState } from 'preact/hooks';
 import { PROVIDERS, extractRegion, needsCorsConfig } from '../lib/provider.js';
-import { corsJson } from '../lib/cors-config.js';
+import { corsJson, shellQuote } from '../lib/cors-config.js';
 
 const isFileProtocol = typeof window !== 'undefined' && window.location.protocol === 'file:';
 
@@ -72,10 +72,13 @@ function Step({ n, title, children }) {
 }
 
 function corsCmd({ endpoint, bucket, origin, profile = 'bucketer' }) {
+  const ep  = shellQuote(endpoint || 'https://s3.<region>.backblazeb2.com');
+  const bkt = shellQuote(bucket || '<your-bucket>');
+  const prof = shellQuote(profile);
   return `aws s3api put-bucket-cors \\
-  --profile ${profile} \\
-  --endpoint-url ${endpoint || 'https://s3.<region>.backblazeb2.com'} \\
-  --bucket ${bucket || '<your-bucket>'} \\
+  --profile ${prof} \\
+  --endpoint-url ${ep} \\
+  --bucket ${bkt} \\
   --cors-configuration '${corsJson(origin)}'`;
 }
 
@@ -217,7 +220,17 @@ function GuideWasabi({ endpoint, bucket, keyId }) {
         </p>
       </Step>
 
-      <Step n="2" title="Configure AWS CLI (optional — for other management tasks)">
+      <Step n="2" title="Bucket naming — avoid dots">
+        <p class="cors-note">
+          Avoid dots in Wasabi bucket names. Wasabi uses virtual-hosted style URLs
+          (<code>{'<bucket>'}.s3.{'<region>'}.wasabisys.com</code>), and dotted names like{' '}
+          <code>my.bucket</code> produce SSL SNI failures — the wildcard cert{' '}
+          <code>*.s3.wasabisys.com</code> does not cover the extra subdomain level.
+          If you must use a dotted bucket name, enable the path-style override in Settings.
+        </p>
+      </Step>
+
+      <Step n="3" title="Configure AWS CLI (optional — for other management tasks)">
         <Code>{`aws configure --profile bucketer
 # AWS Access Key ID:     ${keyId || '<wasabi-access-key>'}
 # AWS Secret Access Key: <wasabi-secret-key>

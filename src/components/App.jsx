@@ -496,6 +496,7 @@ export function App() {
 
             <Browser
               key={browserKey}
+              isFirstMount={browserKey === 0}
               client={client}
               bucket={credentials.bucket}
               provider={credentials.provider}

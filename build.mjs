@@ -166,5 +166,17 @@ if (mode.invariants) {
       console.log(`  ✓ ${tag} ends at byte ${endByte} (limit: ${UPDATE_CHECK_RANGE_BYTES})`);
     }
   }
+  // Bundle size ceiling: guards against accidental inclusion of large assets.
+  const SIZE_LIMIT_BYTES = 600 * 1024;
+  const actualBytes = Buffer.byteLength(out, 'utf8');
+  if (actualBytes > SIZE_LIMIT_BYTES) {
+    console.error(
+      `\nBuild invariant FAILED: ${mode.dest}/index.html is ${(actualBytes / 1024).toFixed(1)} KB, ` +
+      `which exceeds the ${SIZE_LIMIT_BYTES / 1024} KB ceiling (T5-2).\n` +
+      `Investigate what was added; raise the ceiling only after deliberate review.`
+    );
+    invariantFailed = true;
+  }
+
   if (invariantFailed) process.exit(1);
 }

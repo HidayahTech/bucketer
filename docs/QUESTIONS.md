@@ -40,7 +40,7 @@ in all modern browsers. No action needed.
 ## Known Limitations / TODOs
 
 - **No automatic retry with backoff** — deferred per spec §4.10 / §6.
-- **No delete, rename, copy** — out of scope per §6.
+- **No rename, copy** — out of scope per §6.
 - **No multiple saved credential profiles** — out of scope per §6.
 - **MinIO `forcePathStyle` must be set via manual override** — the endpoint pattern is user-defined so auto-detection is impossible. The UI includes a manual provider selector.
 - **Safari `file://` SubtleCrypto** — marked as inconsistent in the spec. The file identity hash in resume records uses SubtleCrypto; on Safari from `file://` this may fail silently. Fallback: name+size+lastModified match is still checked.
@@ -76,5 +76,5 @@ which skips the 'connecting' transition and stays in 'connected' state while the
 | Preact + esbuild + vanilla CSS | User-selected at session start |
 | Single inlined HTML output | Required by §4.3 for `file://` Chrome compatibility |
 | 7-day UploadId expiry warning threshold | Matches R2's known value; B2 unconfirmed (Q1) |
-| N=2 upload concurrency default | Spec §4.6 |
+| N=3 upload concurrency default | Spec §4.6 |
 | B2 default MaxKeys=200, others 1000 | Spec §4.7 |

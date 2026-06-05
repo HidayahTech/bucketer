@@ -58,6 +58,9 @@ function ConfirmContent({ op, onConfirm, onCancel, versioningCaveat }) {
   return (
     <>
       <div class="modal-title">{title}</div>
+      {fc === 1 && pc === 0 && (
+        <div class="modal-filename" title={op.files[0]}>{leafName(op.files[0])}</div>
+      )}
       <div class="modal-body">
         {pc > 0 && (
           <>

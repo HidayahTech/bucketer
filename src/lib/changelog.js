@@ -1,9 +1,31 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.14.3';
+export const CURRENT_VERSION = '1.14.4';
 
 export const CHANGELOG = [
+  {
+    "version": "1.14.4",
+    "date": "2026-06-04",
+    "title": "Quality batch: concurrency cap, format guards, build invariants, provider accuracy, UI polish",
+    "changes": [
+      "**T4-3** Cap discoverPrefixKeys concurrency at 8 with worker-pool; removes bare Promise.all(prefixes.map) that could throttle on large folder-delete operations",
+      "**T4-4** Guard formatBytes against null/undefined/NaN/negative/Infinity — all return '—' instead of crashing",
+      "**T4-5** Remove stale \"No delete, rename, copy\" and \"N=2 concurrency\" claims from docs/QUESTIONS.md",
+      "**T5-1** Add build test: production bundle must have no source map comments (regression guard)",
+      "**T5-2** Add build invariant: dist/index.html must not exceed 600 KB ceiling",
+      "**T5-3** Export shellQuote from cors-config.js; use in corsCmd() to prevent shell injection from bucket/endpoint names",
+      "**T5-4** Add <meta http-equiv=\"Content-Security-Policy\"> to src/index.html for S3/R2/B2 static-hosting deployments",
+      "**T5-5** Replace module-level let _sessionFirstMount in Browser.jsx with isFirstMount prop derived from browserKey === 0 in App.jsx",
+      "**T5-6** Distinguish empty-bucket copy (\"This bucket is empty. Upload files to get started.\") from empty-prefix copy",
+      "**T5-7** Show filename in delete confirmation modal for single-file deletes",
+      "**T5-8** Add inline hint to CapabilityPanel explaining permissions are detected automatically",
+      "**T5-11** Add dotted-bucket SSL caveat to Wasabi SetupGuide step",
+      "**T5-12** Correct requiresPathStyle comment — B2 supports both styles; we use path-style because users supply a plain endpoint",
+      "**T5-13** Correct defaultMaxKeys comment — B2 Class C is not billed per call; 200 is a UX latency choice",
+      "**T5-14** Map Wasabi legacy alias region slugs (nl-1→eu-central-1, de-1→eu-central-2, uk-1→eu-west-1, fr-1→eu-west-2, uk-2→eu-west-3, it-1→eu-south-1) to canonical SigV4 names to prevent signing failures"
+    ]
+  },
   {
     "version": "1.14.3",
     "date": "2026-06-04",

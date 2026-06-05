@@ -39,7 +39,10 @@ export function CapabilityPanel({ capabilities, onRefresh }) {
           </div>
         ))}
       </div>
-      <button class="btn btn-ghost btn-sm" style={{ marginTop: '.5rem' }} onClick={onRefresh}>
+      <p class="cap-hint" style={{ fontSize: '.75rem', color: 'var(--fg-muted)', marginTop: '.5rem' }}>
+        Permissions are detected automatically as you use each feature.
+      </p>
+      <button class="btn btn-ghost btn-sm" style={{ marginTop: '.25rem' }} onClick={onRefresh}>
         Refresh Permissions
       </button>
     </div>

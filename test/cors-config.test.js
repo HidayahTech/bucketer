@@ -3,7 +3,7 @@
 // This is the configuration users apply to their S3-compatible buckets to allow
 // browser-originated requests. Incorrect headers or missing methods cause silent
 // failures in the browser (CORS errors that look like network errors).
-import { test, describe } from 'node:test';
+import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { corsJson } from '../src/lib/cors-config.js';
 
@@ -77,5 +77,39 @@ describe('corsJson — ExposeHeaders', () => {
     for (const h of ['ETag', 'Content-Length', 'Content-Type']) {
       assert.ok(expose.includes(h), `${h} must be in ExposeHeaders`);
     }
+  });
+});
+
+// ── T5-3: corsCmd must shell-quote bucket/endpoint to prevent injection ───────────────
+// corsCmd() interpolates bucket and endpoint directly into a shell command string.
+// A bucket name containing a single quote (e.g. "my'bucket") breaks the shell quoting
+// and can cause the command to execute unexpected tokens.
+
+describe('shellQuote — POSIX shell-quoting for corsCmd arguments (T5-3)', () => {
+  let shellQuote;
+
+  before(async () => {
+    const mod = await import('../src/lib/cors-config.js');
+    shellQuote = mod.shellQuote;
+  });
+
+  test('shellQuote is exported from cors-config.js', () => {
+    assert.ok(
+      typeof shellQuote === 'function',
+      'cors-config.js must export shellQuote — corsCmd interpolates bucket/endpoint ' +
+      'into shell commands; a single quote in the bucket name breaks the command'
+    );
+  });
+
+  test('wraps a plain string in single quotes', () => {
+    assert.equal(shellQuote?.('mybucket'), "'mybucket'");
+  });
+
+  test("escapes an embedded single quote as '\\\\''", () => {
+    assert.equal(shellQuote?.("my'bucket"), "'my'\\''bucket'");
+  });
+
+  test('handles multiple embedded single quotes', () => {
+    assert.equal(shellQuote?.("a'b'c"), "'a'\\''b'\\''c'");
   });
 });

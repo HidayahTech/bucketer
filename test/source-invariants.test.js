@@ -392,3 +392,203 @@ describe('every new XCommand() has a matching @aws-sdk/client-s3 import (T1-2)',
     });
   }
 });
+
+// ── T4-3: discoverPrefixKeys must use a worker pool, not bare Promise.all ──────────────
+// Promise.all(prefixes.map(...)) on 30+ folders launches unlimited concurrent ListObjectsV2
+// crawls — can saturate the HTTP/2 connection pool and trigger 503 throttling.
+
+describe('delete-queue.js — discoverPrefixKeys concurrency is capped (T4-3)', () => {
+  const source = readFileSync(resolve(ROOT, 'src/lib/delete-queue.js'), 'utf8');
+
+  test('does not use bare Promise.all(prefixes.map for discovery', () => {
+    assert.ok(
+      !source.includes('Promise.all(prefixes.map'),
+      'delete-queue.js must not use bare Promise.all(prefixes.map) — deleting 30+ folders ' +
+      'launches unlimited concurrent ListObjectsV2 crawls that can saturate the ' +
+      'connection pool and trigger provider throttling (T4-3)'
+    );
+  });
+});
+
+// ── T4-5: stale claims in docs/QUESTIONS.md must be corrected ────────────────────────
+// Three factual errors: "No delete" shipped; "N=2" is actually N=3; D1 still listed as open.
+
+describe('docs/QUESTIONS.md — stale claims absent (T4-5)', () => {
+  const questions = readFileSync(resolve(ROOT, 'docs/QUESTIONS.md'), 'utf8');
+
+  test('"No delete, rename, copy — out of scope" claim is removed', () => {
+    assert.ok(
+      !questions.includes('No delete, rename, copy'),
+      'docs/QUESTIONS.md must not claim "No delete, rename, copy" — all three shipped in v1.14.0+'
+    );
+  });
+
+  test('"N=2 upload concurrency default" claim is corrected', () => {
+    assert.ok(
+      !questions.includes('N=2 upload concurrency'),
+      'docs/QUESTIONS.md claims N=2 upload concurrency default — actual default is N=3 ' +
+      '(DEFAULT_FILE_CONCURRENCY = 3 in UploadQueue.jsx)'
+    );
+  });
+});
+
+// ── T5-5: Browser.jsx must not use a module-level mutable for session-first-mount ─────
+// Module-level let _sessionFirstMount is shared across all component instances and
+// persists for the module lifetime — pollutes test isolation, wrong if multiple instances.
+
+describe('Browser.jsx — no module-level mutable _sessionFirstMount (T5-5)', () => {
+  const source = src('components/Browser.jsx');
+
+  test('_sessionFirstMount is not declared as a module-level let', () => {
+    assert.ok(
+      !/^let _sessionFirstMount/m.test(source),
+      'Browser.jsx must not use a module-level let _sessionFirstMount — ' +
+      'module-level mutables are shared across instances and pollute test isolation; ' +
+      'derive from browserKey (passed as prop from App.jsx) instead'
+    );
+  });
+});
+
+// ── T5-6: Browser.jsx must distinguish empty-bucket from empty-prefix ─────────────────
+// Showing "This prefix is empty." at the root of an empty bucket is misleading.
+// The root empty state is an onboarding moment — it should invite the user to upload.
+
+describe('Browser.jsx — empty-bucket and empty-prefix have distinct copy (T5-6)', () => {
+  const source = src('components/Browser.jsx');
+
+  test('root empty state renders bucket-specific copy (not just "This prefix is empty.")', () => {
+    assert.ok(
+      /This bucket is empty|bucket is empty/i.test(source),
+      'Browser.jsx must render distinct copy when the root of a bucket is empty — ' +
+      '"This prefix is empty." shown at the root is misleading; use onboarding copy ' +
+      'that tells the user the bucket has no objects and invites an upload'
+    );
+  });
+});
+
+// ── T5-7: DeleteQueue.jsx ConfirmContent must show filename for single-file delete ─────
+// When deleting a single file, the modal only shows "Delete 1 file?" — the user can't
+// confirm which file without looking away from the dialog.
+
+describe('DeleteQueue.jsx — shows filename when deleting a single file (T5-7)', () => {
+  const source = src('components/DeleteQueue.jsx');
+
+  test('ConfirmContent references op.files[0] to show the filename for single-file deletes', () => {
+    assert.ok(
+      /op\.files\[0\]/.test(source),
+      'DeleteQueue.jsx ConfirmContent must surface op.files[0] when deleting a single file — ' +
+      'currently the modal only says "Delete 1 file?" with no filename visible'
+    );
+  });
+});
+
+// ── T5-8: CapabilityPanel must explain the ? (unknown) state inline ───────────────────
+// A tooltip title "Not yet tested" is insufficient — inline hint needed explaining that
+// permissions are probed automatically as the user performs each operation.
+
+describe('CapabilityPanel.jsx — inline hint text for unknown (?) state (T5-8)', () => {
+  const source = src('components/CapabilityPanel.jsx');
+
+  test('has inline hint explaining permissions are detected automatically', () => {
+    assert.ok(
+      /detected automatically|as you use.*feature|as you use each/i.test(source),
+      'CapabilityPanel.jsx must include an inline hint explaining the ? state — ' +
+      '"Not yet tested" as a tooltip title is not visible enough; users need an ' +
+      'inline note that permissions are detected automatically as they use features'
+    );
+  });
+});
+
+// ── T5-10: BUG-023 and BUG-024 regression guards ─────────────────────────────────────
+// These are regression tests for bugs already fixed in v1.14.0. They pass immediately.
+// Their purpose is to catch any future removal of the fix.
+//
+// BUG-023: handleCancelBatch did not call deleteResumeRecord — re-dragging a cancelled
+// folder showed all files as "Paused" because stale IndexedDB resume records survived.
+// BUG-024: enqueueUpload's async gap (awaiting loadResumeRecord) allowed a cancel that
+// fired during the gap to be overwritten — items returned to "paused" after "aborted".
+
+describe('UploadQueue.jsx — BUG-023 regression: handleCancelBatch calls deleteResumeRecord', () => {
+  const source = src('components/UploadQueue.jsx');
+
+  test('handleCancelBatch calls deleteResumeRecord to clean up stale IndexedDB records', () => {
+    const fnStart = source.indexOf('function handleCancelBatch(');
+    assert.ok(fnStart !== -1, 'handleCancelBatch must exist in UploadQueue.jsx');
+    const fnEnd = source.indexOf('\n  function ', fnStart + 1);
+    const fn = source.slice(fnStart, fnEnd > fnStart ? fnEnd : fnStart + 3000);
+    assert.ok(
+      fn.includes('deleteResumeRecord'),
+      'handleCancelBatch must call deleteResumeRecord — otherwise re-dragging a cancelled ' +
+      'folder shows all files as "Paused" due to surviving stale IndexedDB records (BUG-023)'
+    );
+  });
+});
+
+describe('UploadQueue.jsx — BUG-024 regression: cancellation guard after loadResumeRecord', () => {
+  const source = src('components/UploadQueue.jsx');
+
+  test('enqueueUpload has cancellation guard immediately after await loadResumeRecord', () => {
+    assert.ok(
+      /await loadResumeRecord[\s\S]{0,500}cancelledBatchesRef\.current\.has/.test(source),
+      'enqueueUpload must check cancelledBatchesRef.current.has after await loadResumeRecord — ' +
+      'without this guard a cancel fired during the async gap overwrites "aborted" ' +
+      'with "paused" when the promise resolves (BUG-024)'
+    );
+  });
+});
+
+// ── T5-11: GuideWasabi must warn about dotted-bucket SSL caveat ───────────────────────
+// Virtual-hosted style (bucket.s3.wasabisys.com) on dotted bucket names (e.g. my.bucket)
+// causes SSL SNI failures — the wildcard cert *.s3.wasabisys.com does not cover
+// my.bucket.s3.wasabisys.com. Users must either avoid dots in bucket names or use path-style.
+
+describe('SetupGuide.jsx — Wasabi dotted-bucket SSL caveat present (T5-11)', () => {
+  const source = src('components/SetupGuide.jsx');
+
+  test('GuideWasabi warns about dotted bucket names causing SSL issues', () => {
+    const guideStart = source.indexOf('function GuideWasabi');
+    const guideEnd   = source.indexOf('\nfunction ', guideStart + 1);
+    const guide = source.slice(guideStart, guideEnd > guideStart ? guideEnd : undefined);
+    assert.ok(
+      /dotted|dot.*name|path.?style.*bucket|bucket.*dot|avoid.*dot/i.test(guide),
+      'GuideWasabi must warn that bucket names containing dots cause SSL SNI failures ' +
+      'with virtual-hosted style — the wildcard cert *.s3.wasabisys.com does not cover ' +
+      'dotted subdomain names like my.bucket.s3.wasabisys.com'
+    );
+  });
+});
+
+// ── T5-12: provider.js requiresPathStyle comment must not overstate B2 requirement ────
+// B2 supports both path-style and virtual-hosted URLs. We force path-style because users
+// supply a plain regional endpoint, not a bucket-prefixed one. The current comment
+// incorrectly says "B2 and MinIO require path-style URLs."
+
+describe('provider.js — requiresPathStyle B2 comment accuracy (T5-12)', () => {
+  const source = readFileSync(resolve(ROOT, 'src/lib/provider.js'), 'utf8');
+
+  test('comment does not claim B2 requires path-style (B2 supports both)', () => {
+    assert.ok(
+      !/B2 and MinIO require path-style URLs/.test(source),
+      'provider.js comment overstates: B2 supports both path-style and virtual-hosted URLs. ' +
+      'We force path-style because users supply a plain regional endpoint, not a bucket-prefixed one. ' +
+      'MinIO genuinely requires path-style. Update the comment to reflect this distinction.'
+    );
+  });
+});
+
+// ── T5-13: provider.js defaultMaxKeys comment must not claim B2 Class C is billed ────
+// B2 Class C operations (ListObjectsV2) are free for PAYG accounts — all B2 API calls
+// are included in storage fees. Reframe the 200 default as a UX choice.
+
+describe('provider.js — defaultMaxKeys B2 comment accuracy (T5-13)', () => {
+  const source = readFileSync(resolve(ROOT, 'src/lib/provider.js'), 'utf8');
+
+  test('comment does not claim B2 Class C ListObjectsV2 is billed per call', () => {
+    assert.ok(
+      !/billed per call/.test(source),
+      'provider.js comment is factually wrong: B2 Class C operations are free for PAYG accounts. ' +
+      'Reframe the 200 default as a UX choice (smaller pages make browsing feel snappier), ' +
+      'not a billing-avoidance measure.'
+    );
+  });
+});

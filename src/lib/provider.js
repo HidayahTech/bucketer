@@ -64,7 +64,15 @@ export function extractRegion(endpoint, provider) {
         if (/^s3\.wasabisys\.com$/i.test(host)) return 'us-east-1';
         // https://s3.{region}.wasabisys.com
         const m = host.match(/^s3\.([^.]+)\.wasabisys\.com$/i);
-        return m ? m[1] : null;
+        if (!m) return null;
+        // Some Wasabi regions use legacy alias slugs that differ from canonical SigV4 names.
+        // Using the alias slug causes SigV4 signing failures; map to canonical names.
+        const WASABI_ALIASES = {
+          'nl-1': 'eu-central-1', 'de-1': 'eu-central-2',
+          'uk-1': 'eu-west-1',    'fr-1': 'eu-west-2',
+          'uk-2': 'eu-west-3',    'it-1': 'eu-south-1',
+        };
+        return WASABI_ALIASES[m[1]] ?? m[1];
       }
       case PROVIDERS.AWS: {
         // Virtual-hosted: {bucket}.s3.{region}.amazonaws.com
@@ -98,16 +106,15 @@ export function extractRegion(endpoint, provider) {
   }
 }
 
-// B2 and MinIO require path-style URLs (§5 Group A). Using virtual-hosted style for
-// these providers sends requests to the wrong host and produces auth-like errors that
-// are hard to diagnose (noted as a snag in §4.3).
+// B2 supports both path-style and virtual-hosted URLs; we force path-style because users
+// supply a plain regional endpoint (s3.us-west-004.backblazeb2.com), not a bucket-prefixed
+// one. MinIO genuinely requires path-style (virtual-hosted mode is disabled by default).
 export function requiresPathStyle(provider) {
   return provider === PROVIDERS.B2 || provider === PROVIDERS.MINIO;
 }
 
-// B2: 200 because ListObjectsV2 is a Class C operation (billed per call); smaller pages
-// make the cost of browsing legible. Others: 1000 (S3 API maximum; no per-call cost).
-// User can override via Settings, persisted in localStorage.
+// B2: 200 because smaller pages make browsing feel snappier at B2's typical latency.
+// Others: 1000 (S3 API maximum). User can override via Settings, persisted in localStorage.
 export function defaultMaxKeys(provider) {
   return provider === PROVIDERS.B2 ? 200 : 1000;
 }

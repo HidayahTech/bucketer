@@ -113,3 +113,46 @@ describe('Build output — single self-contained bundle', () => {
     assert.ok(!html.match(/<link[^>]+rel="stylesheet"/), 'all CSS must be inlined — no external <link> stylesheet');
   });
 });
+
+describe('Build output — no source maps in production bundle (T5-1)', () => {
+  // sourceMappingURL in a production bundle exposes unminified source to anyone
+  // who fetches the deployed app. Prod mode uses sourcemap:false; this guard
+  // catches any accidental config change.
+  test('JS bundle contains no sourceMappingURL comment', () => {
+    assert.ok(
+      !jsBundle.includes('sourceMappingURL'),
+      'production JS bundle must not contain //# sourceMappingURL — ' +
+      'source maps expose unminified source to any visitor who fetches the app'
+    );
+  });
+});
+
+describe('Build output — bundle size ceiling (T5-2)', () => {
+  // 600 KB ceiling guards against accidental inclusion of large assets or
+  // dependencies. Current size is ~515 KB; 600 KB leaves headroom while
+  // preventing runaway growth.
+  const SIZE_LIMIT_BYTES = 600 * 1024;
+
+  test(`dist/index.html is under ${SIZE_LIMIT_BYTES / 1024} KB`, () => {
+    const size = Buffer.byteLength(html, 'utf8');
+    assert.ok(
+      size <= SIZE_LIMIT_BYTES,
+      `dist/index.html is ${(size / 1024).toFixed(1)} KB — exceeds the ` +
+      `${SIZE_LIMIT_BYTES / 1024} KB ceiling (T5-2)`
+    );
+  });
+});
+
+describe('Build output — meta Content-Security-Policy for static hosting (T5-4)', () => {
+  // When deployed to S3/R2/B2 static hosting, no HTTP server can set headers.
+  // A <meta http-equiv="Content-Security-Policy"> tag provides a baseline XSS
+  // defence without requiring any server configuration.
+  test('HTML head contains a <meta http-equiv="Content-Security-Policy"> tag', () => {
+    assert.ok(
+      html.includes('http-equiv="Content-Security-Policy"'),
+      'dist/index.html must include a <meta http-equiv="Content-Security-Policy"> tag — ' +
+      'S3/R2/B2 static hosting cannot set response headers; the meta CSP provides ' +
+      'a baseline XSS defence for file-hosted deployments (T5-4)'
+    );
+  });
+});

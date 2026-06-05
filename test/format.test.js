@@ -2,6 +2,16 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { formatBytes, formatSpeed, formatEta, leafName, isPermissionError, parseS3Error, isBlockedByExtension } from '../src/lib/format.js';
 
+describe('formatBytes — invalid input returns em dash (T4-4)', () => {
+  // formatBytes only guards for === 0. null/undefined/NaN/negative produce "NaN undefined"
+  // or crash because Math.log(null) → -Infinity → units[undefined].
+  test('null → em dash', () => assert.equal(formatBytes(null), '—'));
+  test('undefined → em dash', () => assert.equal(formatBytes(undefined), '—'));
+  test('NaN → em dash', () => assert.equal(formatBytes(NaN), '—'));
+  test('negative → em dash', () => assert.equal(formatBytes(-1), '—'));
+  test('Infinity → em dash', () => assert.equal(formatBytes(Infinity), '—'));
+});
+
 describe('formatBytes', () => {
   test('zero', () => assert.equal(formatBytes(0), '0 B'));
   test('1 byte', () => assert.equal(formatBytes(1), '1 B'));

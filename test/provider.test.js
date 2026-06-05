@@ -100,3 +100,30 @@ describe('needsCorsConfig', () => {
   test('AWS needs CORS config', () => assert.equal(needsCorsConfig(PROVIDERS.AWS), true));
   test('Generic needs CORS config', () => assert.equal(needsCorsConfig(PROVIDERS.GENERIC), true));
 });
+
+describe('extractRegion — Wasabi legacy alias endpoints (T5-14)', () => {
+  // Wasabi has legacy alias hostnames (nl-1, de-1, uk-1, etc.) that are detected as
+  // Wasabi by the pattern but return alias slugs rather than canonical SigV4 region
+  // names. This causes subtle SigV4 signing errors for users on these old endpoints.
+  // Aliases from: docs/review-v1.14.0/06-providers/wasabi.md
+  test('nl-1 alias → eu-central-1 (T5-14)', () =>
+    assert.equal(extractRegion('https://s3.nl-1.wasabisys.com', PROVIDERS.WASABI), 'eu-central-1'));
+
+  test('de-1 alias → eu-central-2 (T5-14)', () =>
+    assert.equal(extractRegion('https://s3.de-1.wasabisys.com', PROVIDERS.WASABI), 'eu-central-2'));
+
+  test('uk-1 alias → eu-west-1 (T5-14)', () =>
+    assert.equal(extractRegion('https://s3.uk-1.wasabisys.com', PROVIDERS.WASABI), 'eu-west-1'));
+
+  test('fr-1 alias → eu-west-2 (T5-14)', () =>
+    assert.equal(extractRegion('https://s3.fr-1.wasabisys.com', PROVIDERS.WASABI), 'eu-west-2'));
+
+  test('uk-2 alias → eu-west-3 (T5-14)', () =>
+    assert.equal(extractRegion('https://s3.uk-2.wasabisys.com', PROVIDERS.WASABI), 'eu-west-3'));
+
+  test('it-1 alias → eu-south-1 (T5-14)', () =>
+    assert.equal(extractRegion('https://s3.it-1.wasabisys.com', PROVIDERS.WASABI), 'eu-south-1'));
+
+  test('canonical Wasabi endpoint passes through unchanged', () =>
+    assert.equal(extractRegion('https://s3.us-east-1.wasabisys.com', PROVIDERS.WASABI), 'us-east-1'));
+});

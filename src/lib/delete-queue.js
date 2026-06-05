@@ -33,20 +33,31 @@ async function sendBatchWithRetry(client, bucket, batch) {
   }
 }
 
+async function listAllKeysForPrefix(client, bucket, pfx) {
+  const keys = [];
+  let token;
+  do {
+    const resp = await client.send(new ListObjectsV2Command({
+      Bucket: bucket, Prefix: pfx, MaxKeys: 1000, ContinuationToken: token,
+    }));
+    (resp.Contents || []).forEach(o => keys.push(o.Key));
+    token = resp.IsTruncated ? resp.NextContinuationToken : undefined;
+  } while (token);
+  return keys;
+}
+
 async function discoverPrefixKeys(client, bucket, prefixes) {
   const prefixKeys = new Map();
-  await Promise.all(prefixes.map(async (pfx) => {
-    const keys = [];
-    let token;
-    do {
-      const resp = await client.send(new ListObjectsV2Command({
-        Bucket: bucket, Prefix: pfx, MaxKeys: 1000, ContinuationToken: token,
-      }));
-      (resp.Contents || []).forEach(o => keys.push(o.Key));
-      token = resp.IsTruncated ? resp.NextContinuationToken : undefined;
-    } while (token);
-    prefixKeys.set(pfx, keys);
-  }));
+  // Worker-pool: cap concurrent ListObjectsV2 crawls at CONCURRENCY to avoid
+  // saturating the connection pool and triggering 503 throttling on large prefix sets.
+  let idx = 0;
+  async function worker() {
+    while (idx < prefixes.length) {
+      const pfx = prefixes[idx++];
+      prefixKeys.set(pfx, await listAllKeysForPrefix(client, bucket, pfx));
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, prefixes.length) }, worker));
   return prefixKeys;
 }
 

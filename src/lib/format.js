@@ -2,6 +2,7 @@
 // UI formatting utilities: byte sizes, speeds, ETAs, S3 key leaf names, and S3 error normalization.
 
 export function formatBytes(bytes) {
+  if (bytes == null || isNaN(bytes) || bytes < 0 || !isFinite(bytes)) return '—';
   if (bytes === 0) return '0 B';
   const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
   const i = Math.floor(Math.log(bytes) / Math.log(1024));
