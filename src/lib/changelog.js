@@ -1,9 +1,20 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.14.4';
+export const CURRENT_VERSION = '1.15.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.15.0",
+    "date": "2026-06-05",
+    "title": "Refactor + accessibility: usePreview hook, cancellation guard, htmlFor labels, progress ARIA",
+    "changes": [
+      "**T4-1** Extract all preview state, handlePreview, and closePreview into src/lib/usePreview.js; Browser.jsx now consumes the hook",
+      "**T4-2** Add gen-ref cancellation guard to handlePreview — every await is followed by if (gen !== genRef.current) return to drop stale async callbacks when the user opens a new preview",
+      "**T4-6** Add htmlFor + id to all standalone <label> elements in CredentialForm.jsx (6) and SettingsPanel.jsx (7) — screen readers and click-to-focus now work correctly",
+      "**T5-9** Add role=\"progressbar\" + aria-valuenow/min/max + aria-label to progress bar elements in UploadQueue.jsx — upload progress is now exposed to the accessibility tree"
+    ]
+  },
   {
     "version": "1.14.4",
     "date": "2026-06-04",

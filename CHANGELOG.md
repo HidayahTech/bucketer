@@ -7,6 +7,13 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.15.0] — 2026-06-05 — Refactor + accessibility: usePreview hook, cancellation guard, htmlFor labels, progress ARIA
+
+- **T4-1** Extract all preview state, `handlePreview`, and `closePreview` into `src/lib/usePreview.js`; Browser.jsx now consumes the hook
+- **T4-2** Add gen-ref cancellation guard to `handlePreview` — every await is followed by `if (gen !== genRef.current) return` to drop stale async callbacks when the user opens a new preview
+- **T4-6** Add `htmlFor` + `id` to all standalone `<label>` elements in CredentialForm.jsx (6) and SettingsPanel.jsx (7) — screen readers and click-to-focus now work correctly
+- **T5-9** Add `role="progressbar"` + `aria-valuenow/min/max` + `aria-label` to progress bar elements in UploadQueue.jsx — upload progress is now exposed to the accessibility tree
+
 ## [1.14.4] — 2026-06-04 — Quality batch: concurrency cap, format guards, build invariants, provider accuracy, UI polish
 
 - **T4-3** Cap `discoverPrefixKeys` concurrency at 8 with worker-pool; removes bare `Promise.all(prefixes.map)` that could throttle on large folder-delete operations

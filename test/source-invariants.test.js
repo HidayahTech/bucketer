@@ -9,7 +9,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve, dirname } from 'node:path';
 
@@ -589,6 +589,119 @@ describe('provider.js — defaultMaxKeys B2 comment accuracy (T5-13)', () => {
       'provider.js comment is factually wrong: B2 Class C operations are free for PAYG accounts. ' +
       'Reframe the 200 default as a UX choice (smaller pages make browsing feel snappier), ' +
       'not a billing-avoidance measure.'
+    );
+  });
+});
+
+// ── T4-1: Browser.jsx must not contain inline preview state (extracted to usePreview hook) ──
+// Having all preview state (10+ useState calls) inline in Browser.jsx makes the component
+// unwieldy and the preview logic untestable in isolation. The hook belongs in src/lib/.
+
+describe('Browser.jsx — preview state extracted to usePreview hook (T4-1)', () => {
+  const source = src('components/Browser.jsx');
+
+  test('Browser.jsx does not declare const [previewItem, inline', () => {
+    assert.ok(
+      !source.includes('const [previewItem,'),
+      'Browser.jsx must not declare previewItem state inline — preview state must be ' +
+      'extracted to src/lib/usePreview.js so the logic is testable and Browser stays focused'
+    );
+  });
+
+  test('Browser.jsx imports usePreview from lib', () => {
+    assert.ok(
+      /usePreview/.test(source),
+      'Browser.jsx must import and use usePreview — the preview hook must be wired in'
+    );
+  });
+});
+
+// ── T4-2: usePreview hook must have a gen-ref cancellation guard ──────────────────────
+// handlePreview is async (HeadObject + getSignedUrl + fetch). If the user opens preview
+// for file A then immediately file B, A's async callbacks can overwrite B's preview state.
+// The fix: increment a genRef on each call; guard every post-await setState with
+// `if (gen !== genRef.current) return;`
+
+describe('src/lib/usePreview.js — gen-ref cancellation guard (T4-2)', () => {
+  const hookPath = resolve(ROOT, 'src/lib/usePreview.js');
+  const hookSrc  = existsSync(hookPath) ? readFileSync(hookPath, 'utf8') : '';
+
+  test('src/lib/usePreview.js exists', () => {
+    assert.ok(existsSync(hookPath), 'src/lib/usePreview.js must exist — extract preview logic from Browser.jsx');
+  });
+
+  test('usePreview.js contains a generation ref for cancellation', () => {
+    assert.ok(
+      /genRef|previewGenRef/.test(hookSrc),
+      'usePreview.js must use a genRef to guard against stale async callbacks — ' +
+      'without it, opening preview for file B while A is loading overwrites B\'s state'
+    );
+  });
+
+  test('usePreview.js guards setState calls with gen !== check', () => {
+    assert.ok(
+      /gen !== /.test(hookSrc),
+      'usePreview.js must check `if (gen !== genRef.current) return` after every await — ' +
+      'this is the cancellation guard that prevents stale preview state'
+    );
+  });
+});
+
+// ── T4-6: All standalone <label> elements must have htmlFor ──────────────────────────
+// Screen readers associate labels with inputs via htmlFor. A bare <label>Text</label>
+// paired with a separate <input> has no programmatic association — clicking the label
+// does not focus the input and screen readers cannot link them.
+//
+// Note: labels that WRAP their input (<label><input/>text</label>) don't need htmlFor
+// and typically have style= attributes; the bare <label> pattern catches the unfixed ones.
+
+describe('CredentialForm.jsx — all standalone labels have htmlFor (T4-6)', () => {
+  const source = src('components/CredentialForm.jsx');
+
+  test('no bare <label> without attributes', () => {
+    assert.ok(
+      !source.includes('<label>'),
+      'CredentialForm.jsx must not contain bare <label> — every standalone label must have ' +
+      'htmlFor so screen readers and click-to-focus work correctly (T4-6)'
+    );
+  });
+});
+
+describe('SettingsPanel.jsx — all standalone labels have htmlFor (T4-6)', () => {
+  const source = src('components/SettingsPanel.jsx');
+
+  test('no bare <label> without attributes (standalone labels need htmlFor)', () => {
+    // Wrapping labels (<label style=...><input />text</label>) are OK without htmlFor.
+    // This checks for bare <label> — the unfixed standalone form labels.
+    assert.ok(
+      !source.includes('<label>'),
+      'SettingsPanel.jsx must not contain bare <label> — every standalone label must have ' +
+      'htmlFor so screen readers and click-to-focus work correctly (T4-6)'
+    );
+  });
+});
+
+// ── T5-9: Progress bars must have ARIA role and value attributes ──────────────────────
+// A <div class="progress-bar-wrap"> with a width-based inner div is visually correct
+// but invisible to assistive technologies. role="progressbar" + aria-valuenow/min/max
+// expose the upload progress to screen readers and OS accessibility APIs.
+
+describe('UploadQueue.jsx — progress bars have ARIA attributes (T5-9)', () => {
+  const source = src('components/UploadQueue.jsx');
+
+  test('progress-bar-wrap has aria-valuenow', () => {
+    assert.ok(
+      source.includes('aria-valuenow'),
+      'UploadQueue.jsx progress-bar-wrap must have aria-valuenow — without it, screen ' +
+      'readers cannot report upload progress (T5-9)'
+    );
+  });
+
+  test('progress-bar-wrap has role="progressbar"', () => {
+    assert.ok(
+      source.includes('role="progressbar"'),
+      'UploadQueue.jsx progress-bar-wrap must have role="progressbar" — exposes the ' +
+      'upload bar to the accessibility tree (T5-9)'
     );
   });
 });

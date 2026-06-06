@@ -99,8 +99,8 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
       <div class="section-heading">Settings</div>
       <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
         <div class="form-group">
-          <label>Listing cache</label>
-          <select value={cacheTTLValue} onChange={e => setCacheTTLValue(e.target.value)}>
+          <label htmlFor="setting-cache-ttl">Listing cache</label>
+          <select id="setting-cache-ttl" value={cacheTTLValue} onChange={e => setCacheTTLValue(e.target.value)}>
             <option value="0">Off — always fetch fresh</option>
             <option value="30">30 seconds</option>
             <option value="120">2 minutes (default)</option>
@@ -114,8 +114,9 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
           </span>
         </div>
         <div class="form-group">
-          <label>Page size (MaxKeys)</label>
+          <label htmlFor="setting-maxkeys">Page size (MaxKeys)</label>
           <input
+            id="setting-maxkeys"
             type="number"
             value={maxKeysValue}
             onInput={e => setMaxKeysValue(e.target.value)}
@@ -126,8 +127,9 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
           <span class="hint">Objects per listing page. Provider default: {providerDefault}.</span>
         </div>
         <div class="form-group">
-          <label>Upload part size (MiB)</label>
+          <label htmlFor="setting-partsize">Upload part size (MiB)</label>
           <input
+            id="setting-partsize"
             type="number"
             value={partSizeValue}
             onInput={e => setPartSizeValue(e.target.value)}
@@ -147,8 +149,9 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
           </span>
         </div>
         <div class="form-group">
-          <label>Upload part concurrency</label>
+          <label htmlFor="setting-concurrency">Upload part concurrency</label>
           <input
+            id="setting-concurrency"
             type="number"
             value={concurrencyValue}
             onInput={e => setConcurrencyValue(e.target.value)}
@@ -161,8 +164,9 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
           </span>
         </div>
         <div class="form-group">
-          <label>File concurrency</label>
+          <label htmlFor="setting-fileconcurrency">File concurrency</label>
           <input
+            id="setting-fileconcurrency"
             type="number"
             value={fileConcurrencyValue}
             onInput={e => setFileConcurrencyValue(e.target.value)}
@@ -175,8 +179,9 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
           </span>
         </div>
         <div class="form-group">
-          <label>Upload queue expand threshold</label>
+          <label htmlFor="setting-expand-threshold">Upload queue expand threshold</label>
           <input
+            id="setting-expand-threshold"
             type="number"
             value={uploadExpandThresholdValue}
             onInput={e => setUploadExpandThresholdValue(e.target.value)}
@@ -197,8 +202,8 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
       </form>
 
       <div class="form-group" style={{ marginTop: '.75rem' }}>
-        <label>Preview prefetch</label>
-        <select value={String(prefetchSizeLimit)} onChange={e => onPrefetchSizeLimitChange(Number(e.target.value))}>
+        <label htmlFor="setting-prefetch">Preview prefetch</label>
+        <select id="setting-prefetch" value={String(prefetchSizeLimit)} onChange={e => onPrefetchSizeLimitChange(Number(e.target.value))}>
           <option value="0">Off</option>
           <option value={String(1 * 1024 * 1024)}>Up to 1 MB</option>
           <option value={String(5 * 1024 * 1024)}>Up to 5 MB (default)</option>

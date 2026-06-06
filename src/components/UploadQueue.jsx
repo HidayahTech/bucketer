@@ -946,7 +946,7 @@ function BatchSummary({ items, provider, collapsed, onToggleCollapse, onCollapse
     <div class={`batch-summary${errorClass}`}>
       {summaryTop}
 
-      <div class="progress-bar-wrap">
+      <div class="progress-bar-wrap" role="progressbar" aria-valuenow={Math.round(displayProgress)} aria-valuemin={0} aria-valuemax={100} aria-label="Upload progress">
         <div class="progress-bar" style={{ width: `${displayProgress.toFixed(2)}%` }} />
       </div>
 

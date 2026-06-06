@@ -91,8 +91,9 @@ export function CredentialForm({ initial, onSave, onFormChange, loading }) {
   return (
     <form class="cred-panel" onSubmit={handleSubmit}>
       <div class="form-group">
-        <label>Endpoint URL</label>
+        <label htmlFor="cred-endpoint">Endpoint URL</label>
         <input
+          id="cred-endpoint"
           type="url"
           value={form.endpoint}
           onInput={set('endpoint')}
@@ -108,8 +109,9 @@ export function CredentialForm({ initial, onSave, onFormChange, loading }) {
       </div>
 
       <div class="form-group">
-        <label>Bucket Name</label>
+        <label htmlFor="cred-bucket">Bucket Name</label>
         <input
+          id="cred-bucket"
           type="text"
           value={form.bucket}
           onInput={set('bucket')}
@@ -123,8 +125,9 @@ export function CredentialForm({ initial, onSave, onFormChange, loading }) {
       </div>
 
       <div class="form-group">
-        <label>Key ID</label>
+        <label htmlFor="cred-keyid">Key ID</label>
         <input
+          id="cred-keyid"
           type="text"
           value={form.keyId}
           onInput={set('keyId')}
@@ -138,8 +141,9 @@ export function CredentialForm({ initial, onSave, onFormChange, loading }) {
       </div>
 
       <div class="form-group">
-        <label>Secret Key</label>
+        <label htmlFor="cred-secretkey">Secret Key</label>
         <input
+          id="cred-secretkey"
           type="password"
           value={form.secretKey}
           onInput={set('secretKey')}
@@ -153,8 +157,8 @@ export function CredentialForm({ initial, onSave, onFormChange, loading }) {
       </div>
 
       <div class="form-group">
-        <label>Provider Override</label>
-        <select value={form.providerOverride} onChange={set('providerOverride')}>
+        <label htmlFor="cred-provider">Provider Override</label>
+        <select id="cred-provider" value={form.providerOverride} onChange={set('providerOverride')}>
           {PROVIDER_OPTIONS.map(o => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
@@ -166,8 +170,9 @@ export function CredentialForm({ initial, onSave, onFormChange, loading }) {
 
       {needsRegion && (
         <div class="form-group">
-          <label>Region</label>
+          <label htmlFor="cred-region">Region</label>
           <input
+            id="cred-region"
             type="text"
             value={form.regionOverride}
             onInput={set('regionOverride')}

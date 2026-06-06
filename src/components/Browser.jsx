@@ -9,6 +9,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import { ListObjectsV2Command, GetObjectCommand, HeadObjectCommand, PutObjectCommand, CopyObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { formatBytes, leafName, isPermissionError } from '../lib/format.js';
+import { usePreview } from '../lib/usePreview.js';
 import { defaultMaxKeys } from '../lib/provider.js';
 import { loadMaxKeys, loadListingCacheTTL } from '../lib/storage.js';
 import { pushPrefixHistory } from '../lib/url-params.js';
@@ -232,15 +233,14 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const [sortCol, setSortCol] = useState('name');
   const [sortDir, setSortDir] = useState('asc');
   const [selectedPrefixes, setSelectedPrefixes] = useState(new Set());
-  const [previewItem, setPreviewItem] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(null);
-  const [previewError, setPreviewError] = useState(null);
-  const [resolvedKind, setResolvedKind] = useState(null);
-  const [notPreviewable, setNotPreviewable] = useState(false);
-  const [detectedContentType, setDetectedContentType] = useState(null);
-  const [previewText, setPreviewText] = useState(null);
-  const [previewTruncated, setPreviewTruncated] = useState(false);
-  const [previewPixelated, setPreviewPixelated] = useState(false);
+  const {
+    previewItem, previewUrl, previewError,
+    resolvedKind, notPreviewable, detectedContentType,
+    previewText, previewTruncated, previewPixelated, setPreviewPixelated,
+    previewCopyOpen, setPreviewCopyOpen, previewCopied, setPreviewCopied,
+    previewUrlCacheRef, previewCopyWrapRef,
+    handlePreview, closePreview,
+  } = usePreview(client, bucket);
   const [filterQuery, setFilterQuery] = useState('');
   const [selectedKeys, setSelectedKeys] = useState(new Set());
   const [batchCopyOpen, setBatchCopyOpen] = useState(false);
@@ -261,15 +261,11 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const [newFolderSaving, setNewFolderSaving] = useState(false);
   const [tableCopyKey, setTableCopyKey] = useState(null);
   const [tableCopied, setTableCopied] = useState(null);
-  const [previewCopyOpen, setPreviewCopyOpen] = useState(false);
-  const [previewCopied, setPreviewCopied] = useState(false);
   const abortRef = useRef(null);
   const cacheRef = useRef(new Map());
-  const previewUrlCacheRef = useRef(new Map()); // key → { url, expiresAt, kind, contentType, text?, truncated? }
-  const prefetchGenRef     = useRef(0);          // incremented on each prefetch call to abandon stale runs
-  const prevNextRef        = useRef({ prev: null, next: null }); // kept current during render for the prefetch effect
+  const prefetchGenRef = useRef(0); // incremented on each prefetch call to abandon stale runs
+  const prevNextRef    = useRef({ prev: null, next: null }); // kept current during render for the prefetch effect
   const tableCopyWrapRef = useRef(null);
-  const previewCopyWrapRef = useRef(null);
   const batchCopyWrapRef = useRef(null);
   // Always-current reference to navigateTo for the popstate handler (which has [] deps)
   const navigateRef = useRef(null);
@@ -419,15 +415,6 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     document.addEventListener('mousedown', onDown);
     return () => document.removeEventListener('mousedown', onDown);
   }, [tableCopyKey]);
-
-  useEffect(() => {
-    if (!previewCopyOpen) return;
-    function onDown(e) {
-      if (previewCopyWrapRef.current && !previewCopyWrapRef.current.contains(e.target)) setPreviewCopyOpen(false);
-    }
-    document.addEventListener('mousedown', onDown);
-    return () => document.removeEventListener('mousedown', onDown);
-  }, [previewCopyOpen]);
 
   useEffect(() => {
     if (!batchCopyOpen) return;
@@ -600,113 +587,6 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     } finally {
       setDownloadingKey(null);
     }
-  }
-
-  // Preview: detects kind via HeadObject → ContentType first, extension second.
-  // SECURITY: text previews always use ResponseContentType='text/plain; charset=utf-8'
-  // regardless of the stored ContentType. This prevents an uploaded HTML or JS file from
-  // being rendered by the browser — the preview always shows raw source text.
-  async function handlePreview(obj) {
-    setPreviewItem(obj);
-    setPreviewUrl(null);
-    setPreviewText(null);
-    setPreviewTruncated(false);
-    setPreviewPixelated(false);
-    setPreviewError(null);
-    setResolvedKind(null);
-    setNotPreviewable(false);
-    setDetectedContentType(null);
-    setPreviewCopyOpen(false);
-    setPreviewCopied(false);
-    try {
-      // Check signed-URL cache first. URLs are valid for PRESIGN_EXPIRES seconds;
-      // we treat entries as stale 5 minutes early to avoid serving nearly-expired URLs.
-      const cached = previewUrlCacheRef.current.get(obj.Key);
-      if (cached && Date.now() < cached.expiresAt) {
-        setResolvedKind(cached.kind);
-        if (cached.kind === 'text') {
-          if (cached.text !== undefined) {
-            setPreviewText(cached.text);
-            setPreviewTruncated(cached.truncated ?? false);
-          } else {
-            const resp = await fetch(cached.url, { headers: { Range: `bytes=0-${TEXT_PREVIEW_LIMIT - 1}` } });
-            setPreviewText(await resp.text());
-            setPreviewTruncated(resp.status === 206);
-          }
-        } else {
-          setPreviewUrl(cached.url);
-        }
-        return;
-      }
-
-      let kind, contentType;
-      try {
-        const head = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: obj.Key }));
-        contentType = head.ContentType || '';
-        kind = mimeKind(contentType) || mediaKind(obj.Key);
-        // If ContentType is generic but extension tells us the type, use the extension MIME
-        if (!mimeKind(contentType) && mediaKind(obj.Key)) {
-          contentType = mimeType(obj.Key) || contentType;
-        }
-      } catch {
-        // HeadObject failed (e.g. no permission) — fall back to extension-based detection
-        contentType = mimeType(obj.Key) || '';
-        kind = mediaKind(obj.Key);
-      }
-      if (!kind) {
-        setNotPreviewable(true);
-        setDetectedContentType(contentType || null);
-        return;
-      }
-      setResolvedKind(kind);
-
-      const expiresAt = Date.now() + (PRESIGN_EXPIRES - 300) * 1000;
-
-      if (kind === 'text') {
-        // Force text/plain regardless of stored ContentType — prevents HTML/JS execution
-        const url = await getSignedUrl(
-          client,
-          new GetObjectCommand({
-            Bucket: bucket, Key: obj.Key,
-            ResponseContentDisposition: 'inline',
-            ResponseContentType: 'text/plain; charset=utf-8',
-          }),
-          { expiresIn: PRESIGN_EXPIRES },
-        );
-        previewUrlCacheRef.current.set(obj.Key, { url, expiresAt, kind, contentType });
-        const resp = await fetch(url, { headers: { Range: `bytes=0-${TEXT_PREVIEW_LIMIT - 1}` } });
-        setPreviewText(await resp.text());
-        setPreviewTruncated(resp.status === 206);
-      } else {
-        const url = await getSignedUrl(
-          client,
-          new GetObjectCommand({
-            Bucket: bucket, Key: obj.Key,
-            ResponseContentDisposition: 'inline',
-            ...(contentType ? { ResponseContentType: contentType } : {}),
-          }),
-          { expiresIn: PRESIGN_EXPIRES },
-        );
-        previewUrlCacheRef.current.set(obj.Key, { url, expiresAt, kind, contentType });
-        setPreviewUrl(url);
-      }
-    } catch (err) {
-      setPreviewError(err);
-    }
-  }
-
-  function closePreview() {
-    setPreviewItem(null);
-    setPreviewUrl(null);
-    setPreviewText(null);
-    setPreviewTruncated(false);
-    setPreviewPixelated(false);
-    setPreviewError(null);
-    setResolvedKind(null);
-    setNotPreviewable(false);
-    setDetectedContentType(null);
-    setPreviewCopyOpen(false);
-    setPreviewCopied(false);
   }
 
   useEffect(() => {
