@@ -7,6 +7,27 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.15.3] — 2026-06-06 — Upload UI cleanup: hide when denied, drop zone removed, empty-state hint
+
+- **Upload UI hidden when denied**: entire upload section (destination folder, file/folder picker buttons) is now hidden when `capabilities.upload === 'denied'` rather than shown in a disabled/greyed state. When unknown or permitted, everything shows as before.
+- **Dedicated drop zone removed**: the "Drop files or folders here" element in UploadQueue is gone. The window-wide overlay (v1.15.2) covers the same surface area; the zone was redundant. `handleDrop` and `dragOver` state removed from UploadQueue.
+- **Empty-state hint**: when the queue is empty and upload is available, a line reads "Drag files or folders anywhere in this window to upload, or use the buttons above." — the first-use teaching moment.
+- **Window overlay respects upload capability**: the document dragenter listener and the overlay render are both gated on `capabilities.upload !== 'denied'`.
+- **Error handling on detached drops**: `.catch(() => {})` added to the `collectFileEntries().then()` chains in `handleWindowDrop` (App.jsx) and `handleTableDrop` (Browser.jsx) to prevent silent promise rejections.
+
+## [1.15.2] — 2026-06-05 — Window-wide drag-and-drop overlay
+
+- **Drop anywhere on the window to upload**: document-level `dragenter`/`dragleave`/`dragover` listeners in App.jsx activate a full-screen fixed overlay (z-index 500, below modals at 1000) whenever files are dragged over the viewport while connected.
+- **Modal suppression**: dragenter checks `document.querySelector('.modal-overlay')` — the overlay is not activated while any modal is open.
+- **Overlay captures the drop**: `ondrop` on the overlay fires `collectFileEntries` as a detached `.then()`, routing files to the same `addFilesRef` destination as all other drop paths.
+- **Existing zone-specific handlers unchanged**: Browser table drop and UploadQueue upload-zone drop continue to work as before; the window overlay is the primary path when connected.
+
+## [1.15.1] — 2026-06-05 — Synchronous drop capture, parallel folder traversal, pending-drop indicator
+
+- **Drop handlers are now synchronous** (`handleTableDrop` in Browser.jsx, `handleDrop` in UploadQueue.jsx): `FileSystemEntry` objects are captured synchronously before any await, then `collectFileEntries` fires as a detached `.then()`. The handler returns immediately so rapid consecutive drops are captured right away rather than waiting for the previous traversal to complete.
+- **Parallel top-level traversal in `collectFileEntries`**: changed `for…await` over root entries to `Promise.all`, so independent folder subtrees are walked concurrently rather than one at a time.
+- **Pending-drop indicator in UploadQueue**: while folder traversal is running a `pendingDrops` counter drives a "Counting files in N folders…" message beneath the drop zone, giving the user immediate feedback that the drop was accepted.
+
 ## [1.15.0] — 2026-06-05 — Refactor + accessibility: usePreview hook, cancellation guard, htmlFor labels, progress ARIA
 
 - **T4-1** Extract all preview state, `handlePreview`, and `closePreview` into `src/lib/usePreview.js`; Browser.jsx now consumes the hook

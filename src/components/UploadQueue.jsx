@@ -30,7 +30,6 @@ import {
 } from '../lib/indexeddb.js';
 import { UploadQueue as Queue, calcPartSize, collectParts, preparePutBody, uploadPartsWithPool } from '../lib/upload-queue.js';
 import { loadPartConcurrency, loadPartSizeMB, loadFileConcurrency, loadUploadExpandThreshold } from '../lib/storage.js';
-import { collectFileEntries } from '../lib/file-entries.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
 import { createUpdateBatcher } from '../lib/update-batcher.js';
 
@@ -45,7 +44,6 @@ function newId() { return ++_idCounter; }
 
 export function UploadQueue({ client, bucket, provider, currentPrefix, credentials, onCapabilityChange, capabilities, onUploadsComplete, onLogEntry, onMount }) {
   const [items, setItems] = useState([]);
-  const [dragOver, setDragOver] = useState(false);
   const [collapsedBatches, setCollapsedBatches] = useState({});
   const queueRef = useRef(new Queue(loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY));
   const activeUploadsRef = useRef({}); // id → { abort, uploadInstance }
@@ -575,33 +573,6 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     return () => document.removeEventListener('visibilitychange', handler);
   }, [hasActive]);
 
-  // Drop zone — supports both files and folders via the FileSystem API.
-  // DataTransfer items must be read synchronously before any await.
-  async function handleDrop(e) {
-    e.preventDefault();
-    setDragOver(false);
-    if (!canUpload) return;
-
-    const fsEntries = [];
-    const items = e.dataTransfer?.items;
-    if (items) {
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        const entry = item.kind === 'file' && (item.getAsEntry?.() ?? item.webkitGetAsEntry?.());
-        if (entry) fsEntries.push(entry);
-      }
-    }
-
-    if (fsEntries.length) {
-      const fileEntries = await collectFileEntries(fsEntries);
-      if (fileEntries.length) addFiles(fileEntries);
-    } else {
-      // Fallback for browsers without FileSystem API
-      const files = e.dataTransfer?.files;
-      if (files?.length) addFiles(Array.from(files).map(f => ({ file: f, relativePath: f.name })));
-    }
-  }
-
   // Group items by batchId, preserving insertion order (newest batch first)
   const batches = [];
   const batchMap = new Map();
@@ -629,76 +600,67 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
 
   return (
     <div>
-      <div class="form-group" style={{ marginBottom: '.75rem' }}>
-        <label>Destination folder</label>
-        <input
-          type="text"
-          value={destinationPrefix}
-          onInput={e => setDestinationPrefix(e.target.value)}
-          placeholder="(root of bucket)"
-          disabled={!canUpload}
-        />
-        <span class="hint">
-          Where uploaded files will be placed. Navigating the browser updates this automatically.
-          You can also type any path here — it doesn't need to exist yet.
-        </span>
-      </div>
+      {canUpload && (
+        <>
+          <div class="form-group" style={{ marginBottom: '.75rem' }}>
+            <label>Destination folder</label>
+            <input
+              type="text"
+              value={destinationPrefix}
+              onInput={e => setDestinationPrefix(e.target.value)}
+              placeholder="(root of bucket)"
+            />
+            <span class="hint">
+              Where uploaded files will be placed. Navigating the browser updates this automatically.
+              You can also type any path here — it doesn't need to exist yet.
+            </span>
+          </div>
 
-      {!canUpload && (
-        <div class="banner banner-warn" style={{ marginBottom: '.75rem' }}>
-          <div class="banner-body">Upload not permitted with current credentials.</div>
-        </div>
+          <div style={{ display: 'flex', gap: '.5rem', marginBottom: '.5rem' }}>
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              onClick={() => fileInputRef.current?.click()}
+            >Choose files</button>
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              onClick={() => folderInputRef.current?.click()}
+            >Choose folder</button>
+          </div>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            data-testid="file-input"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              addFiles(Array.from(e.target.files).map(f => ({ file: f, relativePath: f.name })));
+              e.target.value = '';
+            }}
+          />
+          <input
+            ref={(el) => { folderInputRef.current = el; if (el) el.webkitdirectory = true; }}
+            type="file"
+            multiple
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              addFiles(Array.from(e.target.files).map(f => ({
+                file: f,
+                relativePath: f.webkitRelativePath || f.name,
+              })));
+              e.target.value = '';
+            }}
+          />
+        </>
       )}
 
-      <div
-        class={`upload-zone${dragOver ? ' drag-over' : ''}`}
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={handleDrop}
-        style={{ opacity: canUpload ? 1 : .5 }}
-      >
-        Drop files or folders here
-      </div>
-
-      <div style={{ display: 'flex', gap: '.5rem', marginTop: '.5rem' }}>
-        <button
-          type="button"
-          class="btn btn-ghost btn-sm"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={!canUpload}
-        >Choose files</button>
-        <button
-          type="button"
-          class="btn btn-ghost btn-sm"
-          onClick={() => folderInputRef.current?.click()}
-          disabled={!canUpload}
-        >Choose folder</button>
-      </div>
-
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        data-testid="file-input"
-        style={{ display: 'none' }}
-        onChange={(e) => {
-          addFiles(Array.from(e.target.files).map(f => ({ file: f, relativePath: f.name })));
-          e.target.value = '';
-        }}
-      />
-      <input
-        ref={(el) => { folderInputRef.current = el; if (el) el.webkitdirectory = true; }}
-        type="file"
-        multiple
-        style={{ display: 'none' }}
-        onChange={(e) => {
-          addFiles(Array.from(e.target.files).map(f => ({
-            file: f,
-            relativePath: f.webkitRelativePath || f.name,
-          })));
-          e.target.value = '';
-        }}
-      />
+      {canUpload && batches.length === 0 && (
+        <p class="upload-empty-hint">
+          Drag files or folders anywhere in this window to upload, or use the buttons above.
+        </p>
+      )}
 
       {showGlobalActions && (
         <div class="queue-global-actions">

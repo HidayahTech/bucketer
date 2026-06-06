@@ -705,3 +705,207 @@ describe('UploadQueue.jsx — progress bars have ARIA attributes (T5-9)', () => 
     );
   });
 });
+
+// ── Drop handler synchronisation (v1.15.1) ────────────────────────────────────────────
+// Both drop handlers were async and awaited collectFileEntries before returning.
+// For large folder drops (1000+ files), the handler stays live and blocks the next drop
+// event — the browser does not fire a new drop event until the handler resolves.
+// Fix: capture FileSystemEntry objects sync (safe — dataTransfer items must be read
+// before any await), then fire collectFileEntries as a detached .then(). The handler
+// returns immediately, allowing the next drop to be captured right away.
+// The parallel traversal fix in collectFileEntries (Promise.all over top-level entries)
+// means independent subtrees are walked concurrently, reducing total traversal time.
+
+describe('Browser.jsx — handleTableDrop is not async (drop-sync)', () => {
+  const source = src('components/Browser.jsx');
+
+  test('handleTableDrop is declared as a plain (non-async) function', () => {
+    assert.ok(
+      !/async function handleTableDrop/.test(source),
+      'Browser.jsx handleTableDrop must not be async — an async handler blocks the drop ' +
+      'event until collectFileEntries resolves; with 1000+ file folders the next drop ' +
+      'is not captured until the first traversal completes. Capture entries sync, then ' +
+      'fire collectFileEntries as a detached .then().'
+    );
+  });
+});
+
+describe('UploadQueue.jsx — handleDrop is not async (drop-sync)', () => {
+  const source = src('components/UploadQueue.jsx');
+
+  test('handleDrop is declared as a plain (non-async) function', () => {
+    assert.ok(
+      !/async function handleDrop/.test(source),
+      'UploadQueue.jsx handleDrop must not be async — an async handler blocks the drop ' +
+      'event until collectFileEntries resolves; rapid consecutive folder drops are not ' +
+      'captured promptly. Capture entries sync, fire collectFileEntries as a detached .then().'
+    );
+  });
+});
+
+// pendingDrops was introduced in v1.15.1 and removed in v1.15.3 when the dedicated
+// UploadQueue drop zone was eliminated. The window-wide overlay (v1.15.2) provides
+// immediate visual feedback during traversal; a zone-local counter is no longer needed.
+
+// ── Window-wide drag-and-drop overlay (v1.15.2) ───────────────────────────────────────
+// Dragging files only over specific zones (Browser table, UploadQueue zone) means users
+// must aim precisely. The window-wide overlay activates on any file drag over the viewport,
+// shows a full-screen visual cue, and routes the drop to addFilesRef — the same destination
+// as zone-specific drops.
+//
+// Design: document-level dragenter/dragleave/dragover listeners (useEffect in App.jsx)
+// manage a counter and windowDragOver state. A fixed overlay (z-index 500, below modals at
+// z-index 1000) is rendered when windowDragOver is true and session === 'connected'. The
+// overlay captures the drop (ondrop) and fires collectFileEntries as a detached .then().
+// Modal suppression: dragenter checks document.querySelector('.modal-overlay'); if a modal
+// is open, the overlay is not activated.
+
+describe('App.jsx — window-drop overlay: imports collectFileEntries (window-drop)', () => {
+  const source = src('components/App.jsx');
+
+  test('App.jsx imports collectFileEntries from file-entries', () => {
+    assert.ok(
+      /collectFileEntries/.test(source),
+      'App.jsx must import collectFileEntries — the window-drop handler uses it to ' +
+      'traverse FileSystemEntry trees just like the zone-specific drop handlers do'
+    );
+  });
+});
+
+describe('App.jsx — window-drop overlay: windowDragOver state (window-drop)', () => {
+  const source = src('components/App.jsx');
+
+  test('App.jsx declares windowDragOver state', () => {
+    assert.ok(
+      /windowDragOver/.test(source),
+      'App.jsx must declare windowDragOver state — it drives whether the full-screen ' +
+      'drop overlay is rendered; set true on dragenter (files + connected + no modal), ' +
+      'false on dragleave counter reaching zero or drop completing'
+    );
+  });
+});
+
+describe('App.jsx — window-drop overlay: document dragenter listener (window-drop)', () => {
+  const source = src('components/App.jsx');
+
+  test('App.jsx registers a dragenter event listener on document', () => {
+    assert.ok(
+      /addEventListener\s*\(\s*['"]dragenter['"]/.test(source),
+      "App.jsx must register a document-level 'dragenter' listener — this is what " +
+      'activates the window-drop overlay when any file is dragged over the viewport'
+    );
+  });
+});
+
+describe('App.jsx — window-drop overlay: overlay element rendered (window-drop)', () => {
+  const source = src('components/App.jsx');
+
+  test('App.jsx renders a window-drop-overlay element', () => {
+    assert.ok(
+      /window-drop-overlay/.test(source),
+      'App.jsx must render a window-drop-overlay element — the full-screen fixed overlay ' +
+      'that gives the user visual feedback and captures drops from anywhere on the page'
+    );
+  });
+});
+
+// ── v1.15.3: upload UI hidden when denied, drop zone removed, empty-state hint ──────────
+// Three related changes shipped together:
+//
+// 1. Upload UI is hidden entirely (not just disabled/greyed) when capabilities.upload ===
+//    'denied'. Greying out sends a confusing signal; hiding removes it from the user's
+//    mental model until they have the necessary permissions.
+//
+// 2. The dedicated "Drop files or folders here" zone is removed. The window-wide overlay
+//    (v1.15.2) covers the same surface area more conveniently. The zone was the only reason
+//    UploadQueue needed its own drag event handlers — those are removed too.
+//
+// 3. An empty-state hint tells first-time users how to initiate an upload now that there
+//    is no visible drop target. Placed where the queue will appear, so it gives way
+//    naturally the moment the first upload starts.
+//
+// 4. The window overlay respects the upload capability: dragenter ignores the event when
+//    upload is denied, and the overlay render is also gated on it.
+//
+// 5. Detached .then() calls (handleWindowDrop, handleTableDrop) get a .catch() to prevent
+//    silent promise rejection if collectFileEntries throws unexpectedly.
+
+describe('UploadQueue.jsx — dedicated drop zone removed (v1.15.3)', () => {
+  const source = src('components/UploadQueue.jsx');
+
+  test('upload-zone CSS class is no longer referenced in UploadQueue.jsx', () => {
+    assert.ok(
+      !source.includes('upload-zone'),
+      'UploadQueue.jsx must not contain the upload-zone element — the window-wide overlay ' +
+      '(v1.15.2) covers the same surface; the dedicated zone is redundant and adds visual noise'
+    );
+  });
+});
+
+describe('UploadQueue.jsx — no "Upload not permitted" warning banner (v1.15.3)', () => {
+  const source = src('components/UploadQueue.jsx');
+
+  test('"Upload not permitted" banner text is absent', () => {
+    assert.ok(
+      !source.includes('Upload not permitted'),
+      'UploadQueue.jsx must not show an "Upload not permitted" banner — when upload is ' +
+      'denied the entire upload initiation UI is hidden rather than shown in a degraded state'
+    );
+  });
+});
+
+describe('UploadQueue.jsx — empty-state drag-anywhere hint (v1.15.3)', () => {
+  const source = src('components/UploadQueue.jsx');
+
+  test('empty queue state shows instruction to drag anywhere in window', () => {
+    assert.ok(
+      /drag.*anywhere|anywhere.*drag/i.test(source),
+      'UploadQueue.jsx must include an empty-state hint explaining that files can be ' +
+      'dragged anywhere in the window — without it users have no cue that drag-and-drop ' +
+      'is available now that the dedicated drop zone is removed'
+    );
+  });
+});
+
+describe('App.jsx — window overlay gated on upload capability (v1.15.3)', () => {
+  const source = src('components/App.jsx');
+
+  test("dragenter handler skips when capabilities.upload is 'denied'", () => {
+    assert.ok(
+      /capabilities\.upload/.test(source),
+      "App.jsx must check capabilities.upload in the window-drop path — the overlay " +
+      "must not activate when upload is definitively denied, matching UploadQueue's canUpload guard"
+    );
+  });
+});
+
+describe('App.jsx — handleWindowDrop has error handling (v1.15.3)', () => {
+  const source = src('components/App.jsx');
+
+  test('collectFileEntries .then() in handleWindowDrop is followed by .catch()', () => {
+    // Find handleWindowDrop body and assert .catch( appears after collectFileEntries
+    const fnStart = source.indexOf('function handleWindowDrop');
+    assert.ok(fnStart !== -1, 'handleWindowDrop must exist in App.jsx');
+    const fnBody = source.slice(fnStart, fnStart + 800);
+    assert.ok(
+      /\.catch\(/.test(fnBody),
+      'handleWindowDrop must chain .catch() onto the collectFileEntries .then() — ' +
+      'an unhandled rejection from collectFileEntries silently swallows the drop with no user feedback'
+    );
+  });
+});
+
+describe('Browser.jsx — handleTableDrop has error handling (v1.15.3)', () => {
+  const source = src('components/Browser.jsx');
+
+  test('collectFileEntries .then() in handleTableDrop is followed by .catch()', () => {
+    const fnStart = source.indexOf('function handleTableDrop');
+    assert.ok(fnStart !== -1, 'handleTableDrop must exist in Browser.jsx');
+    const fnBody = source.slice(fnStart, fnStart + 800);
+    assert.ok(
+      /\.catch\(/.test(fnBody),
+      'handleTableDrop must chain .catch() onto the collectFileEntries .then() — ' +
+      'an unhandled rejection from collectFileEntries silently swallows the drop with no user feedback'
+    );
+  });
+});
