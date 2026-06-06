@@ -28,6 +28,6 @@ export async function collectFileEntries(entries) {
     }
   }
 
-  for (const entry of entries) await traverse(entry, '');
+  await Promise.all(entries.map(entry => traverse(entry, '')));
   return result;
 }

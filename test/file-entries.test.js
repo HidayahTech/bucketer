@@ -126,6 +126,51 @@ describe('collectFileEntries — readEntries pagination (>100 files)', () => {
   });
 });
 
+describe('collectFileEntries — top-level entries traversed in parallel', () => {
+  // Critical: sequential traversal (for...await) blocks the second drop handler from
+  // completing while the first is still walking a large directory tree. Parallel traversal
+  // (Promise.all) allows independent subtrees to be walked concurrently.
+  //
+  // Proof: with parallel, readEntries for b is called before a's second readEntries call.
+  // With sequential, a's entire subtree (both readEntries calls) finishes before b starts.
+  test("begins readEntries for all root dirs before completing any one traversal", async () => {
+    const log = [];
+
+    function trackedDir(name, children) {
+      return {
+        isFile: false, isDirectory: true, name,
+        createReader: () => {
+          let calls = 0;
+          return {
+            readEntries: (ok) => {
+              log.push(`readEntries:${name}`);
+              const batch = calls === 0 ? children : [];
+              calls++;
+              ok(batch);
+            },
+          };
+        },
+      };
+    }
+
+    const a = trackedDir('a', [fileEntry('x.txt')]);
+    const b = trackedDir('b', [fileEntry('y.txt')]);
+    await collectFileEntries([a, b]);
+
+    assert.equal(log.filter(e => e === 'readEntries:a').length, 2, 'a must be read twice (children + empty)');
+    assert.equal(log.filter(e => e === 'readEntries:b').length, 2, 'b must be read twice (children + empty)');
+
+    const bFirstIdx  = log.indexOf('readEntries:b');
+    const aSecondIdx = log.indexOf('readEntries:a', log.indexOf('readEntries:a') + 1);
+
+    assert.ok(
+      bFirstIdx < aSecondIdx,
+      `Expected parallel traversal: b's readEntries should start before a's second call. ` +
+      `Sequential traversal exhausts a entirely before starting b. Log: ${JSON.stringify(log)}`
+    );
+  });
+});
+
 describe('collectFileEntries — error resilience', () => {
   // Unreadable files resolve without throwing — the entry is silently skipped.
   test('skips unreadable files without throwing', async () => {

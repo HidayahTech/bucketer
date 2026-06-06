@@ -481,7 +481,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     if (dragCounterRef.current === 0) setTableDragOver(false);
   }
 
-  async function handleTableDrop(e) {
+  function handleTableDrop(e) {
     e.preventDefault();
     dragCounterRef.current = 0;
     setTableDragOver(false);
@@ -496,8 +496,9 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
       }
     }
     if (fsEntries.length) {
-      const fileEntries = await collectFileEntries(fsEntries);
-      if (fileEntries.length) onExternalDrop(fileEntries);
+      collectFileEntries(fsEntries).then(fileEntries => {
+        if (fileEntries.length) onExternalDrop(fileEntries);
+      }).catch(() => {});
     } else {
       const files = e.dataTransfer?.files;
       if (files?.length) onExternalDrop(Array.from(files).map(f => ({ file: f, relativePath: f.name })));
