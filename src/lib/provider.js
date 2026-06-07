@@ -123,3 +123,32 @@ export function defaultMaxKeys(provider) {
 export function needsCorsConfig(provider) {
   return provider !== PROVIDERS.WASABI;
 }
+
+// Build the canonical HTTPS endpoint URL for a known provider + region string.
+// Returns null when the endpoint cannot be constructed from region alone:
+//   R2 requires an account ID; MinIO/Generic have no standard hostname pattern.
+//
+// Doc sources (all fetched 2026-06-04, verified against project review docs):
+//   B2:        https://www.backblaze.com/docs/cloud-storage-data-regions
+//   Wasabi:    https://docs.wasabi.com/docs/what-are-the-service-urls-for-wasabi-s-different-storage-regions
+//   AWS:       https://docs.aws.amazon.com/general/latest/gr/s3.html
+//   DO Spaces: https://docs.digitalocean.com/products/spaces/details/availability/
+export function buildEndpoint(provider, region) {
+  if (!region) return null;
+  switch (provider) {
+    case PROVIDERS.B2:
+      return `https://s3.${region}.backblazeb2.com`;
+    case PROVIDERS.WASABI:
+      // us-east-1 uses the legacy bare endpoint (no region segment in hostname).
+      // All other regions follow the standard template.
+      return region === 'us-east-1'
+        ? 'https://s3.wasabisys.com'
+        : `https://s3.${region}.wasabisys.com`;
+    case PROVIDERS.AWS:
+      return `https://s3.${region}.amazonaws.com`;
+    case PROVIDERS.DO_SPACES:
+      return `https://${region}.digitaloceanspaces.com`;
+    default:
+      return null;
+  }
+}
