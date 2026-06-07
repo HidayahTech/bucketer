@@ -26,12 +26,25 @@ const PROVIDER_OPTIONS = [
 ];
 
 export function CredentialForm({ initial, onSave, onFormChange, loading }) {
+  // Only pre-select a provider override if it genuinely differs from what
+  // auto-detection would return. Auto-detected values (e.g. 'b2' for a B2
+  // endpoint) should show "Auto-detect" in the dropdown — not the detected
+  // value as an explicit override — so switching endpoints doesn't carry a
+  // stale provider forward. Genuine overrides (e.g. 'minio' on a generic URL,
+  // or 'b2' on a reverse-proxy URL that doesn't pattern-match) are preserved.
+  const _autoDetected = initial.provider && initial.endpoint
+    ? detectProvider(initial.endpoint)
+    : null;
+  const _initProviderOverride = (initial.provider && initial.provider !== _autoDetected)
+    ? initial.provider
+    : '';
+
   const [form, setForm] = useState({
     endpoint: initial.endpoint || '',
     bucket: initial.bucket || '',
     keyId: initial.keyId || '',
     secretKey: initial.secretKey || '',
-    providerOverride: initial.provider || '',
+    providerOverride: _initProviderOverride,
     regionOverride: initial.regionOverride || '',
   });
 
