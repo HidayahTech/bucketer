@@ -1,6 +1,7 @@
 // Copyright (C) 2026 HidayahTech, LLC
 import { useState } from 'preact/hooks';
 import { canSaveProfile } from '../lib/credential-validation.js';
+import { PROVIDER_LABELS } from '../lib/provider.js';
 
 export function ProfilePicker({ profiles, selectedId, onSelect, onDelete, onSave, currentFormData }) {
   const [saving, setSaving] = useState(false);
@@ -9,13 +10,17 @@ export function ProfilePicker({ profiles, selectedId, onSelect, onDelete, onSave
   const saveable = canSaveProfile(currentFormData);
   const saveTitle = saveable ? undefined : 'Fill in endpoint, bucket, and key ID with valid values to save a profile';
 
+  // When a profile is selected, pre-fill its name so the save updates it in place.
+  const selectedProfile = profiles.find(p => p.id === selectedId) || null;
+  const initialSaveName = () => selectedProfile ? selectedProfile.name : defaultName(currentFormData);
+
   if (profiles.length === 0 && !saving) {
     return (
       <div class="profile-picker profile-picker-empty">
         <button class="btn btn-ghost btn-sm profile-save-trigger"
           disabled={!saveable}
           title={saveTitle}
-          onClick={() => { setSaveName(defaultName(currentFormData)); setSaving(true); }}>
+          onClick={() => { setSaveName(initialSaveName()); setSaving(true); }}>
           Save as profile…
         </button>
       </div>
@@ -73,8 +78,8 @@ export function ProfilePicker({ profiles, selectedId, onSelect, onDelete, onSave
         <button class="btn btn-ghost btn-sm profile-save-trigger"
           disabled={!saveable}
           title={saveTitle}
-          onClick={() => { setSaveName(defaultName(currentFormData)); setSaving(true); }}>
-          Save current as profile…
+          onClick={() => { setSaveName(initialSaveName()); setSaving(true); }}>
+          {selectedProfile ? 'Update profile…' : 'Save current as profile…'}
         </button>
       )}
     </div>
@@ -83,7 +88,7 @@ export function ProfilePicker({ profiles, selectedId, onSelect, onDelete, onSave
 
 function profileHint(profile) {
   const parts = [];
-  if (profile.provider) parts.push(profile.provider.toUpperCase());
+  if (profile.provider) parts.push(PROVIDER_LABELS[profile.provider] || profile.provider.toUpperCase());
   if (profile.bucket) parts.push(profile.bucket);
   return parts.join(' · ');
 }
