@@ -1,9 +1,20 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.15.3';
+export const CURRENT_VERSION = '1.15.4';
 
 export const CHANGELOG = [
+  {
+    "version": "1.15.4",
+    "date": "2026-06-06",
+    "title": "Profile reliability: provider inference, update-in-place, reload consistency, hint labels",
+    "changes": [
+      "**Provider override no longer carries over from auto-detection**: CredentialForm previously initialized the provider-override dropdown from the stored/detected provider, so switching a form pre-filled with B2 credentials to a Wasabi endpoint would silently submit provider: 'b2'. The dropdown now only pre-selects a value when it genuinely differs from what detectProvider would return for the current endpoint — i.e., only for real overrides (MinIO on a generic URL, a reverse proxy, etc.). Auto-detected providers always start at \"Auto-detect from endpoint\".",
+      "**Profile save updates in place**: \"Save current as profile…\" previously always created a new profile (id: Date.now()), making it impossible to update an existing one. When a profile is currently selected, the button now reads \"Update profile…\" and saves with the existing profile's id, replacing it rather than duplicating it. The name input pre-fills with the profile's current name.",
+      "**Reload prefers flat credentials over profile data**: on page load, the app previously always loaded the last-selected profile's data, which overwrote credentials saved by a manually-entered connection that was never saved as a profile. Flat credentials (written on every handleConnect) are now used when present; the profile is used only as a fallback when flat credentials are absent (i.e. after a disconnect or first load).",
+      "**Profile list hint shows full provider names**: the hint line under each profile name now uses PROVIDER_LABELS (\"Backblaze B2 · bucket\") instead of the raw key uppercased (\"B2 · bucket\")."
+    ]
+  },
   {
     "version": "1.15.3",
     "date": "2026-06-06",

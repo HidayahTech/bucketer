@@ -165,7 +165,14 @@ export function App() {
     const stored = loadCredentials();
     const fromUrl = readUrlParams();
     const profile = lastId ? updatedProfiles.find(p => p.id === lastId) : null;
-    const base = profile ? { ...profile, secretKey: stored.secretKey || '' } : stored;
+    // Prefer flat credentials (written by saveCredentials on every connect) over profile
+    // data. This ensures that connecting with modified credentials — without saving a new
+    // profile — is correctly restored on reload. Flat credentials are absent only after a
+    // disconnect (clearCredentials wipes them) or on first load, in which case we fall
+    // back to the saved profile so the form is pre-filled.
+    const base = stored.endpoint
+      ? stored
+      : (profile ? { ...profile, secretKey: stored.secretKey || '' } : stored);
     const merged = { ...base, ...fromUrl };
     if (merged.endpoint && merged.bucket && merged.keyId && merged.secretKey) {
       handleConnect(merged);
@@ -321,13 +328,26 @@ export function App() {
 
   function handleSaveProfile(name) {
     const ep = (liveFormData.endpoint || '').trim().replace(/\/$/, '');
+    // Resolve provider: if the form has been edited (onFormChange fired, giving us
+    // providerOverride), use that; otherwise fall back to liveFormData.provider
+    // (set from the profile/credentials on load, before any edits). This prevents
+    // a stale providerOverride from a previous session from leaking into the saved
+    // profile, while preserving genuine explicit overrides (e.g. MinIO on a generic URL).
+    const providerSource = 'providerOverride' in liveFormData
+      ? liveFormData.providerOverride
+      : liveFormData.provider;
+    const provider = providerSource || detectProvider(ep);
+
+    // If a profile is currently selected, update it in place (same id) rather than
+    // always creating a new one, so repeated saves don't accumulate duplicates.
+    const existingProfile = selectedProfileId ? profiles.find(p => p.id === selectedProfileId) : null;
     const profile = {
-      id: Date.now(),
+      id: existingProfile ? existingProfile.id : Date.now(),
       name,
       endpoint: ep,
       bucket: (liveFormData.bucket || '').trim(),
       keyId: (liveFormData.keyId || '').trim(),
-      provider: liveFormData.providerOverride || detectProvider(ep),
+      provider,
       regionOverride: (liveFormData.regionOverride || '').trim(),
     };
     saveProfile(profile);

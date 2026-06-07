@@ -7,6 +7,13 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.15.4] — 2026-06-06 — Profile reliability: provider inference, update-in-place, reload consistency, hint labels
+
+- **Provider override no longer carries over from auto-detection**: `CredentialForm` previously initialized the provider-override dropdown from the stored/detected provider, so switching a form pre-filled with B2 credentials to a Wasabi endpoint would silently submit `provider: 'b2'`. The dropdown now only pre-selects a value when it genuinely differs from what `detectProvider` would return for the current endpoint — i.e., only for real overrides (MinIO on a generic URL, a reverse proxy, etc.). Auto-detected providers always start at "Auto-detect from endpoint".
+- **Profile save updates in place**: "Save current as profile…" previously always created a new profile (`id: Date.now()`), making it impossible to update an existing one. When a profile is currently selected, the button now reads "Update profile…" and saves with the existing profile's id, replacing it rather than duplicating it. The name input pre-fills with the profile's current name.
+- **Reload prefers flat credentials over profile data**: on page load, the app previously always loaded the last-selected profile's data, which overwrote credentials saved by a manually-entered connection that was never saved as a profile. Flat credentials (written on every `handleConnect`) are now used when present; the profile is used only as a fallback when flat credentials are absent (i.e. after a disconnect or first load).
+- **Profile list hint shows full provider names**: the hint line under each profile name now uses `PROVIDER_LABELS` ("Backblaze B2 · bucket") instead of the raw key uppercased ("B2 · bucket").
+
 ## [1.15.3] — 2026-06-06 — Upload UI cleanup: hide when denied, drop zone removed, empty-state hint
 
 - **Upload UI hidden when denied**: entire upload section (destination folder, file/folder picker buttons) is now hidden when `capabilities.upload === 'denied'` rather than shown in a disabled/greyed state. When unknown or permitted, everything shows as before.
