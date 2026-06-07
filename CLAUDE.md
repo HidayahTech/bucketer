@@ -49,7 +49,7 @@ Tests live in `test/` and run with `node --test` (no framework). The suite has t
 **Unit tests — pure Node, no build step needed:**
 - `format.test.js` — `formatBytes`, `formatSpeed`, `formatEta`, `leafName`, `parseS3Error`, `isPermissionError`, `isBlockedByExtension` (BUG-025)
 - `media.test.js` — `mediaKind`, `mimeKind`, `mimeType`
-- `provider.test.js` — `detectProvider`, `extractRegion`, `requiresPathStyle`, `defaultMaxKeys`, `needsCorsConfig`
+- `provider.test.js` — `detectProvider`, `extractRegion`, `requiresPathStyle`, `defaultMaxKeys`, `needsCorsConfig`, `buildEndpoint`
 - `upload-queue.test.js` — `UploadQueue` concurrency, clear, error handling
 - `calc-part-size.test.js` — `calcPartSize` (S3 5 MB floor, 10,000-part ceiling)
 - `collect-parts.test.js` — `collectParts` pagination (BUG-007); uses mock S3 client
