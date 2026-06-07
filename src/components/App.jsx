@@ -147,7 +147,16 @@ export function App() {
     clearCredentials();
     clearCapabilities();
     setCapabilities(defaultCapabilities());
-    setCredentials({ endpoint: '', bucket: '', keyId: '', secretKey: '', provider: null, regionOverride: '' });
+    // Repopulate form from the selected profile (minus secret key) so the user only
+    // has to re-enter their secret key to reconnect. Without this, the form is blank
+    // while the profile row still appears highlighted, and clicking it is a no-op
+    // (same selectedProfileId → same key → CredentialForm doesn't remount).
+    const profile = selectedProfileId ? profiles.find(p => p.id === selectedProfileId) : null;
+    const nextCreds = profile
+      ? { ...profile, secretKey: '' }
+      : { endpoint: '', bucket: '', keyId: '', secretKey: '', provider: null, regionOverride: '' };
+    setCredentials(nextCreds);
+    setLiveFormData(nextCreds);
     setBrowserKey(k => k + 1);
   }
 

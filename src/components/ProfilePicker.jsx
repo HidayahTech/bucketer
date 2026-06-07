@@ -1,11 +1,12 @@
 // Copyright (C) 2026 HidayahTech, LLC
 import { useState } from 'preact/hooks';
 import { canSaveProfile } from '../lib/credential-validation.js';
-import { PROVIDER_LABELS } from '../lib/provider.js';
+import { PROVIDER_LABELS, detectProvider } from '../lib/provider.js';
 
 export function ProfilePicker({ profiles, selectedId, onSelect, onDelete, onSave, currentFormData }) {
   const [saving, setSaving] = useState(false);
   const [saveName, setSaveName] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   const saveable = canSaveProfile(currentFormData);
   const saveTitle = saveable ? undefined : 'Fill in endpoint, bucket, and key ID with valid values to save a profile';
@@ -50,12 +51,28 @@ export function ProfilePicker({ profiles, selectedId, onSelect, onDelete, onSave
             {profiles.map(p => (
               <li key={p.id}
                 class={'profile-row' + (p.id === selectedId ? ' profile-row-selected' : '')}
-                onClick={() => onSelect(p.id)}>
+                onClick={() => { setConfirmDeleteId(null); onSelect(p.id); }}>
                 <span class="profile-row-name">{p.name}</span>
-                <span class="profile-row-hint">{profileHint(p)}</span>
-                <button class="profile-row-delete btn-ghost"
-                  title="Delete profile"
-                  onClick={e => { e.stopPropagation(); onDelete(p.id); }}>✕</button>
+                {confirmDeleteId === p.id ? (
+                  <span class="profile-delete-confirm" onClick={e => e.stopPropagation()}>
+                    Delete?
+                    <button class="btn btn-sm profile-delete-confirm-yes" type="button"
+                      onClick={e => { e.stopPropagation(); onDelete(p.id); setConfirmDeleteId(null); }}>
+                      Confirm
+                    </button>
+                    <button class="btn btn-ghost btn-sm" type="button"
+                      onClick={e => { e.stopPropagation(); setConfirmDeleteId(null); }}>
+                      Cancel
+                    </button>
+                  </span>
+                ) : (
+                  <>
+                    <span class="profile-row-hint">{profileHint(p)}</span>
+                    <button class="profile-row-delete btn-ghost"
+                      title="Delete profile"
+                      onClick={e => { e.stopPropagation(); setConfirmDeleteId(p.id); }}>✕</button>
+                  </>
+                )}
               </li>
             ))}
           </ul>
@@ -95,8 +112,12 @@ function profileHint(profile) {
 
 function defaultName(formData) {
   if (!formData) return '';
-  const { provider, bucket } = formData;
-  if (provider && bucket) return `${provider.toUpperCase()} — ${bucket}`;
+  const { providerOverride, provider, endpoint, bucket } = formData;
+  // providerOverride is set when the user explicitly chooses a provider from the dropdown.
+  // provider is set when formData comes from a loaded profile (before any form edits).
+  // Fall back to auto-detecting from the endpoint so the name reflects what the form shows.
+  const prov = providerOverride || provider || (endpoint ? detectProvider(endpoint) : null);
+  if (prov && bucket) return `${prov.toUpperCase()} — ${bucket}`;
   if (bucket) return bucket;
   return '';
 }

@@ -946,6 +946,9 @@ details[open] .sv-summary::before { transform: rotate(90deg); }
   flex-shrink: 0;
 }
 .profile-row-delete:hover { color: var(--danger, #c0392b); background: color-mix(in srgb, var(--danger, #c0392b) 12%, transparent); }
+.profile-delete-confirm { display: flex; align-items: center; gap: .4rem; font-size: .8rem; color: var(--text-muted); flex: 1; justify-content: flex-end; }
+.profile-delete-confirm-yes { color: var(--danger, #c0392b); border-color: var(--danger, #c0392b); }
+.profile-delete-confirm-yes:hover { background: color-mix(in srgb, var(--danger, #c0392b) 12%, transparent); }
 .profile-save-trigger { font-size: .8rem; color: var(--text-muted); }
 .profile-save-form { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 .profile-save-form .input { flex: 1; min-width: 140px; font-size: .85rem; padding: .3rem .5rem; }

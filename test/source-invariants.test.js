@@ -909,3 +909,49 @@ describe('Browser.jsx — handleTableDrop has error handling (v1.15.3)', () => {
     );
   });
 });
+
+// ── BUG-026: _initExtractedRegion must not bail on initial.regionOverride ────────────────
+// When a profile is loaded, its stored regionOverride causes _initExtractedRegion to return
+// null early, making userEditedRef.current.region always true and disabling endpoint→region
+// inference for all subsequent edits. Changing the endpoint left the region permanently stale.
+// Fix: only bail when initial.endpoint is absent; always compute the extraction so the
+// stored value can be compared to the extracted one.
+
+describe('CredentialForm.jsx — _initExtractedRegion does not bail on regionOverride (BUG-026)', () => {
+  const source = src('components/CredentialForm.jsx');
+
+  test('_initExtractedRegion IIFE does not short-circuit on initial.regionOverride', () => {
+    // The bad pattern: `if (initial.regionOverride || !initial.endpoint) return null`
+    // The good pattern: `if (!initial.endpoint) return null`  (no regionOverride guard)
+    assert.ok(
+      !/if\s*\(\s*initial\.regionOverride\s*\|\|/.test(source),
+      'CredentialForm.jsx _initExtractedRegion must not bail on initial.regionOverride — ' +
+      'that made the region always "user-edited" for loaded profiles, silently sending the ' +
+      'wrong region to the S3 client after any endpoint change (BUG-026)'
+    );
+  });
+});
+
+// ── BUG-027: handleDisconnect must call setLiveFormData ───────────────────────────────────
+// handleDisconnect cleared credentials to empty but not liveFormData. Combined with
+// selectedProfileId not being reset, the highlighted profile row became un-clickable
+// (same key → no CredentialForm remount), leaving the splash screen with blank fields
+// and a selected profile that couldn't repopulate the form.
+// Fix: handleDisconnect calls setLiveFormData (and sets credentials from the profile).
+
+describe('App.jsx — handleDisconnect calls setLiveFormData (BUG-027)', () => {
+  const source = src('components/App.jsx');
+
+  test('handleDisconnect body includes setLiveFormData', () => {
+    const fnStart = source.indexOf('function handleDisconnect');
+    assert.ok(fnStart !== -1, 'handleDisconnect must exist in App.jsx');
+    const fnEnd   = source.indexOf('\n  function ', fnStart + 1);
+    const fn = source.slice(fnStart, fnEnd > fnStart ? fnEnd : fnStart + 600);
+    assert.ok(
+      fn.includes('setLiveFormData'),
+      'handleDisconnect must call setLiveFormData — without it, the "Save/Update profile" ' +
+      'button reflects stale pre-disconnect data, and the profile row is un-clickable ' +
+      'because the form never sees the reset credentials (BUG-027)'
+    );
+  });
+});

@@ -1,9 +1,20 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.15.5';
+export const CURRENT_VERSION = '1.15.6';
 
 export const CHANGELOG = [
+  {
+    "version": "1.15.6",
+    "date": "2026-06-07",
+    "title": "Credential form and profile management bug fixes",
+    "changes": [
+      "**Region inference restored for loaded profiles (BUG-026)**: loading a saved profile silently marked the region as \"user-edited\" regardless of whether its stored value matched what the endpoint would give. The _initExtractedRegion IIFE bailed out early when initial.regionOverride was set, making the comparison against the extracted value impossible. Removed the early bail; now the stored region is compared to the extracted one and treated as inferred (allowing endpoint changes to update it) when they match. The \"Auto-filled from endpoint URL\" hint also reappears for profile-loaded regions that are endpoint-derived.",
+      "**Post-disconnect form repopulated from selected profile (BUG-027)**: disconnecting cleared credentials to all-empty but left selectedProfileId pointing to the last profile, leaving the splash screen with a highlighted profile row and a blank form. Clicking the row was a no-op (same key, no CredentialForm remount). handleDisconnect now repopulates credentials and liveFormData from the selected profile minus the secret key, so the user only needs to re-enter the secret key to reconnect.",
+      "**Default profile name now includes provider (Issue 3)**: defaultName in ProfilePicker read formData.provider, which is absent when liveFormData comes from live form edits (those carry providerOverride instead). Now resolves providerOverride || provider || detectProvider(endpoint) so the suggested name reflects what the form shows — \"B2 — my-bucket\" instead of just \"my-bucket\".",
+      "**Profile delete requires confirmation (Issue 4)**: clicking ✕ on a profile row previously deleted it immediately with no undo. Now shows an inline \"Delete? [Confirm] [Cancel]\" confirmation in the row; the Confirm button is styled in danger-red. Clicking the row itself also dismisses the confirmation without selecting the profile."
+    ]
+  },
   {
     "version": "1.15.5",
     "date": "2026-06-07",

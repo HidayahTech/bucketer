@@ -658,3 +658,79 @@ Requires both a content blocker and a file whose upload URL matches a filter rul
 `isBlockedByExtension` has unit tests in `format.test.js` covering the Firefox, Chrome, and Safari error strings, a TypeError with an HTTP metadata response (must not trigger), a non-TypeError with the same message (must not trigger), a real S3 error (must not trigger), and null/undefined inputs.
 
 **Coverage:** `isBlockedByExtension` fully covered by unit tests. The banner render is DOM-dependent and verified by manual testing.
+
+---
+
+## BUG-026 — Profile load resets region inference: changing endpoint leaves region stale
+
+**Date:** 2026-06-07
+**Commit:** v1.15.6
+
+**Symptom:**
+After loading a saved profile (e.g. B2 `us-west-004`), changing the Endpoint URL to a different B2 region (e.g. `eu-central-003`) left the Region field stuck at the old value (`us-west-004`). The "Auto-filled from endpoint URL" hint also disappeared on load. The stale region would then be sent to the S3 client on connect, causing an authentication failure against the new endpoint.
+
+**Root cause:**
+`CredentialForm.jsx` computes `_initExtractedRegion` (what the endpoint would give for a region) only when `initial.regionOverride` is absent:
+
+```js
+const _initExtractedRegion = (() => {
+  if (initial.regionOverride || !initial.endpoint) return null;  // ← bailed early
+  ...
+})();
+```
+
+Because `_initExtractedRegion` was always `null` when a profile stored a region, the `userEditedRef` comparison `initial.regionOverride !== _initExtractedRegion` was always `true`, marking the region as user-edited regardless of whether the stored value matched extraction. With `ue.region = true`, the `applyChange` endpoint→region inference branch was skipped on every subsequent keypress.
+
+The comment above `userEditedRef` correctly described the *intent* ("a stored value that matches auto-extraction is treated as inferred") but the code never reached the comparison to check this.
+
+**Fix:**
+Remove `initial.regionOverride ||` from the `_initExtractedRegion` bail condition so extraction always runs when an endpoint is present. The existing comparison then correctly evaluates to `false` when the stored region matches extraction, setting `ue.region = false` and restoring inference. Also updated `_infRegion` to `true` in the matching case so the "Auto-filled from endpoint URL" hint is shown.
+
+```js
+// Before:
+if (initial.regionOverride || !initial.endpoint) return null;
+// After:
+if (!initial.endpoint) return null;
+```
+
+```js
+// Before:
+_infRegion: !!(_initExtractedRegion && !initial.regionOverride),
+// After:
+_infRegion: !!(_initExtractedRegion &&
+               (!initial.regionOverride || initial.regionOverride === _initExtractedRegion)),
+```
+
+**Why it wasn't caught earlier:**
+The bug only manifests when a profile is loaded from storage (not when filling the form fresh). The inference tests in `provider.test.js` cover `extractRegion` in isolation. No test exercised the CredentialForm's `userEditedRef` initialization path with a pre-populated `regionOverride`.
+
+**Test case:**
+Structural: assert in `source-invariants.test.js` that `_initExtractedRegion` in `CredentialForm.jsx` does not include `initial.regionOverride` in its bail condition. Or integration: mount CredentialForm with `initial = { endpoint: B2_ENDPOINT, regionOverride: B2_REGION }`, simulate an endpoint change to a different B2 region, and assert the region field updates.
+
+**Coverage:** No automated test. Fix verified by runtime observation: loading the "B2 Test" profile, changing endpoint from `us-west-004` to `eu-central-003`, confirmed region field updated to `eu-central-003` with "Auto-filled from endpoint URL" hint.
+
+---
+
+## BUG-027 — Post-disconnect: form is blank despite profile still highlighted
+
+**Date:** 2026-06-07
+**Commit:** v1.15.6
+
+**Symptom:**
+After disconnecting, the credential form went blank (all fields empty) even though the last-used profile remained highlighted in the profile list. Clicking the highlighted profile row had no effect — the form stayed empty. To recover, the user had to select a different profile and back, or reload the page.
+
+**Root cause:**
+`handleDisconnect` reset `credentials` state to all-empty but did not update `selectedProfileId` (intentional — the user's last profile stays selected across sessions) or `liveFormData`. The splash `CredentialForm` then mounted with `initial={empty credentials}`, showing blank fields.
+
+The highlighted profile row was unclickable because `handleSelectProfile(id)` called `setSelectedProfileId(id)` with the same value already in state — React bails out on same-value state updates, the key (`selectedProfileId ?? 'manual'`) didn't change, and the CredentialForm wasn't remounted. `initial` prop changes don't re-initialize a component's `useState`.
+
+**Fix:**
+In `handleDisconnect`, repopulate `credentials` and `liveFormData` from the selected profile (minus secret key) instead of clearing to empty. The CredentialForm then mounts with the profile's endpoint/bucket/keyId visible; the user only needs to enter the secret key to reconnect. No behavior change for users with no saved profiles — those still see an empty form.
+
+**Why it wasn't caught earlier:**
+The bug is only observable in a live session after connecting and disconnecting. The unit and structural tests have no coverage of App-level state transitions. The pattern of "same-value setState is a no-op" is easy to miss when the component tree has just remounted (connected → disconnected transitions swap the entire layout).
+
+**Test case:**
+Integration: simulate `handleDisconnect` with a selected profile in state, assert `credentials` equals the profile data (minus secret key) and `liveFormData` matches. Or structural: assert `handleDisconnect` calls `setLiveFormData` and that `setCredentials` is not called with all-empty values when a profile is selected.
+
+**Coverage:** No automated test. Fix verified by code review and runtime analysis.

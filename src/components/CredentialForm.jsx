@@ -37,10 +37,12 @@ export function CredentialForm({ initial, onSave, onFormChange, loading }) {
     ? initial.provider
     : '';
 
-  // Compute initial inferred region: if the endpoint is stored but no regionOverride
-  // is, extract the region so it's visible in the field on load.
+  // Compute what the endpoint would give for a region, regardless of whether a
+  // regionOverride is already stored. This lets the userEditedRef initializer below
+  // compare the stored value to the extracted one: if they match, the stored value is
+  // treated as inferred (not user-edited) so endpoint changes can still update it.
   const _initExtractedRegion = (() => {
-    if (initial.regionOverride || !initial.endpoint) return null;
+    if (!initial.endpoint) return null;
     const prov = _initProviderOverride || detectProvider(initial.endpoint);
     return extractRegion(initial.endpoint, prov);
   })();
@@ -64,7 +66,8 @@ export function CredentialForm({ initial, onSave, onFormChange, loading }) {
     providerOverride: _initProviderOverride,
     regionOverride:   initial.regionOverride || _initExtractedRegion || '',
     _infEndpoint:     false,
-    _infRegion:       !!(_initExtractedRegion && !initial.regionOverride),
+    _infRegion:       !!(_initExtractedRegion &&
+                        (!initial.regionOverride || initial.regionOverride === _initExtractedRegion)),
   });
 
   // applyChange: compute the next form state for a field change, including all
