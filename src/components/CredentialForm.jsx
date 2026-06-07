@@ -1,6 +1,6 @@
 // Copyright (C) 2026 HidayahTech, LLC
-import { useState } from 'preact/hooks';
-import { detectProvider, extractRegion, PROVIDERS, PROVIDER_LABELS } from '../lib/provider.js';
+import { useState, useRef } from 'preact/hooks';
+import { detectProvider, extractRegion, buildEndpoint, PROVIDERS, PROVIDER_LABELS } from '../lib/provider.js';
 import { credentialErrors } from '../lib/credential-validation.js';
 import { SetupGuide } from './SetupGuide.jsx';
 
@@ -26,12 +26,9 @@ const PROVIDER_OPTIONS = [
 ];
 
 export function CredentialForm({ initial, onSave, onFormChange, loading }) {
-  // Only pre-select a provider override if it genuinely differs from what
-  // auto-detection would return. Auto-detected values (e.g. 'b2' for a B2
-  // endpoint) should show "Auto-detect" in the dropdown — not the detected
-  // value as an explicit override — so switching endpoints doesn't carry a
-  // stale provider forward. Genuine overrides (e.g. 'minio' on a generic URL,
-  // or 'b2' on a reverse-proxy URL that doesn't pattern-match) are preserved.
+  // Only treat stored provider as an explicit override if it differs from what
+  // auto-detection returns for the stored endpoint. Auto-detected providers should
+  // leave the dropdown at "Auto-detect from endpoint".
   const _autoDetected = initial.provider && initial.endpoint
     ? detectProvider(initial.endpoint)
     : null;
@@ -39,26 +36,128 @@ export function CredentialForm({ initial, onSave, onFormChange, loading }) {
     ? initial.provider
     : '';
 
-  const [form, setForm] = useState({
-    endpoint: initial.endpoint || '',
-    bucket: initial.bucket || '',
-    keyId: initial.keyId || '',
-    secretKey: initial.secretKey || '',
-    providerOverride: _initProviderOverride,
-    regionOverride: initial.regionOverride || '',
+  // Compute initial inferred region: if the endpoint is stored but no regionOverride
+  // is, extract the region so it's visible in the field on load.
+  const _initExtractedRegion = (() => {
+    if (initial.regionOverride || !initial.endpoint) return null;
+    const prov = _initProviderOverride || detectProvider(initial.endpoint);
+    return extractRegion(initial.endpoint, prov);
+  })();
+
+  // userEditedRef: which fields the user has directly typed/pasted into.
+  // Inference only flows from user-edited fields into non-user-edited fields.
+  // This is a ref (not state) because it does not affect rendering.
+  const userEditedRef = useRef({
+    endpoint: !!initial.endpoint,
+    // region is user-edited only when a stored regionOverride exists and differs from
+    // what extraction gives — a stored value that matches auto-extraction is treated as
+    // inferred so that changing the endpoint can update it.
+    region: !!(initial.regionOverride && initial.regionOverride !== _initExtractedRegion),
   });
 
-  const set = (k) => (e) => setForm(f => {
-    const next = { ...f, [k]: e.target.value };
+  const [form, setForm] = useState({
+    endpoint:         initial.endpoint || '',
+    bucket:           initial.bucket || '',
+    keyId:            initial.keyId || '',
+    secretKey:        initial.secretKey || '',
+    providerOverride: _initProviderOverride,
+    regionOverride:   initial.regionOverride || _initExtractedRegion || '',
+    _infEndpoint:     false,
+    _infRegion:       !!(_initExtractedRegion && !initial.regionOverride),
+  });
+
+  // applyChange: compute the next form state for a field change, including all
+  // inference side-effects. Called by both `set` (input) and `onPaste`.
+  function applyChange(prev, k, value) {
+    const ue = userEditedRef.current;
+    if (k === 'endpoint')       ue.endpoint = true;
+    if (k === 'regionOverride') ue.region   = true;
+
+    const next = { ...prev, [k]: value };
+
+    // Editing a field removes its own inferred marker.
+    if (k === 'endpoint')       next._infEndpoint = false;
+    if (k === 'regionOverride') next._infRegion   = false;
+
+    // ── Endpoint → region ──────────────────────────────────────────────────────
+    if (k === 'endpoint' && !ue.region) {
+      const prov = next.providerOverride || detectProvider(next.endpoint);
+      const extracted = next.endpoint ? extractRegion(next.endpoint, prov) : null;
+      if (extracted) {
+        next.regionOverride = extracted;
+        next._infRegion = true;
+      } else if (prev._infRegion) {
+        // Endpoint changed and no longer contains a region — clear the inferred value.
+        next.regionOverride = '';
+        next._infRegion = false;
+      }
+    }
+
+    // ── Region → endpoint ──────────────────────────────────────────────────────
+    if (k === 'regionOverride' && !ue.endpoint) {
+      const prov = next.providerOverride
+        || (next.endpoint ? detectProvider(next.endpoint) : null);
+      const built = (prov && value) ? buildEndpoint(prov, value) : null;
+      if (built) {
+        next.endpoint = built;
+        next._infEndpoint = true;
+      } else if (!value && prev._infEndpoint) {
+        // Region cleared — remove the inferred endpoint too.
+        next.endpoint = '';
+        next._infEndpoint = false;
+      }
+    }
+
+    // ── Provider override change ───────────────────────────────────────────────
+    if (k === 'providerOverride') {
+      const newProv = value;
+
+      // R2 auto-fills 'auto' as region; clear it when switching away from R2.
+      if (prev._infRegion && prev.regionOverride === 'auto' && newProv !== PROVIDERS.R2) {
+        next.regionOverride = '';
+        next._infRegion = false;
+      }
+
+      // Re-extract region from current endpoint using the new provider.
+      if (!ue.region && next.endpoint && !next.regionOverride) {
+        const extracted = extractRegion(next.endpoint, newProv || detectProvider(next.endpoint));
+        if (extracted) {
+          next.regionOverride = extracted;
+          next._infRegion = true;
+        }
+      }
+
+      // R2 always uses 'auto' as the SigV4 region.
+      if (!ue.region && newProv === PROVIDERS.R2) {
+        next.regionOverride = 'auto';
+        next._infRegion = true;
+      }
+
+      // Rebuild endpoint from new provider + current region (if endpoint not user-owned).
+      if (!ue.endpoint && next.regionOverride && newProv) {
+        const built = buildEndpoint(newProv, next.regionOverride);
+        if (built) {
+          next.endpoint = built;
+          next._infEndpoint = true;
+        } else if (prev._infEndpoint) {
+          // New provider can't build an endpoint (e.g. switching to MinIO) — clear inferred.
+          next.endpoint = '';
+          next._infEndpoint = false;
+        }
+      }
+    }
+
+    return next;
+  }
+
+  const set = (k) => (e) => setForm(prev => {
+    const next = applyChange(prev, k, e.target.value);
     onFormChange?.(next);
     return next;
   });
 
-  // Trim leading/trailing whitespace from pasted values. Paste-introduced
-  // whitespace is a common copy/paste artifact; for all credential fields it is
-  // never meaningful, so trimming is unambiguously safe. Only intercepts when
-  // the pasted text actually contains surrounding whitespace — normal typing
-  // and clean pastes fall through to the default handler unchanged.
+  // onPaste: intercepts only when pasted text has surrounding whitespace (common
+  // copy/paste artifact). Uses applyChange so inference fires on trimmed pastes too.
   const onPaste = (k) => (e) => {
     const text = e.clipboardData?.getData('text');
     if (!text || text === text.trim()) return;
@@ -67,9 +166,9 @@ export function CredentialForm({ initial, onSave, onFormChange, loading }) {
     const el = e.currentTarget;
     const start = el.selectionStart ?? 0;
     const end   = el.selectionEnd   ?? el.value.length;
-    setForm(f => {
-      const cur  = f[k] || '';
-      const next = { ...f, [k]: cur.slice(0, start) + trimmed + cur.slice(end) };
+    setForm(prev => {
+      const cur  = prev[k] || '';
+      const next = applyChange(prev, k, cur.slice(0, start) + trimmed + cur.slice(end));
       onFormChange?.(next);
       return next;
     });
@@ -78,12 +177,10 @@ export function CredentialForm({ initial, onSave, onFormChange, loading }) {
   const errors = credentialErrors(form);
   const hasErrors = Object.keys(errors).length > 0;
 
-  // Auto-detect provider label for display
   const detected = form.endpoint ? detectProvider(form.endpoint) : null;
   const detectedLabel = detected ? PROVIDER_LABELS[detected] : null;
-  const regionHint = detected && form.endpoint
-    ? extractRegion(form.endpoint, detected)
-    : null;
+  // regionHint and needsRegion are removed — the region field is always shown,
+  // and inference fills it when the endpoint contains a region.
 
   function handleSubmit(e) {
     e.preventDefault();
@@ -98,8 +195,6 @@ export function CredentialForm({ initial, onSave, onFormChange, loading }) {
       regionOverride: form.regionOverride.trim(),
     });
   }
-
-  const needsRegion = !regionHint && form.endpoint;
 
   return (
     <form class="cred-panel" onSubmit={handleSubmit}>
@@ -116,8 +211,11 @@ export function CredentialForm({ initial, onSave, onFormChange, loading }) {
           autocomplete="off"
           spellcheck={false}
         />
+        {form._infEndpoint && (
+          <span class="hint">Auto-filled from provider and region</span>
+        )}
         {detectedLabel && !form.providerOverride && (
-          <span class="hint">Detected: {detectedLabel}{regionHint ? ` · Region: ${regionHint}` : ''}</span>
+          <span class="hint">Detected: {detectedLabel}</span>
         )}
       </div>
 
@@ -181,23 +279,30 @@ export function CredentialForm({ initial, onSave, onFormChange, loading }) {
         )}
       </div>
 
-      {needsRegion && (
-        <div class="form-group">
-          <label htmlFor="cred-region">Region</label>
-          <input
-            id="cred-region"
-            type="text"
-            value={form.regionOverride}
-            onInput={set('regionOverride')}
-            onPaste={onPaste('regionOverride')}
-            placeholder="us-east-1"
-            autocomplete="off"
-            spellcheck={false}
-          />
-          <span class="hint">Cannot be auto-detected for this endpoint. For R2, use "auto".</span>
-          {errors.regionOverride && <span class="field-error">{errors.regionOverride}</span>}
-        </div>
-      )}
+      <div class="form-group">
+        <label htmlFor="cred-region">Region</label>
+        <input
+          id="cred-region"
+          type="text"
+          value={form.regionOverride}
+          onInput={set('regionOverride')}
+          onPaste={onPaste('regionOverride')}
+          placeholder="us-east-1"
+          autocomplete="off"
+          spellcheck={false}
+        />
+        {form._infRegion && (
+          <span class="hint">Auto-filled from endpoint URL</span>
+        )}
+        {!form._infRegion && !form.regionOverride && (
+          <span class="hint">
+            {form.providerOverride === PROVIDERS.R2
+              ? 'R2 uses "auto" as the region — enter your endpoint above to auto-fill.'
+              : 'Enter the region for this endpoint (e.g. us-east-1).'}
+          </span>
+        )}
+        {errors.regionOverride && <span class="field-error">{errors.regionOverride}</span>}
+      </div>
 
       <div class="form-group">
         <span class="hint" style={{ color: 'var(--text-warn)' }}>
