@@ -10,9 +10,10 @@ import { SetupGuide } from './SetupGuide.jsx';
 // provider and region are shown as display hints — the user can override via dropdown
 // when auto-detection is wrong (reverse proxies, custom domains).
 //
-// Region input: shown only when the endpoint doesn't embed the region. For B2/Wasabi/AWS,
-// region is extracted from the URL. For R2, 'auto' is recommended. For MinIO and GENERIC,
-// the field appears with a placeholder.
+// Region input: always rendered. For providers that embed a region in the endpoint URL
+// (B2, Wasabi, AWS, DO Spaces), the value is inferred automatically and shown with an
+// "Auto-filled from endpoint URL" hint. For R2, 'auto' is auto-filled when the provider
+// override is set. For MinIO and GENERIC, the user enters it manually.
 //
 // Secret key: type="password" prevents on-screen display and excludes from autofill history.
 // Storage policy: sessionStorage only (cleared on tab close, never in localStorage).
@@ -70,8 +71,6 @@ export function CredentialForm({ initial, onSave, onFormChange, loading }) {
   // inference side-effects. Called by both `set` (input) and `onPaste`.
   function applyChange(prev, k, value) {
     const ue = userEditedRef.current;
-    if (k === 'endpoint')       ue.endpoint = true;
-    if (k === 'regionOverride') ue.region   = true;
 
     const next = { ...prev, [k]: value };
 
@@ -150,11 +149,15 @@ export function CredentialForm({ initial, onSave, onFormChange, loading }) {
     return next;
   }
 
-  const set = (k) => (e) => setForm(prev => {
-    const next = applyChange(prev, k, e.target.value);
-    onFormChange?.(next);
-    return next;
-  });
+  const set = (k) => (e) => {
+    if (k === 'endpoint')       userEditedRef.current.endpoint = true;
+    if (k === 'regionOverride') userEditedRef.current.region   = true;
+    setForm(prev => {
+      const next = applyChange(prev, k, e.target.value);
+      onFormChange?.(next);
+      return next;
+    });
+  };
 
   // onPaste: intercepts only when pasted text has surrounding whitespace (common
   // copy/paste artifact). Uses applyChange so inference fires on trimmed pastes too.
@@ -166,6 +169,8 @@ export function CredentialForm({ initial, onSave, onFormChange, loading }) {
     const el = e.currentTarget;
     const start = el.selectionStart ?? 0;
     const end   = el.selectionEnd   ?? el.value.length;
+    if (k === 'endpoint')       userEditedRef.current.endpoint = true;
+    if (k === 'regionOverride') userEditedRef.current.region   = true;
     setForm(prev => {
       const cur  = prev[k] || '';
       const next = applyChange(prev, k, cur.slice(0, start) + trimmed + cur.slice(end));
@@ -292,14 +297,14 @@ export function CredentialForm({ initial, onSave, onFormChange, loading }) {
           spellcheck={false}
         />
         {form._infRegion && (
-          <span class="hint">Auto-filled from endpoint URL</span>
+          <span class="hint">
+            {form.regionOverride === 'auto'
+              ? 'R2 always uses "auto" as the SigV4 region'
+              : 'Auto-filled from endpoint URL'}
+          </span>
         )}
         {!form._infRegion && !form.regionOverride && (
-          <span class="hint">
-            {form.providerOverride === PROVIDERS.R2
-              ? 'R2 uses "auto" as the region — enter your endpoint above to auto-fill.'
-              : 'Enter the region for this endpoint (e.g. us-east-1).'}
-          </span>
+          <span class="hint">Enter the region for this endpoint (e.g. us-east-1).</span>
         )}
         {errors.regionOverride && <span class="field-error">{errors.regionOverride}</span>}
       </div>
