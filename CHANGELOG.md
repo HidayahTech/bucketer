@@ -7,6 +7,13 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.15.5] — 2026-06-07 — Bidirectional endpoint↔region inference in credential form
+
+- **Region auto-filled from endpoint**: the region field is now always visible and is automatically populated when the endpoint URL embeds a region (B2, Wasabi, AWS, DO Spaces). Previously the extracted region was only shown as a sidebar hint; now it appears as an editable value with an "Auto-filled from endpoint URL" indicator.
+- **Endpoint auto-filled from provider + region**: selecting a provider from the override dropdown and typing a region constructs and auto-fills the canonical endpoint URL ("Auto-filled from provider and region"). Provider-specific exceptions are handled: Wasabi's `us-east-1` produces `https://s3.wasabisys.com` (bare legacy hostname) rather than the naïve template. R2 auto-fills the region with `'auto'` (endpoint requires account ID and cannot be constructed). MinIO and Generic providers do not infer endpoints.
+- **Endpoint patterns verified against official docs** (all fetched 2026-06-04/07): B2 via backblaze.com/docs, Wasabi via docs.wasabi.com, AWS via docs.aws.amazon.com/general, DO Spaces via docs.digitalocean.com, R2 via developers.cloudflare.com.
+- **Circular update prevention**: a `userEditedRef` ensures inference only flows from user-typed fields into fields the user has not yet touched. Editing an auto-filled field marks it as user-owned and stops inference from overwriting it.
+
 ## [1.15.4] — 2026-06-06 — Profile reliability: provider inference, update-in-place, reload consistency, hint labels
 
 - **Provider override no longer carries over from auto-detection**: `CredentialForm` previously initialized the provider-override dropdown from the stored/detected provider, so switching a form pre-filled with B2 credentials to a Wasabi endpoint would silently submit `provider: 'b2'`. The dropdown now only pre-selects a value when it genuinely differs from what `detectProvider` would return for the current endpoint — i.e., only for real overrides (MinIO on a generic URL, a reverse proxy, etc.). Auto-detected providers always start at "Auto-detect from endpoint".

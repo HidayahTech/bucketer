@@ -1,9 +1,20 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.15.4';
+export const CURRENT_VERSION = '1.15.5';
 
 export const CHANGELOG = [
+  {
+    "version": "1.15.5",
+    "date": "2026-06-07",
+    "title": "Bidirectional endpoint↔region inference in credential form",
+    "changes": [
+      "**Region auto-filled from endpoint**: the region field is now always visible and is automatically populated when the endpoint URL embeds a region (B2, Wasabi, AWS, DO Spaces). Previously the extracted region was only shown as a sidebar hint; now it appears as an editable value with an \"Auto-filled from endpoint URL\" indicator.",
+      "**Endpoint auto-filled from provider + region**: selecting a provider from the override dropdown and typing a region constructs and auto-fills the canonical endpoint URL (\"Auto-filled from provider and region\"). Provider-specific exceptions are handled: Wasabi's us-east-1 produces https://s3.wasabisys.com (bare legacy hostname) rather than the naïve template. R2 auto-fills the region with 'auto' (endpoint requires account ID and cannot be constructed). MinIO and Generic providers do not infer endpoints.",
+      "**Endpoint patterns verified against official docs** (all fetched 2026-06-04/07): B2 via backblaze.com/docs, Wasabi via docs.wasabi.com, AWS via docs.aws.amazon.com/general, DO Spaces via docs.digitalocean.com, R2 via developers.cloudflare.com.",
+      "**Circular update prevention**: a userEditedRef ensures inference only flows from user-typed fields into fields the user has not yet touched. Editing an auto-filled field marks it as user-owned and stops inference from overwriting it."
+    ]
+  },
   {
     "version": "1.15.4",
     "date": "2026-06-06",
