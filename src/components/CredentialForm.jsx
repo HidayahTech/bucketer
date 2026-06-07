@@ -117,12 +117,20 @@ export function CredentialForm({ initial, onSave, onFormChange, loading }) {
         next._infRegion = false;
       }
 
-      // Re-extract region from current endpoint using the new provider.
-      if (!ue.region && next.endpoint && !next.regionOverride) {
+      // Re-extract region from current endpoint using the new provider. The
+      // !next.regionOverride guard is intentionally absent: if the region is
+      // currently inferred from the old provider (e.g. 'us-west-004' from B2),
+      // it must be re-evaluated with the new provider — otherwise a stale B2
+      // region would persist and silently produce a wrong AWS endpoint below.
+      if (!ue.region && next.endpoint) {
         const extracted = extractRegion(next.endpoint, newProv || detectProvider(next.endpoint));
         if (extracted) {
           next.regionOverride = extracted;
           next._infRegion = true;
+        } else if (next._infRegion) {
+          // New provider can't extract a region from this endpoint — clear stale inferred value.
+          next.regionOverride = '';
+          next._infRegion = false;
         }
       }
 
@@ -149,6 +157,9 @@ export function CredentialForm({ initial, onSave, onFormChange, loading }) {
     return next;
   }
 
+  // Ref mutations must precede setForm so applyChange sees the updated values
+  // inside the synchronous updater callback — inference direction depends on
+  // which fields are user-owned vs inferred at the moment of each change.
   const set = (k) => (e) => {
     if (k === 'endpoint')       userEditedRef.current.endpoint = true;
     if (k === 'regionOverride') userEditedRef.current.region   = true;
