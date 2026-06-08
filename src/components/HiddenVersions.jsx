@@ -13,9 +13,10 @@
 // loaded page) would leave orphaned versions and show a misleading "done" message.
 // Batched in 1000-object chunks — the S3 DeleteObjects API maximum.
 import { useState } from 'preact/hooks';
-import { ListObjectVersionsCommand, DeleteObjectCommand, DeleteObjectsCommand } from '@aws-sdk/client-s3';
+import { ListObjectVersionsCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { formatBytes } from '../lib/format.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
+import { purgeAllVersions, collectHiddenVersions } from '../lib/purge-versions.js';
 
 function formatDate(d) {
   if (!d) return '';
@@ -27,19 +28,6 @@ function shortVersionId(id) {
   return id.length > 18 ? id.slice(0, 18) + '…' : id;
 }
 
-// Extracts only old versions (IsLatest=false) and all delete markers from a
-// ListObjectVersions response page. Latest versions are shown by the main listing;
-// they are deliberately excluded here to avoid confusion with "normal" files.
-function collectHidden(resp) {
-  const hidden = [];
-  for (const v of (resp.Versions || [])) {
-    if (!v.IsLatest) hidden.push({ key: v.Key, versionId: v.VersionId, type: 'old-version', size: v.Size, date: v.LastModified });
-  }
-  for (const dm of (resp.DeleteMarkers || [])) {
-    hidden.push({ key: dm.Key, versionId: dm.VersionId, type: 'delete-marker', isLatest: dm.IsLatest, size: null, date: dm.LastModified });
-  }
-  return hidden;
-}
 
 export function HiddenVersions({ client, bucket, prefix, provider }) {
   const [rows, setRows] = useState(null);
@@ -76,7 +64,7 @@ export function HiddenVersions({ client, bucket, prefix, provider }) {
         KeyMarker: keyMarker || undefined,
         VersionIdMarker: versionIdMarker || undefined,
       }));
-      const hidden = collectHidden(resp);
+      const hidden = collectHiddenVersions(resp);
       hidden.sort((a, b) => {
         const kc = a.key.localeCompare(b.key);
         return kc !== 0 ? kc : new Date(b.date) - new Date(a.date);
@@ -113,40 +101,11 @@ export function HiddenVersions({ client, bucket, prefix, provider }) {
     setDeleting(true);
     setDeleteError(null);
     try {
-      // Collect all rows including any unloaded pages
-      let all = [...(rows || [])];
-      let km = nextKeyMarker;
-      let vim = nextVersionIdMarker;
-      let trunc = isTruncated;
-      while (trunc) {
-        const resp = await client.send(new ListObjectVersionsCommand({
-          Bucket: bucket,
-          Prefix: prefix || undefined,
-          KeyMarker: km || undefined,
-          VersionIdMarker: vim || undefined,
-        }));
-        all = all.concat(collectHidden(resp));
-        trunc = !!resp.IsTruncated;
-        km = resp.NextKeyMarker || null;
-        vim = resp.NextVersionIdMarker || null;
-      }
-
-      // Batch delete in chunks of 1000 (S3 API limit).
-      // Continue through every batch even if some fail — accumulate errors so the
-      // user sees an aggregate count rather than losing the remaining batches silently.
-      const allErrors = [];
-      for (let i = 0; i < all.length; i += 1000) {
-        const batch = all.slice(i, i + 1000);
-        try {
-          const resp = await client.send(new DeleteObjectsCommand({
-            Bucket: bucket,
-            Delete: { Objects: batch.map(r => ({ Key: r.key, VersionId: r.versionId })), Quiet: true },
-          }));
-          if (resp.Errors) allErrors.push(...resp.Errors);
-        } catch (batchErr) {
-          allErrors.push({ Key: '(network)', Message: batchErr.message || String(batchErr) });
-        }
-      }
+      const allErrors = await purgeAllVersions(client, {
+        bucket, prefix: prefix || '',
+        initialRows: rows || [],
+        nextKeyMarker, nextVersionIdMarker, isTruncated,
+      });
 
       if (allErrors.length > 0) {
         const first = allErrors[0];

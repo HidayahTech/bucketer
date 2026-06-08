@@ -82,85 +82,75 @@ export function clearCredentials() {
   safeRemove(sessionStorage, SS_KEY_SECRET);
 }
 
-export function loadMaxKeys() {
-  const v = safeGet(localStorage, LS_KEYS.maxKeys);
-  return v ? parseInt(v, 10) : null; // null → use provider default
+// Settings accessor factory.
+//
+// WHY THIS PATTERN EXISTS: the 8 settings accessors below all follow the same
+// structure — read a localStorage key, parse with a type-specific parser, fall back
+// to a default. Writing each as a separate function pair caused ~80 lines of near-
+// identical code and required updating two functions every time a setting was added.
+//
+// HOW TO ADD A NEW SETTING: add the key to SETTINGS_KEYS above, then add one entry
+// here using makeSettingAccessors. Do NOT write standalone load/save functions.
+//
+// The parser receives the raw string value (or '' if the key is absent). The serializer
+// converts a value back to string for storage. Both must be pure functions.
+function makeSettingAccessors(key, parser, serializer = String) {
+  return {
+    load: () => parser(safeGet(localStorage, key)),
+    save: (val) => safeSet(localStorage, key, serializer(val)),
+  };
 }
 
-export function saveMaxKeys(n) {
-  safeSet(localStorage, LS_KEYS.maxKeys, String(n));
-}
+const _maxKeys = makeSettingAccessors(
+  LS_KEYS.maxKeys,
+  v => v ? parseInt(v, 10) : null,          // null → use provider default
+);
+const _partConcurrency = makeSettingAccessors(
+  LS_KEYS.partConcurrency,
+  v => v ? parseInt(v, 10) : null,
+);
+const _partSizeMB = makeSettingAccessors(
+  LS_KEYS.partSizeMB,
+  v => v ? parseInt(v, 10) : null,
+);
+const _fileConcurrency = makeSettingAccessors(
+  LS_KEYS.fileConcurrency,
+  v => v ? parseInt(v, 10) : null,
+);
+const _listingCacheTTL = makeSettingAccessors(
+  LS_KEYS.listingCacheTTL,
+  // 0 is valid ("disable cache"), so check !== '' rather than !v
+  v => v !== '' ? parseInt(v, 10) : null,   // null → caller uses default (120 s)
+);
+const _prefetchSizeLimit = makeSettingAccessors(
+  LS_KEYS.prefetchSizeLimit,
+  v => { if (v === '') return 5 * 1024 * 1024; const n = parseInt(v, 10); return isNaN(n) || n < 0 ? 5 * 1024 * 1024 : n; }, // default 5 MB; 0 = off
+);
+const _uploadExpandThreshold = makeSettingAccessors(
+  LS_KEYS.uploadExpandThreshold,
+  v => { if (v === '') return 5; const n = parseInt(v, 10); return isNaN(n) || n < 0 ? 5 : n; }, // default 5
+);
+const _updateCheckEnabled = makeSettingAccessors(
+  LS_KEYS.updateCheckEnabled,
+  v => v === '' ? true : v === 'true',       // default true
+);
 
-export function loadPartConcurrency() {
-  const v = safeGet(localStorage, LS_KEYS.partConcurrency);
-  return v ? parseInt(v, 10) : null; // null → caller uses its own default
-}
-
-export function savePartConcurrency(n) {
-  safeSet(localStorage, LS_KEYS.partConcurrency, String(n));
-}
-
-export function loadPartSizeMB() {
-  const v = safeGet(localStorage, LS_KEYS.partSizeMB);
-  return v ? parseInt(v, 10) : null; // null → caller uses its own default
-}
-
-export function savePartSizeMB(n) {
-  safeSet(localStorage, LS_KEYS.partSizeMB, String(n));
-}
-
-export function loadFileConcurrency() {
-  const v = safeGet(localStorage, LS_KEYS.fileConcurrency);
-  return v ? parseInt(v, 10) : null; // null → caller uses its own default
-}
-
-export function saveFileConcurrency(n) {
-  safeSet(localStorage, LS_KEYS.fileConcurrency, String(n));
-}
-
-export function loadListingCacheTTL() {
-  const v = safeGet(localStorage, LS_KEYS.listingCacheTTL);
-  // Check !== '' (not !v) because 0 is a valid value meaning "disable cache".
-  return v !== '' ? parseInt(v, 10) : null; // null → caller uses default (120 s)
-}
-
-export function saveListingCacheTTL(seconds) {
-  safeSet(localStorage, LS_KEYS.listingCacheTTL, String(seconds));
-}
-
-// Default 5 MB. 0 = off.
-export function loadPrefetchSizeLimit() {
-  const v = safeGet(localStorage, LS_KEYS.prefetchSizeLimit);
-  if (v === '') return 5 * 1024 * 1024;
-  const n = parseInt(v, 10);
-  return isNaN(n) || n < 0 ? 5 * 1024 * 1024 : n;
-}
-
-export function savePrefetchSizeLimit(n) {
-  safeSet(localStorage, LS_KEYS.prefetchSizeLimit, String(n));
-}
-
-// Batches at or below this count start expanded; larger batches start collapsed. Default 5.
-export function loadUploadExpandThreshold() {
-  const v = safeGet(localStorage, LS_KEYS.uploadExpandThreshold);
-  if (v === '') return 5;
-  const n = parseInt(v, 10);
-  return isNaN(n) || n < 0 ? 5 : n;
-}
-
-export function saveUploadExpandThreshold(n) {
-  safeSet(localStorage, LS_KEYS.uploadExpandThreshold, String(n));
-}
-
-// Default true — preserves existing behaviour for users who have never changed it.
-export function loadUpdateCheckEnabled() {
-  const v = safeGet(localStorage, LS_KEYS.updateCheckEnabled);
-  return v === '' ? true : v === 'true';
-}
-
-export function saveUpdateCheckEnabled(enabled) {
-  safeSet(localStorage, LS_KEYS.updateCheckEnabled, String(enabled));
-}
+export const loadMaxKeys               = _maxKeys.load;
+export const saveMaxKeys               = _maxKeys.save;
+export const loadPartConcurrency       = _partConcurrency.load;
+export const savePartConcurrency       = _partConcurrency.save;
+export const loadPartSizeMB            = _partSizeMB.load;
+export const savePartSizeMB            = _partSizeMB.save;
+export const loadFileConcurrency       = _fileConcurrency.load;
+export const saveFileConcurrency       = _fileConcurrency.save;
+export const loadListingCacheTTL       = _listingCacheTTL.load;
+export const saveListingCacheTTL       = _listingCacheTTL.save;
+export const loadPrefetchSizeLimit     = _prefetchSizeLimit.load;
+export const savePrefetchSizeLimit     = _prefetchSizeLimit.save;
+export const loadUploadExpandThreshold = _uploadExpandThreshold.load;
+export const saveUploadExpandThreshold = _uploadExpandThreshold.save;
+export const loadUpdateCheckEnabled    = _updateCheckEnabled.load;
+export const saveUpdateCheckEnabled    = _updateCheckEnabled.save;
 
 // Per-operation permission state (§4.12). Each of { list, download, upload, delete }
 // starts as 'unknown' (assumed permitted) and transitions to 'denied' only after an

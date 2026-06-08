@@ -30,13 +30,14 @@ import {
 } from '../lib/indexeddb.js';
 import { UploadQueue as Queue, calcPartSize, collectParts, preparePutBody, uploadPartsWithPool } from '../lib/upload-queue.js';
 import { loadPartConcurrency, loadPartSizeMB, loadFileConcurrency, loadUploadExpandThreshold } from '../lib/storage.js';
+import { MULTIPART_THRESHOLD, LARGE_FILE_WARN, DEFAULT_FILE_CONCURRENCY, PART_CONCURRENCY } from '../lib/constants.js';
+import { isActive as itemIsActive, isFailed as itemIsFailed, isPaused as itemIsPaused } from '../lib/upload-status.js';
+import { abortMultipartSession } from '../lib/upload-cleanup.js';
+import { useDoubleClickSafety } from '../hooks/useDoubleClickSafety.js';
+import { useInterpolatedProgress } from '../hooks/useInterpolatedProgress.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
+import { MultipartFailureConsequence } from './MultipartFailureConsequence.jsx';
 import { createUpdateBatcher } from '../lib/update-batcher.js';
-
-const MULTIPART_THRESHOLD       = 5 * 1024 * 1024;   // 5 MiB — internal threshold, above the 5 MB spec minimum
-const LARGE_FILE_WARN           = 50 * 1024 * 1024 * 1024; // 50 GB — recommend native tools (§4.6)
-const DEFAULT_FILE_CONCURRENCY  = 3;
-const PART_CONCURRENCY          = 4; // concurrent part uploads per file (peak memory: 4 × partSize)
 
 // Status: queued | uploading | paused | resuming | done | error | aborted
 let _idCounter = 0;
@@ -52,8 +53,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   const folderInputRef = useRef(null);
   const notifAskedRef = useRef(false);
   const [notifSuppressed, setNotifSuppressed] = useState(false);
-  const [cancelAllPrimed, setCancelAllPrimed] = useState(false);
-  const cancelAllPrimedTimerRef = useRef(null);
+  const { primed: cancelAllPrimed, handleClick: handleCancelAllClick } = useDoubleClickSafety(cancelAll);
 
   function toggleNotifSuppressed() {
     setNotifSuppressed(prev => !prev);
@@ -68,7 +68,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
 
   // Fire onUploadsComplete once when the queue fully drains (no uploading/queued items left)
   useEffect(() => {
-    const hasActive = items.some(i => i.status === 'uploading' || i.status === 'resuming' || i.status === 'queued');
+    const hasActive = items.some(itemIsActive);
     if (hadActiveRef.current && !hasActive && items.length > 0) {
       onUploadsComplete?.();
     }
@@ -223,8 +223,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         if (file.size >= MULTIPART_THRESHOLD) {
           const rec = await loadResumeRecord({ provider, endpoint: credentials.endpoint, bucket, destinationKey }).catch(() => null);
           if (rec) {
-            await client.send(new AbortMultipartUploadCommand({ Bucket: bucket, Key: destinationKey, UploadId: rec.uploadId })).catch(() => {});
-            await deleteResumeRecord({ provider, endpoint: credentials.endpoint, bucket, destinationKey }).catch(() => {});
+            await abortMultipartSession(client, { bucket, key: destinationKey, uploadId: rec.uploadId, provider, endpoint: credentials.endpoint });
           }
         }
       }
@@ -415,12 +414,10 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     if (!item) return;
 
     if (item.resumeRecord) {
-      try {
-        await client.send(new AbortMultipartUploadCommand({
-          Bucket: bucket, Key: item.destinationKey, UploadId: item.resumeRecord.uploadId,
-        }));
-      } catch { /* best effort */ }
-      await deleteResumeRecord({ provider, endpoint: credentials.endpoint, bucket, destinationKey: item.destinationKey }).catch(() => {});
+      await abortMultipartSession(client, {
+        bucket, key: item.destinationKey, uploadId: item.resumeRecord.uploadId,
+        provider, endpoint: credentials.endpoint,
+      });
     }
 
     updateItem(id, { status: 'queued', resumeRecord: null, error: null, progress: 0 }, true);
@@ -441,14 +438,14 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       const active = activeUploadsRef.current[item.id];
       const uploadId = active?.uploadId ?? item.resumeRecord?.uploadId;
       if (uploadId) {
-        client.send(new AbortMultipartUploadCommand({ Bucket: bucket, Key: item.destinationKey, UploadId: uploadId })).catch(() => {});
-        deleteResumeRecord({ provider, endpoint: credentials.endpoint, bucket, destinationKey: item.destinationKey }).catch(() => {});
+        abortMultipartSession(client, {
+          bucket, key: item.destinationKey, uploadId,
+          provider, endpoint: credentials.endpoint,
+        });
       }
     });
     setItems(prev => prev.map(i =>
-      i.batchId === batchId && (i.status === 'queued' || i.status === 'uploading' || i.status === 'resuming')
-        ? { ...i, status: 'aborted' }
-        : i
+      i.batchId === batchId && itemIsActive(i) ? { ...i, status: 'aborted' } : i
     ));
   }
 
@@ -503,8 +500,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
 
   function dismissAllSettled() {
     const activeOrQueued = new Set(
-      items.filter(i => i.status === 'uploading' || i.status === 'resuming' || i.status === 'queued' || i.status === 'paused')
-           .map(i => i.batchId)
+      items.filter(i => itemIsActive(i) || itemIsPaused(i)).map(i => i.batchId)
     );
     const toRemove = new Set([...new Set(items.map(i => i.batchId))].filter(id => !activeOrQueued.has(id)));
     setItems(prev => prev.filter(i => !toRemove.has(i.batchId)));
@@ -513,27 +509,12 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   }
 
   function retryAllFailed() {
-    items.filter(i => i.status === 'error').forEach(item => handleRestart(item.id));
+    items.filter(itemIsFailed).forEach(item => handleRestart(item.id));
   }
 
   function cancelAll() {
-    const activeBatchIds = new Set(
-      items.filter(i => i.status === 'uploading' || i.status === 'resuming' || i.status === 'queued')
-           .map(i => i.batchId)
-    );
+    const activeBatchIds = new Set(items.filter(itemIsActive).map(i => i.batchId));
     activeBatchIds.forEach(batchId => handleCancelBatch(batchId));
-  }
-
-  function handleCancelAllClick() {
-    if (!cancelAllPrimed) {
-      setCancelAllPrimed(true);
-      clearTimeout(cancelAllPrimedTimerRef.current);
-      cancelAllPrimedTimerRef.current = setTimeout(() => setCancelAllPrimed(false), 3000);
-    } else {
-      clearTimeout(cancelAllPrimedTimerRef.current);
-      setCancelAllPrimed(false);
-      cancelAll();
-    }
   }
 
   function collapseAll() {
@@ -839,20 +820,7 @@ function BatchSummary({ items, provider, collapsed, onToggleCollapse, onCollapse
   const displayProgress = totalBytes > 0 ? Math.min((displayedBytes / totalBytes) * 100, 100) : 0;
   const liveEta = batchSpeed > 0 ? (totalBytes - displayedBytes) / batchSpeed : null;
 
-  const [cancelPrimed, setCancelPrimed] = useState(false);
-  const cancelPrimedTimer = useRef(null);
-
-  function handleCancelBatchClick() {
-    if (!cancelPrimed) {
-      setCancelPrimed(true);
-      clearTimeout(cancelPrimedTimer.current);
-      cancelPrimedTimer.current = setTimeout(() => setCancelPrimed(false), 3000);
-    } else {
-      clearTimeout(cancelPrimedTimer.current);
-      setCancelPrimed(false);
-      onCancelBatch();
-    }
-  }
+  const { primed: cancelPrimed, handleClick: handleCancelBatchClick } = useDoubleClickSafety(onCancelBatch);
 
   const summaryTop = (
     <div class="batch-summary-top">
@@ -938,44 +906,14 @@ function BatchSummary({ items, provider, collapsed, onToggleCollapse, onCollapse
 function UploadItem({ item, onResume, onRestart, onCancel, onRemove, onDismissLargeWarn, provider }) {
   const { name, size, status, bytesUploaded, speed, error, expiryWarning, resumeRecord, largeFileWarningDismissed } = item;
 
-  // Smoothly interpolated byte counter driven by rAF — advances at the current
-  // speed between real part-completion events, floored at confirmed bytes so it
-  // never goes backward and capped at file size.
-  const [displayedBytes, setDisplayedBytes] = useState(bytesUploaded);
-  const animRef  = useRef(null);
-  const speedRef = useRef(speed);
-  const floorRef = useRef(bytesUploaded);
-
-  useEffect(() => { speedRef.current = speed; }, [speed]);
-
-  useEffect(() => {
-    floorRef.current = bytesUploaded;
-    // Snap forward if confirmed bytes overtook the interpolated display
-    setDisplayedBytes(prev => Math.max(prev, bytesUploaded));
-  }, [bytesUploaded]);
-
-  useEffect(() => {
-    if (status !== 'uploading') {
-      cancelAnimationFrame(animRef.current);
-      setDisplayedBytes(bytesUploaded);
-      return;
-    }
-    let last = performance.now();
-    function tick(now) {
-      if (document.visibilityState === 'hidden' || now - last < 66) {
-        animRef.current = requestAnimationFrame(tick);
-        return;
-      }
-      const dt = (now - last) / 1000;
-      last = now;
-      setDisplayedBytes(prev =>
-        Math.min(Math.max(prev + speedRef.current * dt, floorRef.current), size)
-      );
-      animRef.current = requestAnimationFrame(tick);
-    }
-    animRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(animRef.current);
-  }, [status, size]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Smoothly interpolated byte counter — advances at the current speed between
+  // real part-completion events, floored at confirmed bytes, capped at file size.
+  const { displayedBytes } = useInterpolatedProgress({
+    isActive: status === 'uploading',
+    confirmedBytes: bytesUploaded,
+    speed,
+    fileSize: size,
+  });
 
   const displayProgress = size > 0 ? (displayedBytes / size) * 100 : 0;
   const liveEta = speed > 0 ? (size - displayedBytes) / speed : null;
@@ -1070,59 +1008,46 @@ function UploadItem({ item, onResume, onRestart, onCancel, onRemove, onDismissLa
       )}
 
       {error && (
-        <div class="upload-error-detail">
-          {isBlockedByExtension(error) && (
-            <div class="banner banner-warn" style={{ marginBottom: '.4rem', padding: '.4rem .6rem', fontSize: '.78rem' }}>
-              <div class="banner-body">
-                <strong>Request may have been blocked by a browser extension.</strong>{' '}
-                Ad and content blockers (such as uBlock Origin) can intercept uploads
-                to URLs matching their filter rules — common targets include filenames
-                like <code>analytics.js</code>, <code>tracking.js</code>, and similar.
-                Try disabling the extension for this page, or adding the destination
-                domain to its allowlist.
-              </div>
-            </div>
-          )}
-          <details open>
-            <summary>Error details</summary>
-            <pre>{JSON.stringify(parseS3Error(error), null, 2)}</pre>
-          </details>
-          {size >= MULTIPART_THRESHOLD && status === 'error' && (
-            <MultipartFailureConsequence provider={provider} />
-          )}
-          {(error.Code === 'NoSuchUpload' || error.name === 'NoSuchUpload') && (
-            <div style={{ marginTop: '.3rem' }}>
-              The multipart upload session has expired. Incomplete parts have been cleaned up.
-            </div>
-          )}
-        </div>
+        <ErrorDetailsPanel
+          error={error}
+          isMultipart={size >= MULTIPART_THRESHOLD}
+          isError={status === 'error'}
+          provider={provider}
+        />
       )}
     </div>
   );
 }
 
-// Provider-specific multipart failure consequence (§4.10)
-function MultipartFailureConsequence({ provider }) {
-  if (provider === 'r2') {
-    return (
-      <div style={{ marginTop: '.3rem' }}>
-        <strong>R2:</strong> Incomplete multipart uploads are automatically aborted after 7 days — no manual cleanup needed.
-      </div>
-    );
-  }
-  if (provider === 'b2') {
-    return (
-      <div style={{ marginTop: '.3rem' }}>
-        <strong>B2:</strong> Incomplete parts may remain and accrue storage charges until aborted.
-        Check your bucket's incomplete multipart uploads and abort them via the B2 console or CLI.
-        Consider setting a lifecycle rule to auto-abort incomplete uploads.
-      </div>
-    );
-  }
+// Error details shown beneath a failed UploadItem.
+// Extracted as a named component so UploadItem's render body stays focused on
+// layout — the error presentation logic is a distinct concern.
+// Props: error (Error/object), isMultipart (bool), isError (bool), provider (string)
+function ErrorDetailsPanel({ error, isMultipart, isError, provider }) {
   return (
-    <div style={{ marginTop: '.3rem' }}>
-      Incomplete multipart parts may remain on the provider and accrue storage charges.
-      Check your provider's console for incomplete multipart uploads.
+    <div class="upload-error-detail">
+      {isBlockedByExtension(error) && (
+        <div class="banner banner-warn" style={{ marginBottom: '.4rem', padding: '.4rem .6rem', fontSize: '.78rem' }}>
+          <div class="banner-body">
+            <strong>Request may have been blocked by a browser extension.</strong>{' '}
+            Ad and content blockers (such as uBlock Origin) can intercept uploads
+            to URLs matching their filter rules — common targets include filenames
+            like <code>analytics.js</code>, <code>tracking.js</code>, and similar.
+            Try disabling the extension for this page, or adding the destination
+            domain to its allowlist.
+          </div>
+        </div>
+      )}
+      <details open>
+        <summary>Error details</summary>
+        <pre>{JSON.stringify(parseS3Error(error), null, 2)}</pre>
+      </details>
+      {isMultipart && isError && <MultipartFailureConsequence provider={provider} />}
+      {(error.Code === 'NoSuchUpload' || error.name === 'NoSuchUpload') && (
+        <div style={{ marginTop: '.3rem' }}>
+          The multipart upload session has expired. Incomplete parts have been cleaned up.
+        </div>
+      )}
     </div>
   );
 }

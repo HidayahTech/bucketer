@@ -30,7 +30,6 @@ import {
   migrateProfilesFromLegacy, repairStorageInvariants,
 } from '../lib/storage.js';
 import { readUrlParams, hasUrlParams, buildShareUrl } from '../lib/url-params.js';
-import { collectFileEntries } from '../lib/file-entries.js';
 import { FileBanner } from './FileBanner.jsx';
 import { CredentialForm } from './CredentialForm.jsx';
 import { Browser } from './Browser.jsx';
@@ -47,6 +46,8 @@ import { AboutModal } from './AboutModal.jsx';
 import { ProfilePicker } from './ProfilePicker.jsx';
 import { StorageModal } from './StorageModal.jsx';
 import { CURRENT_VERSION } from '../lib/changelog.js';
+import { useWindowDragDrop } from '../hooks/useWindowDragDrop.js';
+import { useModalStates } from '../hooks/useModalStates.js';
 
 const _iconLink = document.querySelector('link[rel="icon"]');
 if (_iconLink) _iconLink.href = logoUrl;
@@ -75,19 +76,15 @@ export function App() {
   const [logKey, setLogKey] = useState(0);         // incremented to refresh upload log
   const [linkCopied, setLinkCopied] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [changelogOpen, setChangelogOpen] = useState(false);
-  const [aboutOpen, setAboutOpen] = useState(false);
-  const [storageOpen, setStorageOpen] = useState(false);
+  const { changelogOpen, setChangelogOpen, aboutOpen, setAboutOpen, storageOpen, setStorageOpen } = useModalStates();
   const [liveFormData, setLiveFormData] = useState(credentials);
   const [updateCheckEnabled, setUpdateCheckEnabled] = useState(() => loadUpdateCheckEnabled());
   const [prefetchSizeLimit, setPrefetchSizeLimit] = useState(() => loadPrefetchSizeLimit());
   const [profiles, setProfiles] = useState(() => loadProfiles().profiles);
   const [deleteOps, setDeleteOps] = useState([]);
-  const [windowDragOver, setWindowDragOver] = useState(false);
   const addFilesRef = useRef(null);
   const browserActionsRef = useRef(null);
   const logKeyDebounceRef = useRef(null);
-  const windowDragCounterRef = useRef(0);
   const urlParamsPresent = hasUrlParams();
 
   // Capability state is updated reactively as operations fail (§4.12).
@@ -195,67 +192,10 @@ export function App() {
     return () => document.removeEventListener('keydown', handler);
   }, [sidebarOpen]);
 
-  useEffect(() => {
-    if (session !== 'connected') return;
-    if (capabilities.upload === 'denied') return;
-    const counter = windowDragCounterRef;
-
-    function onDragEnter(e) {
-      if (!e.dataTransfer?.types?.includes('Files')) return;
-      if (document.querySelector('.modal-overlay')) return;
-      counter.current++;
-      setWindowDragOver(true);
-    }
-    function onDragLeave(e) {
-      if (counter.current === 0) return;
-      // relatedTarget is null when the drag exits the browser window entirely
-      if (e.relatedTarget === null || !document.documentElement.contains(e.relatedTarget)) {
-        counter.current = 0;
-        setWindowDragOver(false);
-        return;
-      }
-      counter.current = Math.max(0, counter.current - 1);
-      if (counter.current === 0) setWindowDragOver(false);
-    }
-    function onDragOver(e) {
-      if (counter.current > 0) e.preventDefault();
-    }
-
-    document.addEventListener('dragenter', onDragEnter);
-    document.addEventListener('dragleave', onDragLeave);
-    document.addEventListener('dragover',  onDragOver);
-    return () => {
-      document.removeEventListener('dragenter', onDragEnter);
-      document.removeEventListener('dragleave', onDragLeave);
-      document.removeEventListener('dragover',  onDragOver);
-      counter.current = 0;
-      setWindowDragOver(false);
-    };
-  }, [session, capabilities.upload]);
-
-  function handleWindowDrop(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    windowDragCounterRef.current = 0;
-    setWindowDragOver(false);
-    const fsEntries = [];
-    const items = e.dataTransfer?.items;
-    if (items) {
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        const entry = item.kind === 'file' && (item.getAsEntry?.() ?? item.webkitGetAsEntry?.());
-        if (entry) fsEntries.push(entry);
-      }
-    }
-    if (fsEntries.length) {
-      collectFileEntries(fsEntries).then(fileEntries => {
-        if (fileEntries.length) addFilesRef.current?.(fileEntries);
-      }).catch(() => {});
-    } else {
-      const files = e.dataTransfer?.files;
-      if (files?.length) addFilesRef.current?.(Array.from(files).map(f => ({ file: f, relativePath: f.name })));
-    }
-  }
+  const { windowDragOver, handleWindowDrop } = useWindowDragDrop({
+    enabled: session === 'connected' && capabilities.upload !== 'denied',
+    addFilesRef,
+  });
 
   function handleDeleteRequest({ files, prefixes, capturedPrefix }) {
     setDeleteOps(prev => [...prev, {
@@ -380,13 +320,6 @@ export function App() {
   }
 
   const providerLabel = credentials.provider ? PROVIDER_LABELS[credentials.provider] : null;
-
-  const statusLabel = {
-    disconnected: 'Disconnected',
-    connecting:   'Connecting…',
-    connected:    `Connected${credentials.bucket ? ` · ${credentials.bucket}` : ''}`,
-    failed:       'Connection failed',
-  }[session];
 
   return (
     <div id="app">

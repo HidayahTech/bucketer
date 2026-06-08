@@ -317,13 +317,15 @@ describe('README.md — CSP examples include media-src and frame-src (T2-5)', ()
 // purge that fails on batch 2 permanently deletes the first 1000 with no indication.
 // Fix: collect errors into allErrors[], continue through every batch, report aggregate.
 
-describe('HiddenVersions — purge-all accumulates errors across all batches (T2-3)', () => {
-  const source = src('components/HiddenVersions.jsx');
+describe('purge-versions.js — purge-all accumulates errors across all batches (T2-3)', () => {
+  // The accumulation logic moved from HiddenVersions.jsx to purge-versions.js in the
+  // 2026-06 simplification pass. The invariant is tested here for the canonical location.
+  const source = src('lib/purge-versions.js');
 
   test('uses error accumulation pattern (allErrors) instead of throwing on first error', () => {
     assert.ok(
       /allErrors\.push/.test(source),
-      'HiddenVersions.jsx must accumulate errors into allErrors[] — throwing on the ' +
+      'purge-versions.js must accumulate errors into allErrors[] — throwing on the ' +
       'first error abandons remaining batches and silently leaves versions undeleted'
     );
   });
@@ -333,7 +335,7 @@ describe('HiddenVersions — purge-all accumulates errors across all batches (T2
     // After fix, errors are collected, not thrown mid-loop.
     assert.ok(
       !/if\s*\(resp\.Errors[^}]*throw/.test(source),
-      'HiddenVersions.jsx must not throw inside the batch loop on resp.Errors — ' +
+      'purge-versions.js must not throw inside the batch loop on resp.Errors — ' +
       'this stops all remaining batches and leaves a partial purge with no error summary'
     );
   });
@@ -760,13 +762,13 @@ describe('UploadQueue.jsx — handleDrop is not async (drop-sync)', () => {
 // Modal suppression: dragenter checks document.querySelector('.modal-overlay'); if a modal
 // is open, the overlay is not activated.
 
-describe('App.jsx — window-drop overlay: imports collectFileEntries (window-drop)', () => {
-  const source = src('components/App.jsx');
+describe('useWindowDragDrop.js — imports collectFileEntries (window-drop)', () => {
+  const source = src('hooks/useWindowDragDrop.js');
 
-  test('App.jsx imports collectFileEntries from file-entries', () => {
+  test('useWindowDragDrop imports collectFileEntries from file-entries', () => {
     assert.ok(
       /collectFileEntries/.test(source),
-      'App.jsx must import collectFileEntries — the window-drop handler uses it to ' +
+      'useWindowDragDrop.js must import collectFileEntries — the window-drop handler uses it to ' +
       'traverse FileSystemEntry trees just like the zone-specific drop handlers do'
     );
   });
@@ -785,13 +787,13 @@ describe('App.jsx — window-drop overlay: windowDragOver state (window-drop)', 
   });
 });
 
-describe('App.jsx — window-drop overlay: document dragenter listener (window-drop)', () => {
-  const source = src('components/App.jsx');
+describe('useWindowDragDrop.js — document dragenter listener (window-drop)', () => {
+  const source = src('hooks/useWindowDragDrop.js');
 
-  test('App.jsx registers a dragenter event listener on document', () => {
+  test('useWindowDragDrop registers a dragenter event listener on document', () => {
     assert.ok(
       /addEventListener\s*\(\s*['"]dragenter['"]/.test(source),
-      "App.jsx must register a document-level 'dragenter' listener — this is what " +
+      "useWindowDragDrop.js must register a document-level 'dragenter' listener — this is what " +
       'activates the window-drop overlay when any file is dragged over the viewport'
     );
   });
@@ -879,13 +881,13 @@ describe('App.jsx — window overlay gated on upload capability (v1.15.3)', () =
   });
 });
 
-describe('App.jsx — handleWindowDrop has error handling (v1.15.3)', () => {
-  const source = src('components/App.jsx');
+describe('useWindowDragDrop.js — handleWindowDrop has error handling (v1.15.3)', () => {
+  const source = src('hooks/useWindowDragDrop.js');
 
   test('collectFileEntries .then() in handleWindowDrop is followed by .catch()', () => {
     // Find handleWindowDrop body and assert .catch( appears after collectFileEntries
     const fnStart = source.indexOf('function handleWindowDrop');
-    assert.ok(fnStart !== -1, 'handleWindowDrop must exist in App.jsx');
+    assert.ok(fnStart !== -1, 'handleWindowDrop must exist in useWindowDragDrop.js');
     const fnBody = source.slice(fnStart, fnStart + 800);
     assert.ok(
       /\.catch\(/.test(fnBody),
@@ -953,5 +955,108 @@ describe('App.jsx — handleDisconnect calls setLiveFormData (BUG-027)', () => {
       'button reflects stale pre-disconnect data, and the profile row is un-clickable ' +
       'because the form never sees the reset credentials (BUG-027)'
     );
+  });
+});
+
+// ── Simplification pass structural guards ─────────────────────────────────────
+// These assertions verify that code simplified during the 2026-06 cleanup pass
+// stays organized correctly. They catch accidental drift back to the old patterns.
+
+describe('UploadQueue.jsx — uses shared hooks and helpers', () => {
+  const source = src('components/UploadQueue.jsx');
+
+  test('imports useDoubleClickSafety hook (double-click pattern not duplicated inline)', () => {
+    assert.ok(
+      source.includes("from '../hooks/useDoubleClickSafety.js'"),
+      'UploadQueue.jsx must import useDoubleClickSafety — the prime/confirm pattern must not be written inline again'
+    );
+  });
+
+  test('imports useInterpolatedProgress hook (rAF animation not duplicated inline)', () => {
+    assert.ok(
+      source.includes("from '../hooks/useInterpolatedProgress.js'"),
+      'UploadQueue.jsx must import useInterpolatedProgress — the rAF byte animation must not be written inline again'
+    );
+  });
+
+  test('imports upload status predicates (inline status chains not duplicated)', () => {
+    assert.ok(
+      source.includes("from '../lib/upload-status.js'"),
+      'UploadQueue.jsx must import status predicates (isActive, isFailed, …) from upload-status.js'
+    );
+  });
+
+  test('imports abortMultipartSession (abort+cleanup sequence not duplicated inline)', () => {
+    assert.ok(
+      source.includes("from '../lib/upload-cleanup.js'"),
+      'UploadQueue.jsx must import abortMultipartSession — abort+deleteResumeRecord must not be copy-pasted again'
+    );
+  });
+
+  test('imports constants from constants.js (thresholds not defined inline)', () => {
+    assert.ok(
+      source.includes("from '../lib/constants.js'"),
+      'UploadQueue.jsx must import MULTIPART_THRESHOLD and other constants from constants.js'
+    );
+  });
+
+});
+
+describe('Browser.jsx — uses shared utilities', () => {
+  const source = src('components/Browser.jsx');
+
+  test('BatchCopyLinkPopover does not exist as a separate function (merged into CopyLinkPopover)', () => {
+    assert.ok(
+      !source.includes('function BatchCopyLinkPopover'),
+      'BatchCopyLinkPopover was merged into CopyLinkPopover — it must not be re-introduced as a separate function'
+    );
+  });
+
+  test('imports validateObjectName (name validation not duplicated inline)', () => {
+    assert.ok(
+      source.includes("from '../lib/validate-object-name.js'"),
+      'Browser.jsx must import validateObjectName from validate-object-name.js'
+    );
+  });
+
+  test('imports constants from constants.js', () => {
+    assert.ok(
+      source.includes("from '../lib/constants.js'"),
+      'Browser.jsx must import PRESIGN_EXPIRES and other constants from constants.js'
+    );
+  });
+});
+
+describe('constants.js — all centralized thresholds present', () => {
+  const source = src('lib/constants.js');
+  test('exports MULTIPART_THRESHOLD', () => { assert.ok(source.includes('MULTIPART_THRESHOLD')); });
+  test('exports PRESIGN_EXPIRES',     () => { assert.ok(source.includes('PRESIGN_EXPIRES')); });
+  test('exports COPY_LINK_PRESETS',   () => { assert.ok(source.includes('COPY_LINK_PRESETS')); });
+});
+
+describe('upload-status.js — all predicates present', () => {
+  const source = src('lib/upload-status.js');
+  test('exports isActive',  () => { assert.ok(source.includes('export const isActive')); });
+  test('exports isFailed',  () => { assert.ok(source.includes('export const isFailed')); });
+  test('exports isSettled', () => { assert.ok(source.includes('export const isSettled')); });
+  test('exports isPaused',  () => { assert.ok(source.includes('export const isPaused')); });
+});
+
+describe('indexeddb.js — is a barrel re-export (no new logic)', () => {
+  const source = src('lib/indexeddb.js');
+
+  test('does not define openDB directly (openDB lives in indexeddb-core.js)', () => {
+    assert.ok(
+      !source.includes('function openDB'),
+      'indexeddb.js must not define openDB — it is a barrel; openDB lives in indexeddb-core.js'
+    );
+  });
+
+  test('re-exports saveResumeRecord from resume-records.js', () => {
+    assert.ok(source.includes("from './resume-records.js'"));
+  });
+
+  test('re-exports uploadExpiryWarningMs from file-identity.js', () => {
+    assert.ok(source.includes("from './file-identity.js'"));
   });
 });

@@ -15,41 +15,36 @@ import { loadMaxKeys, loadListingCacheTTL } from '../lib/storage.js';
 import { pushPrefixHistory } from '../lib/url-params.js';
 import { mediaKind, mimeType, mimeKind } from '../lib/media.js';
 import { collectFileEntries } from '../lib/file-entries.js';
+import { PRESIGN_EXPIRES, TEXT_PREVIEW_LIMIT, COPY_LINK_PRESETS } from '../lib/constants.js';
+import { nameComparator, numericComparator } from '../lib/sort.js';
+import { validateObjectName } from '../lib/validate-object-name.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
 import { HiddenVersions } from './HiddenVersions.jsx';
 
-// 1 hour: long enough for interactive use (preview, copy-link) but short enough that
-// a leaked presigned URL expires overnight without manual rotation.
-const PRESIGN_EXPIRES = 3600;
-
-// Range-limited to 100 KB to prevent loading multi-GB log files into browser memory.
-// Response status 206 (Partial Content) indicates truncation — the UI shows a warning.
-const TEXT_PREVIEW_LIMIT = 100 * 1024;
-
-const COPY_LINK_PRESETS = [
-  { label: '1 hour',   seconds: 3600 },
-  { label: '24 hours', seconds: 86400 },
-  { label: '7 days',   seconds: 604800 },
-];
-
-function CopyLinkPopover({ client, bucket, fileKey, onClose, onCopied, direction = 'down' }) {
+// Single component for both single-file and multi-file copy-link flows.
+// Pass fileKey for one file, fileKeys (array) for batch mode — mutually exclusive.
+// onCopied(count) receives the number of links copied; direction controls popover position.
+function CopyLinkPopover({ client, bucket, fileKey, fileKeys, onClose, onCopied, direction = 'down' }) {
   const [showCustom, setShowCustom] = useState(false);
   const [customValue, setCustomValue] = useState('1');
   const [customUnit, setCustomUnit] = useState('hours');
   const [copying, setCopying] = useState(false);
   const [error, setError] = useState(null);
 
-  async function copyLink(expiresIn) {
+  const isBatch = Array.isArray(fileKeys);
+  const keys    = isBatch ? fileKeys : [fileKey];
+
+  async function copyLinks(expiresIn) {
     setCopying(true);
     setError(null);
     try {
-      const url = await getSignedUrl(
+      const urls = await Promise.all(keys.map(key => getSignedUrl(
         client,
-        new GetObjectCommand({ Bucket: bucket, Key: fileKey, ResponseContentDisposition: 'inline' }),
+        new GetObjectCommand({ Bucket: bucket, Key: key, ResponseContentDisposition: 'inline' }),
         { expiresIn },
-      );
-      await navigator.clipboard.writeText(url);
-      onCopied();
+      )));
+      await navigator.clipboard.writeText(urls.join('\n'));
+      onCopied(urls.length);
       onClose();
     } catch (err) {
       setError(err.message || String(err));
@@ -63,14 +58,18 @@ function CopyLinkPopover({ client, bucket, fileKey, onClose, onCopied, direction
     if (!n || n < 1) { setError('Enter a positive number.'); return; }
     const seconds = n * mult[customUnit];
     if (seconds > 604800) { setError('Maximum is 7 days.'); return; }
-    copyLink(seconds);
+    copyLinks(seconds);
   }
+
+  const note = isBatch
+    ? `${keys.length} link${keys.length !== 1 ? 's' : ''}, one per line. Expires after selected duration.`
+    : 'Link expires after the selected duration.';
 
   return (
     <div class={`copy-link-popover${direction === 'up' ? ' copy-link-popover--up' : ''}`}>
       <div class="copy-link-presets">
         {COPY_LINK_PRESETS.map(p => (
-          <button key={p.seconds} class="btn btn-ghost btn-sm" onClick={() => copyLink(p.seconds)} disabled={copying}>
+          <button key={p.seconds} class="btn btn-ghost btn-sm" onClick={() => copyLinks(p.seconds)} disabled={copying}>
             {p.label}
           </button>
         ))}
@@ -96,73 +95,7 @@ function CopyLinkPopover({ client, bucket, fileKey, onClose, onCopied, direction
         </div>
       )}
       {error && <div class="copy-link-error">{error}</div>}
-      <div class="copy-link-note">Link expires after the selected duration.</div>
-    </div>
-  );
-}
-
-function BatchCopyLinkPopover({ client, bucket, keys, onClose, onCopied }) {
-  const [showCustom, setShowCustom] = useState(false);
-  const [customValue, setCustomValue] = useState('1');
-  const [customUnit, setCustomUnit] = useState('hours');
-  const [copying, setCopying] = useState(false);
-  const [error, setError] = useState(null);
-
-  async function copyLinks(expiresIn) {
-    setCopying(true);
-    setError(null);
-    try {
-      const urls = await Promise.all(keys.map(key => getSignedUrl(
-        client,
-        new GetObjectCommand({ Bucket: bucket, Key: key, ResponseContentDisposition: 'inline' }),
-        { expiresIn },
-      )));
-      await navigator.clipboard.writeText(urls.join('\n'));
-      onCopied(keys.length);
-      onClose();
-    } catch (err) {
-      setError(err.message || String(err));
-      setCopying(false);
-    }
-  }
-
-  function handleCustomCopy() {
-    const mult = { minutes: 60, hours: 3600, days: 86400 };
-    const n = parseInt(customValue, 10);
-    if (!n || n < 1) { setError('Enter a positive number.'); return; }
-    const seconds = n * mult[customUnit];
-    if (seconds > 604800) { setError('Maximum is 7 days.'); return; }
-    copyLinks(seconds);
-  }
-
-  return (
-    <div class="copy-link-popover copy-link-popover--up">
-      <div class="copy-link-presets">
-        {COPY_LINK_PRESETS.map(p => (
-          <button key={p.seconds} class="btn btn-ghost btn-sm" onClick={() => copyLinks(p.seconds)} disabled={copying}>
-            {p.label}
-          </button>
-        ))}
-        <button class="btn btn-ghost btn-sm" onClick={() => setShowCustom(v => !v)} disabled={copying}>
-          Custom…
-        </button>
-      </div>
-      {showCustom && (
-        <div class="copy-link-custom">
-          <input type="number" min="1" class="copy-link-num" value={customValue}
-            onInput={e => { setCustomValue(e.target.value); setError(null); }} />
-          <select class="copy-link-unit" value={customUnit} onChange={e => setCustomUnit(e.target.value)}>
-            <option value="minutes">min</option>
-            <option value="hours">hrs</option>
-            <option value="days">days</option>
-          </select>
-          <button class="btn btn-ghost btn-sm" onClick={handleCustomCopy} disabled={copying}>
-            {copying ? <span class="spinner" /> : 'Copy'}
-          </button>
-        </div>
-      )}
-      {error && <div class="copy-link-error">{error}</div>}
-      <div class="copy-link-note">{keys.length} link{keys.length !== 1 ? 's' : ''}, one per line. Expires after selected duration.</div>
+      <div class="copy-link-note">{note}</div>
     </div>
   );
 }
@@ -531,8 +464,8 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   // Content-Type and custom metadata — the default 'REPLACE' would strip them.
   async function commitRename(oldKey) {
     const newName = renameValue.trim();
-    if (!newName) { setRenameError('Name cannot be empty.'); return; }
-    if (newName.includes('/')) { setRenameError('Name cannot contain slashes.'); return; }
+    const nameErr = validateObjectName(newName);
+    if (nameErr) { setRenameError(nameErr); return; }
     const newKey = prefix + newName;
     if (newKey === oldKey) { setRenamingKey(null); return; }
     if (items.some(o => o.Key === newKey)) { setRenameError('A file with that name already exists.'); return; }
@@ -691,8 +624,8 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
 
   async function handleCreateFolder() {
     const name = newFolderName.trim();
-    if (!name) { setNewFolderError('Enter a folder name.'); return; }
-    if (name.includes('/')) { setNewFolderError('Folder name cannot contain slashes.'); return; }
+    const nameErr = validateObjectName(name);
+    if (nameErr) { setNewFolderError(nameErr); return; }
     const key = prefix + name + '/';
     if (commonPrefixes.includes(key)) { setNewFolderError('A folder with that name already exists.'); return; }
     setNewFolderSaving(true);
@@ -716,26 +649,22 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const canList     = capabilities.list !== 'denied';
 
   // Sort folders by name only (no size/date available)
-  const sortedFolders = [...commonPrefixes].sort((a, b) => {
-    const nameA = a.slice(prefix.length).replace(/\/$/, '');
-    const nameB = b.slice(prefix.length).replace(/\/$/, '');
-    const cmp = nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
-    return sortDir === 'asc' ? cmp : -cmp;
-  });
+  const cmpName    = nameComparator(sortDir);
+  const cmpNumeric = numericComparator(sortDir);
+  const sortedFolders = [...commonPrefixes].sort((a, b) =>
+    cmpName(a.slice(prefix.length).replace(/\/$/, ''), b.slice(prefix.length).replace(/\/$/, ''))
+  );
 
   // Sort files by the selected column
   const sortedItems = items.filter(obj => !!obj.Key.slice(prefix.length)).sort((a, b) => {
-    let cmp = 0;
-    if (sortCol === 'name') {
-      cmp = a.Key.slice(prefix.length).localeCompare(b.Key.slice(prefix.length), undefined, { sensitivity: 'base' });
-    } else if (sortCol === 'size') {
-      cmp = (a.Size || 0) - (b.Size || 0);
-    } else if (sortCol === 'modified') {
+    if (sortCol === 'name')     return cmpName(a.Key.slice(prefix.length), b.Key.slice(prefix.length));
+    if (sortCol === 'size')     return cmpNumeric(a.Size || 0, b.Size || 0);
+    if (sortCol === 'modified') {
       const tA = a.LastModified ? new Date(a.LastModified).getTime() : 0;
       const tB = b.LastModified ? new Date(b.LastModified).getTime() : 0;
-      cmp = tA - tB;
+      return cmpNumeric(tA, tB);
     }
-    return sortDir === 'asc' ? cmp : -cmp;
+    return 0;
   });
 
   const filterQ = filterQuery.trim().toLowerCase();
@@ -996,8 +925,8 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                 {batchCopied !== null ? `✓ ${batchCopied} link${batchCopied !== 1 ? 's' : ''} copied` : 'Copy links'}
               </button>
               {batchCopyOpen && (
-                <BatchCopyLinkPopover
-                  client={client} bucket={bucket} keys={[...selectedKeys]}
+                <CopyLinkPopover
+                  client={client} bucket={bucket} fileKeys={[...selectedKeys]} direction="up"
                   onClose={() => setBatchCopyOpen(false)}
                   onCopied={(count) => { setBatchCopied(count); setTimeout(() => setBatchCopied(null), 2000); }}
                 />

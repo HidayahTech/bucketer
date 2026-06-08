@@ -125,7 +125,7 @@ export function StorageModal({ onClose, isConnected }) {
     await load();
   }
 
-  function Confirm({ id, label, warning, danger = false, reload = false }) {
+  function ConfirmDialog({ id, label, warning, danger = false, reload = false }) {
     const pending = confirmAction === id;
     const done    = cleared === id;
     return (
@@ -204,7 +204,7 @@ export function StorageModal({ onClose, isConnected }) {
                     </tbody>
                   </table>
                 )}
-                <Confirm id="credentials"
+                <ConfirmDialog id="credentials"
                   label={isConnected ? 'Clear & disconnect' : 'Clear connection'}
                   warning={isConnected ? 'You are connected. This will disconnect and reload.' : 'This will reload the page.'}
                   danger reload />
@@ -246,7 +246,7 @@ export function StorageModal({ onClose, isConnected }) {
                     </tbody>
                   </table>
                 )}
-                <Confirm id="profiles" label="Delete all profiles"
+                <ConfirmDialog id="profiles" label="Delete all profiles"
                   warning="All saved profiles will be removed. Credentials on your storage provider are unaffected."
                   danger />
               </div>
@@ -297,7 +297,7 @@ export function StorageModal({ onClose, isConnected }) {
                     </table>
                   </>
                 )}
-                <Confirm id="log" label="Clear history" />
+                <ConfirmDialog id="log" label="Clear history" />
               </div>
             </details>
 
@@ -332,7 +332,7 @@ export function StorageModal({ onClose, isConnected }) {
                     </tbody>
                   </table>
                 )}
-                <Confirm id="resume" label="Discard all resume records"
+                <ConfirmDialog id="resume" label="Discard all resume records"
                   warning="In-progress uploads cannot be resumed after discarding. Incomplete multipart sessions may remain on the server until they expire or are aborted." />
               </div>
             </details>
@@ -370,7 +370,7 @@ export function StorageModal({ onClose, isConnected }) {
                     </tr>
                   </tbody>
                 </table>
-                <Confirm id="settings" label="Reset to defaults" />
+                <ConfirmDialog id="settings" label="Reset to defaults" />
               </div>
             </details>
 
