@@ -1,9 +1,33 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.15.6';
+export const CURRENT_VERSION = '1.16.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.16.0",
+    "date": "2026-06-08",
+    "title": "Code simplification: shared utilities, deduplication, indexeddb split",
+    "changes": [
+      "**lib/constants.js**: centralises MULTIPART_THRESHOLD, LARGE_FILE_WARN, PRESIGN_EXPIRES, TEXT_PREVIEW_LIMIT, COPY_LINK_PRESETS, and concurrency defaults previously scattered across UploadQueue.jsx and Browser.jsx. One place to change a threshold.",
+      "**lib/upload-status.js**: isActive / isFailed / isSettled / isPaused / isDone / isAborted predicate functions, replacing inline i.status === 'uploading' || i.status === 'resuming' || ... chains duplicated 4+ times in UploadQueue.jsx.",
+      "**lib/upload-cleanup.js**: abortMultipartSession(client, params) — abort + deleteResumeRecord were copy-pasted in three best-effort cleanup paths; now a single tested helper with a doc comment explaining which callers must stay inline (those that surface errors to the UI).",
+      "**lib/sort.js**: nameComparator / numericComparator factories extracted from Browser.jsx. Locale-comparison options (sensitivity: 'base') defined in one place.",
+      "**lib/validate-object-name.js**: shared validation (non-empty, no slashes) for both rename and folder-create; rules cannot silently diverge between the two callers.",
+      "**lib/purge-versions.js**: purgeAllVersions() and collectHiddenVersions() extracted from HiddenVersions.jsx. The 57-line async pagination + batched DeleteObjectsCommand loop is now independently testable with a mock S3 client (6 new tests).",
+      "**lib/indexeddb.js → barrel over four focused modules**: indexeddb-core.js (shared openDB, schema constants), resume-records.js, file-identity.js, active-uploads.js, upload-log.js. Each module owns one concern; the barrel preserves all existing import paths.",
+      "**lib/storage.js factory refactor**: 8 near-identical load<Setting> / save<Setting> function pairs collapsed into a makeSettingAccessors() factory. All exported function names are identical — callers are unchanged.",
+      "**hooks/useDoubleClickSafety.js**: the \"prime for 3 s, confirm on second click\" timer pattern was duplicated between the main UploadQueue cancel-all button and BatchSummary's per-batch cancel button. Extracted as a hook + pure applyClickSafety() function (tested with injected timer stubs).",
+      "**hooks/useInterpolatedProgress.js**: rAF byte-counter animation extracted from UploadItem. Pure interpolateBytes() function tested separately from the Preact hook.",
+      "**hooks/useWindowDragDrop.js**: ~60 lines of dragenter / dragleave / dragover event listener setup, counter management, and the handleWindowDrop file-entry resolver extracted from App.jsx.",
+      "**hooks/useModalStates.js**: App-level changelog / about / storage modal open-state grouped so new modals have a canonical home.",
+      "**UploadQueue.jsx** (−75 lines): uses useDoubleClickSafety, useInterpolatedProgress, status predicates, abortMultipartSession, and constants. ErrorDetailsPanel extracted as a named sub-component. MultipartFailureConsequence moved to its own file (components/MultipartFailureConsequence.jsx) since it has no dependency on UploadQueue state.",
+      "**Browser.jsx** (−71 lines): CopyLinkPopover and BatchCopyLinkPopover merged into one parameterised component — fileKey for single, fileKeys for batch. Uses nameComparator / numericComparator, validateObjectName, and constants.",
+      "**App.jsx** (−67 lines): dead statusLabel variable removed (declared but never read). Drag-drop logic extracted to useWindowDragDrop; modal open-state extracted to useModalStates.",
+      "**HiddenVersions.jsx** (−41 lines): delegates purge to purgeAllVersions(); uses collectHiddenVersions.",
+      "**StorageModal.jsx**: internal Confirm sub-component renamed ConfirmDialog for clarity."
+    ]
+  },
   {
     "version": "1.15.6",
     "date": "2026-06-07",
