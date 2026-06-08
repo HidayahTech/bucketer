@@ -3,22 +3,9 @@
 import '../helpers/with-dom.js';       // must be first — installs DOM globals
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { h, render } from 'preact';
-import { act } from 'preact/test-utils';
+import { h } from 'preact';
+import { mount } from '../helpers/render.js';
 import { ErrorBlock } from '../../src/components/ErrorBlock.jsx';
-
-// Render a Preact vnode into an isolated container, return helpers + cleanup.
-function mount(vnode) {
-  const container = document.createElement('div');
-  document.body.appendChild(container);
-  act(() => render(vnode, container));
-  return {
-    text:    ()    => container.textContent,
-    query:   (sel) => container.querySelector(sel),
-    queryAll:(sel) => [...container.querySelectorAll(sel)],
-    cleanup: ()    => { act(() => render(null, container)); container.remove(); },
-  };
-}
 
 describe('ErrorBlock', () => {
   test('renders nothing when error is falsy', () => {

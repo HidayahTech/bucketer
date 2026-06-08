@@ -5,22 +5,10 @@
 import '../helpers/with-dom.js';       // must be first — installs DOM globals
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { h, render } from 'preact';
-import { act } from 'preact/test-utils';
+import { h } from 'preact';
+import { mount } from '../helpers/render.js';
 import { SetupGuide } from '../../src/components/SetupGuide.jsx';
 import { PROVIDERS } from '../../src/lib/provider.js';
-
-function mount(vnode) {
-  const container = document.createElement('div');
-  document.body.appendChild(container);
-  act(() => render(vnode, container));
-  return {
-    text:    ()    => container.textContent,
-    query:   (sel) => container.querySelector(sel),
-    queryAll:(sel) => [...container.querySelectorAll(sel)],
-    cleanup: ()    => { act(() => render(null, container)); container.remove(); },
-  };
-}
 
 describe('SetupGuide — null state', () => {
   test('renders nothing when no provider is given', () => {
