@@ -6,6 +6,7 @@
     "dev": "node build.mjs --mode=dev",
     "serve": "node serve.mjs",
     "test": "node --test test/*.test.js",
+    "test:ui": "node --loader ./test/helpers/jsx-loader.mjs --test test/components/*.test.jsx",
     "bench": "node perf/bench-algorithms.mjs",
     "perftest": "node perf/run.mjs",
     "prepare": "git config core.hooksPath .githooks 2>/dev/null; git config push.followTags true 2>/dev/null; true"
@@ -21,6 +22,7 @@
   "devDependencies": {
     "esbuild": "^0.28.0",
     "fake-indexeddb": "^6.2.5",
+    "jsdom": "^29.1.1",
     "playwright": "^1.60.0"
   }
 }

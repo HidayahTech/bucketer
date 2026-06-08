@@ -68,7 +68,21 @@ Tests live in `test/` and run with `node --test` (no framework). The suite has t
 **Build output assertions — require `npm run build` first:**
 - `build.test.js` — placeholder replacement (BUG-001), Preact JSX transform (BUG-002), version consistency, CORS DELETE (BUG-012), single-bundle structure
 
-**Adding new tests:** Write `test/<name>.test.js`. The test command (`node --test test/*.test.js`) picks it up automatically. For browser globals, set `global.<name>` before the module import. For IndexedDB, use `fake-indexeddb`.
+**Component rendering tests — require `npm run test:ui`, NOT `npm test`:**
+
+Component tests live in `test/components/` and are `.jsx` files. They use jsdom (a browser DOM emulator) and `preact/test-utils` to render components and assert on their output.
+
+- `test/components/error-block.test.jsx` — ErrorBlock renders, CORS heuristic, S3 error metadata
+- `test/components/setup-guide.test.jsx` — all 7 provider guides render correctly; Wasabi has no CORS command
+
+**How the component test layer works:**
+
+- `test/helpers/jsx-loader.mjs` — custom Node ESM loader that transforms `.jsx` files using esbuild (same settings as the production build: `jsx: 'automatic'`, `jsxImportSource: 'preact'`). No additional dependencies beyond esbuild.
+- `test/helpers/with-dom.js` — sets up jsdom globals (`window`, `document`, `navigator`, etc.) before any component imports. **Must be the first import in every component test file.** ES module imports evaluate in order — placing it first guarantees `global.document` is set before Preact accesses it at render time.
+
+**Adding new component tests:** Write `test/components/<name>.test.jsx`. Start with `import '../helpers/with-dom.js'` as the very first line. Use the `mount(vnode)` helper pattern (render into a fresh container, return `text`, `query`, `cleanup`). Run with `npm run test:ui`.
+
+**Adding new unit tests:** Write `test/<name>.test.js`. The test command (`node --test test/*.test.js`) picks it up automatically. For browser globals, set `global.<name>` before the module import. For IndexedDB, use `fake-indexeddb`.
 
 ## Setup
 
@@ -76,7 +90,8 @@ Tests live in `test/` and run with `node --test` (no framework). The suite has t
 npm install     # also configures the pre-push git hook automatically
 npm run build   # → dist/index.html
 npm run serve   # dev build + localhost:3000
-npm test        # run test suite
+npm test        # unit + structural + build tests (no browser required)
+npm run test:ui # component rendering tests (jsdom — no real browser required)
 ```
 
 ## Claude Code Setup
