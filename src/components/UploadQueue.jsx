@@ -697,7 +697,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   );
 }
 
-function BatchSummary({ items, provider, collapsed, onToggleCollapse, onCollapse, onExpand, onDismiss, onCancelBatch, onResume, onRestart, onCancel, onRemove, onDismissLargeWarn, notifSuppressed, onToggleNotifs }) {
+export function BatchSummary({ items, provider, collapsed, onToggleCollapse, onCollapse, onExpand, onDismiss, onCancelBatch, onResume, onRestart, onCancel, onRemove, onDismissLargeWarn, notifSuppressed, onToggleNotifs }) {
   // Single pass — replaces 8 separate filter/reduce calls over all items
   let doneCount = 0, abortedCount = 0, queuedCount = 0, errorCount = 0;
   let totalBytes = 0, confirmedBytes = 0;
@@ -903,7 +903,7 @@ function BatchSummary({ items, provider, collapsed, onToggleCollapse, onCollapse
   );
 }
 
-function UploadItem({ item, onResume, onRestart, onCancel, onRemove, onDismissLargeWarn, provider }) {
+export function UploadItem({ item, onResume, onRestart, onCancel, onRemove, onDismissLargeWarn, provider }) {
   const { name, size, status, bytesUploaded, speed, error, expiryWarning, resumeRecord, largeFileWarningDismissed } = item;
 
   // Smoothly interpolated byte counter — advances at the current speed between
@@ -1023,7 +1023,7 @@ function UploadItem({ item, onResume, onRestart, onCancel, onRemove, onDismissLa
 // Extracted as a named component so UploadItem's render body stays focused on
 // layout — the error presentation logic is a distinct concern.
 // Props: error (Error/object), isMultipart (bool), isError (bool), provider (string)
-function ErrorDetailsPanel({ error, isMultipart, isError, provider }) {
+export function ErrorDetailsPanel({ error, isMultipart, isError, provider }) {
   return (
     <div class="upload-error-detail">
       {isBlockedByExtension(error) && (

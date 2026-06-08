@@ -16,6 +16,12 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 export async function load(url, context, nextLoad) {
+  // SVG imports (used by BucketerLogo.jsx) — return a stub module so components
+  // that import logo assets can be mounted in tests without a build step.
+  if (url.endsWith('.svg')) {
+    return { format: 'module', source: 'export default "";', shortCircuit: true };
+  }
+
   if (!url.endsWith('.jsx')) return nextLoad(url, context);
 
   const filePath = fileURLToPath(url);

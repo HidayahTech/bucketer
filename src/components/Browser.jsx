@@ -24,7 +24,7 @@ import { HiddenVersions } from './HiddenVersions.jsx';
 // Single component for both single-file and multi-file copy-link flows.
 // Pass fileKey for one file, fileKeys (array) for batch mode — mutually exclusive.
 // onCopied(count) receives the number of links copied; direction controls popover position.
-function CopyLinkPopover({ client, bucket, fileKey, fileKeys, onClose, onCopied, direction = 'down' }) {
+export function CopyLinkPopover({ client, bucket, fileKey, fileKeys, onClose, onCopied, direction = 'down' }) {
   const [showCustom, setShowCustom] = useState(false);
   const [customValue, setCustomValue] = useState('1');
   const [customUnit, setCustomUnit] = useState('hours');
@@ -100,7 +100,7 @@ function CopyLinkPopover({ client, bucket, fileKey, fileKeys, onClose, onCopied,
   );
 }
 
-function Breadcrumb({ prefix, onNavigate }) {
+export function Breadcrumb({ prefix, onNavigate }) {
   if (!prefix) return (
     <div class="breadcrumb"><span class="current">/ (root)</span></div>
   );
@@ -127,7 +127,7 @@ function formatDate(dateStr) {
   try { return new Date(dateStr).toLocaleDateString(); } catch { return ''; }
 }
 
-function SortTh({ col, sortCol, sortDir, onSort, align, children }) {
+export function SortTh({ col, sortCol, sortDir, onSort, align, children }) {
   const active = sortCol === col;
   return (
     <th
