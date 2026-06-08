@@ -1,9 +1,18 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.16.0';
+export const CURRENT_VERSION = '1.17.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.17.0",
+    "date": "2026-06-08",
+    "title": "Component decomposition: extract sub-components from UploadQueue and Browser",
+    "changes": [
+      "BatchSummary.jsx, UploadItem.jsx, ErrorDetailsPanel.jsx — from UploadQueue.jsx (1053L → 697L)",
+      "CopyLinkPopover.jsx, Breadcrumb.jsx, SortTh.jsx — from Browser.jsx (1130L → 1015L)"
+    ]
+  },
   {
     "version": "1.16.0",
     "date": "2026-06-08",

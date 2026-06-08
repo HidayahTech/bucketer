@@ -15,133 +15,18 @@ import { loadMaxKeys, loadListingCacheTTL } from '../lib/storage.js';
 import { pushPrefixHistory } from '../lib/url-params.js';
 import { mediaKind, mimeType, mimeKind } from '../lib/media.js';
 import { collectFileEntries } from '../lib/file-entries.js';
-import { PRESIGN_EXPIRES, TEXT_PREVIEW_LIMIT, COPY_LINK_PRESETS } from '../lib/constants.js';
+import { PRESIGN_EXPIRES, TEXT_PREVIEW_LIMIT } from '../lib/constants.js';
 import { nameComparator, numericComparator } from '../lib/sort.js';
 import { validateObjectName } from '../lib/validate-object-name.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
 import { HiddenVersions } from './HiddenVersions.jsx';
-
-// Single component for both single-file and multi-file copy-link flows.
-// Pass fileKey for one file, fileKeys (array) for batch mode — mutually exclusive.
-// onCopied(count) receives the number of links copied; direction controls popover position.
-export function CopyLinkPopover({ client, bucket, fileKey, fileKeys, onClose, onCopied, direction = 'down' }) {
-  const [showCustom, setShowCustom] = useState(false);
-  const [customValue, setCustomValue] = useState('1');
-  const [customUnit, setCustomUnit] = useState('hours');
-  const [copying, setCopying] = useState(false);
-  const [error, setError] = useState(null);
-
-  const isBatch = Array.isArray(fileKeys);
-  const keys    = isBatch ? fileKeys : [fileKey];
-
-  async function copyLinks(expiresIn) {
-    setCopying(true);
-    setError(null);
-    try {
-      const urls = await Promise.all(keys.map(key => getSignedUrl(
-        client,
-        new GetObjectCommand({ Bucket: bucket, Key: key, ResponseContentDisposition: 'inline' }),
-        { expiresIn },
-      )));
-      await navigator.clipboard.writeText(urls.join('\n'));
-      onCopied(urls.length);
-      onClose();
-    } catch (err) {
-      setError(err.message || String(err));
-      setCopying(false);
-    }
-  }
-
-  function handleCustomCopy() {
-    const mult = { minutes: 60, hours: 3600, days: 86400 };
-    const n = parseInt(customValue, 10);
-    if (!n || n < 1) { setError('Enter a positive number.'); return; }
-    const seconds = n * mult[customUnit];
-    if (seconds > 604800) { setError('Maximum is 7 days.'); return; }
-    copyLinks(seconds);
-  }
-
-  const note = isBatch
-    ? `${keys.length} link${keys.length !== 1 ? 's' : ''}, one per line. Expires after selected duration.`
-    : 'Link expires after the selected duration.';
-
-  return (
-    <div class={`copy-link-popover${direction === 'up' ? ' copy-link-popover--up' : ''}`}>
-      <div class="copy-link-presets">
-        {COPY_LINK_PRESETS.map(p => (
-          <button key={p.seconds} class="btn btn-ghost btn-sm" onClick={() => copyLinks(p.seconds)} disabled={copying}>
-            {p.label}
-          </button>
-        ))}
-        <button class="btn btn-ghost btn-sm" onClick={() => setShowCustom(v => !v)} disabled={copying}>
-          Custom…
-        </button>
-      </div>
-      {showCustom && (
-        <div class="copy-link-custom">
-          <input
-            type="number" min="1" class="copy-link-num"
-            value={customValue}
-            onInput={e => { setCustomValue(e.target.value); setError(null); }}
-          />
-          <select class="copy-link-unit" value={customUnit} onChange={e => setCustomUnit(e.target.value)}>
-            <option value="minutes">min</option>
-            <option value="hours">hrs</option>
-            <option value="days">days</option>
-          </select>
-          <button class="btn btn-ghost btn-sm" onClick={handleCustomCopy} disabled={copying}>
-            {copying ? <span class="spinner" /> : 'Copy'}
-          </button>
-        </div>
-      )}
-      {error && <div class="copy-link-error">{error}</div>}
-      <div class="copy-link-note">{note}</div>
-    </div>
-  );
-}
-
-export function Breadcrumb({ prefix, onNavigate }) {
-  if (!prefix) return (
-    <div class="breadcrumb"><span class="current">/ (root)</span></div>
-  );
-  const parts = prefix.split('/').filter(Boolean);
-  return (
-    <div class="breadcrumb">
-      <span class="crumb" onClick={() => onNavigate('')}>root</span>
-      {parts.map((part, i) => {
-        const target = parts.slice(0, i + 1).join('/') + '/';
-        const isLast = i === parts.length - 1;
-        return [
-          <span key={`sep-${i}`} class="sep">/</span>,
-          isLast
-            ? <span key={part} class="current">{part}</span>
-            : <span key={part} class="crumb" onClick={() => onNavigate(target)}>{part}</span>,
-        ];
-      })}
-    </div>
-  );
-}
+import { CopyLinkPopover } from './CopyLinkPopover.jsx';
+import { Breadcrumb } from './Breadcrumb.jsx';
+import { SortTh } from './SortTh.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '';
   try { return new Date(dateStr).toLocaleDateString(); } catch { return ''; }
-}
-
-export function SortTh({ col, sortCol, sortDir, onSort, align, children }) {
-  const active = sortCol === col;
-  return (
-    <th
-      class={`col-sortable${active ? ' col-sort-active' : ''}`}
-      style={align === 'right' ? { textAlign: 'right' } : undefined}
-      onClick={() => onSort(col)}
-      title={`Sort by ${children}`}
-    >
-      {children}
-      <span class="sort-indicator">
-        {active ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
-      </span>
-    </th>
-  );
 }
 
 // State is organized by concern — each interactive feature has its own slice.

@@ -6,7 +6,9 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { h } from 'preact';
 import { mount, fire, setInput } from '../helpers/render.js';
-import { Breadcrumb, SortTh, CopyLinkPopover } from '../../src/components/Browser.jsx';
+import { CopyLinkPopover } from '../../src/components/CopyLinkPopover.jsx';
+import { Breadcrumb } from '../../src/components/Breadcrumb.jsx';
+import { SortTh } from '../../src/components/SortTh.jsx';
 
 // ─── Breadcrumb ───────────────────────────────────────────────────────────────
 

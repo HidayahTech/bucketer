@@ -10,7 +10,9 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { h } from 'preact';
 import { mount, fire } from '../helpers/render.js';
-import { BatchSummary, UploadItem, ErrorDetailsPanel } from '../../src/components/UploadQueue.jsx';
+import { BatchSummary } from '../../src/components/BatchSummary.jsx';
+import { UploadItem } from '../../src/components/UploadItem.jsx';
+import { ErrorDetailsPanel } from '../../src/components/ErrorDetailsPanel.jsx';
 
 // ─── Shared item factories ────────────────────────────────────────────────────
 

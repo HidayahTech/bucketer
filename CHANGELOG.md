@@ -7,6 +7,17 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.17.0] — 2026-06-08 — Component decomposition: extract sub-components from UploadQueue and Browser
+
+Internal refactoring pass with no user-facing behaviour changes. Six sub-components extracted into dedicated files:
+
+- `BatchSummary.jsx`, `UploadItem.jsx`, `ErrorDetailsPanel.jsx` — from `UploadQueue.jsx` (1053L → 697L)
+- `CopyLinkPopover.jsx`, `Breadcrumb.jsx`, `SortTh.jsx` — from `Browser.jsx` (1130L → 1015L)
+
+All 585 unit tests + 233 component tests pass. Test imports updated to reference the new files directly.
+
+---
+
 ## [1.16.0] — 2026-06-08 — Code simplification: shared utilities, deduplication, indexeddb split
 
 Internal refactoring pass with no user-facing behaviour changes. All 584 tests pass before and after. Every new file carries an architectural header comment explaining why it exists and what must not live in it — so future edits (and Claude) know where to place new code.

@@ -688,13 +688,13 @@ describe('SettingsPanel.jsx — all standalone labels have htmlFor (T4-6)', () =
 // but invisible to assistive technologies. role="progressbar" + aria-valuenow/min/max
 // expose the upload progress to screen readers and OS accessibility APIs.
 
-describe('UploadQueue.jsx — progress bars have ARIA attributes (T5-9)', () => {
-  const source = src('components/UploadQueue.jsx');
+describe('BatchSummary.jsx — progress bars have ARIA attributes (T5-9)', () => {
+  const source = src('components/BatchSummary.jsx');
 
   test('progress-bar-wrap has aria-valuenow', () => {
     assert.ok(
       source.includes('aria-valuenow'),
-      'UploadQueue.jsx progress-bar-wrap must have aria-valuenow — without it, screen ' +
+      'BatchSummary.jsx progress-bar-wrap must have aria-valuenow — without it, screen ' +
       'readers cannot report upload progress (T5-9)'
     );
   });
@@ -702,7 +702,7 @@ describe('UploadQueue.jsx — progress bars have ARIA attributes (T5-9)', () => 
   test('progress-bar-wrap has role="progressbar"', () => {
     assert.ok(
       source.includes('role="progressbar"'),
-      'UploadQueue.jsx progress-bar-wrap must have role="progressbar" — exposes the ' +
+      'BatchSummary.jsx progress-bar-wrap must have role="progressbar" — exposes the ' +
       'upload bar to the accessibility tree (T5-9)'
     );
   });
@@ -972,10 +972,11 @@ describe('UploadQueue.jsx — uses shared hooks and helpers', () => {
     );
   });
 
-  test('imports useInterpolatedProgress hook (rAF animation not duplicated inline)', () => {
+  test('UploadItem.jsx imports useInterpolatedProgress hook (rAF animation not duplicated inline)', () => {
+    const uploadItemSource = src('components/UploadItem.jsx');
     assert.ok(
-      source.includes("from '../hooks/useInterpolatedProgress.js'"),
-      'UploadQueue.jsx must import useInterpolatedProgress — the rAF byte animation must not be written inline again'
+      uploadItemSource.includes("from '../hooks/useInterpolatedProgress.js'"),
+      'UploadItem.jsx must import useInterpolatedProgress — the rAF byte animation must not be written inline again'
     );
   });
 
