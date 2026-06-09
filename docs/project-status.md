@@ -128,7 +128,7 @@ Fully designed. A `MockS3Client` that implements the same `client.send()` interf
 
 ### Easter egg
 
-Logo triple-click triggers a leak/mop/restore animation. Designed; not yet implemented.
+Logo triple-tap triggers a 5-phase leak/mop/bandage/refill animation. **Implemented** in `src/components/BucketerLogo.jsx`.
 
 ---
 
