@@ -20,7 +20,7 @@ The core feature set is complete and stable. v1.13–v1.17 was a sustained engin
 | v1.16.0 | Further simplification: 16 libs/hooks extracted, indexeddb split |
 | v1.17.0 | Component decomposition: 6 sub-components extracted from UploadQueue/Browser |
 
-**Test suite:** 585 unit + 233 component tests, 0 failures.  
+**Test suite:** 585 unit + 239 component tests, 0 failures.  
 **Largest remaining files:** `Browser.jsx` (1015L), `UploadQueue.jsx` (697L).
 
 > **Note (2026-06-09):** The T1–T5 backlog below is largely complete as of this session. All items through T5-14 are implemented and passing. The only remaining open work is listed in "Suggested next priorities" at the bottom.

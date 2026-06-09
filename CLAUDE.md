@@ -72,15 +72,32 @@ Tests live in `test/` and run with `node --test` (no framework). The suite has t
 
 Component tests live in `test/components/` and are `.jsx` files. They use jsdom (a browser DOM emulator) and `preact/test-utils` to render components and assert on their output.
 
+- `test/components/about-modal.test.jsx` — AboutModal content and all three close mechanisms
+- `test/components/app.test.jsx` — App disconnected state rendering
+- `test/components/browser-internals.test.jsx` — Breadcrumb, SortTh sub-components
+- `test/components/capability-panel.test.jsx` — CapabilityPanel permitted/denied/unknown/mixed states
+- `test/components/changelog-modal.test.jsx` — ChangelogModal content and close mechanisms
+- `test/components/credential-form.test.jsx` — CredentialForm fields, validation, provider auto-detection, submission
+- `test/components/delete-queue.test.jsx` — DeleteQueue confirm dialog titles, versioning caveats, interactions
 - `test/components/error-block.test.jsx` — ErrorBlock renders, CORS heuristic, S3 error metadata
+- `test/components/file-banner.test.jsx` — FileBanner protocol detection
+- `test/components/hidden-versions.test.jsx` — HiddenVersions R2 gate and initial state
+- `test/components/modal.test.jsx` — Modal overlay/dialog classes, onClose, stopPropagation
+- `test/components/multipart-failure-consequence.test.jsx` — provider-specific multipart error messages (R2, B2, generic)
+- `test/components/profile-picker.test.jsx` — ProfilePicker empty state, list, selection, delete, save form
+- `test/components/settings-panel.test.jsx` — SettingsPanel fields, validation, update check toggle
 - `test/components/setup-guide.test.jsx` — all 7 provider guides render correctly; Wasabi has no CORS command
+- `test/components/storage-modal.test.jsx` — StorageModal structure, close mechanisms, isConnected prop, wipe section
+- `test/components/upload-log.test.jsx` — UploadLog empty state
+- `test/components/upload-queue-ui.test.jsx` — UploadItem and BatchSummary in all states
 
 **How the component test layer works:**
 
 - `test/helpers/jsx-loader.mjs` — custom Node ESM loader that transforms `.jsx` files using esbuild (same settings as the production build: `jsx: 'automatic'`, `jsxImportSource: 'preact'`). No additional dependencies beyond esbuild.
 - `test/helpers/with-dom.js` — sets up jsdom globals (`window`, `document`, `navigator`, etc.) before any component imports. **Must be the first import in every component test file.** ES module imports evaluate in order — placing it first guarantees `global.document` is set before Preact accesses it at render time.
+- `test/helpers/render.js` — shared `mount(vnode)` helper (returns `text`, `html`, `query`, `queryAll`, `container`, `cleanup`) and `fire(element, eventName)` / `setInput(element, value)` utilities. Import this instead of writing inline mount logic.
 
-**Adding new component tests:** Write `test/components/<name>.test.jsx`. Start with `import '../helpers/with-dom.js'` as the very first line. Use the `mount(vnode)` helper pattern (render into a fresh container, return `text`, `query`, `cleanup`). Run with `npm run test:ui`.
+**Adding new component tests:** Write `test/components/<name>.test.jsx`. Start with `import '../helpers/with-dom.js'` as the very first line. Import `{ mount, fire }` from `'../helpers/render.js'`. Run with `npm run test:ui`.
 
 **Adding new unit tests:** Write `test/<name>.test.js`. The test command (`node --test test/*.test.js`) picks it up automatically. For browser globals, set `global.<name>` before the module import. For IndexedDB, use `fake-indexeddb`.
 
