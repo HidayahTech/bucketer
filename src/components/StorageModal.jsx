@@ -20,6 +20,7 @@ import {
   deleteDatabase, loadActiveUploads, clearActiveUploads,
 } from '../lib/indexeddb.js';
 import { formatBytes } from '../lib/format.js';
+import { Modal } from './Modal.jsx';
 
 function age(ts) {
   const s = Math.floor((Date.now() - ts) / 1000);
@@ -152,8 +153,7 @@ export function StorageModal({ onClose, isConnected }) {
   const val = v => v != null ? String(v) : <span class="sv-nil">— default</span>;
 
   return (
-    <div class="modal-overlay" onClick={onClose}>
-      <div class="modal-dialog storage-dialog" onClick={e => e.stopPropagation()}>
+    <Modal onClose={onClose} class="storage-dialog">
 
         <div class="sv-header">
           <div class="modal-title">Storage &amp; Privacy</div>
@@ -462,7 +462,6 @@ export function StorageModal({ onClose, isConnected }) {
         <div class="modal-actions">
           <button type="button" class="btn btn-ghost btn-sm" onClick={onClose}>Close</button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

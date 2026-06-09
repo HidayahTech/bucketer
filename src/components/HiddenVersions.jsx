@@ -16,6 +16,7 @@ import { useState } from 'preact/hooks';
 import { ListObjectVersionsCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { formatBytes } from '../lib/format.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
+import { Modal } from './Modal.jsx';
 import { purgeAllVersions, collectHiddenVersions } from '../lib/purge-versions.js';
 
 function formatDate(d) {
@@ -136,8 +137,7 @@ export function HiddenVersions({ client, bucket, prefix, provider }) {
   return (
     <div class="hidden-versions">
       {pendingDelete && (
-        <div class="modal-overlay" onClick={handleCancel}>
-          <div class="modal-dialog" onClick={e => e.stopPropagation()}>
+        <Modal onClose={handleCancel}>
             <div class="modal-title">
               {isAll ? 'Purge all hidden versions?' : pendingDelete.type === 'delete-marker' && pendingDelete.isLatest ? 'Undelete this file?' : 'Permanently delete this version?'}
             </div>
@@ -181,8 +181,7 @@ export function HiddenVersions({ client, bucket, prefix, provider }) {
                 {deleting ? <span class="spinner" /> : isAll ? 'Purge all' : pendingDelete.type === 'delete-marker' && pendingDelete.isLatest ? 'Undelete' : 'Delete'}
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {rows === null && !loading && !error ? (

@@ -10,6 +10,7 @@ import { ListObjectsV2Command, GetObjectCommand, HeadObjectCommand, PutObjectCom
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { formatBytes, leafName, isPermissionError } from '../lib/format.js';
 import { usePreview } from '../lib/usePreview.js';
+import { Modal } from './Modal.jsx';
 import { defaultMaxKeys } from '../lib/provider.js';
 import { loadMaxKeys, loadListingCacheTTL } from '../lib/storage.js';
 import { pushPrefixHistory } from '../lib/url-params.js';
@@ -607,8 +608,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
         <div class="browser-drop-overlay">Drop files to upload to this folder</div>
       )}
       {newFolderOpen && (
-        <div class="modal-overlay" onClick={() => setNewFolderOpen(false)}>
-          <div class="modal-dialog" onClick={e => e.stopPropagation()}>
+        <Modal onClose={() => setNewFolderOpen(false)}>
             <div class="modal-title">New folder</div>
             <div class="modal-body">
               <input
@@ -628,13 +628,11 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                 {newFolderSaving ? <span class="spinner" /> : 'Create'}
               </button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {metaItem && (
-        <div class="modal-overlay" onClick={() => setMetaItem(null)}>
-          <div class="modal-dialog meta-dialog" onClick={e => e.stopPropagation()}>
+        <Modal onClose={() => setMetaItem(null)} class="meta-dialog">
             <div class="modal-title">File properties</div>
             <div class="modal-body">
               <p class="modal-filename" title={metaItem.Key}>{leafName(metaItem.Key)}</p>
@@ -662,15 +660,13 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
             <div class="modal-actions">
               <button class="btn btn-ghost btn-sm" onClick={() => setMetaItem(null)}>Close</button>
             </div>
-          </div>
-        </div>
+        </Modal>
       )}
 
       {previewItem && (() => {
         const kind = resolvedKind ?? mediaKind(previewItem.Key);
         return (
-          <div class="modal-overlay" onClick={closePreview}>
-            <div class="modal-dialog preview-dialog" onClick={e => e.stopPropagation()}>
+          <Modal onClose={closePreview} class="preview-dialog">
               <div class="modal-title preview-title">
                 <span class="preview-filename" title={previewItem.Key}>{leafName(previewItem.Key)}</span>
                 {previewableItems.length > 1 && previewIdx !== -1 && (
@@ -761,8 +757,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                   {downloadingKey === previewItem.Key ? <span class="spinner" /> : 'Download'}
                 </button>
               </div>
-            </div>
-          </div>
+          </Modal>
         );
       })()}
 

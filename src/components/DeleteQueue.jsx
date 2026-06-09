@@ -2,6 +2,7 @@
 // Lives in App.jsx alongside UploadQueue so delete ops survive folder navigation.
 // Each op flows: confirm → discovering → deleting → done.
 import { leafName } from '../lib/format.js';
+import { Modal } from './Modal.jsx';
 
 export function DeleteQueue({ ops, onConfirm, onDismiss, onCollapse, provider }) {
   if (ops.length === 0) return null;
@@ -18,16 +19,14 @@ export function DeleteQueue({ ops, onConfirm, onDismiss, onCollapse, provider })
   return (
     <>
       {confirmOp && (
-        <div class="modal-overlay" onClick={() => onDismiss(confirmOp.id)}>
-          <div class="modal-dialog" onClick={e => e.stopPropagation()}>
-            <ConfirmContent
-              op={confirmOp}
-              onConfirm={() => onConfirm(confirmOp.id)}
-              onCancel={() => onDismiss(confirmOp.id)}
-              versioningCaveat={versioningCaveat}
-            />
-          </div>
-        </div>
+        <Modal onClose={() => onDismiss(confirmOp.id)}>
+          <ConfirmContent
+            op={confirmOp}
+            onConfirm={() => onConfirm(confirmOp.id)}
+            onCancel={() => onDismiss(confirmOp.id)}
+            versioningCaveat={versioningCaveat}
+          />
+        </Modal>
       )}
       {activeOps.length > 0 && (
         <div class="delete-queue">

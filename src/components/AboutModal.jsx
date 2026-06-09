@@ -1,6 +1,7 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // About modal — product overview and key differentiators.
 import { useEffect } from 'preact/hooks';
+import { Modal } from './Modal.jsx';
 
 export function AboutModal({ onClose }) {
   useEffect(() => {
@@ -10,8 +11,7 @@ export function AboutModal({ onClose }) {
   }, []);
 
   return (
-    <div class="modal-overlay" onClick={onClose}>
-      <div class="modal-dialog about-dialog" onClick={e => e.stopPropagation()}>
+    <Modal onClose={onClose} class="about-dialog">
         <div class="modal-title">About Bucketer</div>
         <div class="about-body">
 
@@ -60,7 +60,6 @@ export function AboutModal({ onClose }) {
         <div class="modal-actions">
           <button class="btn btn-ghost btn-sm" onClick={onClose}>Close</button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
