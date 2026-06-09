@@ -178,5 +178,17 @@ if (mode.invariants) {
     invariantFailed = true;
   }
 
+  // No source map comment leakage: esbuild should not embed sourceMappingURL
+  // in production output, but this catches any future misconfiguration.
+  if (out.includes('sourceMappingURL')) {
+    console.error(
+      `\nBuild invariant FAILED: ${mode.dest}/index.html contains a sourceMappingURL comment (T5-1).\n` +
+      `Source maps must not leak into the production bundle — they expose internal file paths.`
+    );
+    invariantFailed = true;
+  } else {
+    console.log(`  ✓ no sourceMappingURL in bundle`);
+  }
+
   if (invariantFailed) process.exit(1);
 }

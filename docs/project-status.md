@@ -1,6 +1,6 @@
 # Bucketer — Project Status
 
-**Last updated:** 2026-06-08  
+**Last updated:** 2026-06-09  
 **Current version:** v1.17.0  
 **Branch:** main
 
@@ -22,6 +22,8 @@ The core feature set is complete and stable. v1.13–v1.17 was a sustained engin
 
 **Test suite:** 585 unit + 233 component tests, 0 failures.  
 **Largest remaining files:** `Browser.jsx` (1015L), `UploadQueue.jsx` (697L).
+
+> **Note (2026-06-09):** The T1–T5 backlog below is largely complete as of this session. All items through T5-14 are implemented and passing. The only remaining open work is listed in "Suggested next priorities" at the bottom.
 
 ---
 
@@ -150,8 +152,9 @@ Two major features:
 
 ## Suggested next priorities
 
-1. **T1-1** — Fix the rename bug. One-line import fix; blocks a core feature.
-2. **T1-2** — Add the SDK command import invariant to prevent recurrence.
-3. **T2-1** — Fix `clearCredentials()` wiping settings. Silent data loss on every disconnect.
-4. **T2-4** — Endpoint URL validation in `readUrlParams()`. Small security fix.
-5. **T4-1** — Extract `usePreview` from `Browser.jsx`. Required before 2.0 work can safely touch the file.
+All T1–T5 backlog items are done. Remaining work:
+
+1. **T5-1** — ✅ Done (2026-06-09): `sourceMappingURL` absence check added to `build.mjs`.
+2. **StorageModal decomposition** — Step 3 of 3 (deferred). `ConfirmDialog` is a closure component; extract the stateless sub-components first.
+3. **Demo mode** — Design complete (`docs/intent/demo-mode.md`). Blocked on `src/lib/object-url.js` wrapper for presigned URLs.
+4. **v2.0 prerequisites** — All five structural prereqs remain (bucket decoupling, per-bucket capabilities, hook extraction from `Browser.jsx`, responsive skeleton, `SPEC-DRIFT.md`).
