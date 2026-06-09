@@ -99,24 +99,21 @@ Selected highlights:
 
 ### Component decomposition
 
-Three-step plan to reduce the size of the two largest files. Steps 1 and 2 are done.
-
 | Step | Status | Work |
 |------|--------|------|
 | 1 | ✅ v1.17.0 | `BatchSummary`, `UploadItem`, `ErrorDetailsPanel` extracted from `UploadQueue.jsx` |
 | 2 | ✅ v1.17.0 | `CopyLinkPopover`, `Breadcrumb`, `SortTh` extracted from `Browser.jsx` |
-| 3 | Open | `StorageModal.jsx` (468L): `Empty`, `KeyName`, `StoreLoc`, `SectionHead`, `Actions` are extractable. `ConfirmDialog` is a closure component (captures `act`/`setConfirm`/`cleared`) — needs prop-threading or left in place. Lowest priority of the three. |
+| 3 | ✅ Closed | `StorageModal.jsx` — reviewed 2026-06-09; nothing meaningful to extract. The five micro-components (`Empty`, `KeyName`, `StoreLoc`, `SectionHead`, `Actions`) are already cleanly separated at module level. `ConfirmDialog` is appropriately a closure. File size (468L) is warranted for a single complex modal. |
 
 ### Hook extraction from Browser.jsx
 
-Tracked as T4-1 above. Planned extraction order:
+`usePreview` was extracted (clean boundary, zero coupling to listing state). The remaining three planned extractions were reviewed 2026-06-09 and closed:
 
-1. `usePreview` — largest cluster (~150L, 15 state vars), fully self-contained
-2. `useRename` — copy+delete state machine
-3. `useMetadata` — HeadObject lazy fetch
-4. `useListingCache` — in-memory Map + TTL + invalidation
+- `useRename` — `commitRename` directly mutates `items`/`setItems` and needs `client`, `bucket`, `prefix`. Threading those in buys nothing; logic is ~30L.
+- `useListingCache` — cache read/write is woven into the listing effect and sets listing state atomically. Not separable without restructuring the listing effect.
+- `useMetadata` — has a clean boundary but is only 4 state vars and ~15L. Not worth a new file.
 
-This is a v2.0 prerequisite. Any new 2.0 surface area in `Browser.jsx` is risky until it lands.
+`Browser.jsx` at 1015L is appropriately sized for its role. No further extraction planned.
 
 ---
 
@@ -140,13 +137,12 @@ Two major features:
 
 2. **UI refresh** — responsive layout (mobile breakpoints), visual polish, light/auto theme, accessibility overhaul.
 
-**Five structural prerequisites before 2.0 work begins:**
+**Structural work needed before 2.0 features can land cleanly:**
 
 1. Decouple `bucket` from credential/profile model
 2. Key `s3b_capabilities` per bucket (currently global-per-session)
-3. Extract custom hooks from `Browser.jsx` (T4-1 above — the first step)
-4. Establish a responsive layout skeleton (two breakpoints minimum)
-5. Explicitly document the `file://` support stance in `SPEC-DRIFT.md`
+3. Establish a responsive layout skeleton (two breakpoints minimum)
+4. Explicitly document the `file://` support stance in `SPEC-DRIFT.md`
 
 ---
 
@@ -154,7 +150,5 @@ Two major features:
 
 All T1–T5 backlog items are done. Remaining work:
 
-1. **T5-1** — ✅ Done (2026-06-09): `sourceMappingURL` absence check added to `build.mjs`.
-2. **StorageModal decomposition** — Step 3 of 3 (deferred). `ConfirmDialog` is a closure component; extract the stateless sub-components first.
-3. **Demo mode** — Design complete (`docs/intent/demo-mode.md`). Blocked on `src/lib/object-url.js` wrapper for presigned URLs.
-4. **v2.0 prerequisites** — All five structural prereqs remain (bucket decoupling, per-bucket capabilities, hook extraction from `Browser.jsx`, responsive skeleton, `SPEC-DRIFT.md`).
+1. **Demo mode** — Design complete (`docs/intent/demo-mode.md`). Blocked on `src/lib/object-url.js` presigned-URL wrapper.
+2. **v2.0 structural work** — See v2.0 roadmap section above.
