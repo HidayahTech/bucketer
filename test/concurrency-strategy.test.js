@@ -4,7 +4,31 @@ import {
   calcAdaptiveConcurrency,
   createProbeState,
   resolveProbe,
+  capConcurrencyByMemory,
 } from '../src/lib/concurrency-strategy.js';
+
+describe('capConcurrencyByMemory', () => {
+  const MB = 1024 * 1024;
+
+  test('does not reduce concurrency when parts are small', () => {
+    // 16 × 5 MiB = 80 MiB — well under 200 MiB cap
+    assert.equal(capConcurrencyByMemory(16, 5 * MB, 200 * MB), 16);
+  });
+
+  test('reduces concurrency when part size × concurrency exceeds budget', () => {
+    // 50 MiB parts, 200 MiB budget → max 4 concurrent
+    assert.equal(capConcurrencyByMemory(16, 50 * MB, 200 * MB), 4);
+  });
+
+  test('never returns below 1', () => {
+    // Even a 500 MiB part with a 200 MiB budget must allow at least 1 concurrent
+    assert.equal(capConcurrencyByMemory(16, 500 * MB, 200 * MB), 1);
+  });
+
+  test('passes through concurrency unchanged when already under cap', () => {
+    assert.equal(capConcurrencyByMemory(4, 5 * MB, 200 * MB), 4);
+  });
+});
 
 describe('calcAdaptiveConcurrency', () => {
   test('1 active file gets full budget as parts', () => {

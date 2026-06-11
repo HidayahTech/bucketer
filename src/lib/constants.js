@@ -32,6 +32,13 @@ export const ADAPTIVE_CONNECTION_BUDGET = 16;
 // for a meaningful two-phase throughput comparison.
 export const PROBE_THRESHOLD_PARTS = 20;
 
+// Adaptive mode: maximum total bytes held in ArrayBuffer across all concurrent
+// parts for a single file. Caps part concurrency when calcPartSize raises the part
+// size for very large files, preventing runaway memory usage that crashes the tab.
+// At default 5 MiB parts this allows up to 40 concurrent parts (capped to 16 by
+// ADAPTIVE_CONNECTION_BUDGET). At 50 MiB parts it caps to 4 concurrent.
+export const MAX_ADAPTIVE_MEMORY_BYTES = 200 * 1024 * 1024; // 200 MiB
+
 // Presigned URL lifetime in seconds. 1 hour: long enough for interactive use
 // but short enough that a leaked URL expires overnight without manual rotation.
 export const PRESIGN_EXPIRES = 3600;

@@ -1,7 +1,7 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // Pure functions for adaptive upload concurrency.
 // No side effects, no DOM, no S3 dependencies — safe to unit-test in Node.
-import { ADAPTIVE_CONNECTION_BUDGET, PART_CONCURRENCY } from './constants.js';
+import { ADAPTIVE_CONNECTION_BUDGET, PART_CONCURRENCY, MAX_ADAPTIVE_MEMORY_BYTES } from './constants.js';
 
 // Returns the recommended concurrency split for the current number of active uploads.
 // fileConcurrency: how many files the queue should allow to run simultaneously.
@@ -30,6 +30,13 @@ export function createProbeState(baseline, candidate) {
     candidateMs: 0,
     winner: null,
   };
+}
+
+// Clamps concurrency so that (concurrency × partSizeBytes) never exceeds maxBytes.
+// Applied in adaptive mode to prevent very large part sizes (auto-raised by
+// calcPartSize for huge files) from causing runaway ArrayBuffer memory usage.
+export function capConcurrencyByMemory(concurrency, partSizeBytes, maxBytes = MAX_ADAPTIVE_MEMORY_BYTES) {
+  return Math.min(concurrency, Math.max(1, Math.floor(maxBytes / partSizeBytes)));
 }
 
 // Minimum wall-clock time (ms) for a 3-part probe phase to be considered valid.

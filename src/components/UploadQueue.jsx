@@ -31,7 +31,7 @@ import {
 import { UploadQueue as Queue, calcPartSize, collectParts, preparePutBody, uploadPartsWithPool } from '../lib/upload-queue.js';
 import { loadPartConcurrency, loadPartSizeMB, loadFileConcurrency, loadUploadExpandThreshold, loadAdaptiveMode } from '../lib/storage.js';
 import { MULTIPART_THRESHOLD, DEFAULT_FILE_CONCURRENCY, PART_CONCURRENCY, ADAPTIVE_CONNECTION_BUDGET, PROBE_THRESHOLD_PARTS } from '../lib/constants.js';
-import { calcAdaptiveConcurrency, createProbeState, resolveProbe } from '../lib/concurrency-strategy.js';
+import { calcAdaptiveConcurrency, createProbeState, resolveProbe, capConcurrencyByMemory } from '../lib/concurrency-strategy.js';
 import { isActive as itemIsActive, isFailed as itemIsFailed, isPaused as itemIsPaused } from '../lib/upload-status.js';
 import { abortMultipartSession } from '../lib/upload-cleanup.js';
 import { useDoubleClickSafety } from '../hooks/useDoubleClickSafety.js';
@@ -353,8 +353,8 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       onProgress(bytesUploaded, file.size);
     }
 
-    const baseline = getEffectivePartConcurrency();
-    const candidate = Math.min(16, baseline + 4);
+    const baseline = capConcurrencyByMemory(getEffectivePartConcurrency(), partSize);
+    const candidate = capConcurrencyByMemory(Math.min(16, baseline + 4), partSize);
     const shouldProbe = loadAdaptiveMode()
       && totalParts >= PROBE_THRESHOLD_PARTS
       && candidate !== baseline;
@@ -470,7 +470,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       const abortController = new AbortController();
       activeUploadsRef.current[id] = { abort: () => abortController.abort() };
 
-      const concurrency = getEffectivePartConcurrency();
+      const concurrency = capConcurrencyByMemory(getEffectivePartConcurrency(), partSize);
       await uploadPartsWithPool(remainingParts, async (partNumber) => {
         if (abortController.signal.aborted) throw new Error('Upload aborted');
         const start = (partNumber - 1) * partSize;
