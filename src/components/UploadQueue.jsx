@@ -74,6 +74,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
 
   const canUpload = capabilities.upload !== 'denied';
   const hadActiveRef = useRef(false);
+  const lastLoggedPartsPerFileRef = useRef(null);
 
   const [destinationPrefix, setDestinationPrefix] = useState(currentPrefix || '');
   // Keep in sync with browser navigation, but let the user override by typing
@@ -286,11 +287,15 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       queueRef.current.concurrency = effectiveFileConcurrency();
       if (loadAdaptiveMode()) {
         const activeRemaining = Object.keys(activeUploadsRef.current).length;
-        debugConcurrency('rebalance', {
-          activeRemaining,
-          fileConcurrency: queueRef.current.concurrency,
-          partsPerFile: calcAdaptiveConcurrency(activeRemaining).partsPerFile,
-        });
+        const { partsPerFile } = calcAdaptiveConcurrency(activeRemaining);
+        if (partsPerFile !== lastLoggedPartsPerFileRef.current) {
+          lastLoggedPartsPerFileRef.current = partsPerFile;
+          debugConcurrency('rebalance', {
+            activeRemaining,
+            fileConcurrency: queueRef.current.concurrency,
+            partsPerFile,
+          });
+        }
       }
     }
   }
