@@ -47,6 +47,17 @@ export function formatProbeAnnotation(probeResult) {
   return `adaptive · probe: ${range} (held baseline)`;
 }
 
+// Returns the full strategy annotation for a log entry.
+// Shows probe detail when available; falls back to mode + peak part concurrency.
+// Returns '—' only for entries written before this feature existed.
+function formatStrategyAnnotation(entry) {
+  const probe = formatProbeAnnotation(entry.probeResult);
+  if (probe) return probe;
+  if (!entry.concurrencyMode) return '—';
+  const parts = entry.peakPartConcurrency != null ? ` · ${entry.peakPartConcurrency} parts` : '';
+  return `${entry.concurrencyMode}${parts}`;
+}
+
 export function UploadLog({ refreshKey }) {
   const [entries, setEntries] = useState([]);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
@@ -117,7 +128,7 @@ export function UploadLog({ refreshKey }) {
               <td class="log-num">{formatDuration(e.durationSec)}</td>
               <td class="log-num">{e.avgSpeedBps != null ? formatSpeed(e.avgSpeedBps) : '—'}</td>
               <td class="log-strategy">
-                {formatProbeAnnotation(e.probeResult) ?? (e.concurrencyMode === 'manual' ? 'manual' : null) ?? '—'}
+                {formatStrategyAnnotation(e)}
               </td>
             </tr>
           ))}

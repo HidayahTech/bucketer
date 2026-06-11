@@ -236,6 +236,14 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       const durationSec = (completedAt - startTime) / 1000;
       updateItem(id, { status: 'done', progress: 100 }, true);
       onCapabilityChange('upload', 'permitted');
+      debugConcurrency('file-complete', {
+        file: file.name,
+        size: file.size,
+        mode: loadAdaptiveMode() ? 'adaptive' : 'manual',
+        peakPartConcurrency: uploadAnnotation?.peakPartConcurrency ?? '(single PUT)',
+        avgSpeedMbs: durationSec > 0 ? Math.round(file.size / durationSec / 1000) / 1000 : null,
+        probeResult: uploadAnnotation?.probeResult ?? null,
+      });
       saveUploadLogEntry({
         fileName: file.name, destinationKey, fileSize: file.size,
         status: 'done', startedAt: startTime, completedAt, durationSec,
@@ -276,10 +284,14 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       // Re-read concurrency so a setting change mid-queue takes effect on the
       // next _drain() call, which fires immediately after this finally block.
       queueRef.current.concurrency = effectiveFileConcurrency();
-      debugConcurrency('rebalance', {
-        activeRemaining: Object.keys(activeUploadsRef.current).length,
-        fileConcurrency: queueRef.current.concurrency,
-      });
+      if (loadAdaptiveMode()) {
+        const activeRemaining = Object.keys(activeUploadsRef.current).length;
+        debugConcurrency('rebalance', {
+          activeRemaining,
+          fileConcurrency: queueRef.current.concurrency,
+          partsPerFile: calcAdaptiveConcurrency(activeRemaining).partsPerFile,
+        });
+      }
     }
   }
 
