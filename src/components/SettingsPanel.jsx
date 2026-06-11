@@ -153,10 +153,11 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
           </span>
         </div>
         <div class="form-group">
-          <label>Upload concurrency mode</label>
+          <label htmlFor="concurrency-mode-adaptive">Upload concurrency mode</label>
           <div style={{ display: 'flex', gap: '1rem' }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: '.4rem', cursor: 'pointer' }}>
               <input
+                id="concurrency-mode-adaptive"
                 type="radio"
                 name="concurrency-mode"
                 value="adaptive"

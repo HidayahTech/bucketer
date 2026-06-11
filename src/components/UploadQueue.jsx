@@ -221,13 +221,15 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       });
     }
 
+    let uploadAnnotation = null;
+
     try {
       if (file.size < MULTIPART_THRESHOLD) {
         // Small file — single PutObjectCommand
         await uploadSmall(id, file, destinationKey, updateProgress);
       } else {
         // Large file — manual multipart with resume state
-        await uploadMultipart(id, file, destinationKey, updateProgress);
+        uploadAnnotation = await uploadMultipart(id, file, destinationKey, updateProgress);
       }
 
       const completedAt = Date.now();
@@ -239,6 +241,9 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         status: 'done', startedAt: startTime, completedAt, durationSec,
         avgSpeedBps: durationSec > 0 ? file.size / durationSec : null,
         errorMessage: null,
+        concurrencyMode:     loadAdaptiveMode() ? 'adaptive' : 'manual',
+        peakPartConcurrency: uploadAnnotation?.peakPartConcurrency ?? null,
+        probeResult:         uploadAnnotation?.probeResult ?? null,
       }).then(() => onLogEntry?.()).catch(() => {});
 
     } catch (err) {
@@ -251,6 +256,9 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         durationSec: (completedAt - startTime) / 1000,
         avgSpeedBps: null,
         errorMessage: err?.message || String(err),
+        concurrencyMode:     loadAdaptiveMode() ? 'adaptive' : 'manual',
+        peakPartConcurrency: uploadAnnotation?.peakPartConcurrency ?? null,
+        probeResult:         null,
       }).then(() => onLogEntry?.()).catch(() => {});
       if (isPermissionError(err)) {
         onCapabilityChange('upload', 'denied');
@@ -311,39 +319,67 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     } catch { /* IDB may be unavailable */ }
 
     const parts = new Array(totalParts);
-    const queue = Array.from({ length: totalParts }, (_, i) => i + 1);
+    const allPartNumbers = Array.from({ length: totalParts }, (_, i) => i + 1);
     let bytesUploaded = 0;
 
-    // Worker pool: PART_CONCURRENCY workers drain the queue concurrently,
-    // giving full pipelining while bounding memory to PART_CONCURRENCY × partSize.
-    async function worker() {
-      for (;;) {
-        const partNumber = queue.shift();
-        if (partNumber === undefined) break;
-        if (abortController.signal.aborted) throw new Error('Upload aborted');
-
-        const start = (partNumber - 1) * partSize;
-        const end = Math.min(start + partSize, file.size);
-        // slice→arrayBuffer: only this part's bytes live in memory at a time.
-        // Raw Blob is not accepted by the SDK browser handler (calls .getReader()).
-        const chunk = await file.slice(start, end).arrayBuffer();
-
-        const resp = await client.send(
-          new UploadPartCommand({
-            Bucket: bucket, Key: destinationKey, UploadId: uploadId,
-            PartNumber: partNumber, Body: chunk,
-          }),
-          { abortSignal: abortController.signal },
-        );
-
-        parts[partNumber - 1] = { PartNumber: partNumber, ETag: resp.ETag };
-        bytesUploaded += end - start;
-        onProgress(bytesUploaded, file.size);
-      }
+    // slice→arrayBuffer: only this part's bytes live in memory at a time.
+    // Raw Blob is not accepted by the SDK browser handler (calls .getReader()).
+    async function uploadPart(partNumber) {
+      if (abortController.signal.aborted) throw new Error('Upload aborted');
+      const start = (partNumber - 1) * partSize;
+      const end = Math.min(start + partSize, file.size);
+      const chunk = await file.slice(start, end).arrayBuffer();
+      const resp = await client.send(
+        new UploadPartCommand({
+          Bucket: bucket, Key: destinationKey, UploadId: uploadId,
+          PartNumber: partNumber, Body: chunk,
+        }),
+        { abortSignal: abortController.signal },
+      );
+      parts[partNumber - 1] = { PartNumber: partNumber, ETag: resp.ETag };
+      bytesUploaded += end - start;
+      onProgress(bytesUploaded, file.size);
     }
 
-    const concurrency = Math.max(1, loadPartConcurrency() ?? PART_CONCURRENCY);
-    await Promise.all(Array.from({ length: concurrency }, worker));
+    const baseline = getEffectivePartConcurrency();
+    const candidate = Math.min(16, baseline + 4);
+    const shouldProbe = loadAdaptiveMode()
+      && totalParts >= PROBE_THRESHOLD_PARTS
+      && candidate !== baseline;
+
+    let probeResolved = null;
+    let peakPartConcurrency = baseline;
+
+    if (shouldProbe) {
+      debugConcurrency('probe-start', { file: file.name, totalParts, baseline, candidate });
+
+      const t1 = Date.now();
+      await uploadPartsWithPool(allPartNumbers.slice(0, 3), uploadPart, baseline);
+      const baselineMs = Date.now() - t1;
+
+      const t2 = Date.now();
+      await uploadPartsWithPool(allPartNumbers.slice(3, 6), uploadPart, candidate);
+      const candidateMs = Date.now() - t2;
+
+      const state = createProbeState(baseline, candidate);
+      state.baselineBytes  = 3 * partSize;
+      state.baselineMs     = baselineMs;
+      state.candidateBytes = 3 * partSize;
+      state.candidateMs    = candidateMs;
+      probeResolved = resolveProbe(state);
+      peakPartConcurrency = probeResolved.winner;
+
+      debugConcurrency('probe-result', {
+        baseline, candidate,
+        baselineMbs: probeResolved.baselineMbs,
+        candidateMbs: probeResolved.candidateMbs,
+        winner: probeResolved.winner,
+      });
+
+      await uploadPartsWithPool(allPartNumbers.slice(6), uploadPart, probeResolved.winner);
+    } else {
+      await uploadPartsWithPool(allPartNumbers, uploadPart, baseline);
+    }
 
     await client.send(new CompleteMultipartUploadCommand({
       Bucket: bucket, Key: destinationKey, UploadId: uploadId,
@@ -352,6 +388,18 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
 
     await deleteResumeRecord({ provider, endpoint: credentials.endpoint, bucket, destinationKey }).catch(() => {});
     delete activeUploadsRef.current[id];
+    return {
+      peakPartConcurrency,
+      probeResult: probeResolved
+        ? {
+            baseline: probeResolved.baseline,
+            candidate: probeResolved.candidate,
+            baselineMbs: probeResolved.baselineMbs,
+            candidateMbs: probeResolved.candidateMbs,
+            winner: probeResolved.winner,
+          }
+        : null,
+    };
   }
 
   async function handleResume(id) {
