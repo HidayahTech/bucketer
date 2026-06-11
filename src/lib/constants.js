@@ -24,6 +24,14 @@ export const DEFAULT_FILE_CONCURRENCY = 3;
 // Default concurrent part uploads per file (peak memory: PART_CONCURRENCY × partSize).
 export const PART_CONCURRENCY = 4;
 
+// Adaptive mode: target total concurrent HTTP streams across all active uploads.
+export const ADAPTIVE_CONNECTION_BUDGET = 16;
+
+// Adaptive mode: minimum part count for a file to be eligible for the probe.
+// At default 5 MiB parts this is 100 MiB. Files below this complete too quickly
+// for a meaningful two-phase throughput comparison.
+export const PROBE_THRESHOLD_PARTS = 20;
+
 // Presigned URL lifetime in seconds. 1 hour: long enough for interactive use
 // but short enough that a leaked URL expires overnight without manual rotation.
 export const PRESIGN_EXPIRES = 3600;
