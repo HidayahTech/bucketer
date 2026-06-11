@@ -13,7 +13,8 @@
 // (file-identity.js), or cross-tab tracking (active-uploads.js).
 //
 // Each entry: { fileName, destinationKey, fileSize, status, startedAt,
-//               completedAt, durationSec, avgSpeedBps, errorMessage }
+//               completedAt, durationSec, avgSpeedBps, errorMessage,
+//               concurrencyMode, peakPartConcurrency, probeResult }
 
 import { openDB, LOG_STORE } from './indexeddb-core.js';
 
