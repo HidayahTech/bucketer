@@ -34,6 +34,7 @@ import {
   loadProfiles, saveProfile, deleteProfile,
   loadLastProfileId, saveLastProfileId,
   migrateProfilesFromLegacy,
+  loadAdaptiveMode, saveAdaptiveMode,
 } from '../src/lib/storage.js';
 
 // Clear both stores before each test to prevent cross-test contamination.
@@ -460,5 +461,22 @@ describe('migrateProfilesFromLegacy', () => {
     migrateProfilesFromLegacy();
     assert.equal(loadProfiles().profiles.length, 1);
     assert.equal(loadProfiles().profiles[0].name, 'Existing');
+  });
+});
+
+describe('loadAdaptiveMode / saveAdaptiveMode', () => {
+  test('defaults to true when no value is stored', () => {
+    assert.equal(loadAdaptiveMode(), true);
+  });
+
+  test('returns false after saveAdaptiveMode(false)', () => {
+    saveAdaptiveMode(false);
+    assert.equal(loadAdaptiveMode(), false);
+  });
+
+  test('returns true after saveAdaptiveMode(true)', () => {
+    saveAdaptiveMode(false);
+    saveAdaptiveMode(true);
+    assert.equal(loadAdaptiveMode(), true);
   });
 });
