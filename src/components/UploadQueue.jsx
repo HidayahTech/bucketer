@@ -29,8 +29,9 @@ import {
   saveUploadLogEntry,
 } from '../lib/indexeddb.js';
 import { UploadQueue as Queue, calcPartSize, collectParts, preparePutBody, uploadPartsWithPool } from '../lib/upload-queue.js';
-import { loadPartConcurrency, loadPartSizeMB, loadFileConcurrency, loadUploadExpandThreshold } from '../lib/storage.js';
-import { MULTIPART_THRESHOLD, DEFAULT_FILE_CONCURRENCY, PART_CONCURRENCY } from '../lib/constants.js';
+import { loadPartConcurrency, loadPartSizeMB, loadFileConcurrency, loadUploadExpandThreshold, loadAdaptiveMode } from '../lib/storage.js';
+import { MULTIPART_THRESHOLD, DEFAULT_FILE_CONCURRENCY, PART_CONCURRENCY, ADAPTIVE_CONNECTION_BUDGET, PROBE_THRESHOLD_PARTS, MAX_ADAPTIVE_MEMORY_BYTES } from '../lib/constants.js';
+import { calcAdaptiveConcurrency, createProbeState, resolveProbe, capConcurrencyByMemory } from '../lib/concurrency-strategy.js';
 import { isActive as itemIsActive, isFailed as itemIsFailed, isPaused as itemIsPaused } from '../lib/upload-status.js';
 import { abortMultipartSession } from '../lib/upload-cleanup.js';
 import { useDoubleClickSafety } from '../hooks/useDoubleClickSafety.js';
@@ -42,10 +43,23 @@ import { createUpdateBatcher } from '../lib/update-batcher.js';
 let _idCounter = 0;
 function newId() { return ++_idCounter; }
 
+function debugConcurrency(...args) {
+  try {
+    if (localStorage.getItem('s3b_debug_concurrency') === '1') {
+      console.log('[bucketer:concurrency]', ...args);
+    }
+  } catch { /* private browsing — skip */ }
+}
+
 export function UploadQueue({ client, bucket, provider, currentPrefix, credentials, onCapabilityChange, capabilities, onUploadsComplete, onLogEntry, onMount }) {
   const [items, setItems] = useState([]);
   const [collapsedBatches, setCollapsedBatches] = useState({});
-  const queueRef = useRef(new Queue(loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY));
+  const queueRef = useRef(null);
+  if (queueRef.current === null) {
+    queueRef.current = new Queue(
+      loadAdaptiveMode() ? ADAPTIVE_CONNECTION_BUDGET : (loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY)
+    );
+  }
   const activeUploadsRef = useRef({}); // id → { abort, uploadInstance }
   const cancelledBatchesRef = useRef(new Set());
   const fileInputRef = useRef(null);
@@ -60,6 +74,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
 
   const canUpload = capabilities.upload !== 'denied';
   const hadActiveRef = useRef(false);
+  const lastLoggedPartsPerFileRef = useRef(null);
 
   const [destinationPrefix, setDestinationPrefix] = useState(currentPrefix || '');
   // Keep in sync with browser navigation, but let the user override by typing
@@ -87,6 +102,25 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     batcherRef.current.update(id, patch, urgent);
   }, []);
 
+  // Returns the file concurrency to assign to the queue in the current mode.
+  function effectiveFileConcurrency() {
+    return loadAdaptiveMode()
+      ? ADAPTIVE_CONNECTION_BUDGET
+      : (loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY);
+  }
+
+  // Returns the part concurrency to use when starting or resuming a multipart upload.
+  // In adaptive mode, scales up as fewer files are actively uploading.
+  function getEffectivePartConcurrency() {
+    if (loadAdaptiveMode()) {
+      const activeCount = Object.keys(activeUploadsRef.current).length;
+      const { partsPerFile } = calcAdaptiveConcurrency(activeCount);
+      debugConcurrency('part-concurrency', { activeCount, partsPerFile });
+      return partsPerFile;
+    }
+    return Math.max(1, loadPartConcurrency() ?? PART_CONCURRENCY);
+  }
+
   // Expose addFiles to parent (e.g. for drop zones outside this component)
   useEffect(() => { onMount?.({ addFiles }); }, []);
 
@@ -95,6 +129,9 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   // For plain file picks it equals file.name.
   function addFiles(fileEntries) {
     const batchId = String(Date.now() + Math.random());
+    // Smallest-first: minimises time-to-first-completion, reduces active file count
+    // quickly so the part-concurrency rebalancer kicks in sooner for large files.
+    fileEntries.sort((a, b) => a.file.size - b.file.size);
     const newItems = fileEntries.map(({ file, relativePath }) => ({
       id: newId(),
       batchId,
@@ -147,7 +184,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       return; // User must explicitly choose Resume or Restart
     }
 
-    queueRef.current.concurrency = loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY;
+    queueRef.current.concurrency = effectiveFileConcurrency();
     queueRef.current.enqueue(async () => {
       if (cancelledBatchesRef.current.has(item.batchId)) {
         updateItem(item.id, { status: 'aborted' }, true);
@@ -185,24 +222,37 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       });
     }
 
+    let uploadAnnotation = null;
+
     try {
       if (file.size < MULTIPART_THRESHOLD) {
         // Small file — single PutObjectCommand
         await uploadSmall(id, file, destinationKey, updateProgress);
       } else {
         // Large file — manual multipart with resume state
-        await uploadMultipart(id, file, destinationKey, updateProgress);
+        uploadAnnotation = await uploadMultipart(id, file, destinationKey, updateProgress);
       }
 
       const completedAt = Date.now();
       const durationSec = (completedAt - startTime) / 1000;
       updateItem(id, { status: 'done', progress: 100 }, true);
       onCapabilityChange('upload', 'permitted');
+      debugConcurrency('file-complete', {
+        file: file.name,
+        size: file.size,
+        mode: loadAdaptiveMode() ? 'adaptive' : 'manual',
+        peakPartConcurrency: uploadAnnotation?.peakPartConcurrency ?? '(single PUT)',
+        avgSpeedMbs: durationSec > 0 ? Math.round(file.size / durationSec / 1000) / 1000 : null,
+        probeResult: uploadAnnotation?.probeResult ?? null,
+      });
       saveUploadLogEntry({
         fileName: file.name, destinationKey, fileSize: file.size,
         status: 'done', startedAt: startTime, completedAt, durationSec,
         avgSpeedBps: durationSec > 0 ? file.size / durationSec : null,
         errorMessage: null,
+        concurrencyMode:     loadAdaptiveMode() ? 'adaptive' : 'manual',
+        peakPartConcurrency: uploadAnnotation?.peakPartConcurrency ?? null,
+        probeResult:         uploadAnnotation?.probeResult ?? null,
       }).then(() => onLogEntry?.()).catch(() => {});
 
     } catch (err) {
@@ -215,6 +265,9 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         durationSec: (completedAt - startTime) / 1000,
         avgSpeedBps: null,
         errorMessage: err?.message || String(err),
+        concurrencyMode:     loadAdaptiveMode() ? 'adaptive' : 'manual',
+        peakPartConcurrency: uploadAnnotation?.peakPartConcurrency ?? null,
+        probeResult:         null,
       }).then(() => onLogEntry?.()).catch(() => {});
       if (isPermissionError(err)) {
         onCapabilityChange('upload', 'denied');
@@ -231,7 +284,19 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       markUploadInactive(destinationKey);
       // Re-read concurrency so a setting change mid-queue takes effect on the
       // next _drain() call, which fires immediately after this finally block.
-      queueRef.current.concurrency = loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY;
+      queueRef.current.concurrency = effectiveFileConcurrency();
+      if (loadAdaptiveMode()) {
+        const activeRemaining = Object.keys(activeUploadsRef.current).length;
+        const { partsPerFile } = calcAdaptiveConcurrency(activeRemaining);
+        if (partsPerFile !== lastLoggedPartsPerFileRef.current) {
+          lastLoggedPartsPerFileRef.current = partsPerFile;
+          debugConcurrency('rebalance', {
+            activeRemaining,
+            fileConcurrency: queueRef.current.concurrency,
+            partsPerFile,
+          });
+        }
+      }
     }
   }
 
@@ -271,39 +336,77 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     } catch { /* IDB may be unavailable */ }
 
     const parts = new Array(totalParts);
-    const queue = Array.from({ length: totalParts }, (_, i) => i + 1);
+    const allPartNumbers = Array.from({ length: totalParts }, (_, i) => i + 1);
     let bytesUploaded = 0;
 
-    // Worker pool: PART_CONCURRENCY workers drain the queue concurrently,
-    // giving full pipelining while bounding memory to PART_CONCURRENCY × partSize.
-    async function worker() {
-      for (;;) {
-        const partNumber = queue.shift();
-        if (partNumber === undefined) break;
-        if (abortController.signal.aborted) throw new Error('Upload aborted');
-
-        const start = (partNumber - 1) * partSize;
-        const end = Math.min(start + partSize, file.size);
-        // slice→arrayBuffer: only this part's bytes live in memory at a time.
-        // Raw Blob is not accepted by the SDK browser handler (calls .getReader()).
-        const chunk = await file.slice(start, end).arrayBuffer();
-
-        const resp = await client.send(
-          new UploadPartCommand({
-            Bucket: bucket, Key: destinationKey, UploadId: uploadId,
-            PartNumber: partNumber, Body: chunk,
-          }),
-          { abortSignal: abortController.signal },
-        );
-
-        parts[partNumber - 1] = { PartNumber: partNumber, ETag: resp.ETag };
-        bytesUploaded += end - start;
-        onProgress(bytesUploaded, file.size);
-      }
+    // slice→arrayBuffer: only this part's bytes live in memory at a time.
+    // Raw Blob is not accepted by the SDK browser handler (calls .getReader()).
+    async function uploadPart(partNumber) {
+      if (abortController.signal.aborted) throw new Error('Upload aborted');
+      const start = (partNumber - 1) * partSize;
+      const end = Math.min(start + partSize, file.size);
+      const chunk = await file.slice(start, end).arrayBuffer();
+      const resp = await client.send(
+        new UploadPartCommand({
+          Bucket: bucket, Key: destinationKey, UploadId: uploadId,
+          PartNumber: partNumber, Body: chunk,
+        }),
+        { abortSignal: abortController.signal },
+      );
+      parts[partNumber - 1] = { PartNumber: partNumber, ETag: resp.ETag };
+      bytesUploaded += end - start;
+      onProgress(bytesUploaded, file.size);
     }
 
-    const concurrency = Math.max(1, loadPartConcurrency() ?? PART_CONCURRENCY);
-    await Promise.all(Array.from({ length: concurrency }, worker));
+    // Divide the total memory budget across all concurrently-uploading files so the
+    // combined ArrayBuffer footprint stays within MAX_ADAPTIVE_MEMORY_BYTES total.
+    const activeCount = Object.keys(activeUploadsRef.current).length;
+    const perFileBudget = Math.floor(MAX_ADAPTIVE_MEMORY_BYTES / Math.max(1, activeCount));
+    const baseline = capConcurrencyByMemory(getEffectivePartConcurrency(), partSize, perFileBudget);
+    const candidate = capConcurrencyByMemory(Math.min(16, baseline + 4), partSize, perFileBudget);
+    const shouldProbe = loadAdaptiveMode()
+      && totalParts >= PROBE_THRESHOLD_PARTS
+      && candidate !== baseline;
+
+    let probeResolved = null;
+    let peakPartConcurrency = baseline;
+
+    if (shouldProbe) {
+      debugConcurrency('probe-start', { file: file.name, totalParts, baseline, candidate });
+
+      // Warm-up: upload part 1 without timing. This establishes the HTTP/2 connection
+      // to S3 and brings the file's first bytes into the browser's page cache so the
+      // timed phases start from a consistent steady-state rather than a cold start.
+      await uploadPartsWithPool(allPartNumbers.slice(0, 1), uploadPart, 1);
+
+      const t1 = Date.now();
+      await uploadPartsWithPool(allPartNumbers.slice(1, 4), uploadPart, baseline);
+      const baselineMs = Date.now() - t1;
+
+      const t2 = Date.now();
+      await uploadPartsWithPool(allPartNumbers.slice(4, 7), uploadPart, candidate);
+      const candidateMs = Date.now() - t2;
+
+      const state = createProbeState(baseline, candidate);
+      state.baselineBytes  = 3 * partSize;
+      state.baselineMs     = baselineMs;
+      state.candidateBytes = 3 * partSize;
+      state.candidateMs    = candidateMs;
+      probeResolved = resolveProbe(state);
+      peakPartConcurrency = probeResolved.winner;
+
+      debugConcurrency('probe-result', {
+        baseline, candidate,
+        baselineMbs: probeResolved.baselineMbs,
+        candidateMbs: probeResolved.candidateMbs,
+        winner: probeResolved.winner,
+        inconclusive: probeResolved.inconclusive,
+      });
+
+      await uploadPartsWithPool(allPartNumbers.slice(7), uploadPart, probeResolved.winner);
+    } else {
+      await uploadPartsWithPool(allPartNumbers, uploadPart, baseline);
+    }
 
     await client.send(new CompleteMultipartUploadCommand({
       Bucket: bucket, Key: destinationKey, UploadId: uploadId,
@@ -312,6 +415,18 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
 
     await deleteResumeRecord({ provider, endpoint: credentials.endpoint, bucket, destinationKey }).catch(() => {});
     delete activeUploadsRef.current[id];
+    return {
+      peakPartConcurrency,
+      probeResult: probeResolved
+        ? {
+            baseline: probeResolved.baseline,
+            candidate: probeResolved.candidate,
+            baselineMbs: probeResolved.baselineMbs,
+            candidateMbs: probeResolved.candidateMbs,
+            winner: probeResolved.winner,
+          }
+        : null,
+    };
   }
 
   async function handleResume(id) {
@@ -364,7 +479,9 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       const abortController = new AbortController();
       activeUploadsRef.current[id] = { abort: () => abortController.abort() };
 
-      const concurrency = Math.max(1, loadPartConcurrency() ?? PART_CONCURRENCY);
+      const activeCount = Object.keys(activeUploadsRef.current).length;
+      const perFileBudget = Math.floor(MAX_ADAPTIVE_MEMORY_BYTES / Math.max(1, activeCount));
+      const concurrency = capConcurrencyByMemory(getEffectivePartConcurrency(), partSize, perFileBudget);
       await uploadPartsWithPool(remainingParts, async (partNumber) => {
         if (abortController.signal.aborted) throw new Error('Upload aborted');
         const start = (partNumber - 1) * partSize;
@@ -420,7 +537,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     }
 
     updateItem(id, { status: 'queued', resumeRecord: null, error: null, progress: 0 }, true);
-    queueRef.current.concurrency = loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY;
+    queueRef.current.concurrency = effectiveFileConcurrency();
     queueRef.current.enqueue(() => runUpload(id, item.file, item.destinationKey));
   }
 

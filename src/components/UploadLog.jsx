@@ -36,6 +36,29 @@ function formatCompletedAt(ts) {
   } catch { return '—'; }
 }
 
+// Returns a short human-readable string for the probe result, or null if none.
+export function formatProbeAnnotation(probeResult) {
+  if (!probeResult) return null;
+  const range = `${probeResult.baseline}→${probeResult.candidate} parts`;
+  if (probeResult.inconclusive) return `adaptive · probe: ${range} (unreliable measurement)`;
+  if (probeResult.winner === probeResult.candidate) {
+    const pct = Math.round((probeResult.candidateMbs / probeResult.baselineMbs - 1) * 100);
+    return `adaptive · probe: ${range} (+${pct}%)`;
+  }
+  return `adaptive · probe: ${range} (held baseline)`;
+}
+
+// Returns the full strategy annotation for a log entry.
+// Shows probe detail when available; falls back to mode + peak part concurrency.
+// Returns '—' only for entries written before this feature existed.
+function formatStrategyAnnotation(entry) {
+  const probe = formatProbeAnnotation(entry.probeResult);
+  if (probe) return probe;
+  if (!entry.concurrencyMode) return '—';
+  const parts = entry.peakPartConcurrency != null ? ` · ${entry.peakPartConcurrency} parts` : '';
+  return `${entry.concurrencyMode}${parts}`;
+}
+
 export function UploadLog({ refreshKey }) {
   const [entries, setEntries] = useState([]);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
@@ -88,6 +111,7 @@ export function UploadLog({ refreshKey }) {
             <th>Completed</th>
             <th>Duration</th>
             <th>Avg speed</th>
+            <th>Strategy</th>
           </tr>
         </thead>
         <tbody>
@@ -104,6 +128,9 @@ export function UploadLog({ refreshKey }) {
               <td class="log-num">{formatCompletedAt(e.completedAt)}</td>
               <td class="log-num">{formatDuration(e.durationSec)}</td>
               <td class="log-num">{e.avgSpeedBps != null ? formatSpeed(e.avgSpeedBps) : '—'}</td>
+              <td class="log-strategy">
+                {formatStrategyAnnotation(e)}
+              </td>
             </tr>
           ))}
         </tbody>

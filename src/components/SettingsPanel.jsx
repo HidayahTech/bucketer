@@ -1,7 +1,7 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // Application settings (page size, upload concurrency, part size) (§4.7)
 import { useState } from 'preact/hooks';
-import { loadMaxKeys, saveMaxKeys, loadPartConcurrency, savePartConcurrency, loadPartSizeMB, savePartSizeMB, loadFileConcurrency, saveFileConcurrency, loadListingCacheTTL, saveListingCacheTTL, loadUpdateCheckEnabled, saveUpdateCheckEnabled, loadPrefetchSizeLimit, savePrefetchSizeLimit, loadUploadExpandThreshold, saveUploadExpandThreshold } from '../lib/storage.js';
+import { loadMaxKeys, saveMaxKeys, loadPartConcurrency, savePartConcurrency, loadPartSizeMB, savePartSizeMB, loadFileConcurrency, saveFileConcurrency, loadListingCacheTTL, saveListingCacheTTL, loadUpdateCheckEnabled, saveUpdateCheckEnabled, loadPrefetchSizeLimit, savePrefetchSizeLimit, loadUploadExpandThreshold, saveUploadExpandThreshold, loadAdaptiveMode, saveAdaptiveMode } from '../lib/storage.js';
 import { defaultMaxKeys } from '../lib/provider.js';
 
 const DEFAULT_PART_CONCURRENCY     = 4;
@@ -36,6 +36,8 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
   const [activeConcurrency, setActiveConcurrency] = useState(() => loadPartConcurrency() ?? DEFAULT_PART_CONCURRENCY);
   const [activePartSize, setActivePartSize] = useState(() => loadPartSizeMB() ?? DEFAULT_PART_SIZE_MB);
   const [activeFileConcurrency, setActiveFileConcurrency] = useState(() => loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY);
+
+  const [adaptiveMode, setAdaptiveMode] = useState(() => loadAdaptiveMode());
 
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
@@ -87,6 +89,8 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
     saveUploadExpandThreshold(DEFAULT_UPLOAD_EXPAND_THRESHOLD);
     savePrefetchSizeLimit(5 * 1024 * 1024);
     onPrefetchSizeLimitChange(5 * 1024 * 1024);
+    saveAdaptiveMode(true);
+    setAdaptiveMode(true);
     setActiveConcurrency(DEFAULT_PART_CONCURRENCY);
     setActivePartSize(DEFAULT_PART_SIZE_MB);
     setActiveFileConcurrency(DEFAULT_FILE_CONCURRENCY);
@@ -149,35 +153,69 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
           </span>
         </div>
         <div class="form-group">
-          <label htmlFor="setting-concurrency">Upload part concurrency</label>
-          <input
-            id="setting-concurrency"
-            type="number"
-            value={concurrencyValue}
-            onInput={e => setConcurrencyValue(e.target.value)}
-            min="1"
-            max="16"
-          />
-          <span class="hint">Simultaneous part uploads per file (1–16). Default: {DEFAULT_PART_CONCURRENCY}.</span>
-          <span class="hint" style={{ color: 'var(--accent)' }}>
-            Active: <strong>{activeConcurrency}</strong>
+          <label htmlFor="concurrency-mode-adaptive">Upload concurrency mode</label>
+          <div style={{ display: 'flex', gap: '1rem' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '.4rem', cursor: 'pointer' }}>
+              <input
+                id="concurrency-mode-adaptive"
+                type="radio"
+                name="concurrency-mode"
+                value="adaptive"
+                checked={adaptiveMode}
+                onChange={() => { saveAdaptiveMode(true); setAdaptiveMode(true); }}
+              />
+              Adaptive
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '.4rem', cursor: 'pointer' }}>
+              <input
+                type="radio"
+                name="concurrency-mode"
+                value="manual"
+                checked={!adaptiveMode}
+                onChange={() => { saveAdaptiveMode(false); setAdaptiveMode(false); }}
+              />
+              Manual
+            </label>
+          </div>
+          <span class="hint">
+            Adaptive automatically scales file and part concurrency based on how many uploads are active.
+            Manual exposes the sliders below for direct control.
           </span>
         </div>
-        <div class="form-group">
-          <label htmlFor="setting-fileconcurrency">File concurrency</label>
-          <input
-            id="setting-fileconcurrency"
-            type="number"
-            value={fileConcurrencyValue}
-            onInput={e => setFileConcurrencyValue(e.target.value)}
-            min="1"
-            max="16"
-          />
-          <span class="hint">Simultaneous file uploads (1–16). Default: {DEFAULT_FILE_CONCURRENCY}. Higher values improve throughput for many small files; lower values reduce load on constrained backends.</span>
-          <span class="hint" style={{ color: 'var(--accent)' }}>
-            Active: <strong>{activeFileConcurrency}</strong>
-          </span>
-        </div>
+        {!adaptiveMode && (
+          <>
+            <div class="form-group">
+              <label htmlFor="setting-concurrency">Upload part concurrency</label>
+              <input
+                id="setting-concurrency"
+                type="number"
+                value={concurrencyValue}
+                onInput={e => setConcurrencyValue(e.target.value)}
+                min="1"
+                max="16"
+              />
+              <span class="hint">Simultaneous part uploads per file (1–16). Default: {DEFAULT_PART_CONCURRENCY}.</span>
+              <span class="hint" style={{ color: 'var(--accent)' }}>
+                Active: <strong>{activeConcurrency}</strong>
+              </span>
+            </div>
+            <div class="form-group">
+              <label htmlFor="setting-fileconcurrency">File concurrency</label>
+              <input
+                id="setting-fileconcurrency"
+                type="number"
+                value={fileConcurrencyValue}
+                onInput={e => setFileConcurrencyValue(e.target.value)}
+                min="1"
+                max="16"
+              />
+              <span class="hint">Simultaneous file uploads (1–16). Default: {DEFAULT_FILE_CONCURRENCY}. Higher values improve throughput for many small files; lower values reduce load on constrained backends.</span>
+              <span class="hint" style={{ color: 'var(--accent)' }}>
+                Active: <strong>{activeFileConcurrency}</strong>
+              </span>
+            </div>
+          </>
+        )}
         <div class="form-group">
           <label htmlFor="setting-expand-threshold">Upload queue expand threshold</label>
           <input
