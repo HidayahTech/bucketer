@@ -1,9 +1,20 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.18.0';
+export const CURRENT_VERSION = '1.19.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.19.0",
+    "date": "2026-06-11",
+    "title": "Presigned URL sharing",
+    "changes": [
+      "**Share via Bucketer** button in the file copy-link popover (single-file only; preset durations: 1 h, 24 h, 7 d).",
+      "**DownloadPage** — recipients open the link in Bucketer and see a clean download card showing the file name, expiry countdown, and a Download button. No S3 credentials required.",
+      "**Expired link handling** — if the presigned URL has passed its expiry, the download button is replaced with an \"This link has expired\" notice.",
+      "**base64url encoding** — synchronous, universally supported (including Safari), no compression API required."
+    ]
+  },
   {
     "version": "1.18.0",
     "date": "2026-06-11",

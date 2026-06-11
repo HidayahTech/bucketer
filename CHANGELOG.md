@@ -7,6 +7,17 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.19.0] — 2026-06-11 — Presigned URL sharing
+
+Adds a "Share via Bucketer" button to the copy-link popover that encodes a presigned download URL into a compact, shareable Bucketer link. The presigned URL is placed in the URL fragment (`#dl=`), which browsers never transmit to servers, keeping credentials and signatures invisible to server logs.
+
+- **Share via Bucketer** button in the file copy-link popover (single-file only; preset durations: 1 h, 24 h, 7 d).
+- **DownloadPage** — recipients open the link in Bucketer and see a clean download card showing the file name, expiry countdown, and a Download button. No S3 credentials required.
+- **Expired link handling** — if the presigned URL has passed its expiry, the download button is replaced with an "This link has expired" notice.
+- **base64url encoding** — synchronous, universally supported (including Safari), no compression API required.
+
+---
+
 ## [1.18.0] — 2026-06-11 — Adaptive upload concurrency
 
 Adds an automatic concurrency mode that rebalances file and part concurrency as a batch progresses, with a one-shot probe on large files to find the optimal part concurrency for the current connection.

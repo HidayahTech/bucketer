@@ -3,6 +3,7 @@ import { useState } from 'preact/hooks';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { COPY_LINK_PRESETS } from '../lib/constants.js';
+import { buildShareLink } from '../lib/share-url.js';
 
 // Single component for both single-file and multi-file copy-link flows.
 // Pass fileKey for one file, fileKeys (array) for batch mode — mutually exclusive.
@@ -12,6 +13,7 @@ export function CopyLinkPopover({ client, bucket, fileKey, fileKeys, onClose, on
   const [customValue, setCustomValue] = useState('1');
   const [customUnit, setCustomUnit] = useState('hours');
   const [copying, setCopying] = useState(false);
+  const [sharingViaBucketer, setSharingViaBucketer] = useState(false);
   const [error, setError] = useState(null);
 
   const isBatch = Array.isArray(fileKeys);
@@ -32,6 +34,26 @@ export function CopyLinkPopover({ client, bucket, fileKey, fileKeys, onClose, on
     } catch (err) {
       setError(err.message || String(err));
       setCopying(false);
+    }
+  }
+
+  async function copyBucketerLink(expiresIn) {
+    setSharingViaBucketer(true);
+    setError(null);
+    try {
+      const presignedUrl = await getSignedUrl(
+        client,
+        new GetObjectCommand({ Bucket: bucket, Key: keys[0], ResponseContentDisposition: 'inline' }),
+        { expiresIn },
+      );
+      const shareLink = buildShareLink(presignedUrl);
+      if (!shareLink) throw new Error('Cannot build a share link from a file:// URL.');
+      await navigator.clipboard.writeText(shareLink);
+      onCopied(1);
+      onClose();
+    } catch (err) {
+      setError(err.message || String(err));
+      setSharingViaBucketer(false);
     }
   }
 
@@ -79,6 +101,22 @@ export function CopyLinkPopover({ client, bucket, fileKey, fileKeys, onClose, on
       )}
       {error && <div class="copy-link-error">{error}</div>}
       <div class="copy-link-note">{note}</div>
+
+      {!isBatch && (
+        <>
+          <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '.6rem 0' }} />
+          <div class="copy-link-presets">
+            {COPY_LINK_PRESETS.map(p => (
+              <button key={p.seconds} class="btn btn-ghost btn-sm" onClick={() => copyBucketerLink(p.seconds)} disabled={sharingViaBucketer || copying}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <div class="copy-link-note">
+            Share via Bucketer — opens in the app, hides raw credentials from server logs.
+          </div>
+        </>
+      )}
     </div>
   );
 }
