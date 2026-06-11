@@ -29,8 +29,9 @@ import {
   saveUploadLogEntry,
 } from '../lib/indexeddb.js';
 import { UploadQueue as Queue, calcPartSize, collectParts, preparePutBody, uploadPartsWithPool } from '../lib/upload-queue.js';
-import { loadPartConcurrency, loadPartSizeMB, loadFileConcurrency, loadUploadExpandThreshold } from '../lib/storage.js';
-import { MULTIPART_THRESHOLD, DEFAULT_FILE_CONCURRENCY, PART_CONCURRENCY } from '../lib/constants.js';
+import { loadPartConcurrency, loadPartSizeMB, loadFileConcurrency, loadUploadExpandThreshold, loadAdaptiveMode } from '../lib/storage.js';
+import { MULTIPART_THRESHOLD, DEFAULT_FILE_CONCURRENCY, PART_CONCURRENCY, ADAPTIVE_CONNECTION_BUDGET, PROBE_THRESHOLD_PARTS } from '../lib/constants.js';
+import { calcAdaptiveConcurrency, createProbeState, resolveProbe } from '../lib/concurrency-strategy.js';
 import { isActive as itemIsActive, isFailed as itemIsFailed, isPaused as itemIsPaused } from '../lib/upload-status.js';
 import { abortMultipartSession } from '../lib/upload-cleanup.js';
 import { useDoubleClickSafety } from '../hooks/useDoubleClickSafety.js';
@@ -42,10 +43,23 @@ import { createUpdateBatcher } from '../lib/update-batcher.js';
 let _idCounter = 0;
 function newId() { return ++_idCounter; }
 
+function debugConcurrency(...args) {
+  try {
+    if (localStorage.getItem('s3b_debug_concurrency') === '1') {
+      console.log('[bucketer:concurrency]', ...args);
+    }
+  } catch { /* private browsing — skip */ }
+}
+
 export function UploadQueue({ client, bucket, provider, currentPrefix, credentials, onCapabilityChange, capabilities, onUploadsComplete, onLogEntry, onMount }) {
   const [items, setItems] = useState([]);
   const [collapsedBatches, setCollapsedBatches] = useState({});
-  const queueRef = useRef(new Queue(loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY));
+  const queueRef = useRef(null);
+  if (queueRef.current === null) {
+    queueRef.current = new Queue(
+      loadAdaptiveMode() ? ADAPTIVE_CONNECTION_BUDGET : (loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY)
+    );
+  }
   const activeUploadsRef = useRef({}); // id → { abort, uploadInstance }
   const cancelledBatchesRef = useRef(new Set());
   const fileInputRef = useRef(null);
@@ -87,6 +101,25 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     batcherRef.current.update(id, patch, urgent);
   }, []);
 
+  // Returns the file concurrency to assign to the queue in the current mode.
+  function effectiveFileConcurrency() {
+    return loadAdaptiveMode()
+      ? ADAPTIVE_CONNECTION_BUDGET
+      : (loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY);
+  }
+
+  // Returns the part concurrency to use when starting or resuming a multipart upload.
+  // In adaptive mode, scales up as fewer files are actively uploading.
+  function getEffectivePartConcurrency() {
+    if (loadAdaptiveMode()) {
+      const activeCount = Object.keys(activeUploadsRef.current).length;
+      const { partsPerFile } = calcAdaptiveConcurrency(activeCount);
+      debugConcurrency('part-concurrency', { activeCount, partsPerFile });
+      return partsPerFile;
+    }
+    return Math.max(1, loadPartConcurrency() ?? PART_CONCURRENCY);
+  }
+
   // Expose addFiles to parent (e.g. for drop zones outside this component)
   useEffect(() => { onMount?.({ addFiles }); }, []);
 
@@ -95,6 +128,9 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   // For plain file picks it equals file.name.
   function addFiles(fileEntries) {
     const batchId = String(Date.now() + Math.random());
+    // Smallest-first: minimises time-to-first-completion, reduces active file count
+    // quickly so the part-concurrency rebalancer kicks in sooner for large files.
+    fileEntries.sort((a, b) => a.file.size - b.file.size);
     const newItems = fileEntries.map(({ file, relativePath }) => ({
       id: newId(),
       batchId,
@@ -147,7 +183,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       return; // User must explicitly choose Resume or Restart
     }
 
-    queueRef.current.concurrency = loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY;
+    queueRef.current.concurrency = effectiveFileConcurrency();
     queueRef.current.enqueue(async () => {
       if (cancelledBatchesRef.current.has(item.batchId)) {
         updateItem(item.id, { status: 'aborted' }, true);
@@ -231,7 +267,11 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       markUploadInactive(destinationKey);
       // Re-read concurrency so a setting change mid-queue takes effect on the
       // next _drain() call, which fires immediately after this finally block.
-      queueRef.current.concurrency = loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY;
+      queueRef.current.concurrency = effectiveFileConcurrency();
+      debugConcurrency('rebalance', {
+        activeRemaining: Object.keys(activeUploadsRef.current).length,
+        fileConcurrency: queueRef.current.concurrency,
+      });
     }
   }
 
@@ -364,7 +404,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       const abortController = new AbortController();
       activeUploadsRef.current[id] = { abort: () => abortController.abort() };
 
-      const concurrency = Math.max(1, loadPartConcurrency() ?? PART_CONCURRENCY);
+      const concurrency = getEffectivePartConcurrency();
       await uploadPartsWithPool(remainingParts, async (partNumber) => {
         if (abortController.signal.aborted) throw new Error('Upload aborted');
         const start = (partNumber - 1) * partSize;
@@ -420,7 +460,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     }
 
     updateItem(id, { status: 'queued', resumeRecord: null, error: null, progress: 0 }, true);
-    queueRef.current.concurrency = loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY;
+    queueRef.current.concurrency = effectiveFileConcurrency();
     queueRef.current.enqueue(() => runUpload(id, item.file, item.destinationKey));
   }
 
