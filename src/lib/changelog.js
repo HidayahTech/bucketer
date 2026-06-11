@@ -1,9 +1,24 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.17.0';
+export const CURRENT_VERSION = '1.18.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.18.0",
+    "date": "2026-06-11",
+    "title": "Adaptive upload concurrency",
+    "changes": [
+      "**Adaptive/Manual toggle** in Settings (adaptive is the default). In adaptive mode the part and file concurrency sliders are hidden.",
+      "**Sort-by-size**: files in a batch are enqueued smallest-first so small files complete quickly and part concurrency scales up sooner for large files.",
+      "**Budget rebalancer**: as active uploads drop, partsPerFile scales up automatically (4 files → 4 parts/file, 2 files → 8 parts/file, 1 file → 16 parts/file), keeping total in-flight streams near 16.",
+      "**Per-file probe** (files ≥ 100 MB): uploads one warm-up part then times a baseline and candidate (+4) concurrency phase; holds the faster result for the rest of the file. Inconclusive probes (measurement < 10 ms) fall back to baseline.",
+      "**Memory cap**: part concurrency is clamped so total ArrayBuffer usage across all concurrent files stays within 200 MiB, preventing tab crashes on very large files where calcPartSize raises the part size beyond 5 MiB.",
+      "**Strategy column** in Upload history showing mode, peak part concurrency, and probe outcome per file.",
+      "**Console debug output** via localStorage.setItem('s3b_debug_concurrency', '1'): logs rebalance events (only when partsPerFile changes) and per-file file-complete summaries with speed and probe results.",
+      "New pure module src/lib/concurrency-strategy.js (calcAdaptiveConcurrency, createProbeState, resolveProbe, capConcurrencyByMemory) — fully unit-tested."
+    ]
+  },
   {
     "version": "1.17.0",
     "date": "2026-06-08",
