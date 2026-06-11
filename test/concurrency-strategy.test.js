@@ -28,6 +28,22 @@ describe('capConcurrencyByMemory', () => {
   test('passes through concurrency unchanged when already under cap', () => {
     assert.equal(capConcurrencyByMemory(4, 5 * MB, 200 * MB), 4);
   });
+
+  test('3 concurrent files share the budget — total stays within limit', () => {
+    // 3 files, 200 MiB total → 66 MiB per file → floor(66/50) = 1 for 50 MiB parts
+    const perFile = Math.floor(200 * MB / 3);
+    const concPerFile = capConcurrencyByMemory(5, 50 * MB, perFile);
+    assert.equal(concPerFile, 1);
+    assert.ok(concPerFile * 50 * MB * 3 <= 200 * MB, 'total across 3 files must not exceed 200 MiB');
+  });
+
+  test('2 concurrent files share the budget', () => {
+    // 2 files, 200 MiB total → 100 MiB per file → floor(100/50) = 2 for 50 MiB parts
+    const perFile = Math.floor(200 * MB / 2);
+    const concPerFile = capConcurrencyByMemory(5, 50 * MB, perFile);
+    assert.equal(concPerFile, 2);
+    assert.ok(concPerFile * 50 * MB * 2 <= 200 * MB, 'total across 2 files must not exceed 200 MiB');
+  });
 });
 
 describe('calcAdaptiveConcurrency', () => {
