@@ -40,6 +40,7 @@ function formatCompletedAt(ts) {
 export function formatProbeAnnotation(probeResult) {
   if (!probeResult) return null;
   const range = `${probeResult.baseline}→${probeResult.candidate} parts`;
+  if (probeResult.inconclusive) return `adaptive · probe: ${range} (unreliable measurement)`;
   if (probeResult.winner === probeResult.candidate) {
     const pct = Math.round((probeResult.candidateMbs / probeResult.baselineMbs - 1) * 100);
     return `adaptive · probe: ${range} (+${pct}%)`;

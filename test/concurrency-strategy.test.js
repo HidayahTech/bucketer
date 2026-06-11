@@ -97,4 +97,32 @@ describe('resolveProbe', () => {
     assert.ok(typeof r.candidateMbs === 'number');
     assert.ok(r.candidateMbs > r.baselineMbs);
   });
+
+  test('marks inconclusive and uses baseline when baselineMs is too short', () => {
+    const s = createProbeState(4, 8);
+    s.baselineBytes  = 15_000_000; s.baselineMs  = 2;   // 2ms — impossible speed
+    s.candidateBytes = 15_000_000; s.candidateMs = 500;
+    const r = resolveProbe(s);
+    assert.equal(r.winner, 4, 'must fall back to baseline on inconclusive probe');
+    assert.equal(r.inconclusive, true);
+    assert.equal(r.baselineMbs, null);
+    assert.equal(r.candidateMbs, null);
+  });
+
+  test('marks inconclusive when candidateMs is too short', () => {
+    const s = createProbeState(4, 8);
+    s.baselineBytes  = 15_000_000; s.baselineMs  = 500;
+    s.candidateBytes = 15_000_000; s.candidateMs = 3;   // 3ms — impossible speed
+    const r = resolveProbe(s);
+    assert.equal(r.winner, 4, 'must fall back to baseline on inconclusive probe');
+    assert.equal(r.inconclusive, true);
+  });
+
+  test('sets inconclusive=false on a valid measurement', () => {
+    const s = createProbeState(4, 8);
+    s.baselineBytes  = 15_000_000; s.baselineMs  = 1000;
+    s.candidateBytes = 15_000_000; s.candidateMs = 800;
+    const r = resolveProbe(s);
+    assert.equal(r.inconclusive, false);
+  });
 });

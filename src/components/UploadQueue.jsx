@@ -365,12 +365,17 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     if (shouldProbe) {
       debugConcurrency('probe-start', { file: file.name, totalParts, baseline, candidate });
 
+      // Warm-up: upload part 1 without timing. This establishes the HTTP/2 connection
+      // to S3 and brings the file's first bytes into the browser's page cache so the
+      // timed phases start from a consistent steady-state rather than a cold start.
+      await uploadPartsWithPool(allPartNumbers.slice(0, 1), uploadPart, 1);
+
       const t1 = Date.now();
-      await uploadPartsWithPool(allPartNumbers.slice(0, 3), uploadPart, baseline);
+      await uploadPartsWithPool(allPartNumbers.slice(1, 4), uploadPart, baseline);
       const baselineMs = Date.now() - t1;
 
       const t2 = Date.now();
-      await uploadPartsWithPool(allPartNumbers.slice(3, 6), uploadPart, candidate);
+      await uploadPartsWithPool(allPartNumbers.slice(4, 7), uploadPart, candidate);
       const candidateMs = Date.now() - t2;
 
       const state = createProbeState(baseline, candidate);
@@ -386,9 +391,10 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         baselineMbs: probeResolved.baselineMbs,
         candidateMbs: probeResolved.candidateMbs,
         winner: probeResolved.winner,
+        inconclusive: probeResolved.inconclusive,
       });
 
-      await uploadPartsWithPool(allPartNumbers.slice(6), uploadPart, probeResolved.winner);
+      await uploadPartsWithPool(allPartNumbers.slice(7), uploadPart, probeResolved.winner);
     } else {
       await uploadPartsWithPool(allPartNumbers, uploadPart, baseline);
     }

@@ -32,10 +32,26 @@ export function createProbeState(baseline, candidate) {
   };
 }
 
+// Minimum wall-clock time (ms) for a 3-part probe phase to be considered valid.
+// 3 parts × 5 MiB = 15 MiB. 10 ms → ~12 Gbps, which exceeds any real upload link.
+// If either phase completes faster than this, the measurement is from a warm cache
+// or pre-established connection — not representative of steady-state throughput.
+const PROBE_MIN_MS = 10;
+
 // Resolves a completed probe by comparing throughput of the two phases.
 // Candidate wins only if it is >10% faster — the threshold filters network jitter.
-// Returns the state enriched with winner, baselineMbs, and candidateMbs.
+// Returns the state enriched with winner, baselineMbs, candidateMbs, and inconclusive.
+// inconclusive is true when either phase duration was too short to be meaningful.
 export function resolveProbe(state) {
+  if (state.baselineMs < PROBE_MIN_MS || state.candidateMs < PROBE_MIN_MS) {
+    return {
+      ...state,
+      winner:       state.baseline,
+      baselineMbs:  null,
+      candidateMbs: null,
+      inconclusive: true,
+    };
+  }
   const baselineMbs  = state.baselineBytes / state.baselineMs;
   const candidateMbs = state.candidateBytes / state.candidateMs;
   const winner = candidateMbs > baselineMbs * 1.1 ? state.candidate : state.baseline;
@@ -44,5 +60,6 @@ export function resolveProbe(state) {
     winner,
     baselineMbs:  Math.round(baselineMbs  * 1000) / 1000,
     candidateMbs: Math.round(candidateMbs * 1000) / 1000,
+    inconclusive: false,
   };
 }

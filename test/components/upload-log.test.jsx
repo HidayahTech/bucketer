@@ -52,9 +52,18 @@ describe('formatProbeAnnotation', () => {
   test('formats a winner=baseline result (no improvement)', () => {
     const result = formatProbeAnnotation({
       baseline: 4, candidate: 8, winner: 4,
-      baselineMbs: 10, candidateMbs: 9,
+      baselineMbs: 10, candidateMbs: 9, inconclusive: false,
     });
     assert.ok(result.includes('4→8'), 'must show part concurrency range');
     assert.ok(result.includes('held') || result.includes('baseline') || result.includes('4'), 'must indicate baseline was kept');
+  });
+
+  test('formats an inconclusive probe result', () => {
+    const result = formatProbeAnnotation({
+      baseline: 4, candidate: 8, winner: 4,
+      baselineMbs: null, candidateMbs: null, inconclusive: true,
+    });
+    assert.ok(result.includes('4→8'), 'must show part concurrency range');
+    assert.ok(result.includes('unreliable') || result.includes('inconclusive'), 'must indicate unreliable measurement');
   });
 });
