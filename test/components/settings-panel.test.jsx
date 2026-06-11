@@ -109,3 +109,25 @@ describe('SettingsPanel — Update Check toggle', () => {
     cleanup();
   });
 });
+
+describe('SettingsPanel — adaptive/manual toggle', () => {
+  test('renders an adaptive/manual mode toggle', () => {
+    const { text, cleanup } = mount(h(SettingsPanel, defaultProps()));
+    assert.ok(
+      text().toLowerCase().includes('adaptive') || text().toLowerCase().includes('manual'),
+      'settings panel must contain an adaptive/manual toggle'
+    );
+    cleanup();
+  });
+
+  test('hides concurrency sliders in adaptive mode (default)', () => {
+    // localStorage is empty → adaptive mode is true by default
+    const { query, cleanup } = mount(h(SettingsPanel, defaultProps()));
+    // In adaptive mode the part/file concurrency inputs should not be present
+    const concurrencyInput = query('#setting-concurrency');
+    const fileConcurrencyInput = query('#setting-fileconcurrency');
+    assert.equal(concurrencyInput, null, 'part concurrency input must be hidden in adaptive mode');
+    assert.equal(fileConcurrencyInput, null, 'file concurrency input must be hidden in adaptive mode');
+    cleanup();
+  });
+});
