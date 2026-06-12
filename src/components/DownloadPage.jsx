@@ -61,7 +61,10 @@ export function DownloadPage({ presignedUrl }) {
     fetch(presignedUrl, { headers: { Range: `bytes=0-${TEXT_PREVIEW_LIMIT - 1}` } })
       .then(r => {
         const mtime = r.headers.get('x-amz-meta-' + FILE_MTIME_KEY);
-        if (mtime) setFileMtime(new Date(mtime));
+        if (mtime) {
+          const d = new Date(mtime);
+          if (!isNaN(d.getTime())) setFileMtime(d);
+        }
         return r.text().then(t => { setPreviewText(t); setPreviewTruncated(r.status === 206); });
       })
       .catch(() => {});
@@ -75,7 +78,10 @@ export function DownloadPage({ presignedUrl }) {
     fetch(presignedUrl, { headers: { Range: 'bytes=0-0' } })
       .then(r => {
         const mtime = r.headers.get('x-amz-meta-' + FILE_MTIME_KEY);
-        if (mtime) setFileMtime(new Date(mtime));
+        if (mtime) {
+          const d = new Date(mtime);
+          if (!isNaN(d.getTime())) setFileMtime(d);
+        }
       })
       .catch(() => {});
   }, [presignedUrl]);
@@ -92,18 +98,17 @@ export function DownloadPage({ presignedUrl }) {
         <div class="splash" style={{ maxWidth: '32rem' }}>
           <h2 style={{ wordBreak: 'break-all' }}>{fileName}</h2>
 
-          {fileMtime && (
-            <p style={{ color: 'var(--text-muted)', margin: '0 0 .5rem', fontSize: '.85rem' }}>
-              File Modified: {fileMtime.toLocaleString()}
-            </p>
-          )}
-
           {expired ? (
             <div class="banner banner-danger" style={{ marginTop: '1rem' }}>
               <div class="banner-body">This link has expired.</div>
             </div>
           ) : (
             <>
+              {fileMtime && (
+                <p style={{ color: 'var(--text-muted)', margin: '0 0 .5rem', fontSize: '.85rem' }}>
+                  File Modified: {fileMtime.toLocaleString()}
+                </p>
+              )}
               <p style={{ color: 'var(--text-muted)', margin: '0 0 1.5rem' }}>
                 Expires in {remaining}
               </p>

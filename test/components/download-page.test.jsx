@@ -105,7 +105,7 @@ describe('DownloadPage — file-mtime display', () => {
     await act(async () => { await Promise.resolve(); });
 
     assert.ok(
-      result.text().includes('File Modified') || result.text().includes('2024'),
+      result.text().includes('File Modified'),
       `DownloadPage must display "File Modified" when x-amz-meta-file-mtime is in response headers; got: ${result.text()}`
     );
     result.cleanup();
