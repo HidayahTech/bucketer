@@ -131,3 +131,14 @@ describe('SettingsPanel — adaptive/manual toggle', () => {
     cleanup();
   });
 });
+
+describe('SettingsPanel — file-mtime auto-load setting', () => {
+  test('renders "automatically load file modification times" label', () => {
+    const { text, cleanup } = mount(h(SettingsPanel, defaultProps()));
+    assert.ok(
+      text().toLowerCase().includes('file modification') || text().toLowerCase().includes('modification time'),
+      'SettingsPanel must render a label for the file modification time auto-load toggle'
+    );
+    cleanup();
+  });
+});

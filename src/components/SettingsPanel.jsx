@@ -1,7 +1,7 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // Application settings (page size, upload concurrency, part size) (§4.7)
 import { useState } from 'preact/hooks';
-import { loadMaxKeys, saveMaxKeys, loadPartConcurrency, savePartConcurrency, loadPartSizeMB, savePartSizeMB, loadFileConcurrency, saveFileConcurrency, loadListingCacheTTL, saveListingCacheTTL, loadUpdateCheckEnabled, saveUpdateCheckEnabled, loadPrefetchSizeLimit, savePrefetchSizeLimit, loadUploadExpandThreshold, saveUploadExpandThreshold, loadAdaptiveMode, saveAdaptiveMode } from '../lib/storage.js';
+import { loadMaxKeys, saveMaxKeys, loadPartConcurrency, savePartConcurrency, loadPartSizeMB, savePartSizeMB, loadFileConcurrency, saveFileConcurrency, loadListingCacheTTL, saveListingCacheTTL, loadUpdateCheckEnabled, saveUpdateCheckEnabled, loadPrefetchSizeLimit, savePrefetchSizeLimit, loadUploadExpandThreshold, saveUploadExpandThreshold, loadAdaptiveMode, saveAdaptiveMode, loadFileMtimeAutoLoad, saveFileMtimeAutoLoad } from '../lib/storage.js';
 import { defaultMaxKeys } from '../lib/provider.js';
 
 const DEFAULT_PART_CONCURRENCY     = 4;
@@ -38,6 +38,7 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
   const [activeFileConcurrency, setActiveFileConcurrency] = useState(() => loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY);
 
   const [adaptiveMode, setAdaptiveMode] = useState(() => loadAdaptiveMode());
+  const [fileMtimeAutoLoad, setFileMtimeAutoLoad] = useState(() => loadFileMtimeAutoLoad());
 
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
@@ -253,6 +254,22 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
           feels instant. Images within the size limit and text files are fetched in
           the background; audio and video are never prefetched. Increases egress —
           reduce or disable on metered connections.
+        </span>
+      </div>
+
+      <div class="form-group" style={{ marginTop: '.75rem' }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={fileMtimeAutoLoad}
+            onChange={e => { saveFileMtimeAutoLoad(e.target.checked); setFileMtimeAutoLoad(e.target.checked); }}
+          />
+          Automatically load file modification times
+        </label>
+        <span class="hint">
+          When enabled, fetches the original file modification time for each listed file in the
+          background. Adds one request per file per session (results are cached). Off by default
+          — click the "File Modified" column header to load on demand instead.
         </span>
       </div>
 
