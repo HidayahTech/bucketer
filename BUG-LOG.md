@@ -4,6 +4,29 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-028 — Custom object metadata invisible to browser despite being stored on S3
+
+**Date:** 2026-06-12
+
+**Symptom:**
+After uploading a file to Wasabi, the "File Modified" column and properties modal showed no original modification time even though the upload succeeded. The DownloadPage also showed nothing. The metadata appeared never to have been stored, but checking via server-side tools confirmed `x-amz-meta-file-mtime` was present on the object.
+
+**Root cause:**
+The CORS `ExposeHeaders` list in `corsJson()` did not include `x-amz-meta-*`. Browsers silently strip response headers not listed in `ExposeHeaders` before JavaScript can read them — this is standard CORS behaviour. The AWS SDK v3 builds `head.Metadata` by reading `x-amz-meta-*` headers from the HeadObject response; with those headers stripped, `head.Metadata` was always `{}` from the browser's perspective, making all stored custom metadata invisible. The `fetch()` call in DownloadPage suffered the same block: `response.headers.get('x-amz-meta-file-mtime')` always returned `null`.
+
+The upload side was unaffected: `AllowedHeaders` already contained `x-amz-*`, which covers `x-amz-meta-file-mtime` as a request header, so the preflight allowed the upload and the metadata was stored correctly.
+
+**Fix:**
+Add `'x-amz-meta-*'` to `ExposeHeaders` in `corsJson()` (`src/lib/cors-config.js`). Existing bucket owners must re-apply the CORS configuration (re-run the CORS command from the Setup guide) to pick up the change.
+
+**Why it wasn't caught earlier:**
+`ExposeHeaders` is easy to overlook because the upload path (controlled by `AllowedHeaders`) and the read path (controlled by `ExposeHeaders`) are separate concerns. The feature was tested by verifying the metadata was set on upload (correct) and displayed by HeadObject in Node.js (correct), but never tested in a real browser against a cross-origin bucket, where the CORS filter applies. The `cors-config.test.js` suite tested `ExposeHeaders` for `ETag`, `Content-Length`, and `Content-Type` but had no assertion about custom metadata headers.
+
+**Test case:**
+`test/cors-config.test.js` — "exposes x-amz-meta-* so custom object metadata is readable from the browser": asserts `x-amz-meta-*` is present in `ExposeHeaders`.
+
+---
+
 ## BUG-001 — `$` special patterns in minified bundle corrupted build output
 
 **Date:** 2026-05-21

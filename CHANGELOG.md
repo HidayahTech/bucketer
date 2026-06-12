@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.21.1] — 2026-06-12 — Fix custom metadata invisible in browser (BUG-028)
+
+Adds `x-amz-meta-*` to the CORS `ExposeHeaders` template. Without it, browsers silently stripped all `x-amz-meta-*` response headers before JavaScript could read them, making stored file modification times (and any other custom metadata) invisible to HeadObject calls and DownloadPage fetches. Existing bucket owners must re-apply their CORS configuration to pick up the fix.
+
 ## [1.21.0] — 2026-06-12 — File modification time tracking
 
 Stores the original filesystem modification time of every uploaded file as `x-amz-meta-file-mtime` S3 custom metadata, then surfaces it across the app. The file properties modal shows a formatted "File Modified" date row. The DownloadPage (shared presigned links) shows the original mtime below the filename. The browser table gains a "File Modified" column with opt-in loading: click the column header to start, or enable auto-load in Settings. Loading is viewport-based (IntersectionObserver), capped at 3 concurrent HeadObject calls, and backed by a two-level cache (session ref + localStorage keyed on `bucket:key:S3LastModified`) that automatically invalidates when a file is replaced.

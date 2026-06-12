@@ -78,6 +78,22 @@ describe('corsJson — ExposeHeaders', () => {
       assert.ok(expose.includes(h), `${h} must be in ExposeHeaders`);
     }
   });
+
+  // BUG-028: x-amz-meta-* response headers were not in ExposeHeaders.
+  // Browsers silently strip response headers absent from ExposeHeaders before
+  // JavaScript can read them. The AWS SDK v3 builds head.Metadata from those
+  // headers, so HeadObject appeared to return no custom metadata even when
+  // the data was stored. fetch() response.headers.get() was similarly blocked,
+  // breaking the DownloadPage mtime display. Fix: expose x-amz-meta-*.
+  test('exposes x-amz-meta-* so custom object metadata is readable from the browser', () => {
+    const expose = parsed().CORSRules[0].ExposeHeaders;
+    assert.ok(
+      expose.includes('x-amz-meta-*'),
+      'x-amz-meta-* must be in ExposeHeaders — without it the browser strips custom ' +
+      'metadata headers (e.g. x-amz-meta-file-mtime) from HeadObject and GET responses ' +
+      'before JavaScript can read them, making all stored object metadata invisible'
+    );
+  });
 });
 
 // ── T5-3: corsCmd must shell-quote bucket/endpoint to prevent injection ───────────────

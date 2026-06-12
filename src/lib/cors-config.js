@@ -17,7 +17,7 @@ export function corsJson(origin) {
       AllowedOrigins: [origin],
       AllowedMethods: ['GET', 'PUT', 'HEAD', 'POST', 'DELETE'],
       AllowedHeaders: ['Authorization', 'Content-Type', 'Content-MD5', 'x-amz-*', 'amz-sdk-invocation-id', 'amz-sdk-request', 'ETag'],
-      ExposeHeaders: ['ETag', 'Content-Length', 'Content-Type'],
+      ExposeHeaders: ['ETag', 'Content-Length', 'Content-Type', 'x-amz-meta-*'],
       MaxAgeSeconds: 3600,
     }],
   }, null, 2);
