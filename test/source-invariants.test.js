@@ -1152,3 +1152,33 @@ describe('Browser.jsx — File Modified column with background HeadObject loadin
     );
   });
 });
+
+describe('Browser.jsx — file-mtime loading is opt-in (default off)', () => {
+  const source = src('components/Browser.jsx');
+
+  test('declares mtimeLoadEnabled state initialized from loadFileMtimeAutoLoad', () => {
+    assert.ok(
+      source.includes('mtimeLoadEnabled') && source.includes('loadFileMtimeAutoLoad'),
+      'Browser.jsx must declare mtimeLoadEnabled state initialised from loadFileMtimeAutoLoad — ' +
+      'the File Modified column must be opt-in; HeadObject requests must not fire until ' +
+      'the user clicks the column header or enables the setting'
+    );
+  });
+
+  test('HeadObject mtime effect is gated on mtimeLoadEnabled', () => {
+    assert.ok(
+      /if\s*\(!mtimeLoadEnabled/.test(source),
+      'Browser.jsx mtime loading useEffect must bail with `if (!mtimeLoadEnabled ...) return` — ' +
+      'without this guard, HeadObject calls fire automatically for every listed file, ' +
+      'incurring one API call per file per page load without user consent'
+    );
+  });
+
+  test('col-file-modified header has onClick to enable loading', () => {
+    assert.ok(
+      /col-file-modified[\s\S]{0,300}onClick|onClick[\s\S]{0,100}setMtimeLoadEnabled/.test(source),
+      'Browser.jsx must wire an onClick to the col-file-modified header — clicking it ' +
+      'is the primary way to opt in to loading file modification times'
+    );
+  });
+});
