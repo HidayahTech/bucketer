@@ -93,6 +93,8 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const navigatePreviewRef = useRef(null);
   // Capture the prefix value at mount time for the initial history replaceState
   const initialPrefixRef = useRef(prefix);
+  const fileMtimeCacheRef = useRef(new Map()); // Key → ISO string | null
+  const [, setMtimeCacheVer] = useState(0);
 
   const maxKeys = loadMaxKeys() || defaultMaxKeys(provider);
   const cacheTTL = loadListingCacheTTL() ?? 120; // seconds; 0 = off
@@ -108,10 +110,47 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
 
   useEffect(() => { onMount?.({ removeItems, invalidateCache }); }, []);
 
+  // Reset file-mtime cache when the user switches buckets
+  useEffect(() => {
+    fileMtimeCacheRef.current = new Map();
+    setMtimeCacheVer(0);
+  }, [bucket]);
+
   // Notify parent of current prefix so upload queue knows where to target
   useEffect(() => {
     if (onUploadTargetChange) onUploadTargetChange(prefix);
   }, [prefix]);
+
+  // Background HeadObject batch: load file-mtime for visible items not yet cached.
+  // Concurrency=3; results stored in fileMtimeCacheRef (session-scoped, reset on bucket change).
+  // setMtimeCacheVer triggers re-renders as responses arrive so the column fills in progressively.
+  useEffect(() => {
+    if (!client || !bucket) return;
+    const uncached = items.filter(obj => !fileMtimeCacheRef.current.has(obj.Key));
+    if (!uncached.length) return;
+    let cancelled = false;
+    const queue = [...uncached];
+    let active = 0;
+    function flush() {
+      while (queue.length && active < 3) {
+        const { Key } = queue.shift();
+        active++;
+        client.send(new HeadObjectCommand({ Bucket: bucket, Key }))
+          .then(head => {
+            fileMtimeCacheRef.current.set(Key, head.Metadata?.[FILE_MTIME_KEY] ?? null);
+          })
+          .catch(() => {
+            fileMtimeCacheRef.current.set(Key, null);
+          })
+          .finally(() => {
+            active--;
+            if (!cancelled) { flush(); setMtimeCacheVer(v => v + 1); }
+          });
+      }
+    }
+    flush();
+    return () => { cancelled = true; };
+  }, [items, bucket]);
 
   // Navigate to a new prefix — flush state and push a browser history entry (§4.7, §4.14)
   function navigateTo(newPrefix, { historyMode = 'push' } = {}) {
@@ -845,6 +884,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                 <SortTh col="name" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort}>Name</SortTh>
                 <SortTh col="size" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort}>Size</SortTh>
                 <SortTh col="modified" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort}>Modified</SortTh>
+                <th class="col-file-modified">File Modified</th>
                 <th></th>
               </tr>
             </thead>
@@ -862,6 +902,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                     </td>
                     <td class="col-size">—</td>
                     <td class="col-modified"></td>
+                    <td class="col-file-modified"></td>
                     <td class="col-actions">
                       <button
                         class="btn btn-ghost btn-sm"
@@ -915,6 +956,13 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                     </td>
                     <td class="col-size">{formatBytes(obj.Size)}</td>
                     <td class="col-modified">{formatDate(obj.LastModified)}</td>
+                    <td class="col-file-modified">
+                      {fileMtimeCacheRef.current.has(obj.Key)
+                        ? (fileMtimeCacheRef.current.get(obj.Key)
+                            ? formatDate(new Date(fileMtimeCacheRef.current.get(obj.Key)))
+                            : '—')
+                        : null}
+                    </td>
                     <td class="col-actions">
                       <button
                         class="btn btn-ghost btn-sm"

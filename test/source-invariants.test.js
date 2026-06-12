@@ -1125,3 +1125,30 @@ describe('UploadQueue.jsx — file-mtime set on both upload paths', () => {
     );
   });
 });
+
+describe('Browser.jsx — File Modified column with background HeadObject loading', () => {
+  const source = src('components/Browser.jsx');
+
+  test('declares fileMtimeCacheRef for session-local HeadObject cache', () => {
+    assert.ok(
+      source.includes('fileMtimeCacheRef'),
+      'Browser.jsx must declare fileMtimeCacheRef — a useRef Map that caches file-mtime ' +
+      'HeadObject results for the current session, preventing redundant re-fetches on pagination'
+    );
+  });
+
+  test('has HeadObjectCommand call inside mtime-loading useEffect', () => {
+    assert.ok(
+      /fileMtimeCacheRef[\s\S]{0,2000}HeadObjectCommand|HeadObjectCommand[\s\S]{0,500}fileMtimeCacheRef/.test(source),
+      'Browser.jsx must call HeadObjectCommand inside the mtime-loading useEffect — ' +
+      'the File Modified column requires HeadObject since ListObjectsV2 does not return custom metadata'
+    );
+  });
+
+  test('renders col-file-modified table column', () => {
+    assert.ok(
+      source.includes('col-file-modified') || source.includes('File Modified'),
+      'Browser.jsx must include a "File Modified" column in the file table'
+    );
+  });
+});
