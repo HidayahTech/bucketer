@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.21.0] — 2026-06-12 — File modification time tracking
+
+Stores the original filesystem modification time of every uploaded file as `x-amz-meta-file-mtime` S3 custom metadata, then surfaces it across the app. The file properties modal shows a formatted "File Modified" date row. The DownloadPage (shared presigned links) shows the original mtime below the filename. The browser table gains a "File Modified" column with opt-in loading: click the column header to start, or enable auto-load in Settings. Loading is viewport-based (IntersectionObserver), capped at 3 concurrent HeadObject calls, and backed by a two-level cache (session ref + localStorage keyed on `bucket:key:S3LastModified`) that automatically invalidates when a file is replaced.
+
 ## [1.20.0] — 2026-06-11 — In-page preview on download links
 
 Extracts media rendering into a shared `PreviewMedia` component and adds preview directly to the DownloadPage, so recipients of a "Share via Bucketer" link see an inline image, video, audio, or text preview without needing S3 credentials.
