@@ -17,7 +17,7 @@ import { loadMaxKeys, loadListingCacheTTL } from '../lib/storage.js';
 import { pushPrefixHistory } from '../lib/url-params.js';
 import { mediaKind, mimeType, mimeKind } from '../lib/media.js';
 import { collectFileEntries } from '../lib/file-entries.js';
-import { PRESIGN_EXPIRES, TEXT_PREVIEW_LIMIT } from '../lib/constants.js';
+import { PRESIGN_EXPIRES, TEXT_PREVIEW_LIMIT, FILE_MTIME_KEY } from '../lib/constants.js';
 import { nameComparator, numericComparator } from '../lib/sort.js';
 import { validateObjectName } from '../lib/validate-object-name.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
@@ -640,12 +640,14 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
               {metaLoading && <div class="empty-state"><span class="spinner" style={{ marginRight: '.4rem' }} />Loading…</div>}
               {metaError && <div class="modal-error">{metaError}</div>}
               {metaData && (() => {
-                const custom = Object.entries(metaData.Metadata || {});
+                const fileMtime = metaData.Metadata?.[FILE_MTIME_KEY];
+                const custom = Object.entries(metaData.Metadata || {}).filter(([k]) => k !== FILE_MTIME_KEY);
                 return (
                   <table class="meta-table">
                     <tbody>
                       {metaData.ContentType && <tr><td class="meta-key">Content-Type</td><td class="meta-val">{metaData.ContentType}</td></tr>}
                       {metaData.ContentLength != null && <tr><td class="meta-key">Size</td><td class="meta-val">{formatBytes(metaData.ContentLength)}</td></tr>}
+                      {fileMtime && <tr><td class="meta-key">File Modified</td><td class="meta-val">{new Date(fileMtime).toLocaleString()}</td></tr>}
                       {metaData.LastModified && <tr><td class="meta-key">Last Modified</td><td class="meta-val">{new Date(metaData.LastModified).toLocaleString()}</td></tr>}
                       {metaData.ETag && <tr><td class="meta-key">ETag</td><td class="meta-val meta-mono">{metaData.ETag}</td></tr>}
                       {metaData.StorageClass && <tr><td class="meta-key">Storage Class</td><td class="meta-val">{metaData.StorageClass}</td></tr>}

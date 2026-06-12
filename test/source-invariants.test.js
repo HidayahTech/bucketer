@@ -1047,6 +1047,27 @@ describe('constants.js — FILE_MTIME_KEY exported', () => {
   });
 });
 
+describe('Browser.jsx — file-mtime formatted in properties modal', () => {
+  const source = src('components/Browser.jsx');
+
+  test('properties modal special-cases FILE_MTIME_KEY as a formatted date row', () => {
+    assert.ok(
+      source.includes('FILE_MTIME_KEY') || source.includes('file-mtime'),
+      'Browser.jsx properties modal must special-case FILE_MTIME_KEY — ' +
+      'without this, the mtime appears as a raw ISO string under "x-amz-meta-file-mtime" ' +
+      'rather than as a labelled, human-readable date row'
+    );
+  });
+
+  test('FILE_MTIME_KEY row excluded from generic custom metadata loop', () => {
+    assert.ok(
+      /custom\.filter|k !== FILE_MTIME_KEY|k !== 'file-mtime'/.test(source),
+      'Browser.jsx must exclude FILE_MTIME_KEY from the generic x-amz-meta-* loop — ' +
+      'otherwise the mtime appears twice: once formatted and once as a raw string'
+    );
+  });
+});
+
 describe('upload-status.js — all predicates present', () => {
   const source = src('lib/upload-status.js');
   test('exports isActive',  () => { assert.ok(source.includes('export const isActive')); });
