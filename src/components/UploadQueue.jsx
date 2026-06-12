@@ -30,7 +30,7 @@ import {
 } from '../lib/indexeddb.js';
 import { UploadQueue as Queue, calcPartSize, collectParts, preparePutBody, uploadPartsWithPool } from '../lib/upload-queue.js';
 import { loadPartConcurrency, loadPartSizeMB, loadFileConcurrency, loadUploadExpandThreshold, loadAdaptiveMode } from '../lib/storage.js';
-import { MULTIPART_THRESHOLD, DEFAULT_FILE_CONCURRENCY, PART_CONCURRENCY, ADAPTIVE_CONNECTION_BUDGET, PROBE_THRESHOLD_PARTS, MAX_ADAPTIVE_MEMORY_BYTES } from '../lib/constants.js';
+import { MULTIPART_THRESHOLD, DEFAULT_FILE_CONCURRENCY, PART_CONCURRENCY, ADAPTIVE_CONNECTION_BUDGET, PROBE_THRESHOLD_PARTS, MAX_ADAPTIVE_MEMORY_BYTES, FILE_MTIME_KEY } from '../lib/constants.js';
 import { calcAdaptiveConcurrency, createProbeState, resolveProbe, capConcurrencyByMemory } from '../lib/concurrency-strategy.js';
 import { isActive as itemIsActive, isFailed as itemIsFailed, isPaused as itemIsPaused } from '../lib/upload-status.js';
 import { abortMultipartSession } from '../lib/upload-cleanup.js';
@@ -307,7 +307,11 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     onProgress(0, file.size);
     const body = await preparePutBody(file); // BUG-003: must be Uint8Array, not Blob
     await client.send(
-      new PutObjectCommand({ Bucket: bucket, Key: destinationKey, Body: body, ContentType: file.type || 'application/octet-stream' }),
+      new PutObjectCommand({
+        Bucket: bucket, Key: destinationKey, Body: body,
+        ContentType: file.type || 'application/octet-stream',
+        Metadata: { [FILE_MTIME_KEY]: new Date(file.lastModified).toISOString() },
+      }),
       { abortSignal: controller.signal }
     );
     onProgress(file.size, file.size);
@@ -321,6 +325,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     const { UploadId: uploadId } = await client.send(new CreateMultipartUploadCommand({
       Bucket: bucket, Key: destinationKey,
       ContentType: file.type || 'application/octet-stream',
+      Metadata: { [FILE_MTIME_KEY]: new Date(file.lastModified).toISOString() },
     }));
 
     const abortController = new AbortController();

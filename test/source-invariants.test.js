@@ -1073,3 +1073,34 @@ describe('indexeddb.js — is a barrel re-export (no new logic)', () => {
     assert.ok(source.includes("from './file-identity.js'"));
   });
 });
+
+describe('UploadQueue.jsx — file-mtime set on both upload paths', () => {
+  const source = src('components/UploadQueue.jsx');
+
+  test('uploadSmall PutObjectCommand includes FILE_MTIME_KEY metadata', () => {
+    const fnStart = source.indexOf('async function uploadSmall(');
+    assert.ok(fnStart !== -1, 'uploadSmall must exist in UploadQueue.jsx');
+    const fnEnd = source.indexOf('\n  async function ', fnStart + 1);
+    const fn = source.slice(fnStart, fnEnd > fnStart ? fnEnd : fnStart + 600);
+    assert.ok(
+      fn.includes('FILE_MTIME_KEY') || fn.includes('file-mtime'),
+      'uploadSmall must set FILE_MTIME_KEY in PutObjectCommand Metadata — the original ' +
+      'file modification time is discarded without this; once lost, it cannot be recovered'
+    );
+  });
+
+  test('uploadMultipart CreateMultipartUploadCommand includes FILE_MTIME_KEY metadata', () => {
+    const fnStart = source.indexOf('async function uploadMultipart(');
+    assert.ok(fnStart !== -1, 'uploadMultipart must exist in UploadQueue.jsx');
+    // CreateMultipartUploadCommand is the first S3 call in this function
+    const createStart = source.indexOf('CreateMultipartUploadCommand', fnStart);
+    assert.ok(createStart !== -1, 'CreateMultipartUploadCommand must exist in uploadMultipart');
+    const callEnd = source.indexOf('})', createStart);
+    const call = source.slice(createStart, callEnd + 2);
+    assert.ok(
+      call.includes('FILE_MTIME_KEY') || call.includes('file-mtime'),
+      'uploadMultipart CreateMultipartUploadCommand must include file-mtime Metadata — ' +
+      'multipart metadata must be set at creation, not in UploadPartCommand'
+    );
+  });
+});
