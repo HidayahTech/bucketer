@@ -54,3 +54,7 @@ export const COPY_LINK_PRESETS = [
   { label: '24 hours', seconds: 86400 },
   { label: '7 days',   seconds: 604800 },
 ];
+
+// S3 custom metadata key for the original file modification time.
+// Stored as x-amz-meta-file-mtime in object metadata; value is ISO 8601.
+export const FILE_MTIME_KEY = 'file-mtime';

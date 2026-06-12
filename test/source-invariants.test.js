@@ -1035,6 +1035,18 @@ describe('constants.js — all centralized thresholds present', () => {
   test('exports COPY_LINK_PRESETS',   () => { assert.ok(source.includes('COPY_LINK_PRESETS')); });
 });
 
+describe('constants.js — FILE_MTIME_KEY exported', () => {
+  const source = src('lib/constants.js');
+  test('exports FILE_MTIME_KEY', () => {
+    assert.ok(
+      source.includes('FILE_MTIME_KEY'),
+      'constants.js must export FILE_MTIME_KEY — the S3 Metadata key used to store ' +
+      'the original file modification time; a shared constant prevents typos across ' +
+      'UploadQueue.jsx, Browser.jsx, and DownloadPage.jsx'
+    );
+  });
+});
+
 describe('upload-status.js — all predicates present', () => {
   const source = src('lib/upload-status.js');
   test('exports isActive',  () => { assert.ok(source.includes('export const isActive')); });
