@@ -126,7 +126,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   // setMtimeCacheVer triggers re-renders as responses arrive so the column fills in progressively.
   useEffect(() => {
     if (!client || !bucket) return;
-    const uncached = items.filter(obj => !fileMtimeCacheRef.current.has(obj.Key));
+    const uncached = items.filter(obj => !obj.Key.endsWith('/') && !fileMtimeCacheRef.current.has(obj.Key));
     if (!uncached.length) return;
     let cancelled = false;
     const queue = [...uncached];
@@ -959,7 +959,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                     <td class="col-file-modified">
                       {fileMtimeCacheRef.current.has(obj.Key)
                         ? (fileMtimeCacheRef.current.get(obj.Key)
-                            ? formatDate(new Date(fileMtimeCacheRef.current.get(obj.Key)))
+                            ? formatDate(fileMtimeCacheRef.current.get(obj.Key))
                             : '—')
                         : null}
                     </td>

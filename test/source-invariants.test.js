@@ -1147,7 +1147,7 @@ describe('Browser.jsx — File Modified column with background HeadObject loadin
 
   test('renders col-file-modified table column', () => {
     assert.ok(
-      source.includes('col-file-modified') || source.includes('File Modified'),
+      source.includes('col-file-modified'),
       'Browser.jsx must include a "File Modified" column in the file table'
     );
   });
