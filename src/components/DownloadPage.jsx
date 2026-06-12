@@ -7,6 +7,7 @@ import { PreviewMedia } from './PreviewMedia.jsx';
 import { leafName } from '../lib/format.js';
 import { mediaKind } from '../lib/media.js';
 import { CURRENT_VERSION } from '../lib/changelog.js';
+import { FILE_MTIME_KEY } from '../lib/constants.js';
 
 const TEXT_PREVIEW_LIMIT = 100 * 1024;
 
@@ -50,13 +51,32 @@ export function DownloadPage({ presignedUrl }) {
   const [previewText, setPreviewText] = useState(null);
   const [previewTruncated, setPreviewTruncated] = useState(false);
   const [pixelated, setPixelated] = useState(false);
+  const [fileMtime, setFileMtime] = useState(null);
 
   // Fetch text content directly from the presigned URL when kind is text.
+  // Also reads x-amz-meta-file-mtime from the response headers.
   // No S3 client needed — the presigned URL is self-contained.
   useEffect(() => {
     if (kind !== 'text' || expired) return;
     fetch(presignedUrl, { headers: { Range: `bytes=0-${TEXT_PREVIEW_LIMIT - 1}` } })
-      .then(r => r.text().then(t => { setPreviewText(t); setPreviewTruncated(r.status === 206); }))
+      .then(r => {
+        const mtime = r.headers.get('x-amz-meta-' + FILE_MTIME_KEY);
+        if (mtime) setFileMtime(new Date(mtime));
+        return r.text().then(t => { setPreviewText(t); setPreviewTruncated(r.status === 206); });
+      })
+      .catch(() => {});
+  }, [presignedUrl]);
+
+  // Read mtime from response headers for non-text files (text path handles its own).
+  // Presigned GetObject URLs are signed for GET, not HEAD — HEAD returns 403.
+  // A Range: bytes=0-0 request fetches just 1 byte to stay lightweight.
+  useEffect(() => {
+    if (kind === 'text' || expired) return;
+    fetch(presignedUrl, { headers: { Range: 'bytes=0-0' } })
+      .then(r => {
+        const mtime = r.headers.get('x-amz-meta-' + FILE_MTIME_KEY);
+        if (mtime) setFileMtime(new Date(mtime));
+      })
       .catch(() => {});
   }, [presignedUrl]);
 
@@ -71,6 +91,12 @@ export function DownloadPage({ presignedUrl }) {
       <div class="main-content">
         <div class="splash" style={{ maxWidth: '32rem' }}>
           <h2 style={{ wordBreak: 'break-all' }}>{fileName}</h2>
+
+          {fileMtime && (
+            <p style={{ color: 'var(--text-muted)', margin: '0 0 .5rem', fontSize: '.85rem' }}>
+              File Modified: {fileMtime.toLocaleString()}
+            </p>
+          )}
 
           {expired ? (
             <div class="banner banner-danger" style={{ marginTop: '1rem' }}>
