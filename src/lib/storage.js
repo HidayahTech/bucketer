@@ -36,6 +36,7 @@ const SETTINGS_KEYS = {
   prefetchSizeLimit:     's3b_prefetch_size_limit',
   uploadExpandThreshold: 's3b_upload_expand_threshold',
   adaptiveMode:          's3b_adaptive_mode',
+  fileMtimeAutoLoad:     's3b_file_mtime_auto_load',
 };
 
 // Convenience: all keyed storage keys (excludes capabilities, which has its own clear path).
@@ -139,6 +140,10 @@ const _adaptiveMode = makeSettingAccessors(
   LS_KEYS.adaptiveMode,
   v => v === '' ? true : v === 'true',       // default true
 );
+const _fileMtimeAutoLoad = makeSettingAccessors(
+  LS_KEYS.fileMtimeAutoLoad,
+  v => v === '' ? false : v === 'true',      // default false
+);
 
 export const loadMaxKeys               = _maxKeys.load;
 export const saveMaxKeys               = _maxKeys.save;
@@ -158,6 +163,8 @@ export const loadUpdateCheckEnabled    = _updateCheckEnabled.load;
 export const saveUpdateCheckEnabled    = _updateCheckEnabled.save;
 export const loadAdaptiveMode          = _adaptiveMode.load;
 export const saveAdaptiveMode          = _adaptiveMode.save;
+export const loadFileMtimeAutoLoad     = _fileMtimeAutoLoad.load;
+export const saveFileMtimeAutoLoad     = _fileMtimeAutoLoad.save;
 
 // Per-operation permission state (§4.12). Each of { list, download, upload, delete }
 // starts as 'unknown' (assumed permitted) and transitions to 'denied' only after an

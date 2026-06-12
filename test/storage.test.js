@@ -35,6 +35,7 @@ import {
   loadLastProfileId, saveLastProfileId,
   migrateProfilesFromLegacy,
   loadAdaptiveMode, saveAdaptiveMode,
+  loadFileMtimeAutoLoad, saveFileMtimeAutoLoad,
 } from '../src/lib/storage.js';
 
 // Clear both stores before each test to prevent cross-test contamination.
@@ -478,5 +479,22 @@ describe('loadAdaptiveMode / saveAdaptiveMode', () => {
     saveAdaptiveMode(false);
     saveAdaptiveMode(true);
     assert.equal(loadAdaptiveMode(), true);
+  });
+});
+
+describe('loadFileMtimeAutoLoad / saveFileMtimeAutoLoad', () => {
+  test('defaults to false when no value is stored', () => {
+    assert.equal(loadFileMtimeAutoLoad(), false);
+  });
+
+  test('returns true after saveFileMtimeAutoLoad(true)', () => {
+    saveFileMtimeAutoLoad(true);
+    assert.equal(loadFileMtimeAutoLoad(), true);
+  });
+
+  test('returns false after saveFileMtimeAutoLoad(false)', () => {
+    saveFileMtimeAutoLoad(true);
+    saveFileMtimeAutoLoad(false);
+    assert.equal(loadFileMtimeAutoLoad(), false);
   });
 });
