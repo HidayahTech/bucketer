@@ -1,9 +1,14 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // Standalone download landing page rendered when a #dl= fragment is detected.
 // No S3 credentials needed — the presigned URL is self-contained.
+import { useState, useEffect } from 'preact/hooks';
 import { BucketerLogo } from './BucketerLogo.jsx';
+import { PreviewMedia } from './PreviewMedia.jsx';
 import { leafName } from '../lib/format.js';
+import { mediaKind } from '../lib/media.js';
 import { CURRENT_VERSION } from '../lib/changelog.js';
+
+const TEXT_PREVIEW_LIMIT = 100 * 1024;
 
 // AWS basic ISO 8601 (20260611T203417Z) → extended ISO (2026-06-11T20:34:17Z)
 function awsDateToIso(d) {
@@ -37,9 +42,23 @@ function formatTimeRemaining(expiresAt) {
 
 export function DownloadPage({ presignedUrl }) {
   const fileName = leafName(new URL(presignedUrl).pathname);
+  const kind = mediaKind(fileName);
   const expiresAt = parseExpiry(presignedUrl);
   const remaining = expiresAt ? formatTimeRemaining(expiresAt) : null;
   const expired = !remaining;
+
+  const [previewText, setPreviewText] = useState(null);
+  const [previewTruncated, setPreviewTruncated] = useState(false);
+  const [pixelated, setPixelated] = useState(false);
+
+  // Fetch text content directly from the presigned URL when kind is text.
+  // No S3 client needed — the presigned URL is self-contained.
+  useEffect(() => {
+    if (kind !== 'text' || expired) return;
+    fetch(presignedUrl, { headers: { Range: `bytes=0-${TEXT_PREVIEW_LIMIT - 1}` } })
+      .then(r => r.text().then(t => { setPreviewText(t); setPreviewTruncated(r.status === 206); }))
+      .catch(() => {});
+  }, [presignedUrl]);
 
   return (
     <div id="app">
@@ -65,6 +84,19 @@ export function DownloadPage({ presignedUrl }) {
               <a class="btn btn-primary" href={presignedUrl} style={{ display: 'inline-block' }}>
                 Download
               </a>
+              {kind && (
+                <div class="preview-content" style={{ marginTop: '1.5rem' }}>
+                  <PreviewMedia
+                    kind={kind}
+                    url={kind !== 'text' ? presignedUrl : undefined}
+                    text={kind === 'text' ? previewText : undefined}
+                    truncated={previewTruncated}
+                    alt={fileName}
+                    pixelated={pixelated}
+                    onLoad={e => setPixelated(e.target.naturalWidth < 128 && e.target.naturalHeight < 128)}
+                  />
+                </div>
+              )}
             </>
           )}
         </div>

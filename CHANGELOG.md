@@ -7,6 +7,16 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.20.0] — 2026-06-11 — In-page preview on download links
+
+Extracts media rendering into a shared `PreviewMedia` component and adds preview directly to the DownloadPage, so recipients of a "Share via Bucketer" link see an inline image, video, audio, or text preview without needing S3 credentials.
+
+- **PreviewMedia component** (`src/components/PreviewMedia.jsx`) — shared renderer for image, audio, video, PDF, and text kinds; replaces the equivalent inline JSX in `Browser`.
+- **DownloadPage preview** — detects the file type from the extension and renders the appropriate preview element using the presigned URL as the source directly. Text files are fetched in a `useEffect` (range-limited to 100 KB, same as the browser preview).
+- **Browser refactor** — preview rendering in `Browser.jsx` now delegates to `PreviewMedia` with no behaviour change.
+
+---
+
 ## [1.19.0] — 2026-06-11 — Presigned URL sharing
 
 Adds a "Share via Bucketer" button to the copy-link popover that encodes a presigned download URL into a compact, shareable Bucketer link. The presigned URL is placed in the URL fragment (`#dl=`), which browsers never transmit to servers, keeping credentials and signatures invisible to server logs.

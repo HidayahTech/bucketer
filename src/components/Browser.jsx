@@ -11,6 +11,7 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { formatBytes, leafName, isPermissionError } from '../lib/format.js';
 import { usePreview } from '../lib/usePreview.js';
 import { Modal } from './Modal.jsx';
+import { PreviewMedia } from './PreviewMedia.jsx';
 import { defaultMaxKeys } from '../lib/provider.js';
 import { loadMaxKeys, loadListingCacheTTL } from '../lib/storage.js';
 import { pushPrefixHistory } from '../lib/url-params.js';
@@ -708,31 +709,15 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                   {previewError && (
                     <div class="modal-error">Preview failed: {previewError.message || String(previewError)}</div>
                   )}
-                  {previewUrl && kind === 'image' && (
-                    <img
-                      src={previewUrl}
-                      alt={leafName(previewItem.Key)}
-                      class={`preview-media${previewPixelated ? ' preview-media--pixelated' : ''}`}
-                      onLoad={e => setPreviewPixelated(e.target.naturalWidth < 128 && e.target.naturalHeight < 128)}
-                    />
-                  )}
-                  {previewUrl && kind === 'audio' && (
-                    <audio controls src={previewUrl} class="preview-audio" />
-                  )}
-                  {previewUrl && kind === 'video' && (
-                    <video controls src={previewUrl} class="preview-media" />
-                  )}
-                  {previewUrl && kind === 'pdf' && (
-                    <iframe src={previewUrl} class="preview-pdf" title={leafName(previewItem.Key)} sandbox="" />
-                  )}
-                  {previewText !== null && kind === 'text' && (
-                    <div class="preview-text-wrap">
-                      <pre class="preview-text">{previewText}</pre>
-                      {previewTruncated && (
-                        <div class="preview-truncated">Preview limited to 100 KB — download for the full file.</div>
-                      )}
-                    </div>
-                  )}
+                  <PreviewMedia
+                    kind={kind}
+                    url={previewUrl}
+                    text={previewText}
+                    truncated={previewTruncated}
+                    alt={leafName(previewItem.Key)}
+                    pixelated={previewPixelated}
+                    onLoad={e => setPreviewPixelated(e.target.naturalWidth < 128 && e.target.naturalHeight < 128)}
+                  />
                 </div>
                 {previewableItems.length > 1 && previewIdx !== -1 && kind !== 'image' && (
                   <button class="preview-nav" onClick={() => navigatePreviewRef.current(1)} disabled={!nextPreviewItem} aria-label="Next">›</button>

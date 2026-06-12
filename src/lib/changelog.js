@@ -1,9 +1,19 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.19.0';
+export const CURRENT_VERSION = '1.20.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.20.0",
+    "date": "2026-06-11",
+    "title": "In-page preview on download links",
+    "changes": [
+      "**PreviewMedia component** (src/components/PreviewMedia.jsx) — shared renderer for image, audio, video, PDF, and text kinds; replaces the equivalent inline JSX in Browser.",
+      "**DownloadPage preview** — detects the file type from the extension and renders the appropriate preview element using the presigned URL as the source directly. Text files are fetched in a useEffect (range-limited to 100 KB, same as the browser preview).",
+      "**Browser refactor** — preview rendering in Browser.jsx now delegates to PreviewMedia with no behaviour change."
+    ]
+  },
   {
     "version": "1.19.0",
     "date": "2026-06-11",
