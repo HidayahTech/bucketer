@@ -13,7 +13,7 @@ import { usePreview } from '../lib/usePreview.js';
 import { Modal } from './Modal.jsx';
 import { PreviewMedia } from './PreviewMedia.jsx';
 import { defaultMaxKeys } from '../lib/provider.js';
-import { loadMaxKeys, loadListingCacheTTL } from '../lib/storage.js';
+import { loadMaxKeys, loadListingCacheTTL, loadFileMtimeAutoLoad } from '../lib/storage.js';
 import { pushPrefixHistory } from '../lib/url-params.js';
 import { mediaKind, mimeType, mimeKind } from '../lib/media.js';
 import { collectFileEntries } from '../lib/file-entries.js';
@@ -93,8 +93,11 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const navigatePreviewRef = useRef(null);
   // Capture the prefix value at mount time for the initial history replaceState
   const initialPrefixRef = useRef(prefix);
-  const fileMtimeCacheRef = useRef(new Map()); // Key → ISO string | null
+  // cacheKey = `${bucket}:${Key}:${lastModifiedMs}` — includes S3 LastModified for auto-invalidation on file replace
+  const fileMtimeCacheRef = useRef(new Map());
   const [, setMtimeCacheVer] = useState(0);
+  const [mtimeLoadEnabled, setMtimeLoadEnabled] = useState(() => loadFileMtimeAutoLoad());
+  const [isMtimeLoading, setIsMtimeLoading] = useState(false);
 
   const maxKeys = loadMaxKeys() || defaultMaxKeys(provider);
   const cacheTTL = loadListingCacheTTL() ?? 120; // seconds; 0 = off
@@ -110,10 +113,11 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
 
   useEffect(() => { onMount?.({ removeItems, invalidateCache }); }, []);
 
-  // Reset file-mtime cache when the user switches buckets
+  // Reset file-mtime state when the user switches buckets
   useEffect(() => {
     fileMtimeCacheRef.current = new Map();
     setMtimeCacheVer(0);
+    setIsMtimeLoading(false);
   }, [bucket]);
 
   // Notify parent of current prefix so upload queue knows where to target
@@ -121,36 +125,76 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     if (onUploadTargetChange) onUploadTargetChange(prefix);
   }, [prefix]);
 
-  // Background HeadObject batch: load file-mtime for visible items not yet cached.
-  // Concurrency=3; results stored in fileMtimeCacheRef (session-scoped, reset on bucket change).
-  // setMtimeCacheVer triggers re-renders as responses arrive so the column fills in progressively.
+  // File-mtime opt-in loading via IntersectionObserver.
+  // Only active when mtimeLoadEnabled is true (user clicked header or setting is on).
+  // Observes [data-mtime-key] cells; IntersectionObserver fires immediately for visible ones.
+  // Two-level cache: L1 session ref, L2 localStorage (key includes S3 LastModified for
+  // automatic invalidation when a file is replaced).
   useEffect(() => {
-    if (!client || !bucket) return;
-    const uncached = items.filter(obj => !obj.Key.endsWith('/') && !fileMtimeCacheRef.current.has(obj.Key));
-    if (!uncached.length) return;
+    if (!mtimeLoadEnabled || !client || !bucket) return;
     let cancelled = false;
-    const queue = [...uncached];
+    const queue = [];
     let active = 0;
+
     function flush() {
       while (queue.length && active < 3) {
-        const { Key } = queue.shift();
+        const { Key, cacheKey } = queue.shift();
         active++;
         client.send(new HeadObjectCommand({ Bucket: bucket, Key }))
           .then(head => {
-            fileMtimeCacheRef.current.set(Key, head.Metadata?.[FILE_MTIME_KEY] ?? null);
+            const mtime = head.Metadata?.[FILE_MTIME_KEY] ?? null;
+            fileMtimeCacheRef.current.set(cacheKey, mtime);
+            try { localStorage.setItem('bucketer:mtime:' + cacheKey, mtime ?? ''); } catch {}
           })
           .catch(() => {
-            fileMtimeCacheRef.current.set(Key, null);
+            fileMtimeCacheRef.current.set(cacheKey, null);
+            try { localStorage.setItem('bucketer:mtime:' + cacheKey, ''); } catch {}
           })
           .finally(() => {
             active--;
-            if (!cancelled) { flush(); setMtimeCacheVer(v => v + 1); }
+            if (!cancelled) {
+              flush();
+              setMtimeCacheVer(v => v + 1);
+              if (active === 0 && queue.length === 0) setIsMtimeLoading(false);
+            }
           });
       }
     }
-    flush();
-    return () => { cancelled = true; };
-  }, [items, bucket]);
+
+    function enqueue(Key, lastModifiedMs) {
+      const cacheKey = `${bucket}:${Key}:${lastModifiedMs}`;
+      if (fileMtimeCacheRef.current.has(cacheKey)) return; // L1 hit
+      let stored = null;
+      try { stored = localStorage.getItem('bucketer:mtime:' + cacheKey); } catch {}
+      if (stored !== null) {
+        // L2 hit — warm L1 and trigger a re-render without a HeadObject call
+        fileMtimeCacheRef.current.set(cacheKey, stored === '' ? null : stored);
+        setMtimeCacheVer(v => v + 1);
+        return;
+      }
+      if (!queue.some(e => e.cacheKey === cacheKey)) {
+        queue.push({ Key, cacheKey });
+        if (active === 0 && queue.length === 1) setIsMtimeLoading(true);
+        flush();
+      }
+    }
+
+    const observer = new IntersectionObserver(entries => {
+      for (const entry of entries) {
+        if (!entry.isIntersecting) continue;
+        const Key = entry.target.dataset.mtimeKey;
+        const lastModifiedMs = Number(entry.target.dataset.mtimeLm);
+        if (Key && lastModifiedMs) enqueue(Key, lastModifiedMs);
+      }
+    }, { rootMargin: '100px 0px' });
+
+    document.querySelectorAll('[data-mtime-key]').forEach(el => observer.observe(el));
+
+    return () => {
+      cancelled = true;
+      observer.disconnect();
+    };
+  }, [mtimeLoadEnabled, items, bucket]);
 
   // Navigate to a new prefix — flush state and push a browser history entry (§4.7, §4.14)
   function navigateTo(newPrefix, { historyMode = 'push' } = {}) {
@@ -884,7 +928,16 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                 <SortTh col="name" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort}>Name</SortTh>
                 <SortTh col="size" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort}>Size</SortTh>
                 <SortTh col="modified" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort}>Modified</SortTh>
-                <th class="col-file-modified">File Modified</th>
+                <th
+                  class="col-file-modified"
+                  onClick={!mtimeLoadEnabled ? () => setMtimeLoadEnabled(true) : undefined}
+                  title={!mtimeLoadEnabled ? 'Click to load file modification times' : undefined}
+                  style={!mtimeLoadEnabled ? { cursor: 'pointer' } : undefined}
+                >
+                  File Modified
+                  {!mtimeLoadEnabled && <span style={{ opacity: .5, marginLeft: '.3rem' }}>↓</span>}
+                  {mtimeLoadEnabled && isMtimeLoading && <span class="spinner" style={{ marginLeft: '.4rem' }} />}
+                </th>
                 <th></th>
               </tr>
             </thead>
@@ -956,12 +1009,17 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                     </td>
                     <td class="col-size">{formatBytes(obj.Size)}</td>
                     <td class="col-modified">{formatDate(obj.LastModified)}</td>
-                    <td class="col-file-modified">
-                      {fileMtimeCacheRef.current.has(obj.Key)
-                        ? (fileMtimeCacheRef.current.get(obj.Key)
-                            ? formatDate(fileMtimeCacheRef.current.get(obj.Key))
-                            : '—')
-                        : null}
+                    <td
+                      class="col-file-modified"
+                      data-mtime-key={obj.Key}
+                      data-mtime-lm={new Date(obj.LastModified).getTime()}
+                    >
+                      {mtimeLoadEnabled && (() => {
+                        const cacheKey = `${bucket}:${obj.Key}:${new Date(obj.LastModified).getTime()}`;
+                        const cached = fileMtimeCacheRef.current.get(cacheKey);
+                        if (cached === undefined) return null;
+                        return cached ? formatDate(cached) : '—';
+                      })()}
                     </td>
                     <td class="col-actions">
                       <button
