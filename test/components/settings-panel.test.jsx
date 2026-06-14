@@ -16,8 +16,6 @@ function defaultProps(overrides = {}) {
     onUpdateCheckChange: () => {},
     prefetchSizeLimit: 10,
     onPrefetchSizeLimitChange: () => {},
-    verifyIntegrityEnabled: false,
-    onVerifyIntegrityChange: () => {},
     ...overrides,
   };
 }
@@ -108,32 +106,6 @@ describe('SettingsPanel — Update Check toggle', () => {
       text().toLowerCase().includes('update') || text().toLowerCase().includes('check'),
       'update check setting must be labeled'
     );
-    cleanup();
-  });
-});
-
-describe('SettingsPanel — build integrity check toggle', () => {
-  test('renders the integrity-check toggle label', () => {
-    const { text, cleanup } = mount(h(SettingsPanel, defaultProps()));
-    assert.ok(
-      text().toLowerCase().includes('integrity'),
-      'settings panel must surface the build integrity check setting'
-    );
-    cleanup();
-  });
-
-  test('does not render the IntegrityCheck verify-now button when toggle is off', () => {
-    const { queryAll, cleanup } = mount(h(SettingsPanel, defaultProps({ verifyIntegrityEnabled: false })));
-    const verifyBtn = queryAll('button').find(b => /verify now/i.test(b.textContent));
-    assert.equal(verifyBtn, undefined,
-      'IntegrityCheck button must stay hidden until the user opts in');
-    cleanup();
-  });
-
-  test('renders the IntegrityCheck verify-now button when toggle is on', () => {
-    const { queryAll, cleanup } = mount(h(SettingsPanel, defaultProps({ verifyIntegrityEnabled: true })));
-    const verifyBtn = queryAll('button').find(b => /verify now/i.test(b.textContent));
-    assert.ok(verifyBtn, 'IntegrityCheck button must render when the user has opted in');
     cleanup();
   });
 });

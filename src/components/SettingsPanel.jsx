@@ -3,7 +3,6 @@
 import { useState } from 'preact/hooks';
 import { loadMaxKeys, saveMaxKeys, loadPartConcurrency, savePartConcurrency, loadPartSizeMB, savePartSizeMB, loadFileConcurrency, saveFileConcurrency, loadListingCacheTTL, saveListingCacheTTL, loadUpdateCheckEnabled, saveUpdateCheckEnabled, loadPrefetchSizeLimit, savePrefetchSizeLimit, loadUploadExpandThreshold, saveUploadExpandThreshold, loadAdaptiveMode, saveAdaptiveMode, loadFileMtimeAutoLoad, saveFileMtimeAutoLoad } from '../lib/storage.js';
 import { defaultMaxKeys } from '../lib/provider.js';
-import { IntegrityCheck } from './IntegrityCheck.jsx';
 
 const DEFAULT_PART_CONCURRENCY     = 4;
 const DEFAULT_PART_SIZE_MB         = 5;
@@ -11,7 +10,7 @@ const DEFAULT_FILE_CONCURRENCY     = 3;
 const DEFAULT_LISTING_CACHE_TTL    = 120;
 const DEFAULT_UPLOAD_EXPAND_THRESHOLD = 5;
 
-export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChange, prefetchSizeLimit, onPrefetchSizeLimitChange, verifyIntegrityEnabled, onVerifyIntegrityChange }) {
+export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChange, prefetchSizeLimit, onPrefetchSizeLimitChange }) {
   const providerDefault = defaultMaxKeys(provider);
 
   const [maxKeysValue, setMaxKeysValue] = useState(() => {
@@ -290,23 +289,6 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
         </span>
       </div>
 
-      <div class="form-group" style={{ marginTop: '.75rem' }}>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', cursor: 'pointer' }}>
-          <input
-            type="checkbox"
-            checked={verifyIntegrityEnabled}
-            onChange={e => onVerifyIntegrityChange(e.target.checked)}
-          />
-          Enable build integrity check
-        </label>
-        <span class="hint">
-          Adds a "Verify now" button below that fetches an integrity manifest from GitLab
-          and compares it against the bytes this page is serving. Off by default because
-          the verify action makes a request to GitLab — enable only if you want that option.
-        </span>
-      </div>
-
-      {verifyIntegrityEnabled && <IntegrityCheck />}
     </div>
   );
 }

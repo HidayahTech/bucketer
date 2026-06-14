@@ -38,11 +38,23 @@ describe('IntegrityCheck — idle state', () => {
     cleanup();
   });
 
-  test('explains the honest-host limit in the hint text', () => {
-    const { text, cleanup } = mount(h(IntegrityCheck, { verify: fakeVerify({ status: 'match' }) }));
+  test('button label references build integrity, not generic verification', () => {
+    const { query, cleanup } = mount(h(IntegrityCheck, { verify: fakeVerify({ status: 'match' }) }));
+    assert.ok(/integrity/i.test(query('button').textContent),
+      'button label must say "Verify build integrity" so the action is self-explanatory wherever the component is mounted');
+    cleanup();
+  });
+});
+
+describe('IntegrityCheck — match result framing', () => {
+  test('match banner surfaces the honest-host limit', async () => {
+    const result = { status: 'match', version: VERSION, algorithm: 'sha256', hash: 'a'.repeat(64) };
+    const { query, text, cleanup } = mount(h(IntegrityCheck, { verify: fakeVerify(result) }));
+    fire(query('button'), 'click');
+    await flush();
     const body = text().toLowerCase();
     assert.ok(body.includes('does not prove') || body.includes('cannot prove'),
-      'hint text must surface the limit that this does not prove the JS is untampered');
+      'match banner must explicitly state that this does not prove the running JS was not modified — the framing was the whole point of the feature');
     cleanup();
   });
 });

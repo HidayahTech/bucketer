@@ -116,24 +116,15 @@ export function IntegrityCheck({ verify = defaultVerify }) {
   }
 
   return (
-    <div class="form-group" style={{ marginTop: '.75rem' }}>
-      <label>Verify build integrity</label>
-      <span class="hint">
-        Compares the bytes this page is currently serving against the build GitLab CI
-        published for this version. This proves the host is serving the canonical artifact;
-        it does not prove the running JavaScript was not modified — a malicious host could
-        rewrite both the bundle and this check.
-      </span>
-      <div style={{ marginTop: '.4rem' }}>
-        <button
-          type="button"
-          class="btn btn-ghost btn-sm"
-          onClick={handleVerify}
-          disabled={phase === 'running'}
-        >
-          {phase === 'running' ? 'Verifying…' : 'Verify now'}
-        </button>
-      </div>
+    <div class="integrity-check">
+      <button
+        type="button"
+        class="btn btn-ghost btn-sm"
+        onClick={handleVerify}
+        disabled={phase === 'running'}
+      >
+        {phase === 'running' ? 'Verifying…' : 'Verify build integrity'}
+      </button>
       {phase === 'result' && result && <ResultBanner result={result} />}
     </div>
   );

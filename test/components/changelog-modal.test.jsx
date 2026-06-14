@@ -42,6 +42,17 @@ describe('ChangelogModal — content', () => {
     assert.ok(text().includes('Check for upstream release'), '"Check for upstream release" button must be present');
     cleanup();
   });
+
+  test('shows the build-integrity verify button (pre-auth surface)', () => {
+    // The integrity check lives in ChangelogModal so it is reachable from the
+    // header version button before the user enters any credentials. Anywhere
+    // gated behind authentication would defeat the point — you want to verify
+    // the running build BEFORE you trust it with your secret key.
+    const { queryAll, cleanup } = mount(h(ChangelogModal, { onClose: () => {} }));
+    const verifyBtn = queryAll('button').find(b => /verify build integrity/i.test(b.textContent));
+    assert.ok(verifyBtn, 'IntegrityCheck button must render inside ChangelogModal');
+    cleanup();
+  });
 });
 
 describe('ChangelogModal — close mechanisms', () => {

@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { CHANGELOG, CURRENT_VERSION } from '../lib/changelog.js';
 import { Modal } from './Modal.jsx';
+import { IntegrityCheck } from './IntegrityCheck.jsx';
 
 const RELEASES_URL  = 'https://gitlab.com/hidayahtech/bucketer/-/releases';
 const RELEASES_API  = 'https://gitlab.com/api/v4/projects/hidayahtech%2Fbucketer/releases?per_page=1';
@@ -101,6 +102,9 @@ export function ChangelogModal({ onClose }) {
           {checkState === 'error' && (
             <span class="upstream-status upstream-err">Upstream check failed</span>
           )}
+        </div>
+        <div class="changelog-integrity">
+          <IntegrityCheck />
         </div>
         <div class="modal-actions">
           <button class="btn btn-ghost btn-sm" onClick={onClose}>Close</button>

@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.22.1] — 2026-06-13 — Move integrity check pre-auth into the version modal
+
+Relocates the build integrity check from the Settings panel (only available after connecting to a bucket) to the changelog/version modal opened from the header version badge. The check now reaches the user *before* they enter credentials — which is the moment that matters most for deciding whether to trust the running build. Removes the opt-in toggle, since the check has always been one explicit button click with no background activity. The settings key `s3b_verify_integrity_enabled` is no longer read or written; old values are harmless.
+
 ## [1.22.0] — 2026-06-13 — Build integrity check (honest-host)
 
 Adds an opt-in in-app check that verifies the bytes the browser is currently serving match the canonical artifact GitLab CI built and published for the declared version. Surfaces under Settings → "Enable build integrity check"; a "Verify now" button then fetches the bytes via `cache: 'no-store'`, hashes them with Web Crypto SHA-256, and compares against a manifest the release pipeline now uploads next to the HTML artifact.

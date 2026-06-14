@@ -1,9 +1,15 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.22.0';
+export const CURRENT_VERSION = '1.22.1';
 
 export const CHANGELOG = [
+  {
+    "version": "1.22.1",
+    "date": "2026-06-13",
+    "title": "Move integrity check pre-auth into the version modal",
+    "changes": []
+  },
   {
     "version": "1.22.0",
     "date": "2026-06-13",
