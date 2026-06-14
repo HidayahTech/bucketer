@@ -21,6 +21,7 @@ import {
 } from '../lib/indexeddb.js';
 import { formatBytes } from '../lib/format.js';
 import { Modal } from './Modal.jsx';
+import { ConfirmDialog } from './ConfirmDialog.jsx';
 
 function age(ts) {
   const s = Math.floor((Date.now() - ts) / 1000);
@@ -126,31 +127,8 @@ export function StorageModal({ onClose, isConnected }) {
     await load();
   }
 
-  function ConfirmDialog({ id, label, warning, danger = false, reload = false }) {
-    const pending = confirmAction === id;
-    const done    = cleared === id;
-    return (
-      <Actions>
-        {done && !pending && <span class="sv-cleared-msg">✓ Cleared</span>}
-        {pending ? (
-          <>
-            {(warning || reload) && (
-              <span class="sv-confirm-warn">
-                {warning ?? (reload ? 'This will reload the page.' : '')}
-              </span>
-            )}
-            <button type="button" class="btn btn-ghost btn-sm" onClick={() => setConfirm(null)}>Cancel</button>
-            <button type="button" class={`btn btn-sm ${danger ? 'btn-danger' : 'btn-ghost'}`}
-              onClick={() => act(id)}>{label}</button>
-          </>
-        ) : (
-          <button type="button" class="btn btn-ghost btn-sm" onClick={() => setConfirm(id)}>{label}</button>
-        )}
-      </Actions>
-    );
-  }
-
   const val = v => v != null ? String(v) : <span class="sv-nil">— default</span>;
+  const controller = { confirmAction, cleared, setConfirm, act };
 
   return (
     <Modal onClose={onClose} class="storage-dialog">
@@ -204,7 +182,7 @@ export function StorageModal({ onClose, isConnected }) {
                     </tbody>
                   </table>
                 )}
-                <ConfirmDialog id="credentials"
+                <ConfirmDialog id="credentials" controller={controller}
                   label={isConnected ? 'Clear & disconnect' : 'Clear connection'}
                   warning={isConnected ? 'You are connected. This will disconnect and reload.' : 'This will reload the page.'}
                   danger reload />
@@ -246,7 +224,7 @@ export function StorageModal({ onClose, isConnected }) {
                     </tbody>
                   </table>
                 )}
-                <ConfirmDialog id="profiles" label="Delete all profiles"
+                <ConfirmDialog id="profiles" controller={controller} label="Delete all profiles"
                   warning="All saved profiles will be removed. Credentials on your storage provider are unaffected."
                   danger />
               </div>
@@ -297,7 +275,7 @@ export function StorageModal({ onClose, isConnected }) {
                     </table>
                   </>
                 )}
-                <ConfirmDialog id="log" label="Clear history" />
+                <ConfirmDialog id="log" controller={controller} label="Clear history" />
               </div>
             </details>
 
@@ -332,7 +310,7 @@ export function StorageModal({ onClose, isConnected }) {
                     </tbody>
                   </table>
                 )}
-                <ConfirmDialog id="resume" label="Discard all resume records"
+                <ConfirmDialog id="resume" controller={controller} label="Discard all resume records"
                   warning="In-progress uploads cannot be resumed after discarding. Incomplete multipart sessions may remain on the server until they expire or are aborted." />
               </div>
             </details>
@@ -370,7 +348,7 @@ export function StorageModal({ onClose, isConnected }) {
                     </tr>
                   </tbody>
                 </table>
-                <ConfirmDialog id="settings" label="Reset to defaults" />
+                <ConfirmDialog id="settings" controller={controller} label="Reset to defaults" />
               </div>
             </details>
 
