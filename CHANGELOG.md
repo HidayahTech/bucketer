@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.22.3] — 2026-06-14 — Chore: reconcile package-lock.json version
+
+`package-lock.json` had been drifting since pre-v1.17.0 — both the root `version` field and the `packages.""` entry were stuck at `1.16.0` while `package.json` advanced to `1.22.2`. The release workflow never updated the lock, so the drift was invisible to the build invariants and to the integrity check (which only hashes `dist/index.html`). This entry reconciles the lock against `package.json` via `npm install --package-lock-only`. No dependency changes.
+
 ## [1.22.2] — 2026-06-14 — Internal: extract ConfirmDialog from StorageModal
 
 Closes out the last open item from the v1.17.0 component-decomposition wave. `ConfirmDialog` previously lived as a closure inside `StorageModal.jsx`, capturing `confirmAction`, `cleared`, `setConfirm`, and `act` from the parent render scope. It now lives in its own module at `src/components/ConfirmDialog.jsx`, with those four values passed through a single `controller` prop. Adds a dedicated test suite covering idle / pending / cleared-flash states. No user-visible change.
