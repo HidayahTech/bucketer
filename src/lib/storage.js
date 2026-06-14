@@ -37,6 +37,7 @@ const SETTINGS_KEYS = {
   uploadExpandThreshold: 's3b_upload_expand_threshold',
   adaptiveMode:          's3b_adaptive_mode',
   fileMtimeAutoLoad:     's3b_file_mtime_auto_load',
+  verifyIntegrityEnabled: 's3b_verify_integrity_enabled',
 };
 
 // Convenience: all keyed storage keys (excludes capabilities, which has its own clear path).
@@ -144,6 +145,10 @@ const _fileMtimeAutoLoad = makeSettingAccessors(
   LS_KEYS.fileMtimeAutoLoad,
   v => v === '' ? false : v === 'true',      // default false
 );
+const _verifyIntegrityEnabled = makeSettingAccessors(
+  LS_KEYS.verifyIntegrityEnabled,
+  v => v === '' ? false : v === 'true',      // default false — opt-in network request to GitLab
+);
 
 export const loadMaxKeys               = _maxKeys.load;
 export const saveMaxKeys               = _maxKeys.save;
@@ -165,6 +170,8 @@ export const loadAdaptiveMode          = _adaptiveMode.load;
 export const saveAdaptiveMode          = _adaptiveMode.save;
 export const loadFileMtimeAutoLoad     = _fileMtimeAutoLoad.load;
 export const saveFileMtimeAutoLoad     = _fileMtimeAutoLoad.save;
+export const loadVerifyIntegrityEnabled = _verifyIntegrityEnabled.load;
+export const saveVerifyIntegrityEnabled = _verifyIntegrityEnabled.save;
 
 // Per-operation permission state (§4.12). Each of { list, download, upload, delete }
 // starts as 'unknown' (assumed permitted) and transitions to 'denied' only after an

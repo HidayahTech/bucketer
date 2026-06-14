@@ -7,6 +7,17 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.22.0] — 2026-06-13 — Build integrity check (honest-host)
+
+Adds an opt-in in-app check that verifies the bytes the browser is currently serving match the canonical artifact GitLab CI built and published for the declared version. Surfaces under Settings → "Enable build integrity check"; a "Verify now" button then fetches the bytes via `cache: 'no-store'`, hashes them with Web Crypto SHA-256, and compares against a manifest the release pipeline now uploads next to the HTML artifact.
+
+- **Honest framing** — the match/mismatch UI explicitly states that this proves the host is serving the canonical artifact, not that the running JavaScript was not modified. A malicious host could rewrite both.
+- **Build pipeline** — `build.mjs` now emits `dist/integrity.json` alongside `dist/index.html` (sha256 in an extensible `hashes` object — sha512/blake3 can be added later without a schema migration).
+- **Release pipeline** — `scripts/release.mjs` uploads the manifest to the same GitLab Generic Package Registry path as the HTML and lists it among the Release assets.
+- **CI reproducibility guard** — `.gitlab-ci.yml` gains a `reproducibility` stage that builds twice and diffs both `index.html` and `integrity.json`. The release job now depends on this stage. Catches any future regression that leaks nondeterminism into the build.
+- **Result states** — match (green), mismatch (red with both hashes), no-manifest (yellow, for versions predating this feature), unknown-algorithm (yellow), network error (yellow).
+- Default off — enabling the toggle is the only thing that triggers any network call to GitLab.
+
 ## [1.21.1] — 2026-06-12 — Fix custom metadata invisible in browser (BUG-028)
 
 Adds `x-amz-meta-*` to the CORS `ExposeHeaders` template. Without it, browsers silently stripped all `x-amz-meta-*` response headers before JavaScript could read them, making stored file modification times (and any other custom metadata) invisible to HeadObject calls and DownloadPage fetches. Existing bucket owners must re-apply their CORS configuration to pick up the fix.

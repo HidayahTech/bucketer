@@ -17,9 +17,12 @@ for (const [name, val] of Object.entries({ CI_COMMIT_TAG: TAG, CI_JOB_TOKEN: TOK
   if (!val) { console.error(`Missing required variable: ${name}`); process.exit(1); }
 }
 
-const VERSION  = TAG.replace(/^v/, '');
-const FILENAME = `bucketer-${TAG}.html`;
-const PKG_URL  = `${API_V4}/projects/${PROJECT}/packages/generic/bucketer/${VERSION}/${FILENAME}`;
+const VERSION             = TAG.replace(/^v/, '');
+const FILENAME            = `bucketer-${TAG}.html`;
+const INTEGRITY_FILENAME  = `bucketer-${TAG}.integrity.json`;
+const PKG_BASE            = `${API_V4}/projects/${PROJECT}/packages/generic/bucketer/${VERSION}`;
+const PKG_URL             = `${PKG_BASE}/${FILENAME}`;
+const INTEGRITY_URL       = `${PKG_BASE}/${INTEGRITY_FILENAME}`;
 
 function httpRequest(method, url, body, headers) {
   return new Promise((resolve, reject) => {
@@ -69,6 +72,21 @@ if (upload.status !== 200 && upload.status !== 201) {
 }
 console.log(`Uploaded — HTTP ${upload.status}`);
 
+// Upload integrity manifest. Sibling to the HTML artifact; consumed by the
+// in-app honest-host check that compares running bytes against this manifest.
+console.log(`Uploading ${INTEGRITY_FILENAME}...`);
+const integrityBuffer = readFileSync('dist/integrity.json');
+const integrityUpload = await httpRequest('PUT', INTEGRITY_URL, integrityBuffer, {
+  'JOB-TOKEN': TOKEN,
+  'Content-Type': 'application/json',
+});
+if (integrityUpload.status !== 200 && integrityUpload.status !== 201) {
+  console.error(`Integrity manifest upload failed — HTTP ${integrityUpload.status}`);
+  console.error(integrityUpload.body.slice(0, 400));
+  process.exit(1);
+}
+console.log(`Uploaded — HTTP ${integrityUpload.status}`);
+
 // Create the GitLab Release
 console.log(`Creating release ${releaseName}...`);
 const releasePayload = Buffer.from(JSON.stringify({
@@ -76,11 +94,10 @@ const releasePayload = Buffer.from(JSON.stringify({
   tag_name: TAG,
   description,
   assets: {
-    links: [{
-      name: FILENAME,
-      url: PKG_URL,
-      link_type: 'package',
-    }],
+    links: [
+      { name: FILENAME,           url: PKG_URL,       link_type: 'package' },
+      { name: INTEGRITY_FILENAME, url: INTEGRITY_URL, link_type: 'package' },
+    ],
   },
 }));
 const release = await httpRequest(

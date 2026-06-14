@@ -1,9 +1,34 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.20.0';
+export const CURRENT_VERSION = '1.22.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.22.0",
+    "date": "2026-06-13",
+    "title": "Build integrity check (honest-host)",
+    "changes": [
+      "**Honest framing** — the match/mismatch UI explicitly states that this proves the host is serving the canonical artifact, not that the running JavaScript was not modified. A malicious host could rewrite both.",
+      "**Build pipeline** — build.mjs now emits dist/integrity.json alongside dist/index.html (sha256 in an extensible hashes object — sha512/blake3 can be added later without a schema migration).",
+      "**Release pipeline** — scripts/release.mjs uploads the manifest to the same GitLab Generic Package Registry path as the HTML and lists it among the Release assets.",
+      "**CI reproducibility guard** — .gitlab-ci.yml gains a reproducibility stage that builds twice and diffs both index.html and integrity.json. The release job now depends on this stage. Catches any future regression that leaks nondeterminism into the build.",
+      "**Result states** — match (green), mismatch (red with both hashes), no-manifest (yellow, for versions predating this feature), unknown-algorithm (yellow), network error (yellow).",
+      "Default off — enabling the toggle is the only thing that triggers any network call to GitLab."
+    ]
+  },
+  {
+    "version": "1.21.1",
+    "date": "2026-06-12",
+    "title": "Fix custom metadata invisible in browser (BUG-028)",
+    "changes": []
+  },
+  {
+    "version": "1.21.0",
+    "date": "2026-06-12",
+    "title": "File modification time tracking",
+    "changes": []
+  },
   {
     "version": "1.20.0",
     "date": "2026-06-11",

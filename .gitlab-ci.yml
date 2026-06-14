@@ -1,5 +1,6 @@
 stages:
   - test
+  - reproducibility
   - release
 
 test:
@@ -12,8 +13,27 @@ test:
   artifacts:
     paths:
       - dist/index.html
+      - dist/integrity.json
     expire_in: 1 day
     when: on_success
+
+# Guards the invariant the in-app integrity check depends on: the build must
+# be bit-identical across runs given the same source. If anything ever leaks
+# nondeterminism into the build (timestamps, RNG, unpinned tooling), this job
+# catches it on the release tag before the release artifact is uploaded.
+reproducibility:
+  stage: reproducibility
+  image: node:20-alpine
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+  script:
+    - npm ci
+    - npm run build
+    - mv dist /tmp/build-a
+    - npm run build
+    - diff /tmp/build-a/index.html dist/index.html
+    - diff /tmp/build-a/integrity.json dist/integrity.json
+    - echo "Reproducibility verified — two consecutive builds are byte-identical."
 
 release:
   stage: release
@@ -22,5 +42,6 @@ release:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
   needs:
     - test
+    - reproducibility
   script:
     - node scripts/release.mjs

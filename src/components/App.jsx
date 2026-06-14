@@ -25,6 +25,7 @@ import {
   loadCredentials, saveCredentials, clearCredentials,
   loadCapabilities, saveCapabilities, clearCapabilities, defaultCapabilities,
   loadUpdateCheckEnabled, saveUpdateCheckEnabled,
+  loadVerifyIntegrityEnabled, saveVerifyIntegrityEnabled,
   loadPrefetchSizeLimit, savePrefetchSizeLimit,
   loadProfiles, saveProfile, deleteProfile, loadLastProfileId, saveLastProfileId,
   migrateProfilesFromLegacy, repairStorageInvariants,
@@ -79,6 +80,7 @@ export function App() {
   const { changelogOpen, setChangelogOpen, aboutOpen, setAboutOpen, storageOpen, setStorageOpen } = useModalStates();
   const [liveFormData, setLiveFormData] = useState(credentials);
   const [updateCheckEnabled, setUpdateCheckEnabled] = useState(() => loadUpdateCheckEnabled());
+  const [verifyIntegrityEnabled, setVerifyIntegrityEnabled] = useState(() => loadVerifyIntegrityEnabled());
   const [prefetchSizeLimit, setPrefetchSizeLimit] = useState(() => loadPrefetchSizeLimit());
   const [profiles, setProfiles] = useState(() => loadProfiles().profiles);
   const [deleteOps, setDeleteOps] = useState([]);
@@ -460,6 +462,8 @@ export function App() {
               onUpdateCheckChange={(val) => { saveUpdateCheckEnabled(val); setUpdateCheckEnabled(val); }}
               prefetchSizeLimit={prefetchSizeLimit}
               onPrefetchSizeLimitChange={(val) => { savePrefetchSizeLimit(val); setPrefetchSizeLimit(val); }}
+              verifyIntegrityEnabled={verifyIntegrityEnabled}
+              onVerifyIntegrityChange={(val) => { saveVerifyIntegrityEnabled(val); setVerifyIntegrityEnabled(val); }}
             />
             <hr style={{ border: 'none', borderTop: '1px solid var(--border)' }} />
             <details class="s3-primer">

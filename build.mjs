@@ -11,6 +11,7 @@
 
 import * as esbuild from 'esbuild';
 import { readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'fs';
+import { createHash } from 'node:crypto';
 
 // ── Build invariant constant (prod only) ─────────────────────────────────────
 // UpdateBanner uses Range: bytes=0-(UPDATE_CHECK_RANGE_BYTES-1) to detect a
@@ -188,6 +189,22 @@ if (mode.invariants) {
     invariantFailed = true;
   } else {
     console.log(`  ✓ no sourceMappingURL in bundle`);
+  }
+
+  // Integrity manifest: publishes the SHA-256 of dist/index.html so an in-app
+  // verification check can compare the running bytes against this canonical
+  // artifact (honest-host check; see plan in chat history).
+  // Hashes object is intentionally an object, not a string, so additional
+  // algorithms (sha512, blake3) can be added later without a schema migration.
+  if (!invariantFailed) {
+    const sha256 = createHash('sha256').update(out, 'utf8').digest('hex');
+    const manifest = {
+      version: appVersion,
+      filename: `bucketer-v${appVersion}.html`,
+      hashes: { sha256 },
+    };
+    writeFileSync(`${mode.dest}/integrity.json`, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
+    console.log(`  ✓ integrity.json (sha256: ${sha256.slice(0, 12)}…)`);
   }
 
   if (invariantFailed) process.exit(1);

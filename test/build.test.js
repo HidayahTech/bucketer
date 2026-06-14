@@ -14,6 +14,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { resolve, dirname } from 'node:path';
 
@@ -140,6 +141,36 @@ describe('Build output — bundle size ceiling (T5-2)', () => {
       `dist/index.html is ${(size / 1024).toFixed(1)} KB — exceeds the ` +
       `${SIZE_LIMIT_BYTES / 1024} KB ceiling (T5-2)`
     );
+  });
+});
+
+describe('Build output — integrity manifest', () => {
+  // dist/integrity.json publishes the SHA-256 of dist/index.html so an in-app
+  // verification check can compare the running bytes against the canonical
+  // build GitLab CI published for this version (honest-host check).
+  const manifestPath = resolve(ROOT, 'dist/integrity.json');
+
+  test('integrity.json exists alongside dist/index.html', () => {
+    assert.doesNotThrow(() => readFileSync(manifestPath, 'utf8'),
+      'dist/integrity.json must be emitted by production build');
+  });
+
+  test('manifest.version matches package.json', () => {
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    assert.equal(manifest.version, pkg.version);
+  });
+
+  test('manifest.filename follows bucketer-v{VERSION}.html convention', () => {
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    assert.equal(manifest.filename, `bucketer-v${pkg.version}.html`);
+  });
+
+  test('manifest.hashes.sha256 matches actual SHA-256 of dist/index.html', () => {
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
+    const expected = createHash('sha256')
+      .update(readFileSync(resolve(ROOT, 'dist/index.html')))
+      .digest('hex');
+    assert.equal(manifest.hashes.sha256, expected);
   });
 });
 
