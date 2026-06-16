@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.22.4] — 2026-06-16 — Fix: upload completion no longer resets browser to root (BUG-029)
+
+After an upload batch drained, the file browser remounted and dropped the user back at the bucket root — wiping the URL hash `?prefix=...`, the active selection, and any filter. The fix routes the upload-completion signal through a new `onUploadsDrained(prefixSet)` action on Browser: it invalidates the listing cache only for prefixes that received successful uploads, and refetches the current view in place only if the user is still in one of them. If the user navigated away mid-upload, the view does not change. See `BUG-LOG.md` BUG-029 for the full trace.
+
 ## [1.22.3] — 2026-06-14 — Chore: reconcile package-lock.json version
 
 `package-lock.json` had been drifting since pre-v1.17.0 — both the root `version` field and the `packages.""` entry were stuck at `1.16.0` while `package.json` advanced to `1.22.2`. The release workflow never updated the lock, so the drift was invisible to the build invariants and to the integrity check (which only hashes `dist/index.html`). This entry reconciles the lock against `package.json` via `npm install --package-lock-only`. No dependency changes.

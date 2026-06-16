@@ -1,9 +1,15 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.22.3';
+export const CURRENT_VERSION = '1.22.4';
 
 export const CHANGELOG = [
+  {
+    "version": "1.22.4",
+    "date": "2026-06-16",
+    "title": "Fix: upload completion no longer resets browser to root (BUG-029)",
+    "changes": []
+  },
   {
     "version": "1.22.3",
     "date": "2026-06-14",

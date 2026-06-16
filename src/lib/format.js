@@ -28,6 +28,14 @@ export function leafName(key) {
   return i >= 0 ? key.slice(i + 1) : key;
 }
 
+// Parent prefix of an object key (everything up to and including the last /).
+// Returns '' for root-level keys (no slash). Mirrors how Browser keys its
+// listing cache: each prefix string ends in '/', and the root is ''.
+export function parentPrefix(key) {
+  const i = key.lastIndexOf('/');
+  return i >= 0 ? key.slice(0, i + 1) : '';
+}
+
 // Normalize AWS SDK v3 error objects (§4.10, §4.12). Provider implementations use
 // varying field names (Code vs name, $metadata.httpStatusCode, etc.). parseS3Error
 // extracts canonical fields. isPermissionError detects AccessDenied / 403 / 401 to

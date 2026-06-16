@@ -20,7 +20,7 @@
 // Peak RAM at defaults: 3 files × 4 parts × 5 MiB = 60 MiB.
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import { PutObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand } from '@aws-sdk/client-s3';
-import { isPermissionError } from '../lib/format.js';
+import { isPermissionError, parentPrefix } from '../lib/format.js';
 import {
   saveResumeRecord, loadResumeRecord, deleteResumeRecord,
   buildFileIdentityWithHash, fileIdentityMatches, computeFileHash,
@@ -75,16 +75,25 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   const canUpload = capabilities.upload !== 'denied';
   const hadActiveRef = useRef(false);
   const lastLoggedPartsPerFileRef = useRef(null);
+  // Parent prefixes of files that have completed (status='done') since the last
+  // drain fire. Passed to onUploadsComplete so Browser can invalidate the right
+  // listing-cache entries and refetch only when the user is actually viewing
+  // an affected folder. See BUG-029.
+  const drainedPrefixesRef = useRef(new Set());
 
   const [destinationPrefix, setDestinationPrefix] = useState(currentPrefix || '');
   // Keep in sync with browser navigation, but let the user override by typing
   useEffect(() => { setDestinationPrefix(currentPrefix || ''); }, [currentPrefix]);
 
-  // Fire onUploadsComplete once when the queue fully drains (no uploading/queued items left)
+  // Fire onUploadsComplete once when the queue fully drains (no uploading/queued items left).
+  // Passes the set of parent prefixes that received at least one successful upload this drain
+  // cycle, then resets the accumulator for the next batch.
   useEffect(() => {
     const hasActive = items.some(itemIsActive);
     if (hadActiveRef.current && !hasActive && items.length > 0) {
-      onUploadsComplete?.();
+      const drained = drainedPrefixesRef.current;
+      drainedPrefixesRef.current = new Set();
+      onUploadsComplete?.(drained);
     }
     hadActiveRef.current = hasActive;
   }, [items, onUploadsComplete]);
@@ -236,6 +245,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       const completedAt = Date.now();
       const durationSec = (completedAt - startTime) / 1000;
       updateItem(id, { status: 'done', progress: 100 }, true);
+      drainedPrefixesRef.current.add(parentPrefix(destinationKey));
       onCapabilityChange('upload', 'permitted');
       debugConcurrency('file-complete', {
         file: file.name,

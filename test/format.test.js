@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatBytes, formatSpeed, formatEta, leafName, isPermissionError, parseS3Error, isBlockedByExtension } from '../src/lib/format.js';
+import { formatBytes, formatSpeed, formatEta, leafName, parentPrefix, isPermissionError, parseS3Error, isBlockedByExtension } from '../src/lib/format.js';
 
 describe('formatBytes — invalid input returns em dash (T4-4)', () => {
   // formatBytes only guards for === 0. null/undefined/NaN/negative produce "NaN undefined"
@@ -49,6 +49,20 @@ describe('leafName', () => {
   test('trailing slash → empty string', () => assert.equal(leafName('folder/'), ''));
   test('empty string', () => assert.equal(leafName(''), ''));
   test('key with many segments', () => assert.equal(leafName('a/b/c/d/e/f.jpg'), 'f.jpg'));
+});
+
+describe('parentPrefix', () => {
+  test('no slashes → root (empty string)', () => assert.equal(parentPrefix('file.txt'), ''));
+  test('single folder', () => assert.equal(parentPrefix('folder/file.txt'), 'folder/'));
+  test('deeply nested', () => assert.equal(parentPrefix('a/b/c/file.txt'), 'a/b/c/'));
+  test('trailing slash → keeps trailing slash', () => assert.equal(parentPrefix('folder/'), 'folder/'));
+  test('empty string → root', () => assert.equal(parentPrefix(''), ''));
+  test('always ends with / when non-empty (matches Browser cache key)', () => {
+    for (const key of ['a/b.jpg', 'a/b/c.jpg', 'photos/2024/img.png']) {
+      const p = parentPrefix(key);
+      assert.ok(p === '' || p.endsWith('/'), `parentPrefix("${key}") = "${p}" must be '' or end with /`);
+    }
+  });
 });
 
 describe('isPermissionError', () => {

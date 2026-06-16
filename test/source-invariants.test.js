@@ -1182,3 +1182,94 @@ describe('Browser.jsx — file-mtime loading is opt-in (default off)', () => {
     );
   });
 });
+
+// ── BUG-029: onUploadsComplete must not remount Browser ────────────────────────
+// Wiring onUploadsComplete to setBrowserKey forced a full Browser remount when
+// the upload queue drained. The remount reset prefix to root (because the
+// post-mount initial-state branch ignores isFirstMount=false), nuked the URL
+// hash prefix param via replaceState, and reset selection / filter / listing
+// cache. Net effect: every upload teleported the user back to the bucket root,
+// regardless of which folder they were viewing — including folders they had
+// nothing to do with the upload (e.g. uploaded to A, navigated to B mid-upload,
+// got reset to root). Fix: pass the set of completed parent prefixes from
+// UploadQueue, invalidate just those cache entries, and refetch only if the
+// user is still in one of them.
+
+describe('App.jsx — onUploadsComplete must not remount Browser (BUG-029)', () => {
+  const source = src('components/App.jsx');
+
+  test('onUploadsComplete handler does not call setBrowserKey', () => {
+    const m = source.match(/onUploadsComplete\s*=\s*\{([^}]+)\}/);
+    assert.ok(m, 'App.jsx must wire onUploadsComplete on the UploadQueue component');
+    assert.ok(
+      !/setBrowserKey/.test(m[1]),
+      `onUploadsComplete handler must not call setBrowserKey — that triggers a full ` +
+      `Browser remount which resets prefix, URL hash, selection, and filter. ` +
+      `Current handler: ${m[1].trim()}`
+    );
+  });
+
+  test('onUploadsComplete handler delegates to browserActionsRef.onUploadsDrained', () => {
+    const m = source.match(/onUploadsComplete\s*=\s*\{([^}]+)\}/);
+    assert.ok(m, 'App.jsx must wire onUploadsComplete on the UploadQueue component');
+    assert.ok(
+      /browserActionsRef[\s\S]*onUploadsDrained/.test(m[1]),
+      `onUploadsComplete handler must delegate to browserActionsRef.current.onUploadsDrained — ` +
+      `that method does targeted cache invalidation per affected prefix and refetches only ` +
+      `when the user is in one of them. Current handler: ${m[1].trim()}`
+    );
+  });
+});
+
+describe('Browser.jsx — onUploadsDrained action exposed via onMount (BUG-029)', () => {
+  const source = src('components/Browser.jsx');
+
+  test('onMount payload includes onUploadsDrained', () => {
+    assert.ok(
+      /onMount\?\.\(\s*\{[^}]*onUploadsDrained[^}]*\}\s*\)/.test(source),
+      'Browser.jsx must expose onUploadsDrained via the onMount actions object — ' +
+      'App.jsx calls it through browserActionsRef.current after each upload batch drains'
+    );
+  });
+
+  test('onUploadsDrained function is defined and uses prefixRef + invalidateCache + fetchPage', () => {
+    const m = source.match(/function\s+onUploadsDrained\s*\([^)]*\)\s*\{([\s\S]*?)\n  \}/);
+    assert.ok(m, 'Browser.jsx must define an onUploadsDrained function');
+    const body = m[1];
+    assert.ok(/invalidateCache/.test(body), 'onUploadsDrained must invalidate cache for each completed prefix');
+    assert.ok(/fetchPage/.test(body),       'onUploadsDrained must refetch the current prefix when affected');
+    assert.ok(/prefixRef/.test(body),       'onUploadsDrained must read prefixRef (live prefix) not the captured closure');
+  });
+});
+
+describe('UploadQueue.jsx — onUploadsComplete passes drained prefix set (BUG-029)', () => {
+  const source = src('components/UploadQueue.jsx');
+
+  test('drainedPrefixesRef accumulator declared', () => {
+    assert.ok(
+      /drainedPrefixesRef\s*=\s*useRef\(\s*new Set\(\)\s*\)/.test(source),
+      'UploadQueue.jsx must declare drainedPrefixesRef as a useRef(new Set()) — ' +
+      'this accumulates parent prefixes of successful uploads since the last drain fire'
+    );
+  });
+
+  test('drain effect passes the accumulator and resets it', () => {
+    assert.ok(
+      /onUploadsComplete\?\.\(\s*drained\s*\)/.test(source),
+      'UploadQueue.jsx drain effect must call onUploadsComplete?.(drained) so App can route the affected-prefixes set to Browser'
+    );
+    assert.ok(
+      /drainedPrefixesRef\.current\s*=\s*new Set\(\)/.test(source),
+      'UploadQueue.jsx drain effect must reset drainedPrefixesRef to a fresh Set so the next batch starts clean'
+    );
+  });
+
+  test('success path records parentPrefix(destinationKey)', () => {
+    assert.ok(
+      /drainedPrefixesRef\.current\.add\(\s*parentPrefix\(destinationKey\)\s*\)/.test(source),
+      'UploadQueue.jsx must call drainedPrefixesRef.current.add(parentPrefix(destinationKey)) ' +
+      'right after marking an item status:"done" — this is the seam between per-file completion ' +
+      'and per-batch drain notification'
+    );
+  });
+});

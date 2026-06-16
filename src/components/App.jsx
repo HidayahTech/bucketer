@@ -498,7 +498,7 @@ export function App() {
               credentials={credentials}
               onCapabilityChange={handleCapabilityChange}
               capabilities={capabilities}
-              onUploadsComplete={() => setBrowserKey(k => k + 1)}
+              onUploadsComplete={(prefixSet) => browserActionsRef.current?.onUploadsDrained?.(prefixSet)}
               onLogEntry={() => {
                 if (logKeyDebounceRef.current) return;
                 logKeyDebounceRef.current = setTimeout(() => {

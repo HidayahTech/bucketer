@@ -4,6 +4,46 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-029 — Upload completion teleports user to bucket root
+
+**Date:** 2026-06-16
+
+**Symptom:**
+After uploading any file or batch of files into a subfolder, the file browser would jump back to the bucket root once the queue drained. The URL hash `?prefix=...` was wiped (via `replaceState`, so the back button did not restore the previous view), and any in-progress selection or filter was cleared. The behaviour was the same regardless of where the user had navigated *to* during the upload — uploading into `a/` then navigating to `b/` mid-upload still ended at root, not at `b/` and not at `a/`.
+
+**Root cause:**
+`App.jsx` wired `onUploadsComplete={() => setBrowserKey(k => k + 1)}` on `<UploadQueue/>`. Incrementing `browserKey` changed the `key` prop on `<Browser/>`, which forced Preact to unmount and remount the component. The remounted Browser initialised `prefix` from this branch:
+
+```js
+const [prefix, setPrefix] = useState(() => {
+  if (isFirstMount) return URL_HASH_PREFIX_OR_EMPTY;
+  return '';
+});
+```
+
+`isFirstMount` is `browserKey === 0` — false on any remount. So the new instance always started at root, then `navigateTo('', { historyMode: 'replace' })` ran in the initial-load effect, which wiped the URL hash prefix and fetched the root listing. The remount-on-key-change mechanism was intended for genuine reset events (reconnect, disconnect, refresh-permissions); reusing it for "the upload queue drained" was overkill and surprising.
+
+The mechanism was probably picked because it conveniently invalidates the in-memory listing cache as a side effect of unmounting. A targeted invalidate-and-refetch was already available — `handleRefresh()` and the post-rename path both use `invalidateCache(prefix); fetchPage(prefix, null, true);` — but `onUploadsComplete` did not use it.
+
+**Fix:**
+Three coordinated changes:
+
+- `UploadQueue.jsx` accumulates the parent prefix of every successful upload in a `drainedPrefixesRef = useRef(new Set())`. When the queue drains, the ref's `Set` is passed to `onUploadsComplete(drainedSet)` and reset.
+- `Browser.jsx` exposes a new action `onUploadsDrained(prefixSet)` via the `onMount` payload. It invalidates the cache entry for each affected prefix (so a later navigation back picks up the new files), and refetches the current listing only if `prefixRef.current` (a live mirror of `prefix`) is in the set.
+- `App.jsx` rewires `onUploadsComplete={(prefixSet) => browserActionsRef.current?.onUploadsDrained?.(prefixSet)}`. The `setBrowserKey(k => k + 1)` call is gone.
+
+Net effect: the user stays exactly where they are. If they were in the upload target, the listing refreshes in place. If they navigated away, only the cache for the affected prefix is invalidated — no network traffic, no visible change, and the cached stale listing is rebuilt on next visit.
+
+**Why it wasn't caught earlier:**
+- The reset-to-root behaviour worked "correctly enough" for the common case where the user uploads into a folder, watches it finish, and was about to refresh anyway. The bug only surfaces when the user navigates away mid-upload, or cares about retaining selection / filter / URL state across an upload.
+- No test covered the upload → navigation interaction. Component tests stop at single-component boundaries; the App-level integration was implicit.
+- The reset was buried two levels of indirection deep (`setBrowserKey` → `key={browserKey}` → `isFirstMount={browserKey === 0}` → initial-state branch in Browser) and looked like normal reconnect handling at each layer.
+
+**Test case:**
+A source-invariant assertion that `App.jsx`'s `onUploadsComplete` handler does NOT call `setBrowserKey` and DOES delegate to `browserActionsRef.current.onUploadsDrained`. Plus structural checks that `UploadQueue.jsx` accumulates parent prefixes per success and passes them to the drain callback, and that `Browser.jsx` exposes `onUploadsDrained` via `onMount`. These prevent re-introducing the remount lever for this code path without forcing the test author to also think about the prefix/selection/URL reset side effects. See `test/source-invariants.test.js` describes under "BUG-029".
+
+---
+
 ## BUG-028 — Custom object metadata invisible to browser despite being stored on S3
 
 **Date:** 2026-06-12

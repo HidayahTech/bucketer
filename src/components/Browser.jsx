@@ -93,6 +93,10 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const navigatePreviewRef = useRef(null);
   // Capture the prefix value at mount time for the initial history replaceState
   const initialPrefixRef = useRef(prefix);
+  // Live mirror of the current prefix, so actions exposed via onMount (captured once
+  // at mount with [] deps) can read the up-to-date value without stale-closure bugs.
+  const prefixRef = useRef(prefix);
+  prefixRef.current = prefix;
   // cacheKey = `${bucket}:${Key}:${lastModifiedMs}` — includes S3 LastModified for auto-invalidation on file replace
   const fileMtimeCacheRef = useRef(new Map());
   const [, setMtimeCacheVer] = useState(0);
@@ -111,7 +115,20 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     }
   }
 
-  useEffect(() => { onMount?.({ removeItems, invalidateCache }); }, []);
+  useEffect(() => { onMount?.({ removeItems, invalidateCache, onUploadsDrained }); }, []);
+
+  // Called by App when an upload batch fully drains. prefixSet is the set of
+  // parent prefixes that received at least one successful upload. We invalidate
+  // their cached listings so a later navigation back shows the new files, and
+  // refetch only if the user is currently viewing one of those prefixes (BUG-029).
+  // Previously: App incremented browserKey, which remounted Browser and reset
+  // the view to root, losing prefix, URL hash, selection, filter — even when
+  // the user had navigated away from the upload target during the upload.
+  function onUploadsDrained(prefixSet) {
+    if (!prefixSet || prefixSet.size === 0) return;
+    for (const p of prefixSet) invalidateCache(p);
+    if (prefixSet.has(prefixRef.current)) fetchPage(prefixRef.current, null, true);
+  }
 
   // Reset file-mtime state when the user switches buckets
   useEffect(() => {
