@@ -45,6 +45,7 @@ import { ChangelogModal } from './ChangelogModal.jsx';
 import { AboutModal } from './AboutModal.jsx';
 import { ProfilePicker } from './ProfilePicker.jsx';
 import { StorageModal } from './StorageModal.jsx';
+import { DuplicatesModal } from './DuplicatesModal.jsx';
 import { CURRENT_VERSION } from '../lib/changelog.js';
 import { useWindowDragDrop } from '../hooks/useWindowDragDrop.js';
 import { useModalStates } from '../hooks/useModalStates.js';
@@ -76,7 +77,7 @@ export function App() {
   const [logKey, setLogKey] = useState(0);         // incremented to refresh upload log
   const [linkCopied, setLinkCopied] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { changelogOpen, setChangelogOpen, aboutOpen, setAboutOpen, storageOpen, setStorageOpen } = useModalStates();
+  const { changelogOpen, setChangelogOpen, aboutOpen, setAboutOpen, storageOpen, setStorageOpen, duplicatesOpen, setDuplicatesOpen } = useModalStates();
   const [liveFormData, setLiveFormData] = useState(credentials);
   const [updateCheckEnabled, setUpdateCheckEnabled] = useState(() => loadUpdateCheckEnabled());
   const [prefetchSizeLimit, setPrefetchSizeLimit] = useState(() => loadPrefetchSizeLimit());
@@ -326,6 +327,17 @@ export function App() {
       {changelogOpen && <ChangelogModal onClose={() => setChangelogOpen(false)} />}
       {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}
       {storageOpen && <StorageModal onClose={() => setStorageOpen(false)} isConnected={session === 'connected'} />}
+      {duplicatesOpen && session === 'connected' && (
+        <DuplicatesModal
+          client={client}
+          bucket={credentials.bucket}
+          currentPrefix={currentPrefix}
+          provider={credentials.provider}
+          capabilities={capabilities}
+          onDeleteRequest={handleDeleteRequest}
+          onClose={() => setDuplicatesOpen(false)}
+        />
+      )}
       <header class="app-header">
         {session === 'connected' && (
           <button
@@ -355,8 +367,19 @@ export function App() {
             {linkCopied && <span style={{ fontSize: '.8rem', color: '#86efac' }}>✓ Copied</span>}
           </>
         )}
+        {session === 'connected' && capabilities.list !== 'denied' && (
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            style={{ color: '#fff', borderColor: 'rgba(255,255,255,.4)' }}
+            onClick={() => setDuplicatesOpen(true)}
+            title="Scan this bucket or folder for duplicate files"
+          >
+            Find duplicates
+          </button>
+        )}
         {session === 'connected' && (
-          <button class="btn btn-ghost btn-sm" style={{ color: '#fff', borderColor: 'rgba(255,255,255,.4)' }} onClick={handleDisconnect}>
+          <button type="button" class="btn btn-ghost btn-sm" style={{ color: '#fff', borderColor: 'rgba(255,255,255,.4)' }} onClick={handleDisconnect}>
             Disconnect
           </button>
         )}

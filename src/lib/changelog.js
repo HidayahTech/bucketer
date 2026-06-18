@@ -1,9 +1,21 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.22.4';
+export const CURRENT_VERSION = '1.23.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.23.0",
+    "date": "2026-06-17",
+    "title": "Duplicate detection (iteration 1: scan + verify, read-only)",
+    "changes": [
+      "**Tiered, provider-agnostic detection** (src/lib/dedup-scan.js) — narrows candidates cheaply: free size grouping → one HeadObject per same-size object (deriving a trusted single-part ETag-MD5, our content-hash stamp, and the multipart/encryption flags) → an opportunistic, **AWS-only** GetObjectAttributes checksum adapter. The engine only ever lists and HEADs; it never mutates an object.",
+      "**Byte-for-byte verification is the only deletion gate** (src/lib/verify-bytes.js). No hash decides identity: MD5 and SHA-1 are broken for collision resistance and even SHA-256 is a hash, so matches are shown as **candidates** and a streaming byte-for-byte comparison (immune to any hash collision, low memory, early-abort) is what promotes a group to **verified**.",
+      "**Content-hash stamp on upload** — every upload now records x-amz-meta-bucketer-content-hash with a self-describing value (sha256-ht64k:<hex>, the existing head/tail sample) as a cheap candidate filter for future scans. The hash is computed once and reused for the multipart resume record. Works on every provider, including those that expose no usable server-side checksum.",
+      "**Strict, fail-loud provider adapter** (src/lib/provider-checksum.js) — accepts a provider checksum only in an exact full-object shape, falls back to the universal tiers otherwise, and console.warns genuinely unexpected shapes so they can be reported and the adapter refined from real data. Other providers get an adapter only once probe output confirms one.",
+      "**Report UI** (src/components/DuplicatesModal.jsx) — candidate/verified badges, per-group keep-selection (default: oldest copy), and read-only per-object download/preview/copy-link. **Delete others** and **Move others** render as disabled stubs in this iteration."
+    ]
+  },
   {
     "version": "1.22.4",
     "date": "2026-06-16",

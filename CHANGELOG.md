@@ -7,6 +7,18 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.23.0] — 2026-06-17 — Duplicate detection (iteration 1: scan + verify, read-only)
+
+Adds an on-demand, read-only **"Find duplicates"** scan that groups identical objects in the current folder or the whole bucket and reports how much storage is redundant. This first iteration is intentionally non-destructive so the detection and verification workflow can pass human review before any delete/move is enabled.
+
+- **Tiered, provider-agnostic detection** (`src/lib/dedup-scan.js`) — narrows candidates cheaply: free size grouping → one `HeadObject` per same-size object (deriving a trusted single-part ETag-MD5, our content-hash stamp, and the multipart/encryption flags) → an opportunistic, **AWS-only** `GetObjectAttributes` checksum adapter. The engine only ever lists and HEADs; it never mutates an object.
+- **Byte-for-byte verification is the only deletion gate** (`src/lib/verify-bytes.js`). No hash decides identity: MD5 and SHA-1 are broken for collision resistance and even SHA-256 is a hash, so matches are shown as **candidates** and a streaming byte-for-byte comparison (immune to any hash collision, low memory, early-abort) is what promotes a group to **verified**.
+- **Content-hash stamp on upload** — every upload now records `x-amz-meta-bucketer-content-hash` with a self-describing value (`sha256-ht64k:<hex>`, the existing head/tail sample) as a cheap candidate filter for future scans. The hash is computed once and reused for the multipart resume record. Works on every provider, including those that expose no usable server-side checksum.
+- **Strict, fail-loud provider adapter** (`src/lib/provider-checksum.js`) — accepts a provider checksum only in an exact full-object shape, falls back to the universal tiers otherwise, and `console.warn`s genuinely unexpected shapes so they can be reported and the adapter refined from real data. Other providers get an adapter only once probe output confirms one.
+- **Report UI** (`src/components/DuplicatesModal.jsx`) — candidate/verified badges, per-group keep-selection (default: oldest copy), and read-only per-object download/preview/copy-link. **Delete others** and **Move others** render as disabled stubs in this iteration.
+
+No existing object is ever rewritten (no checksum backfill) and the CORS template is unchanged.
+
 ## [1.22.4] — 2026-06-16 — Fix: upload completion no longer resets browser to root (BUG-029)
 
 After an upload batch drained, the file browser remounted and dropped the user back at the bucket root — wiping the URL hash `?prefix=...`, the active selection, and any filter. The fix routes the upload-completion signal through a new `onUploadsDrained(prefixSet)` action on Browser: it invalidates the listing cache only for prefixes that received successful uploads, and refetches the current view in place only if the user is still in one of them. If the user navigated away mid-upload, the view does not change. See `BUG-LOG.md` BUG-029 for the full trace.

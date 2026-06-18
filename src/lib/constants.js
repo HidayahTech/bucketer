@@ -58,3 +58,23 @@ export const COPY_LINK_PRESETS = [
 // S3 custom metadata key for the original file modification time.
 // Stored as x-amz-meta-file-mtime in object metadata; value is ISO 8601.
 export const FILE_MTIME_KEY = 'file-mtime';
+
+// Duplicate detection — Bucketer's own content-hash stamp (§ duplicate-detection).
+// App-namespaced custom metadata key, stored as x-amz-meta-bucketer-content-hash.
+// The value is self-describing ("<scheme>:<hex>") so the algorithm + method are
+// derivable and future schemes never cross-match. See src/lib/content-hash.js.
+// This stamp is only ever a *candidate filter* for dedup — never a deletion gate;
+// byte-for-byte comparison is what confirms identity.
+export const CONTENT_HASH_KEY = 'bucketer-content-hash';
+
+// Current stamp scheme: SHA-256 of the first + last 64 KiB of the file
+// (computeFileHash in file-identity.js). "ht64k" = head/tail 64 KiB sample.
+export const CONTENT_HASH_SCHEME = 'sha256-ht64k';
+
+// Duplicate scan: concurrent HeadObject calls when probing size-collision groups.
+// Matches the delete-queue worker-pool width to avoid 503 throttling on large sets.
+export const DEDUP_HEAD_CONCURRENCY = 8;
+
+// Duplicate verify: above this size, byte-for-byte verification is still allowed but
+// the UI must show the estimated egress and require an explicit confirmation first.
+export const DEDUP_VERIFY_MAX_BYTES = 256 * 1024 * 1024; // 256 MiB

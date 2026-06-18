@@ -1095,22 +1095,38 @@ describe('indexeddb.js — is a barrel re-export (no new logic)', () => {
   });
 });
 
-describe('UploadQueue.jsx — file-mtime set on both upload paths', () => {
+describe('UploadQueue.jsx — object metadata set on both upload paths', () => {
   const source = src('components/UploadQueue.jsx');
 
-  test('uploadSmall PutObjectCommand includes FILE_MTIME_KEY metadata', () => {
+  // Both upload paths build their S3 Metadata via buildUploadMetadata(file, hashValue),
+  // which always stamps the original file mtime (FILE_MTIME_KEY) and, when a hash is
+  // available, Bucketer's content-hash stamp (a duplicate-detection candidate filter).
+  // upload-metadata.test.js pins that the mtime is always present and the hash key is
+  // omitted when absent.
+  function uploadSmallBody() {
     const fnStart = source.indexOf('async function uploadSmall(');
     assert.ok(fnStart !== -1, 'uploadSmall must exist in UploadQueue.jsx');
     const fnEnd = source.indexOf('\n  async function ', fnStart + 1);
-    const fn = source.slice(fnStart, fnEnd > fnStart ? fnEnd : fnStart + 600);
+    return source.slice(fnStart, fnEnd > fnStart ? fnEnd : fnStart + 800);
+  }
+
+  test('uploadSmall PutObjectCommand sets Metadata via buildUploadMetadata', () => {
     assert.ok(
-      fn.includes('FILE_MTIME_KEY') || fn.includes('file-mtime'),
-      'uploadSmall must set FILE_MTIME_KEY in PutObjectCommand Metadata — the original ' +
+      uploadSmallBody().includes('buildUploadMetadata('),
+      'uploadSmall must set PutObjectCommand Metadata via buildUploadMetadata — the original ' +
       'file modification time is discarded without this; once lost, it cannot be recovered'
     );
   });
 
-  test('uploadMultipart CreateMultipartUploadCommand includes FILE_MTIME_KEY metadata', () => {
+  test('uploadSmall stamps the content hash (buildContentHashValue)', () => {
+    assert.ok(
+      uploadSmallBody().includes('buildContentHashValue('),
+      'uploadSmall must stamp the content hash so the object is a cheap duplicate-detection ' +
+      'candidate on a later scan'
+    );
+  });
+
+  test('uploadMultipart CreateMultipartUploadCommand sets Metadata via buildUploadMetadata', () => {
     const fnStart = source.indexOf('async function uploadMultipart(');
     assert.ok(fnStart !== -1, 'uploadMultipart must exist in UploadQueue.jsx');
     // CreateMultipartUploadCommand is the first S3 call in this function
@@ -1119,9 +1135,20 @@ describe('UploadQueue.jsx — file-mtime set on both upload paths', () => {
     const callEnd = source.indexOf('})', createStart);
     const call = source.slice(createStart, callEnd + 2);
     assert.ok(
-      call.includes('FILE_MTIME_KEY') || call.includes('file-mtime'),
-      'uploadMultipart CreateMultipartUploadCommand must include file-mtime Metadata — ' +
+      call.includes('buildUploadMetadata('),
+      'uploadMultipart CreateMultipartUploadCommand must set Metadata via buildUploadMetadata — ' +
       'multipart metadata must be set at creation, not in UploadPartCommand'
+    );
+  });
+
+  test('uploadMultipart computes the hash once and stamps it', () => {
+    const fnStart = source.indexOf('async function uploadMultipart(');
+    const fnEnd = source.indexOf('\n  async function ', fnStart + 1);
+    const fn = source.slice(fnStart, fnEnd > fnStart ? fnEnd : fnStart + 4000);
+    assert.ok(
+      fn.includes('computeFileHash(file)') && fn.includes('buildContentHashValue('),
+      'uploadMultipart must compute the content hash once and stamp it (reusing it for the ' +
+      'resume record), so the object is a cheap duplicate-detection candidate on a later scan'
     );
   });
 });
@@ -1271,5 +1298,28 @@ describe('UploadQueue.jsx — onUploadsComplete passes drained prefix set (BUG-0
       'right after marking an item status:"done" — this is the seam between per-file completion ' +
       'and per-batch drain notification'
     );
+  });
+});
+
+describe('DuplicatesModal.jsx — buttons declare an explicit type (BUG-006)', () => {
+  const source = src('components/DuplicatesModal.jsx');
+
+  test('every <button> sets an explicit type attribute', () => {
+    const buttons = source.match(/<button[^>]*>/g) || [];
+    assert.ok(buttons.length > 0, 'DuplicatesModal.jsx should contain buttons');
+    for (const b of buttons) {
+      assert.ok(/\btype=/.test(b), `button without an explicit type would default to submit: ${b}`);
+    }
+  });
+
+  test('Delete others and Move others are rendered disabled in iteration 1', () => {
+    // Destructive actions must not be operable until the detection/verification workflow
+    // passes UAT (iteration 2), and even then only for verified groups.
+    for (const cls of ['dup-delete', 'dup-move']) {
+      const idx = source.indexOf(cls);
+      assert.ok(idx !== -1, `${cls} button must exist`);
+      const tag = source.slice(source.lastIndexOf('<button', idx), source.indexOf('>', idx) + 1);
+      assert.ok(/\bdisabled\b/.test(tag), `${cls} must be rendered disabled in iteration 1: ${tag}`);
+    }
   });
 });

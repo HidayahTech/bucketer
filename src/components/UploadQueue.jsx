@@ -23,14 +23,16 @@ import { PutObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, Comp
 import { isPermissionError, parentPrefix } from '../lib/format.js';
 import {
   saveResumeRecord, loadResumeRecord, deleteResumeRecord,
-  buildFileIdentityWithHash, fileIdentityMatches, computeFileHash,
+  buildFileIdentity, fileIdentityMatches, computeFileHash,
   uploadExpiryWarningMs,
   markUploadActive, markUploadInactive, isUploadActiveElsewhere,
   saveUploadLogEntry,
 } from '../lib/indexeddb.js';
 import { UploadQueue as Queue, calcPartSize, collectParts, preparePutBody, uploadPartsWithPool } from '../lib/upload-queue.js';
 import { loadPartConcurrency, loadPartSizeMB, loadFileConcurrency, loadUploadExpandThreshold, loadAdaptiveMode } from '../lib/storage.js';
-import { MULTIPART_THRESHOLD, DEFAULT_FILE_CONCURRENCY, PART_CONCURRENCY, ADAPTIVE_CONNECTION_BUDGET, PROBE_THRESHOLD_PARTS, MAX_ADAPTIVE_MEMORY_BYTES, FILE_MTIME_KEY } from '../lib/constants.js';
+import { MULTIPART_THRESHOLD, DEFAULT_FILE_CONCURRENCY, PART_CONCURRENCY, ADAPTIVE_CONNECTION_BUDGET, PROBE_THRESHOLD_PARTS, MAX_ADAPTIVE_MEMORY_BYTES } from '../lib/constants.js';
+import { buildUploadMetadata } from '../lib/upload-metadata.js';
+import { buildContentHashValue } from '../lib/content-hash.js';
 import { calcAdaptiveConcurrency, createProbeState, resolveProbe, capConcurrencyByMemory } from '../lib/concurrency-strategy.js';
 import { isActive as itemIsActive, isFailed as itemIsFailed, isPaused as itemIsPaused } from '../lib/upload-status.js';
 import { abortMultipartSession } from '../lib/upload-cleanup.js';
@@ -316,11 +318,12 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
 
     onProgress(0, file.size);
     const body = await preparePutBody(file); // BUG-003: must be Uint8Array, not Blob
+    const contentHash = await computeFileHash(file);
     await client.send(
       new PutObjectCommand({
         Bucket: bucket, Key: destinationKey, Body: body,
         ContentType: file.type || 'application/octet-stream',
-        Metadata: { [FILE_MTIME_KEY]: new Date(file.lastModified).toISOString() },
+        Metadata: buildUploadMetadata(file, buildContentHashValue(contentHash)),
       }),
       { abortSignal: controller.signal }
     );
@@ -332,10 +335,15 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     const partSize = calcPartSize(file.size, preferredBytes);
     const totalParts = Math.ceil(file.size / partSize);
 
+    // Compute the content hash once, up front: it stamps the object metadata (a cheap
+    // duplicate-detection filter) and is reused for the resume record below — avoiding a
+    // second hash pass over the file.
+    const contentHash = await computeFileHash(file);
+
     const { UploadId: uploadId } = await client.send(new CreateMultipartUploadCommand({
       Bucket: bucket, Key: destinationKey,
       ContentType: file.type || 'application/octet-stream',
-      Metadata: { [FILE_MTIME_KEY]: new Date(file.lastModified).toISOString() },
+      Metadata: buildUploadMetadata(file, buildContentHashValue(contentHash)),
     }));
 
     const abortController = new AbortController();
@@ -343,7 +351,10 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
 
     // Save resume record before any parts so a crash mid-upload is recoverable
     try {
-      const fileIdentity = await buildFileIdentityWithHash(file);
+      // BUG-008: the content hash must be on the identity BEFORE saveResumeRecord so a
+      // crash between save and a later hash write can't leave a record without one.
+      const fileIdentity = buildFileIdentity(file);
+      if (contentHash) fileIdentity.contentHash = contentHash;
       await saveResumeRecord({
         provider, endpoint: credentials.endpoint, bucket, destinationKey,
         uploadId, partSize, fileIdentity, startedAt: Date.now(),

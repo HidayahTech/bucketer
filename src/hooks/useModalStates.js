@@ -15,8 +15,14 @@
 import { useState } from 'preact/hooks';
 
 export function useModalStates() {
-  const [changelogOpen, setChangelogOpen] = useState(false);
-  const [aboutOpen,     setAboutOpen]     = useState(false);
-  const [storageOpen,   setStorageOpen]   = useState(false);
-  return { changelogOpen, setChangelogOpen, aboutOpen, setAboutOpen, storageOpen, setStorageOpen };
+  const [changelogOpen,   setChangelogOpen]   = useState(false);
+  const [aboutOpen,       setAboutOpen]       = useState(false);
+  const [storageOpen,     setStorageOpen]     = useState(false);
+  const [duplicatesOpen,  setDuplicatesOpen]  = useState(false);
+  return {
+    changelogOpen, setChangelogOpen,
+    aboutOpen, setAboutOpen,
+    storageOpen, setStorageOpen,
+    duplicatesOpen, setDuplicatesOpen,
+  };
 }
