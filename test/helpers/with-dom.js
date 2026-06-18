@@ -53,8 +53,12 @@ def('MutationObserver', window.MutationObserver);
 def('requestAnimationFrame', window.requestAnimationFrame ?? ((cb) => setTimeout(cb, 16)));
 def('cancelAnimationFrame',  window.cancelAnimationFrame  ?? clearTimeout);
 
-// Timing and rendering
-def('performance',      window.performance);
+// Timing and rendering. jsdom's window.performance.now() recurses into itself once it is
+// installed as the global `performance` (a jsdom quirk): under an async re-render that calls
+// it, the stack overflows ("Maximum call stack size exceeded"). The source only needs
+// performance.now(), so install a simple non-recursive implementation. This also removes the
+// long-standing jsdom rAF stack-overflow hazard in component tests.
+def('performance',      { now: () => Date.now(), timeOrigin: Date.now() });
 def('getComputedStyle', window.getComputedStyle);
 
 // DOM node constructors (instanceof checks in Preact internals)

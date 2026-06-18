@@ -331,6 +331,7 @@ export function App() {
         <DuplicatesModal
           client={client}
           bucket={credentials.bucket}
+          endpoint={credentials.endpoint}
           currentPrefix={currentPrefix}
           provider={credentials.provider}
           capabilities={capabilities}

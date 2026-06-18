@@ -29,6 +29,18 @@ function group(id, keys, extra = {}) {
 
 const noop = () => {};
 const handlers = { onSelectKeeper: noop, onVerify: noop, onDownload: noop, onPreview: noop, onCopyLink: noop };
+const tick = () => new Promise((r) => setTimeout(r, 0));
+
+const savedRecord = (extra = {}) => ({
+  scope: 'bucket', prefix: '', scannedAt: 1700000000000, objectCount: 30000,
+  groups: [group('g0', ['a', 'b'])],
+  ...extra,
+});
+const modalProps = (over = {}) => ({
+  client: { send: () => Promise.resolve({}) },
+  bucket: 'bk', endpoint: 'https://e', currentPrefix: '', provider: 'aws',
+  capabilities: CAPS, onDeleteRequest: noop, onClose: noop, ...over,
+});
 
 describe('DuplicatesReport — empty', () => {
   test('shows a no-duplicates message when there are no groups', () => {
@@ -108,5 +120,40 @@ describe('DuplicatesModal — idle container', () => {
     assert.ok(query('.dup-scan'), 'a Scan button must be present');
     assert.ok(/duplicate/i.test(text()), 'modal should be titled around duplicates');
     cleanup();
+  });
+});
+
+describe('DuplicatesModal — durable results', () => {
+  test('restores a previously saved scan when reopened (no re-scan needed)', async () => {
+    const view = mount(h(DuplicatesModal, modalProps({ load: async () => savedRecord() })));
+    await tick();
+    assert.ok(/restored from cache/i.test(view.text()), 'shows the restored banner');
+    assert.equal(view.queryAll('.dup-member').length, 2, 'restored group members render');
+    assert.ok(view.query('.dup-clear'), 'a Clear saved control is offered');
+    view.cleanup();
+  });
+
+  test('persists the result after a scan', async () => {
+    let saved = null;
+    const scan = async () => [group('g0', ['a', 'b'])];
+    const view = mount(h(DuplicatesModal, modalProps({ load: async () => null, scan, save: async (rec) => { saved = rec; } })));
+    await tick(); // initial (empty) restore settles
+    fire(view.query('.dup-scan'), 'click');
+    for (let i = 0; i < 20 && !saved; i++) await tick(); // scan resolves → render → persist effect
+    assert.ok(saved, 'save must be called after a scan');
+    assert.equal(saved.groups.length, 1);
+    assert.equal(saved.bucket, 'bk');
+    view.cleanup();
+  });
+
+  test('Clear saved discards the stored scan and returns to idle', async () => {
+    let deleted = false;
+    const view = mount(h(DuplicatesModal, modalProps({ load: async () => savedRecord(), save: async () => {}, del: async () => { deleted = true; } })));
+    await tick();
+    fire(view.query('.dup-clear'), 'click');
+    await tick();
+    assert.equal(deleted, true, 'delete must be called');
+    assert.ok(!/restored from cache/i.test(view.text()), 'the restored banner is gone after clearing');
+    view.cleanup();
   });
 });

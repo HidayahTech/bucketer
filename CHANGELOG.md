@@ -7,6 +7,14 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.24.0] — 2026-06-18 — Duplicate detection: durable results + scrollable report
+
+Follow-up to v1.23.0 from real-world use on a ~30k-object bucket.
+
+- **Durable scan results** — a scan is no longer discarded when the report closes. Results are persisted per (endpoint, bucket) in a new IndexedDB store (`bucketer_dedup_scans`; DB schema bumped v2 → v3) and **restored on reopen**, so a large scan never has to be repeated. Keeper choices and byte-for-byte verifications are saved as they are made (transient progress flags are stripped, so a reload never shows a stuck spinner). The report shows a "Last scan: … · N objects · timestamp · restored from cache" line with **Re-scan** and **Clear saved** controls. Persistence is best-effort: when IndexedDB is unavailable it degrades to a no-op rather than failing the scan. New module `src/lib/dedup-scan-store.js`.
+- **Scrollable, wider report** — the duplicates dialog is now `min(94vw, 920px)` wide and height-capped at `88vh`, with the match list scrolling inside the dialog instead of overflowing the viewport. Long keys/paths wrap rather than truncating.
+- **Test infrastructure** — `test/helpers/with-dom.js` now installs a non-recursive `performance.now()`. jsdom's own `performance.now()` recurses into itself once installed as the global `performance`, overflowing the stack under an async component re-render; this removes that long-standing hazard and unblocks async component tests.
+
 ## [1.23.0] — 2026-06-17 — Duplicate detection (iteration 1: scan + verify, read-only)
 
 Adds an on-demand, read-only **"Find duplicates"** scan that groups identical objects in the current folder or the whole bucket and reports how much storage is redundant. This first iteration is intentionally non-destructive so the detection and verification workflow can pass human review before any delete/move is enabled.

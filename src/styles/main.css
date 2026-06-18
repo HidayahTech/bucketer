@@ -530,6 +530,26 @@ details[open] .upload-log-summary::before { transform: rotate(90deg); }
 }
 .modal-actions { display: flex; justify-content: flex-end; gap: .5rem; }
 
+/* ── Duplicate detection report ──────────────────────────────────────────── */
+/* Wider than a standard dialog (paths are long) and height-capped so the match
+   list scrolls inside the dialog instead of overflowing the viewport. */
+.duplicates-dialog {
+  min-width: 0;
+  max-width: min(94vw, 920px);
+  width: min(94vw, 920px);
+  max-height: 88vh;
+}
+/* The report region grows to fill the dialog and scrolls; the title, scan
+   controls, and footer stay pinned. min-height:0 lets a flex child shrink so
+   overflow-y actually takes effect. */
+.duplicates-dialog .dup-report {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+/* Long keys/paths wrap rather than truncate — the user needs to read the whole path. */
+.dup-member-key { word-break: break-all; }
+
 /* ── Preview modal ───────────────────────────────────────────────────────── */
 .preview-dialog {
   min-width: 0;

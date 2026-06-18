@@ -11,7 +11,7 @@
 // container that runs the read-only scan/verify against S3. The scan/verify functions can be
 // injected (for tests); production uses the real S3-backed implementations below.
 
-import { useState, useCallback } from 'preact/hooks';
+import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Modal } from './Modal.jsx';
@@ -20,6 +20,7 @@ import { PRESIGN_EXPIRES, DEDUP_VERIFY_MAX_BYTES } from '../lib/constants.js';
 import { scanForDuplicates } from '../lib/dedup-scan.js';
 import { providerChecksumAdapter } from '../lib/provider-checksum.js';
 import { verifyAgainstReference } from '../lib/verify-bytes.js';
+import { saveScanResult, loadScanResult, deleteScanResult } from '../lib/dedup-scan-store.js';
 
 // ── Pure presentational report ─────────────────────────────────────────────────
 
@@ -180,31 +181,76 @@ function progressLabel(p) {
   return 'Scanning…';
 }
 
-export function DuplicatesModal({ client, bucket, currentPrefix, provider, capabilities, onDeleteRequest, onClose, scan, verify }) {
+export function DuplicatesModal({ client, bucket, endpoint, currentPrefix, provider, capabilities, onDeleteRequest, onClose, scan, verify, load, save, del }) {
   const [scope, setScope] = useState('prefix');
   const [status, setStatus] = useState('idle');
   const [groups, setGroups] = useState([]);
   const [progress, setProgress] = useState(null);
   const [error, setError] = useState(null);
+  const [scanMeta, setScanMeta] = useState(null); // { scope, prefix, scannedAt, objectCount }
+  const [restored, setRestored] = useState(false);
+
+  // Guards async state updates after the modal closes — the scan/verify/persist promises
+  // can settle after unmount, and updating a torn-down tree throws in some environments.
+  const mounted = useRef(true);
+  useEffect(() => () => { mounted.current = false; }, []);
+
+  const doLoad   = load || (() => loadScanResult(endpoint, bucket));
+  const doSave   = save || ((rec) => saveScanResult(rec));
+  const doDelete = del  || (() => deleteScanResult(endpoint, bucket));
+
+  // Restore the previous scan once, when the report opens — a large scan (tens of
+  // thousands of objects) should never have to be repeated.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const rec = await doLoad();
+      if (cancelled || !rec || !Array.isArray(rec.groups)) return;
+      setGroups(rec.groups);
+      if (rec.scope) setScope(rec.scope);
+      setScanMeta({ scope: rec.scope, prefix: rec.prefix, scannedAt: rec.scannedAt, objectCount: rec.objectCount });
+      setRestored(true);
+      setStatus('done');
+    })();
+    return () => { cancelled = true; };
+  }, []); // open-once restore
+
+  // Persist results whenever they change so keeper choices and verifications survive a
+  // reopen. Transient `verifying` flags are stripped so a reload never shows a stuck spinner.
+  useEffect(() => {
+    if (status !== 'done' || !scanMeta) return;
+    const clean = groups.map((g) => ({ ...g, verifying: false }));
+    Promise.resolve(doSave({
+      endpoint, bucket, scope: scanMeta.scope, prefix: scanMeta.prefix,
+      scannedAt: scanMeta.scannedAt, objectCount: scanMeta.objectCount, groups: clean,
+    })).catch(() => {});
+  }, [groups, scanMeta, status]);
+
+  async function clearSaved() {
+    await Promise.resolve(doDelete()).catch(() => {});
+    if (!mounted.current) return;
+    setGroups([]); setScanMeta(null); setRestored(false); setStatus('idle');
+  }
 
   const runScan = useCallback(async () => {
-    setStatus('scanning'); setError(null); setGroups([]); setProgress(null);
+    setStatus('scanning'); setError(null); setGroups([]); setProgress(null); setRestored(false);
     const prefix = scope === 'bucket' ? '' : (currentPrefix || '');
+    let totalObjects = 0;
+    const onProgress = (p) => { if (p && p.phase === 'listing') totalObjects = p.count; setProgress(p); };
     try {
       const found = scan
         ? await scan({ scope, prefix })
         : await scanForDuplicates(client, bucket, prefix, {
             adapter: providerChecksumAdapter(provider),
-            onProgress: setProgress,
+            onProgress,
           });
-      setGroups(found.map((g, i) => ({
-        ...g,
-        id: g.id || `g${i}`,
-        keeperKey: g.members[0].Key,
-        verifying: false,
-      })));
+      if (!mounted.current) return;
+      const result = found.map((g, i) => ({ ...g, id: g.id || `g${i}`, keeperKey: g.members[0].Key, verifying: false }));
+      setGroups(result);
+      setScanMeta({ scope, prefix, scannedAt: Date.now(), objectCount: totalObjects });
       setStatus('done');
     } catch (err) {
+      if (!mounted.current) return;
       setError(err?.message || String(err));
       setStatus('error');
     }
@@ -235,11 +281,13 @@ export function DuplicatesModal({ client, bucket, currentPrefix, provider, capab
       const results = verify
         ? await verify({ group: g, keeperKey: g.keeperKey, candidateKeys: others })
         : await verifyGroupBytes(client, bucket, g.keeperKey, others);
+      if (!mounted.current) return;
       const allMatch = results.length > 0 && results.every(Boolean);
       setGroups((prev) => prev.map((x) => x.id === gid
         ? { ...x, verifying: false, verified: allMatch, confidence: allMatch ? 'verified' : 'candidate' }
         : x));
     } catch (err) {
+      if (!mounted.current) return;
       setError(err?.message || String(err));
       setGroups((prev) => prev.map((x) => x.id === gid ? { ...x, verifying: false } : x));
     }
@@ -264,9 +312,22 @@ export function DuplicatesModal({ client, bucket, currentPrefix, provider, capab
           </select>
         </label>
         <button type="button" class="btn btn-sm dup-scan" disabled={status === 'scanning'} onClick={runScan}>
-          {status === 'scanning' ? 'Scanning…' : 'Scan'}
+          {status === 'scanning' ? 'Scanning…' : scanMeta ? 'Re-scan' : 'Scan'}
         </button>
+        {scanMeta && status !== 'scanning' && (
+          <button type="button" class="btn btn-ghost btn-sm dup-clear" onClick={clearSaved}
+            title="Discard the saved scan results">Clear saved</button>
+        )}
       </div>
+
+      {scanMeta && status === 'done' && (
+        <p class="hint dup-scanned-meta" style={{ margin: 0 }}>
+          Last scan: {scanMeta.scope === 'bucket' ? 'whole bucket' : `folder ${scanMeta.prefix || '(root)'}`}
+          {scanMeta.objectCount ? ` · ${scanMeta.objectCount.toLocaleString()} objects` : ''}
+          {scanMeta.scannedAt ? ` · ${new Date(scanMeta.scannedAt).toLocaleString()}` : ''}
+          {restored ? ' · restored from cache' : ''}
+        </p>
+      )}
 
       {status === 'scanning' && (
         <p class="hint" style={{ display: 'flex', alignItems: 'center', gap: '.4rem' }}>
