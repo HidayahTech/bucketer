@@ -86,6 +86,13 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   const [destinationPrefix, setDestinationPrefix] = useState(currentPrefix || '');
   // Keep in sync with browser navigation, but let the user override by typing
   useEffect(() => { setDestinationPrefix(currentPrefix || ''); }, [currentPrefix]);
+  // Live mirror of destinationPrefix. addFiles is exposed once via onMount ([] deps), so its closure
+  // is captured at mount; reading destinationPrefix directly there would forever see the mount-time
+  // value ('' = root) and send every drag-dropped upload to the root (GitLab #2 / BUG-031). The ref
+  // is reassigned every render, so addFiles always reads the current destination. (Same pattern
+  // Browser.jsx uses with prefixRef for its onMount-exposed actions.)
+  const destinationPrefixRef = useRef(destinationPrefix);
+  destinationPrefixRef.current = destinationPrefix;
 
   // Fire onUploadsComplete once when the queue fully drains (no uploading/queued items left).
   // Passes the set of parent prefixes that received at least one successful upload this drain
@@ -155,7 +162,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       speed: 0,
       eta: null,
       error: null,
-      destinationKey: (destinationPrefix && !destinationPrefix.endsWith('/') ? destinationPrefix + '/' : destinationPrefix) + relativePath,
+      destinationKey: (() => { const dp = destinationPrefixRef.current; return (dp && !dp.endsWith('/') ? dp + '/' : dp) + relativePath; })(),
       resumeRecord: null,
       largeFileWarningDismissed: false,
     }));

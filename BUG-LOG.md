@@ -4,6 +4,48 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-031 — Drag-and-dropped uploads always land at the bucket root, ignoring the current folder
+
+**Date:** 2026-06-20 · **GitLab:** #2
+
+**Symptom:**
+While viewing a nested folder, dragging files or folders from the OS onto the app uploaded them to the bucket **root** instead of the folder being viewed. Uploading via the "Choose files" button (file picker) worked correctly and targeted the current folder.
+
+**Root cause:**
+`UploadQueue.jsx` exposes its `addFiles` function to the parent once, at mount: `useEffect(() => { onMount?.({ addFiles }); }, [])`. `App.jsx` stores that reference in `addFilesRef.current`. Because the effect has `[]` deps, the captured `addFiles` closure is the **mount-time** one, which closes over the mount-time value of `destinationPrefix` state (`''` = root). Every drag-and-drop path — the window overlay (`useWindowDragDrop.handleWindowDrop`) and the table drop (`Browser.handleTableDrop`) — routes through `addFilesRef.current`, so they always computed `destinationKey = '' + relativePath` and uploaded to root regardless of navigation. The file-picker path (`<input onChange={e => addFiles(...)}>`) calls the **current render's** `addFiles`, which reads the live `destinationPrefix`, which is why that path worked.
+
+`Browser.jsx` had already encountered and documented this exact class of bug (its `prefixRef` exists specifically so onMount-exposed actions can read the live prefix "without stale-closure bugs"); `UploadQueue` did not apply the same pattern to `destinationPrefix`.
+
+**Fix:**
+Mirror `destinationPrefix` into a ref that is reassigned every render (`destinationPrefixRef.current = destinationPrefix`) and read `destinationPrefixRef.current` when computing `destinationKey` in `addFiles`. The captured closure now always sees the current destination.
+
+**Why it wasn't caught earlier:**
+The file-picker path (the one exercised in development and in the e2e suite via `setInputFiles`) uses the fresh closure and worked. No test drove the drag-and-drop upload path (window/table drop), which is the only one that goes through the stale `addFilesRef`. Reported by a real user (GitLab #2).
+
+**Test case:**
+`test/e2e/browser/issue-2-drop-destination.test.mjs` — navigate into `sub/`, dispatch a synthetic file `drop` on the Browser drop container (the `e.dataTransfer.files` fallback the OS uses), assert the object lands at `sub/dropped.txt`, never at the root. Verified to fail against the stale-closure version and pass with the ref.
+
+---
+
+## BUG-032 — A sub-folder created by an upload into the current view doesn't appear until reload
+
+**Date:** 2026-06-20 · **GitLab:** #4 (part 2)
+
+**Symptom:**
+Uploading content that creates a **new sub-folder** in the folder you're currently viewing (e.g. dragging a folder `test/` into the current directory) did not show the new folder in the listing until the page was manually reloaded.
+
+**Root cause:**
+After an upload batch drains, `UploadQueue` passes the set of parent prefixes that received files to `Browser.onUploadsDrained`. That handler refetched the current listing only when the set contained the current prefix **exactly**: `if (prefixSet.has(prefixRef.current)) fetchPage(...)`. When an upload creates a sub-folder, the drained prefix is the **new sub-prefix** (e.g. `test/`), not the current view (e.g. `''`). The exact-match test failed, so the current listing was never refetched and the new `test/` folder (a `CommonPrefix`) never appeared until a reload re-listed.
+
+**Fix:**
+Refetch the current view when any drained prefix is the current prefix **or a descendant of it** — `[...prefixSet].some(p => p.startsWith(cur))` — and `invalidateCache(cur)` before the refetch so a still-valid cache entry isn't served stale.
+
+**Why it wasn't caught earlier:**
+The BUG-029 fix (which introduced `onUploadsDrained`) was exercised by uploading files *directly into* the current view (drained prefix == current), which the exact match handled. The sub-folder case (drained prefix is a descendant) was never tested. Compounded in the wild by BUG-031 (the upload often went to root entirely). Reported by a real user (GitLab #4).
+
+**Test case:**
+`test/e2e/browser/issue-4-refresh.test.mjs` — at root, drop a file with relativePath `newdir/x.txt`, assert the `newdir` folder row appears without a reload. Verified to fail against the exact-match version and pass with the descendant check. The same file also covers the existing manual **Refresh** control pulling an out-of-band (other-device) write.
+
 ## BUG-030 — Clicking a file's checkbox did not select the file (double-toggle no-op)
 
 **Date:** 2026-06-20

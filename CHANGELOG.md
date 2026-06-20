@@ -7,6 +7,27 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.26.3] — 2026-06-20 — Fix: drag-dropped uploads landed at root; sub-folder not shown until reload
+
+Two user-reported bug fixes (GitLab #2, #4).
+
+- **Drag-dropped uploads now target the current folder, not the bucket root (#2, BUG-031).** `UploadQueue`
+  exposed `addFiles` once via `onMount` ([] deps), so the reference the drag-drop handlers call captured a
+  stale closure over the mount-time destination prefix (root). Every dragged file/folder uploaded to the
+  root regardless of the folder being viewed; the "Choose files" picker (which used a fresh closure) worked.
+  Fixed by reading the destination through a live ref (`destinationPrefixRef`) — the same pattern Browser.jsx
+  already uses for its onMount-exposed actions.
+- **A sub-folder created by an upload into the current view now appears without a manual reload (#4, BUG-032).**
+  `onUploadsDrained` refetched the listing only on an exact prefix match, so uploading a folder *into* the
+  current view (which drains the new sub-prefix, not the current prefix) left the new folder invisible until
+  reload. It now refetches when any drained prefix is the current prefix or a descendant of it.
+- **Refresh control is now labelled "↺ Refresh"** (was an unlabelled ↺ icon) and its tooltip notes it pulls
+  changes uploaded from other devices — Bucketer is backendless, so cross-client changes (#4, part 1) surface
+  on demand via Refresh rather than live.
+- **e2e regression coverage** for all of the above, plus an Android-emulated check that uploading into a
+  nested folder does not teleport the view to root (the desktop BUG-029 fix holds under mobile emulation;
+  the reporter's residual mobile teleport (#3) needs native-device repro details).
+
 ## [1.26.2] — 2026-06-20 — Fix: file checkboxes were unclickable (BUG-030) + P1 e2e coverage
 
 **Bug fix.** Clicking the checkbox on a **file** row did nothing — the row did not select and the

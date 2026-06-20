@@ -138,7 +138,16 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   function onUploadsDrained(prefixSet) {
     if (!prefixSet || prefixSet.size === 0) return;
     for (const p of prefixSet) invalidateCache(p);
-    if (prefixSet.has(prefixRef.current)) fetchPage(prefixRef.current, null, true);
+    // Refetch the current view if an upload landed directly in it OR created a sub-folder under it.
+    // An exact-match check (prefixSet.has(cur)) missed the sub-folder case: uploading a folder INTO
+    // the current view drains the NEW sub-prefix (e.g. cur='' , drained='test/'), so the new folder
+    // stayed invisible until a manual reload (GitLab #4 / BUG-032). `startsWith` covers both. The
+    // current prefix's own cache may still be valid, so invalidate it before refetching.
+    const cur = prefixRef.current;
+    if ([...prefixSet].some(p => p.startsWith(cur))) {
+      invalidateCache(cur);
+      fetchPage(cur, null, true);
+    }
   }
 
   // Reset file-mtime state when the user switches buckets
@@ -781,6 +790,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   return (
     <div
       class={tableDragOver ? 'browser-drop-active' : undefined}
+      data-testid="browser-drop"
       onDragEnter={handleTableDragEnter}
       onDragOver={e => { if (e.dataTransfer?.types?.includes('Files')) e.preventDefault(); }}
       onDragLeave={handleTableDragLeave}
@@ -967,8 +977,8 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
           </div>
         )}
         <div class="browser-toolbar-actions">
-          <button class="btn btn-ghost btn-sm" onClick={handleRefresh} title="Refresh listing" style={{ marginRight: '.25rem' }}>
-            ↺
+          <button class="btn btn-ghost btn-sm" data-testid="refresh-listing" onClick={handleRefresh} title="Refresh listing (pull changes uploaded from other devices)" style={{ marginRight: '.25rem' }}>
+            ↺ Refresh
           </button>
           <button class="btn btn-ghost btn-sm" onClick={openNewFolder} title="Create a new folder">
             + New folder

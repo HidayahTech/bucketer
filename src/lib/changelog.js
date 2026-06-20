@@ -1,9 +1,20 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.26.2';
+export const CURRENT_VERSION = '1.26.3';
 
 export const CHANGELOG = [
+  {
+    "version": "1.26.3",
+    "date": "2026-06-20",
+    "title": "Fix: drag-dropped uploads landed at root; sub-folder not shown until reload",
+    "changes": [
+      "**Drag-dropped uploads now target the current folder, not the bucket root (#2, BUG-031).** UploadQueue",
+      "**A sub-folder created by an upload into the current view now appears without a manual reload (#4, BUG-032).**",
+      "**Refresh control is now labelled \"↺ Refresh\"** (was an unlabelled ↺ icon) and its tooltip notes it pulls",
+      "**e2e regression coverage** for all of the above, plus an Android-emulated check that uploading into a"
+    ]
+  },
   {
     "version": "1.26.2",
     "date": "2026-06-20",
