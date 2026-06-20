@@ -1033,6 +1033,47 @@ describe('constants.js — all centralized thresholds present', () => {
   test('exports MULTIPART_THRESHOLD', () => { assert.ok(source.includes('MULTIPART_THRESHOLD')); });
   test('exports PRESIGN_EXPIRES',     () => { assert.ok(source.includes('PRESIGN_EXPIRES')); });
   test('exports COPY_LINK_PRESETS',   () => { assert.ok(source.includes('COPY_LINK_PRESETS')); });
+  test('exports COPY_MULTIPART_THRESHOLD', () => {
+    assert.ok(
+      source.includes('COPY_MULTIPART_THRESHOLD'),
+      'constants.js must export COPY_MULTIPART_THRESHOLD — the 5 GiB ceiling above which ' +
+      'a move switches from single-request CopyObject to multipart UploadPartCopy'
+    );
+  });
+});
+
+// ── Move feature: multipart server-side copy uses UploadPartCopy (T1-2 defense-in-depth) ──
+// UploadPartCopyCommand is a genuinely new SDK import — used nowhere else in src/. The
+// T1-2 auto-scan guarantees it is imported wherever `new UploadPartCopyCommand(` appears,
+// but this pins that the multipart-copy path actually uses it (and inclusive byte ranges),
+// so a refactor cannot silently drop the >5 GiB copy path.
+
+describe('move-multipart.js — uses UploadPartCopy with CopySourceRange', () => {
+  const source = src('lib/move-multipart.js');
+
+  test('references UploadPartCopyCommand', () => {
+    assert.ok(
+      source.includes('UploadPartCopyCommand'),
+      'move-multipart.js must use UploadPartCopyCommand — it is the only server-side copy ' +
+      'path for objects above the 5 GiB single-request CopyObject cap'
+    );
+  });
+
+  test('sets CopySourceRange for byte-range part copies', () => {
+    assert.ok(
+      source.includes('CopySourceRange'),
+      'move-multipart.js must set CopySourceRange on each UploadPartCopy — without per-part ' +
+      'byte ranges the multipart copy is incorrect'
+    );
+  });
+
+  test('aborts the multipart session on failure (no orphaned upload, source never deleted)', () => {
+    assert.ok(
+      source.includes('AbortMultipartUploadCommand'),
+      'move-multipart.js must abort the multipart upload on any failure so a partial copy ' +
+      'does not linger and the source is never deleted'
+    );
+  });
 });
 
 describe('constants.js — FILE_MTIME_KEY exported', () => {

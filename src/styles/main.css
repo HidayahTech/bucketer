@@ -397,6 +397,70 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
   margin: .3rem 0 .5rem;
 }
 
+/* ── Move queue (mirrors the delete-op visual language) ───────────────────── */
+.move-queue { display: flex; flex-direction: column; gap: .5rem; }
+.move-op {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: .6rem .75rem;
+  font-size: .85rem;
+}
+.move-op-expanded { padding-bottom: .5rem; }
+.move-op-header { display: flex; align-items: center; gap: .5rem; }
+.move-op-summary { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.move-op-icon { font-size: .9rem; flex-shrink: 0; }
+.move-op-ok  { color: var(--text-success); }
+.move-op-err { color: var(--text-danger); }
+.move-op-errors {
+  margin-top: .4rem;
+  border-top: 1px solid var(--border);
+  padding-top: .4rem;
+  display: flex;
+  flex-direction: column;
+  gap: .2rem;
+}
+.move-op-error-row { display: flex; gap: .5rem; font-size: .78rem; align-items: baseline; }
+.move-op-error-key {
+  color: var(--text-muted);
+  min-width: 0; flex-shrink: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--mono);
+}
+.move-op-error-msg  { color: var(--text-danger); flex-shrink: 0; }
+.move-op-error-skip { color: var(--text-muted); flex-shrink: 0; }
+.move-op-error-more { color: var(--text-muted); font-style: italic; }
+
+/* ── Move destination picker ──────────────────────────────────────────────── */
+.move-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+  max-height: 40vh;
+  overflow-y: auto;
+  margin: .25rem 0 .5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: .35rem;
+}
+.move-picker-folder {
+  display: flex;
+  align-items: center;
+  gap: .4rem;
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: var(--radius);
+  padding: .35rem .5rem;
+  font: inherit;
+  color: var(--text);
+  cursor: pointer;
+}
+.move-picker-folder:hover { background: var(--surface); }
+.move-picker-loading, .move-picker-empty { color: var(--text-muted); padding: .35rem .5rem; font-size: .85rem; }
+.move-picker-error { color: var(--text-danger); padding: .35rem .5rem; font-size: .85rem; }
+.move-picker-dest code { font-family: var(--mono); }
+.move-picker-reason { color: var(--text-danger); }
+
 /* ── Capability badges ────────────────────────────────────────────────────── */
 .cap-list { display: flex; flex-direction: column; gap: .3rem; font-size: .8rem; }
 .cap-item { display: flex; align-items: center; gap: .4rem; }

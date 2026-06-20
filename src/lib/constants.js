@@ -18,6 +18,11 @@ export const MULTIPART_THRESHOLD = 5 * 1024 * 1024;
 // Files at or above this size show a warning recommending native tools (§4.6).
 export const LARGE_FILE_WARN = 50 * 1024 * 1024 * 1024;
 
+// Move routing: a single-request CopyObject is capped at 5 GiB by S3 (and B2).
+// Objects above this must be copied with multipart UploadPartCopy. Distinct from
+// MULTIPART_THRESHOLD above, which governs fresh uploads (5 MiB).
+export const COPY_MULTIPART_THRESHOLD = 5 * 1024 * 1024 * 1024;
+
 // Default concurrent file uploads when no user preference is saved.
 export const DEFAULT_FILE_CONCURRENCY = 3;
 

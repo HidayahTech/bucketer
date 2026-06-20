@@ -7,6 +7,17 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.25.0] — 2026-06-19 — Move files & folders into another folder
+
+Adds a **move** operation: relocate selected files and/or "folders" (S3 prefixes) into a different folder within the same bucket. S3 has no native move, so a move is, per object, a server-side copy to the remapped key followed by a delete of the source — generalizing the existing single-file rename into a multi-item, cross-prefix, folder-aware operation with its own progress queue (mirrors the delete-queue architecture).
+
+- **Folder-tree destination picker** (`src/components/MovePickerModal.jsx`) — drill into prefixes (`ListObjectsV2` with `Delimiter:'/'`) and click **Move here**. The picker is the confirmation step; a structural guard (`src/lib/move-guards.js`) disables "Move here" with an inline reason for invalid destinations (a folder into itself or a descendant, or a no-op move).
+- **Copy-before-delete, per object** (`src/lib/move-queue.js`, `runMoveOperation`) — each object's source is deleted only after its copy is confirmed, so an object is always in a clean state (source-only / both / destination-only). Source rows are removed incrementally as they complete; a worker pool (8) with throttling backoff (`src/lib/s3-retry.js`) handles large folder moves.
+- **Any size, from day one** — objects ≤ 5 GiB use a single `CopyObject` (`MetadataDirective:'COPY'`); objects > 5 GiB use multipart `UploadPartCopy` (`src/lib/move-multipart.js`), carrying Content-Type and custom metadata forward via a source `HeadObject` (UploadPartCopy copies bytes only) and aborting any orphaned multipart session on failure. New constant `COPY_MULTIPART_THRESHOLD` (5 GiB), distinct from the 5 MiB upload `MULTIPART_THRESHOLD`.
+- **Never overwrites** — a single destination-prefix scan pre-detects collisions (and intra-batch duplicate target keys); a colliding object is skipped with both source and destination left untouched. Skips are surfaced in the move panel (`src/components/MoveQueue.jsx`) distinctly from genuine failures. If a copy succeeds but the source delete is denied, the object now exists in both places — this is reported as a distinct error and the source is left in place (never auto-deleted).
+- **Cross-provider** — server-side copy is permitted by the existing CORS template (`PUT` + `x-amz-copy-source` via the `x-amz-*` rule) on all supported providers; no CORS change is needed. Move is gated on both write (`upload`) and `delete` capabilities.
+- **Key remapping** (`src/lib/move-key.js`) preserves a moved folder's own name and nested sub-prefix structure under the destination, including the 0-byte folder-marker object.
+
 ## [1.24.0] — 2026-06-18 — Duplicate detection: durable results + scrollable report
 
 Follow-up to v1.23.0 from real-world use on a ~30k-object bucket.

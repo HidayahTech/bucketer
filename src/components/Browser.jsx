@@ -25,6 +25,7 @@ import { HiddenVersions } from './HiddenVersions.jsx';
 import { CopyLinkPopover } from './CopyLinkPopover.jsx';
 import { Breadcrumb } from './Breadcrumb.jsx';
 import { SortTh } from './SortTh.jsx';
+import { MovePickerModal } from './MovePickerModal.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '';
@@ -35,7 +36,7 @@ function formatDate(dateStr) {
 // selectedKeys and selectedPrefixes are Sets for O(1) has() checks per row.
 // Delete operations are owned by App.jsx (via onDeleteRequest) so they survive navigation.
 // cacheRef and abortRef are Refs (not state) to avoid triggering re-renders.
-export function Browser({ client, bucket, provider, credentials, onCapabilityChange, capabilities, onUploadTargetChange, onInitialListFailed, onExternalDrop, onDeleteRequest, onMount, prefetchSizeLimit, isFirstMount }) {
+export function Browser({ client, bucket, provider, credentials, onCapabilityChange, capabilities, onUploadTargetChange, onInitialListFailed, onExternalDrop, onDeleteRequest, onMoveRequest, onMount, prefetchSizeLimit, isFirstMount }) {
   const [prefix, setPrefix] = useState(() => {
     if (isFirstMount) {
       return new URLSearchParams(window.location.hash.slice(1)).get('prefix') || '';
@@ -81,6 +82,10 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const [newFolderSaving, setNewFolderSaving] = useState(false);
   const [tableCopyKey, setTableCopyKey] = useState(null);
   const [tableCopied, setTableCopied] = useState(null);
+  // Non-null while the move destination picker is open; holds the selection being moved
+  // ({ files: [{key, size}], prefixes: [pfx] }). Captured at open time so it is stable
+  // even if the underlying selection changes.
+  const [moveSel, setMoveSel] = useState(null);
   const abortRef = useRef(null);
   const cacheRef = useRef(new Map());
   const prefetchGenRef = useRef(0); // incremented on each prefetch call to abandon stale runs
@@ -634,6 +639,24 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const canDownload = capabilities.download !== 'denied';
   const canDelete   = capabilities.delete !== 'denied';
   const canList     = capabilities.list !== 'denied';
+  // A move is a copy (write) + delete, so it needs both capabilities.
+  const canMove     = capabilities.upload !== 'denied' && capabilities.delete !== 'denied';
+
+  // Build the {key, size} list for the selected files from the current listing (Browser
+  // already holds each object's Size). Used to open the move picker for the batch selection.
+  function selectedFilesWithSize() {
+    return [...selectedKeys].map(k => ({ key: k, size: items.find(o => o.Key === k)?.Size ?? 0 }));
+  }
+
+  function handleMoveHere(dest) {
+    const sel = moveSel;
+    setMoveSel(null);
+    if (!sel) return;
+    onMoveRequest?.({ files: sel.files, prefixes: sel.prefixes, dest, capturedPrefix: prefix });
+    // Clear the multi-select once a move is underway (matches delete's row removal flow).
+    setSelectedKeys(new Set());
+    setSelectedPrefixes(new Set());
+  }
 
   // Sort folders by name only (no size/date available)
   const cmpName    = nameComparator(sortDir);
@@ -730,6 +753,16 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
               </button>
             </div>
         </Modal>
+      )}
+
+      {moveSel && (
+        <MovePickerModal
+          client={client}
+          bucket={bucket}
+          selection={moveSel}
+          onCancel={() => setMoveSel(null)}
+          onMove={handleMoveHere}
+        />
       )}
 
       {metaItem && (
@@ -901,8 +934,16 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
             </div>
           )}
           <button
-            class="btn btn-danger btn-sm"
+            class="btn btn-ghost btn-sm"
             style={selectedKeys.size === 0 ? { marginLeft: 'auto' } : undefined}
+            onClick={() => setMoveSel({ files: selectedFilesWithSize(), prefixes: [...selectedPrefixes] })}
+            disabled={!canMove}
+            title={!canMove ? 'Move needs both write and delete permissions' : 'Move to another folder'}
+          >
+            Move {selectedKeys.size + selectedPrefixes.size}
+          </button>
+          <button
+            class="btn btn-danger btn-sm"
             onClick={() => onDeleteRequest({ files: [...selectedKeys], prefixes: [...selectedPrefixes], capturedPrefix: prefix })}
             disabled={!canDelete}
           >
@@ -974,6 +1015,13 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                     <td class="col-modified"></td>
                     <td class="col-file-modified"></td>
                     <td class="col-actions">
+                      <button
+                        class="btn btn-ghost btn-sm"
+                        style={{ marginRight: '.25rem' }}
+                        onClick={e => { e.stopPropagation(); setMoveSel({ files: [], prefixes: [cp] }); }}
+                        disabled={!canMove}
+                        title={!canMove ? 'Move not permitted with current credentials' : 'Move folder to another folder'}
+                      >↪</button>
                       <button
                         class="btn btn-ghost btn-sm"
                         style={{ color: 'var(--text-danger)', borderColor: 'transparent' }}
@@ -1084,6 +1132,15 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                           />
                         )}
                       </div>
+                      <button
+                        class="btn btn-ghost btn-sm"
+                        style={{ marginLeft: '.25rem' }}
+                        onClick={e => { e.stopPropagation(); setMoveSel({ files: [{ key: obj.Key, size: obj.Size ?? 0 }], prefixes: [] }); }}
+                        disabled={!canMove}
+                        title={!canMove ? 'Move not permitted with current credentials' : 'Move to another folder'}
+                      >
+                        ↪
+                      </button>
                       <button
                         class="btn btn-ghost btn-sm"
                         style={{ color: 'var(--text-danger)', borderColor: 'transparent', marginLeft: '.25rem' }}

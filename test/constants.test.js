@@ -2,7 +2,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   MULTIPART_THRESHOLD, LARGE_FILE_WARN, DEFAULT_FILE_CONCURRENCY, PART_CONCURRENCY,
-  PRESIGN_EXPIRES, TEXT_PREVIEW_LIMIT, COPY_LINK_PRESETS,
+  PRESIGN_EXPIRES, TEXT_PREVIEW_LIMIT, COPY_LINK_PRESETS, COPY_MULTIPART_THRESHOLD,
 } from '../src/lib/constants.js';
 
 describe('constants', () => {
@@ -20,6 +20,10 @@ describe('constants', () => {
 
   test('PART_CONCURRENCY is 4', () => {
     assert.equal(PART_CONCURRENCY, 4);
+  });
+
+  test('COPY_MULTIPART_THRESHOLD is 5 GiB (single-request CopyObject cap)', () => {
+    assert.equal(COPY_MULTIPART_THRESHOLD, 5 * 1024 * 1024 * 1024);
   });
 
   test('PRESIGN_EXPIRES is 3600 seconds (1 hour)', () => {

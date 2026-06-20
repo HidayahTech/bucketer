@@ -1,9 +1,22 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.24.0';
+export const CURRENT_VERSION = '1.25.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.25.0",
+    "date": "2026-06-19",
+    "title": "Move files & folders into another folder",
+    "changes": [
+      "**Folder-tree destination picker** (src/components/MovePickerModal.jsx) — drill into prefixes (ListObjectsV2 with Delimiter:'/') and click **Move here**. The picker is the confirmation step; a structural guard (src/lib/move-guards.js) disables \"Move here\" with an inline reason for invalid destinations (a folder into itself or a descendant, or a no-op move).",
+      "**Copy-before-delete, per object** (src/lib/move-queue.js, runMoveOperation) — each object's source is deleted only after its copy is confirmed, so an object is always in a clean state (source-only / both / destination-only). Source rows are removed incrementally as they complete; a worker pool (8) with throttling backoff (src/lib/s3-retry.js) handles large folder moves.",
+      "**Any size, from day one** — objects ≤ 5 GiB use a single CopyObject (MetadataDirective:'COPY'); objects > 5 GiB use multipart UploadPartCopy (src/lib/move-multipart.js), carrying Content-Type and custom metadata forward via a source HeadObject (UploadPartCopy copies bytes only) and aborting any orphaned multipart session on failure. New constant COPY_MULTIPART_THRESHOLD (5 GiB), distinct from the 5 MiB upload MULTIPART_THRESHOLD.",
+      "**Never overwrites** — a single destination-prefix scan pre-detects collisions (and intra-batch duplicate target keys); a colliding object is skipped with both source and destination left untouched. Skips are surfaced in the move panel (src/components/MoveQueue.jsx) distinctly from genuine failures. If a copy succeeds but the source delete is denied, the object now exists in both places — this is reported as a distinct error and the source is left in place (never auto-deleted).",
+      "**Cross-provider** — server-side copy is permitted by the existing CORS template (PUT + x-amz-copy-source via the x-amz-* rule) on all supported providers; no CORS change is needed. Move is gated on both write (upload) and delete capabilities.",
+      "**Key remapping** (src/lib/move-key.js) preserves a moved folder's own name and nested sub-prefix structure under the destination, including the 0-byte folder-marker object."
+    ]
+  },
   {
     "version": "1.24.0",
     "date": "2026-06-18",

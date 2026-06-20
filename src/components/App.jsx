@@ -36,6 +36,8 @@ import { Browser } from './Browser.jsx';
 import { UploadQueue } from './UploadQueue.jsx';
 import { DeleteQueue } from './DeleteQueue.jsx';
 import { runDeleteOperation } from '../lib/delete-queue.js';
+import { MoveQueue } from './MoveQueue.jsx';
+import { runMoveOperation } from '../lib/move-queue.js';
 import { CapabilityPanel } from './CapabilityPanel.jsx';
 import { SettingsPanel } from './SettingsPanel.jsx';
 import { UploadLog } from './UploadLog.jsx';
@@ -83,6 +85,7 @@ export function App() {
   const [prefetchSizeLimit, setPrefetchSizeLimit] = useState(() => loadPrefetchSizeLimit());
   const [profiles, setProfiles] = useState(() => loadProfiles().profiles);
   const [deleteOps, setDeleteOps] = useState([]);
+  const [moveOps, setMoveOps] = useState([]);
   const addFilesRef = useRef(null);
   const browserActionsRef = useRef(null);
   const logKeyDebounceRef = useRef(null);
@@ -252,6 +255,61 @@ export function App() {
 
   function handleDeleteCollapse(id) {
     setDeleteOps(prev => prev.map(op =>
+      op.id === id ? { ...op, collapsed: !op.collapsed } : op
+    ));
+  }
+
+  // Move ops are owned by App (like delete ops) so they survive folder navigation. The
+  // MovePickerModal is the confirmation step, so a request starts the operation directly.
+  function updateMoveOp(id, update) {
+    setMoveOps(prev => prev.map(op => op.id === id ? { ...op, ...update } : op));
+  }
+
+  async function handleMoveRequest({ files, prefixes, dest, capturedPrefix }) {
+    const id = String(Date.now() + Math.random());
+    const op = {
+      id, phase: 'checking', files, prefixes, dest, capturedPrefix,
+      bucket: credentials.bucket, moved: 0, total: null, errors: [], collapsed: false,
+    };
+    setMoveOps(prev => [...prev, op]);
+    try {
+      await runMoveOperation(client, op.bucket, op, (update) => {
+        // Remove moved source rows incrementally (copy+delete confirmed for those keys).
+        if (update.movedKeys?.length) {
+          browserActionsRef.current?.removeItems(update.movedKeys, []);
+        }
+        if (update.phase === 'done') {
+          if (update.movedPrefixes?.length) {
+            browserActionsRef.current?.removeItems([], update.movedPrefixes);
+          }
+          // Invalidate both the source view and the destination so each refetches.
+          browserActionsRef.current?.invalidateCache(op.capturedPrefix);
+          browserActionsRef.current?.invalidateCache(op.dest);
+          if (update.moved > 0) {
+            handleCapabilityChange('upload', 'permitted');
+            handleCapabilityChange('delete', 'permitted');
+          }
+          if (update.errors.length === 0) {
+            setTimeout(() => setMoveOps(prev => prev.filter(o => o.id !== id)), 3000);
+          }
+        }
+        updateMoveOp(id, update);
+      });
+    } catch (err) {
+      updateMoveOp(id, {
+        phase: 'done',
+        errors: [{ key: '(unexpected)', message: err.message || String(err) }],
+        movedPrefixes: [],
+      });
+    }
+  }
+
+  function handleMoveDismiss(id) {
+    setMoveOps(prev => prev.filter(o => o.id !== id));
+  }
+
+  function handleMoveCollapse(id) {
+    setMoveOps(prev => prev.map(op =>
       op.id === id ? { ...op, collapsed: !op.collapsed } : op
     ));
   }
@@ -541,6 +599,12 @@ export function App() {
               provider={credentials.provider}
             />
 
+            <MoveQueue
+              ops={moveOps}
+              onDismiss={handleMoveDismiss}
+              onCollapse={handleMoveCollapse}
+            />
+
             <UploadLog refreshKey={logKey} />
 
             <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '1rem 0' }} />
@@ -558,6 +622,7 @@ export function App() {
               onUploadTargetChange={setCurrentPrefix}
               onExternalDrop={(entries) => addFilesRef.current?.(entries)}
               onDeleteRequest={handleDeleteRequest}
+              onMoveRequest={handleMoveRequest}
               onMount={(actions) => { browserActionsRef.current = actions; }}
               prefetchSizeLimit={prefetchSizeLimit}
             />
