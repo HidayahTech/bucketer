@@ -726,6 +726,17 @@ details[open] .upload-log-summary::before { transform: rotate(90deg); }
   border-radius: var(--radius);
 }
 
+/* Drag-and-drop move: the folder row / breadcrumb crumb under a valid internal drag. */
+.file-row.drop-target-active td {
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.breadcrumb .crumb.drop-target-active {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  outline: 1px solid var(--accent);
+  border-radius: 4px;
+}
+
 /* ── File properties (metadata) modal ───────────────────────────────────── */
 .meta-dialog { max-width: 480px; }
 .meta-table { width: 100%; border-collapse: collapse; font-size: .82rem; }

@@ -26,6 +26,7 @@ import { CopyLinkPopover } from './CopyLinkPopover.jsx';
 import { Breadcrumb } from './Breadcrumb.jsx';
 import { SortTh } from './SortTh.jsx';
 import { MovePickerModal } from './MovePickerModal.jsx';
+import { dragPayload, dropAccepted } from '../lib/move-drag.js';
 
 function formatDate(dateStr) {
   if (!dateStr) return '';
@@ -86,6 +87,11 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   // ({ files: [{key, size}], prefixes: [pfx] }). Captured at open time so it is stable
   // even if the underlying selection changes.
   const [moveSel, setMoveSel] = useState(null);
+  // Drag-and-drop move: the payload ({ files, prefixes, fromSelection }) of an in-progress
+  // internal drag (a ref — not reactive — so dragover/drop handlers read it without re-renders),
+  // and the prefix of the drop target currently under the cursor (drives the highlight).
+  const internalDragRef = useRef(null);
+  const [dndHoverTarget, setDndHoverTarget] = useState(null);
   const abortRef = useRef(null);
   const cacheRef = useRef(new Map());
   const prefetchGenRef = useRef(0); // incremented on each prefetch call to abandon stale runs
@@ -396,6 +402,9 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   // overlay would flicker as the cursor moves across table rows. Counter hits 0 only when
   // the user has fully exited the drop target.
   function handleTableDragEnter(e) {
+    // Only OS file drags (upload) raise the table overlay. Internal object-move drags carry
+    // 'application/x-bucketer-move', not 'Files', and must not trigger the upload affordance.
+    if (!e.dataTransfer?.types?.includes('Files')) return;
     e.preventDefault();
     dragCounterRef.current += 1;
     if (onExternalDrop) setTableDragOver(true);
@@ -658,6 +667,56 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     setSelectedPrefixes(new Set());
   }
 
+  // ── Drag-and-drop move ────────────────────────────────────────────────────────
+  // Internal object drags carry an 'application/x-bucketer-move' marker so they are told
+  // apart from external OS file drags (which carry 'Files' and route to upload).
+  function handleRowDragStart(dragged, e) {
+    if (!canMove) return;
+    internalDragRef.current = dragPayload(dragged, { files: selectedFilesWithSize(), prefixes: [...selectedPrefixes] });
+    try {
+      e.dataTransfer.setData('application/x-bucketer-move', '1');
+      e.dataTransfer.effectAllowed = 'move';
+    } catch { /* dataTransfer unavailable (older engines) */ }
+  }
+
+  function handleRowDragEnd() {
+    internalDragRef.current = null;
+    setDndHoverTarget(null);
+  }
+
+  // Folder rows and breadcrumb crumbs are drop targets. Highlight + allow the drop only when
+  // the structural guard accepts it (no folder-into-itself, no no-op).
+  function handleTargetDragOver(dest, e) {
+    const payload = internalDragRef.current;
+    if (!payload || !e.dataTransfer?.types?.includes('application/x-bucketer-move')) return;
+    if (dropAccepted(payload, dest)) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      setDndHoverTarget(dest);
+    } else if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'none';
+    }
+  }
+
+  function handleTargetDragLeave(dest) {
+    setDndHoverTarget(t => (t === dest ? null : t));
+  }
+
+  function handleInternalDrop(dest, e) {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    const payload = internalDragRef.current;
+    internalDragRef.current = null;
+    setDndHoverTarget(null);
+    if (!payload || !dropAccepted(payload, dest)) return;
+    onMoveRequest?.({ files: payload.files, prefixes: payload.prefixes, dest, capturedPrefix: prefix });
+    // Only clear the selection if the whole selection was being dragged.
+    if (payload.fromSelection) {
+      setSelectedKeys(new Set());
+      setSelectedPrefixes(new Set());
+    }
+  }
+
   // Sort folders by name only (no size/date available)
   const cmpName    = nameComparator(sortDir);
   const cmpNumeric = numericComparator(sortDir);
@@ -723,7 +782,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     <div
       class={tableDragOver ? 'browser-drop-active' : undefined}
       onDragEnter={handleTableDragEnter}
-      onDragOver={e => e.preventDefault()}
+      onDragOver={e => { if (e.dataTransfer?.types?.includes('Files')) e.preventDefault(); }}
       onDragLeave={handleTableDragLeave}
       onDrop={handleTableDrop}
       style={{ position: 'relative' }}
@@ -881,7 +940,14 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
         );
       })()}
 
-      <Breadcrumb prefix={prefix} onNavigate={navigateTo} />
+      <Breadcrumb
+        prefix={prefix}
+        onNavigate={navigateTo}
+        onMoveOver={handleTargetDragOver}
+        onMoveLeave={handleTargetDragLeave}
+        onMoveDrop={handleInternalDrop}
+        moveHoverTarget={dndHoverTarget}
+      />
 
       <div class="browser-toolbar">
         {(sortedItems.length > 0 || sortedFolders.length > 0 || filterQ) && (
@@ -1003,7 +1069,18 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
               {visibleFolders.map(cp => {
                 const isFolderSelected = selectedPrefixes.has(cp);
                 return (
-                  <tr key={cp} class={`file-row${isFolderSelected ? ' file-row-selected' : ''}`} onClick={() => navigateTo(cp)} style={{ cursor: 'pointer' }}>
+                  <tr
+                    key={cp}
+                    class={`file-row${isFolderSelected ? ' file-row-selected' : ''}${dndHoverTarget === cp ? ' drop-target-active' : ''}`}
+                    onClick={() => navigateTo(cp)}
+                    style={{ cursor: 'pointer' }}
+                    draggable={canMove}
+                    onDragStart={e => handleRowDragStart({ prefix: cp }, e)}
+                    onDragEnd={handleRowDragEnd}
+                    onDragOver={e => handleTargetDragOver(cp, e)}
+                    onDragLeave={() => handleTargetDragLeave(cp)}
+                    onDrop={e => handleInternalDrop(cp, e)}
+                  >
                     <td class="col-check" onClick={e => toggleSelectPrefix(cp, e)}>
                       <input type="checkbox" checked={isFolderSelected} onChange={e => toggleSelectPrefix(cp, e)} onClick={e => e.stopPropagation()} />
                     </td>
@@ -1039,7 +1116,13 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                 const isDownloading = downloadingKey === obj.Key;
                 const isSelected = selectedKeys.has(obj.Key);
                 return (
-                  <tr key={obj.Key} class={`file-row${isSelected ? ' file-row-selected' : ''}`}>
+                  <tr
+                    key={obj.Key}
+                    class={`file-row${isSelected ? ' file-row-selected' : ''}`}
+                    draggable={canMove && renamingKey !== obj.Key}
+                    onDragStart={e => handleRowDragStart({ fileKey: obj.Key, fileSize: obj.Size }, e)}
+                    onDragEnd={handleRowDragEnd}
+                  >
                     <td class="col-check" onClick={e => toggleSelect(obj.Key, e)}>
                       <input type="checkbox" checked={isSelected} onChange={e => toggleSelect(obj.Key, e)} />
                     </td>

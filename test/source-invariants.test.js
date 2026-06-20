@@ -1364,3 +1364,52 @@ describe('DuplicatesModal.jsx — buttons declare an explicit type (BUG-006)', (
     }
   });
 });
+
+// ── Drag-and-drop move wiring (v1.26.0) ───────────────────────────────────────────────
+// Dragging an object row onto a folder row or breadcrumb crumb moves it. Two regressions
+// to guard: (1) internal object drags must be told apart from OS file drags by the 'Files'
+// DataTransfer type, or every internal drag wrongly raises the "Drop files to upload"
+// overlay; (2) the rows must actually be draggable and wired to the move handlers.
+
+describe('Browser.jsx — drag-and-drop move wiring (v1.26.0)', () => {
+  const source = src('components/Browser.jsx');
+
+  test('imports the pure drag helpers from move-drag.js', () => {
+    assert.ok(
+      source.includes("from '../lib/move-drag.js'") && /dragPayload/.test(source) && /dropAccepted/.test(source),
+      'Browser.jsx must import dragPayload/dropAccepted — the drag payload and drop-validity decisions ' +
+      'live in src/lib/move-drag.js so they are unit-testable without a DragEvent'
+    );
+  });
+
+  test('handleTableDragEnter gates the upload overlay on the Files type', () => {
+    const fnStart = source.indexOf('function handleTableDragEnter');
+    assert.ok(fnStart !== -1, 'handleTableDragEnter must exist');
+    const fn = source.slice(fnStart, fnStart + 400);
+    assert.ok(
+      /types\?\.includes\('Files'\)/.test(fn),
+      'handleTableDragEnter must return early unless the drag carries OS files — otherwise an ' +
+      'internal object-move drag wrongly raises the "Drop files to upload" overlay'
+    );
+  });
+
+  test('file and folder rows are draggable and wired to handleRowDragStart', () => {
+    assert.ok(/draggable=\{canMove\}/.test(source), 'folder rows must be draggable when moves are permitted');
+    assert.ok(/draggable=\{canMove && renamingKey/.test(source), 'file rows must be draggable (except while renaming)');
+    assert.ok(/onDragStart=\{e => handleRowDragStart/.test(source), 'rows must wire onDragStart to handleRowDragStart');
+  });
+
+  test('folder rows are drop targets wired to handleInternalDrop', () => {
+    assert.ok(
+      /onDrop=\{e => handleInternalDrop\(cp/.test(source),
+      'folder rows must accept an internal drop via handleInternalDrop(cp, e)'
+    );
+  });
+
+  test('Breadcrumb is wired as a move drop target', () => {
+    assert.ok(
+      /onMoveDrop=\{handleInternalDrop\}/.test(source) && /moveHoverTarget=\{dndHoverTarget\}/.test(source),
+      'Breadcrumb must receive onMoveDrop + moveHoverTarget so crumbs become move-up drop targets'
+    );
+  });
+});

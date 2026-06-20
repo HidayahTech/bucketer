@@ -1,9 +1,20 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.25.0';
+export const CURRENT_VERSION = '1.26.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.26.0",
+    "date": "2026-06-19",
+    "title": "Drag-and-drop moving",
+    "changes": [
+      "**Drop targets you can already see** — folder rows in the listing (move *into* a subfolder) and breadcrumb crumbs for the current folder's parent and any ancestor up to root (move *up*). A target highlights only while it is a valid destination; dropping a folder into itself/a descendant, or onto its current location, is rejected with a no-drop cursor.",
+      "**Selection-aware** — dragging a row that is part of the current selection moves the whole selection; dragging an unselected row moves just that row, leaving any selection intact.",
+      "**Internal vs. external drags** — object moves are distinguished from OS file drags by the Files DataTransfer type, so dragging an object no longer raises the \"Drop files to upload\" overlay (handleTableDragEnter and the table's onDragOver now gate on it).",
+      "**Pure decision logic** in new src/lib/move-drag.js (dragPayload, dropAccepted) — unit-tested in isolation since DragEvent/DataTransfer don't exist under the test runner; the Browser/Breadcrumb wiring is a thin shell over it. Breadcrumb.jsx gained opt-in move-drop props (the picker's use is unchanged)."
+    ]
+  },
   {
     "version": "1.25.0",
     "date": "2026-06-19",

@@ -7,6 +7,15 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.26.0] — 2026-06-19 — Drag-and-drop moving
+
+Adds a direct-manipulation path to the move feature (v1.25.0): **drag a file or folder row — or the current multi-selection — and drop it onto a destination** to move it there, without opening the picker dialog. The dialog remains for moves whose destination isn't currently on screen. Every drag-drop move reuses the existing pipeline unchanged — a drop builds the same request and runs through `runMoveOperation` (copy-before-delete, collision-skip, multipart >5 GB, MoveQueue progress).
+
+- **Drop targets you can already see** — folder rows in the listing (move *into* a subfolder) and breadcrumb crumbs for the current folder's parent and any ancestor up to root (move *up*). A target highlights only while it is a valid destination; dropping a folder into itself/a descendant, or onto its current location, is rejected with a no-drop cursor.
+- **Selection-aware** — dragging a row that is part of the current selection moves the whole selection; dragging an unselected row moves just that row, leaving any selection intact.
+- **Internal vs. external drags** — object moves are distinguished from OS file drags by the `Files` DataTransfer type, so dragging an object no longer raises the "Drop files to upload" overlay (`handleTableDragEnter` and the table's `onDragOver` now gate on it).
+- **Pure decision logic** in new `src/lib/move-drag.js` (`dragPayload`, `dropAccepted`) — unit-tested in isolation since `DragEvent`/`DataTransfer` don't exist under the test runner; the Browser/Breadcrumb wiring is a thin shell over it. `Breadcrumb.jsx` gained opt-in move-drop props (the picker's use is unchanged).
+
 ## [1.25.0] — 2026-06-19 — Move files & folders into another folder
 
 Adds a **move** operation: relocate selected files and/or "folders" (S3 prefixes) into a different folder within the same bucket. S3 has no native move, so a move is, per object, a server-side copy to the remapped key followed by a delete of the source — generalizing the existing single-file rename into a multi-item, cross-prefix, folder-aware operation with its own progress queue (mirrors the delete-queue architecture).

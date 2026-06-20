@@ -71,6 +71,72 @@ describe('Breadcrumb — nested prefix', () => {
   });
 });
 
+describe('Breadcrumb — move drop targets (drag-and-drop move)', () => {
+  test('firing drop on the root crumb calls onMoveDrop with the empty prefix', () => {
+    let dropped;
+    const { query, cleanup } = mount(h(Breadcrumb, {
+      prefix: 'photos/2024/', onNavigate: () => {},
+      onMoveDrop: (target) => { dropped = target; },
+    }));
+    fire(query('.crumb'), 'drop'); // first .crumb is "root"
+    assert.equal(dropped, '', 'dropping on root must move to the bucket root');
+    cleanup();
+  });
+
+  test('firing drop on an ancestor crumb calls onMoveDrop with that prefix', () => {
+    let dropped;
+    const { queryAll, cleanup } = mount(h(Breadcrumb, {
+      prefix: 'photos/2024/summer/', onNavigate: () => {},
+      onMoveDrop: (target) => { dropped = target; },
+    }));
+    const photos = queryAll('.crumb').find(c => c.textContent.includes('photos'));
+    fire(photos, 'drop');
+    assert.equal(dropped, 'photos/', 'dropping on the "photos" crumb must move to photos/');
+    cleanup();
+  });
+
+  test('dragover on a crumb forwards to onMoveOver with the target prefix', () => {
+    let overTarget = 'unset';
+    const { query, cleanup } = mount(h(Breadcrumb, {
+      prefix: 'photos/', onNavigate: () => {},
+      onMoveOver: (target) => { overTarget = target; },
+    }));
+    fire(query('.crumb'), 'dragover');
+    assert.equal(overTarget, '', 'dragover on root must report the root target');
+    cleanup();
+  });
+
+  test('moveHoverTarget applies drop-target-active to the matching crumb only', () => {
+    const { queryAll, cleanup } = mount(h(Breadcrumb, {
+      prefix: 'photos/2024/', onNavigate: () => {},
+      onMoveDrop: () => {}, moveHoverTarget: 'photos/',
+    }));
+    const crumbs = queryAll('.crumb');
+    const photos = crumbs.find(c => c.textContent.includes('photos'));
+    const root   = crumbs.find(c => c.textContent.includes('root'));
+    assert.ok(photos.className.includes('drop-target-active'), 'hovered crumb must be highlighted');
+    assert.ok(!root.className.includes('drop-target-active'), 'non-hovered crumb must not be highlighted');
+    cleanup();
+  });
+
+  test('the current (last) crumb is NOT a drop target', () => {
+    let dropped = 'unset';
+    const { query, cleanup } = mount(h(Breadcrumb, {
+      prefix: 'photos/2024/', onNavigate: () => {},
+      onMoveDrop: (target) => { dropped = target; },
+    }));
+    fire(query('.current'), 'drop'); // "2024" — the folder we're already in
+    assert.equal(dropped, 'unset', 'dropping on the current folder must do nothing');
+    cleanup();
+  });
+
+  test('without move props, crumbs carry no drop-target-active class', () => {
+    const { queryAll, cleanup } = mount(h(Breadcrumb, { prefix: 'photos/2024/', onNavigate: () => {} }));
+    assert.ok(queryAll('.crumb').every(c => !c.className.includes('drop-target-active')));
+    cleanup();
+  });
+});
+
 // ─── SortTh ───────────────────────────────────────────────────────────────────
 
 describe('SortTh — inactive column', () => {
