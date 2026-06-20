@@ -7,6 +7,31 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.26.1] — 2026-06-20 — End-to-end test coverage on the stateful mock S3 server
+
+Test-infrastructure release. Builds out the in-repo stateful mock S3 server into a thorough
+end-to-end suite that exercises real S3 protocol behaviour (SigV4 over the wire, CORS, multipart
+state, copy, versioning, presigned GET) against the built app — no Docker, no Python, no real
+credentials. The only source change is a focused set of inert `data-testid` hooks for stable
+browser selectors; no runtime behaviour changes.
+
+- **Mock server extensions** (`test/e2e/mock-s3/server.mjs`): `ListParts` pagination (the BUG-007
+  substrate), fault hooks on the multipart/copy/get paths, presigned response-header overrides
+  (`response-content-disposition`), a request-level vs per-key delete fault distinction, and a CORS
+  fix so a narrowed `ExposeHeaders` genuinely hides `x-amz-meta-*` from the browser (the BUG-028 substrate).
+- **Node-integration layer** (`test/e2e/node/`): the destructive failure modes asserted against real
+  bucket state — delete-denied-after-copy duplicate, multipart-copy abort-on-failure, partial batch
+  delete, transient-throttle recovery, the dedup byte-for-byte gate over real GetObject streams, and a
+  >1000-part `ListParts` resume (BUG-007).
+- **Browser layer** (`test/e2e/browser/`): real-browser proofs that unit tests can't give — BUG-028
+  (metadata hidden vs visible by CORS `ExposeHeaders`) and BUG-012 (an HTTP-DELETE operation blocked
+  when DELETE is absent from CORS), batch upload, stay-in-folder after upload (BUG-029), move via the
+  picker and via HTML5 drag-and-drop, presigned download, and capability-denied handling.
+- **Source `data-testid` hooks** (inert): `app-connected`, `file-row:<name>`, `folder-row:<name>`,
+  `properties-modal`, `meta-file-modified`, `delete-confirm`.
+- **Scripts/CI**: `npm run test:e2e` (+ `:node`/`:browser`); a non-blocking GitLab `e2e` job. The e2e
+  build targets the gitignored `perf/` directory so the committed `dist/index.html` stays pristine.
+
 ## [1.26.0] — 2026-06-19 — Drag-and-drop moving
 
 Adds a direct-manipulation path to the move feature (v1.25.0): **drag a file or folder row — or the current multi-selection — and drop it onto a destination** to move it there, without opening the picker dialog. The dialog remains for moves whose destination isn't currently on screen. Every drag-drop move reuses the existing pipeline unchanged — a drop builds the same request and runs through `runMoveOperation` (copy-before-delete, collision-skip, multipart >5 GB, MoveQueue progress).

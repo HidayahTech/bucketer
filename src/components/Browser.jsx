@@ -826,7 +826,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
 
       {metaItem && (
         <Modal onClose={() => setMetaItem(null)} class="meta-dialog">
-            <div class="modal-title">File properties</div>
+            <div class="modal-title" data-testid="properties-modal">File properties</div>
             <div class="modal-body">
               <p class="modal-filename" title={metaItem.Key}>{leafName(metaItem.Key)}</p>
               {metaLoading && <div class="empty-state"><span class="spinner" style={{ marginRight: '.4rem' }} />Loading…</div>}
@@ -839,7 +839,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                     <tbody>
                       {metaData.ContentType && <tr><td class="meta-key">Content-Type</td><td class="meta-val">{metaData.ContentType}</td></tr>}
                       {metaData.ContentLength != null && <tr><td class="meta-key">Size</td><td class="meta-val">{formatBytes(metaData.ContentLength)}</td></tr>}
-                      {fileMtime && <tr><td class="meta-key">File Modified</td><td class="meta-val">{new Date(fileMtime).toLocaleString()}</td></tr>}
+                      {fileMtime && <tr data-testid="meta-file-modified"><td class="meta-key">File Modified</td><td class="meta-val">{new Date(fileMtime).toLocaleString()}</td></tr>}
                       {metaData.LastModified && <tr><td class="meta-key">Last Modified</td><td class="meta-val">{new Date(metaData.LastModified).toLocaleString()}</td></tr>}
                       {metaData.ETag && <tr><td class="meta-key">ETag</td><td class="meta-val meta-mono">{metaData.ETag}</td></tr>}
                       {metaData.StorageClass && <tr><td class="meta-key">Storage Class</td><td class="meta-val">{metaData.StorageClass}</td></tr>}
@@ -1072,6 +1072,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                   <tr
                     key={cp}
                     class={`file-row${isFolderSelected ? ' file-row-selected' : ''}${dndHoverTarget === cp ? ' drop-target-active' : ''}`}
+                    data-testid={`folder-row:${cp.slice(prefix.length).replace(/\/$/, '')}`}
                     onClick={() => navigateTo(cp)}
                     style={{ cursor: 'pointer' }}
                     draggable={canMove}
@@ -1119,6 +1120,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                   <tr
                     key={obj.Key}
                     class={`file-row${isSelected ? ' file-row-selected' : ''}`}
+                    data-testid={`file-row:${obj.Key.slice(prefix.length)}`}
                     draggable={canMove && renamingKey !== obj.Key}
                     onDragStart={e => handleRowDragStart({ fileKey: obj.Key, fileSize: obj.Size }, e)}
                     onDragEnd={handleRowDragEnd}

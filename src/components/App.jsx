@@ -570,7 +570,7 @@ export function App() {
             </details>
           </aside>
 
-          <main class="main-content">
+          <main class="main-content" data-testid="app-connected">
             {/* Upload zone above the browser */}
             <UploadQueue
               client={client}

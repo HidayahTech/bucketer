@@ -17,6 +17,18 @@ test:
     expire_in: 1 day
     when: on_success
 
+# End-to-end tests against the in-repo stateful mock S3 server: the node-integration layer
+# (real lib functions over HTTP) and the browser layer (Playwright drives the built UI). The
+# Playwright image ships Chromium, so no browser download is needed. allow_failure keeps this
+# non-blocking while it stabilizes; flip it to required once it has a green track record.
+e2e:
+  stage: test
+  image: mcr.microsoft.com/playwright:v1.60.0-jammy
+  allow_failure: true
+  script:
+    - npm ci
+    - npm run test:e2e
+
 # Guards the invariant the in-app integrity check depends on: the build must
 # be bit-identical across runs given the same source. If anything ever leaks
 # nondeterminism into the build (timestamps, RNG, unpinned tooling), this job

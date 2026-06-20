@@ -1,7 +1,28 @@
 # E2E Testing Plan — Playwright
 
 ## Status
-Deferred. Infrastructure is ready; implementation not yet started.
+**Implemented (v1.26.0+).** Connected-state e2e runs against an in-repo **stateful mock S3
+server** — no real credentials, no Docker, no Python. This supersedes the earlier assumption
+below that connected flows "require real credentials": a throwaway bucket is no longer needed
+for hermetic e2e (it remains an optional fidelity spot-check via `E2E_REAL_ENDPOINT`, not built).
+
+## How it works now
+- `test/e2e/mock-s3/server.mjs` — dependency-free stateful S3 server (real MD5 ETags, multipart
+  state, copy, versioning, the exact `cors-config.js` CORS contract, fault injection). Strict where
+  real S3 is strict (1000-key delete cap, part-size + ETag validation, illegal self-copy).
+- `test/e2e/harness.mjs` — boots the mock, builds an S3 client via the app's own `createS3Client`,
+  serves the built `dist/index.html`, and connects the UI.
+- `test/e2e/node/*` — runs the real lib orchestrators (`runMoveOperation`, `runDeleteOperation`,
+  `copyObjectMultipart`, …) over HTTP and asserts actual bucket state.
+- `test/e2e/browser/*` — `node --test` + the `playwright` library drives the built app through
+  full flows, asserting DOM **and** mock bucket state.
+- Run: `npm run test:e2e` (build + node + browser), `:node` / `:browser` for a single layer.
+  CI: a non-blocking `e2e` job (Playwright image). Not part of the pre-push gate.
+
+### Fidelity note
+The mock and moto cover the same tier (real `@aws-sdk`-over-HTTP wiring); neither models non-AWS
+provider quirks (B2 5 GiB copy cap, R2 no-versioning, Wasabi retention, AWS checksums) — those stay
+as `provider.js`/`provider-checksum.js` unit tests, the per-provider review docs, and manual UAT.
 
 ## Available Infrastructure
 

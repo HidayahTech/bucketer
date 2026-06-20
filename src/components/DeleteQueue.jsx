@@ -77,7 +77,7 @@ function ConfirmContent({ op, onConfirm, onCancel, versioningCaveat }) {
       </div>
       <div class="modal-actions">
         <button class="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
-        <button class="btn btn-danger btn-sm" onClick={onConfirm}>Delete</button>
+        <button class="btn btn-danger btn-sm" data-testid="delete-confirm" onClick={onConfirm}>Delete</button>
       </div>
     </>
   );

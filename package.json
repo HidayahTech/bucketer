@@ -1,12 +1,15 @@
 {
   "type": "module",
-  "version": "1.26.0",
+  "version": "1.26.1",
   "scripts": {
     "build": "node build.mjs",
     "dev": "node build.mjs --mode=dev",
     "serve": "node serve.mjs",
     "test": "node --test test/*.test.js",
     "test:ui": "node --loader ./test/helpers/jsx-loader.mjs --test test/components/*.test.jsx",
+    "test:e2e": "node test/e2e/run.mjs",
+    "test:e2e:node": "node test/e2e/run.mjs node",
+    "test:e2e:browser": "node test/e2e/run.mjs browser",
     "bench": "node perf/bench-algorithms.mjs",
     "perftest": "node perf/run.mjs",
     "prepare": "git config core.hooksPath .githooks 2>/dev/null; git config push.followTags true 2>/dev/null; true"

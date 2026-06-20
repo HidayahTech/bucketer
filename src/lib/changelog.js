@@ -1,9 +1,21 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.26.0';
+export const CURRENT_VERSION = '1.26.1';
 
 export const CHANGELOG = [
+  {
+    "version": "1.26.1",
+    "date": "2026-06-20",
+    "title": "End-to-end test coverage on the stateful mock S3 server",
+    "changes": [
+      "**Mock server extensions** (test/e2e/mock-s3/server.mjs): ListParts pagination (the BUG-007",
+      "**Node-integration layer** (test/e2e/node/): the destructive failure modes asserted against real",
+      "**Browser layer** (test/e2e/browser/): real-browser proofs that unit tests can't give — BUG-028",
+      "**Source data-testid hooks** (inert): app-connected, file-row:<name>, folder-row:<name>,",
+      "**Scripts/CI**: npm run test:e2e (+ :node/:browser); a non-blocking GitLab e2e job. The e2e"
+    ]
+  },
   {
     "version": "1.26.0",
     "date": "2026-06-19",
