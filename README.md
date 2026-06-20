@@ -56,7 +56,7 @@ Bucketer doesn't make you choose.
 
 It runs entirely in the browser — no installation, no backend, no server to maintain. The whole application ships as a single self-contained HTML file you can serve from anywhere: nginx, Cloudflare Pages, a corporate intranet, the bucket you're actually browsing, or directly as `file://`. Your secret key never leaves your browser except as a SigV4 signature on requests sent over TLS directly to your storage endpoint. Close the tab; the credentials are gone.
 
-It's not minimal because of the constraints. Bucketer handles multipart uploads for files of any size, with cross-session resume via IndexedDB — the provider is asked what actually landed, a content hash confirms you have the right file, and the upload continues without a server to hold state between retries. It works first-class against Backblaze B2, Cloudflare R2, Wasabi, AWS S3, DigitalOcean Spaces, MinIO, and any S3-compatible API, with per-provider behavior encoded where it matters: routing, CORS requirements, multipart lifetimes, even billing (B2's listing costs are per-call; the default page size is 200 so you notice before you overspend). It manages versioned buckets, surfaces delete markers, and lets you undelete files. It shares state as deep-linkable URLs with parameters in the hash fragment so they never appear in server access logs.
+It's not minimal because of the constraints. Bucketer handles multipart uploads for files of any size, with cross-session resume via IndexedDB — the provider is asked what actually landed, a content hash confirms you have the right file, and the upload continues without a server to hold state between retries. It works first-class against Backblaze B2, Cloudflare R2, Wasabi, AWS S3, DigitalOcean Spaces, MinIO, and any S3-compatible API, with per-provider behavior encoded where it matters: routing, CORS requirements, multipart lifetimes, even billing (B2's listing costs are per-call; the default page size is 200 so you notice before you overspend). It manages versioned buckets, surfaces delete markers, and lets you undelete files. It renames and moves files and whole folders to reorganize a bucket — a server-side copy-then-delete that confirms the copy before removing the original, falls back to multipart copy for objects over 5 GB, and never overwrites an existing object at the destination. It shares state as deep-linkable URLs with parameters in the hash fragment so they never appear in server access logs.
 
 The entire app is one auditable file. No runtime CDN calls. No external scripts. What's in the repository is what runs in your browser.
 
@@ -284,6 +284,14 @@ Multipart uploads (≥ 5 MB) save a resume record in IndexedDB. If interrupted:
 
 When versioning is enabled on a bucket, deleting a file creates a delete marker rather than removing the content. The **Hidden versions & deleted files** panel (below the file listing) surfaces these using `ListObjectVersions`. Removing a delete marker undeletes the file. Old versions can also be purged individually or in bulk.
 
+### Moving and renaming objects
+
+Select one or more files and folders and click **Move** in the action bar (or the **↪** action on a single row) to relocate them into another folder. A folder picker lets you drill into the destination and click **Move here**. To rename a single file in place, use the **✎** action.
+
+S3 has no native move or rename, so both are a server-side copy to the new key followed by a delete of the original. The copy is always confirmed before the source is deleted, so an interrupted move never loses data, and objects larger than 5 GB are copied with multipart `UploadPartCopy`. Moving a folder relocates every object beneath it, preserving the nested structure under the new location. Content-Type and custom metadata are preserved.
+
+Bucketer **never overwrites**: if an object already exists at the destination, that item is skipped and both copies are left untouched. A move needs both write and delete permissions on the bucket.
+
 ---
 
 ## Credential security
@@ -298,7 +306,7 @@ When versioning is enabled on a bucket, deleting a file creates a delete marker 
 
 ## Known limitations
 
-- No rename, copy, or bucket management.
+- No bucket management (creating or deleting buckets).
 - No automatic retry with backoff (manual retry available).
 - No multiple saved credential profiles.
 - MinIO requires manual provider override (endpoint pattern is user-defined).
