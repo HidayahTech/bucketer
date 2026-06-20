@@ -1,9 +1,19 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.26.1';
+export const CURRENT_VERSION = '1.26.2';
 
 export const CHANGELOG = [
+  {
+    "version": "1.26.2",
+    "date": "2026-06-20",
+    "title": "Fix: file checkboxes were unclickable (BUG-030) + P1 e2e coverage",
+    "changes": [
+      "Node: presigned GET full + Range (206) + content-disposition override.",
+      "Browser: multi-select batch delete & batch move, select-all, filter, sort, copy-link popover; the",
+      "Mock server: batch DeleteObjects now creates delete markers on a versioned bucket; e2e files run"
+    ]
+  },
   {
     "version": "1.26.1",
     "date": "2026-06-20",

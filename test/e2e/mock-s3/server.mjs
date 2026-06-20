@@ -330,7 +330,10 @@ export function createMockS3(opts = {}) {
       const key = k.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
       const f = matchFault('DeleteObject', 'POST', key);
       if (f) { errors.push(`<Error><Key>${xmlEsc(key)}</Key><Code>${xmlEsc(f.code)}</Code><Message>${xmlEsc(f.message)}</Message></Error>`); continue; }
-      b.objects.delete(key);
+      // On a versioned bucket a batch delete (no per-key VersionId) creates a delete marker, same as
+      // a single DeleteObject — the current version is hidden but retained (so it can be undeleted).
+      if (b.versioning) putVersion(b, key, { versionId: newId(), deleteMarker: true, lastModified: nowISO() });
+      else b.objects.delete(key);
       if (!quiet) deleted.push(`<Deleted><Key>${xmlEsc(key)}</Key></Deleted>`);
     }
     sendXml(req, res, 200, `<DeleteResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">${deleted.join('')}${errors.join('')}</DeleteResult>`);

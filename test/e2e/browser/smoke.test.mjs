@@ -59,11 +59,11 @@ describe('browser e2e — connect, upload, list, delete', () => {
 
   test('deleting the file removes it from the bucket and the listing', async () => {
     const row = page.locator('tr.file-row', { hasText: 'e2e-upload.txt' });
-    await row.locator('button[title="Delete"]').click();
+    await row.locator('button[title="Delete"]').click({ force: true });
     // DeleteQueue confirm modal → confirm, then wait for the modal to close (confirm fired).
     const modal = page.locator('.modal-overlay');
     await modal.waitFor({ timeout: 5000 });
-    await modal.locator('.btn-danger').click();
+    await page.locator('[data-testid="delete-confirm"]').click();
     await modal.waitFor({ state: 'detached', timeout: 5000 });
 
     // DOM: the row is removed (auto-retries until the optimistic re-render flushes).

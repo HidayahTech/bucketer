@@ -43,7 +43,10 @@ try {
   }
   const files = dirs.flatMap(collect);
   console.log(`\n── Running e2e layer: ${layer} (${files.length} files) ──\n`);
-  run(['--test', ...files]);
+  // Serialize test files (--test-concurrency=1): the browser specs each launch Chromium, and
+  // running them concurrently overloads the machine and causes timeout flakes. Serial is slower
+  // but deterministic — the right trade for browser e2e.
+  run(['--test', '--test-concurrency=1', ...files]);
 } catch (err) {
   process.exit(err.status ?? 1);
 }

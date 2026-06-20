@@ -1126,7 +1126,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                     onDragEnd={handleRowDragEnd}
                   >
                     <td class="col-check" onClick={e => toggleSelect(obj.Key, e)}>
-                      <input type="checkbox" checked={isSelected} onChange={e => toggleSelect(obj.Key, e)} />
+                      <input type="checkbox" checked={isSelected} onChange={e => toggleSelect(obj.Key, e)} onClick={e => e.stopPropagation()} />
                     </td>
                     <td class="col-name">
                       <span class="file-icon">📄</span>

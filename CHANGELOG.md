@@ -7,6 +7,27 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.26.2] — 2026-06-20 — Fix: file checkboxes were unclickable (BUG-030) + P1 e2e coverage
+
+**Bug fix.** Clicking the checkbox on a **file** row did nothing — the row did not select and the
+batch action bar never appeared (you could only select a file by clicking the cell padding around
+the checkbox). The file-row checkbox fired the toggle on both the `<td>` (onClick) and the `<input>`
+(onChange), so a direct click double-toggled to a no-op. The folder row already guarded against this
+with `onClick={e => e.stopPropagation()}` on its input; the file row was missing it. Added the same
+guard. See BUG-030. **Discovered by the new e2e batch-selection tests** — the first real bug the e2e
+suite has caught.
+
+**P1 e2e coverage** (extends the v1.26.1 suite; test-infra, no runtime change beyond the fix above):
+- Node: presigned GET full + Range (206) + content-disposition override.
+- Browser: multi-select batch delete & batch move, select-all, filter, sort, copy-link popover; the
+  full properties metadata matrix (Content-Type/Size/ETag/File Modified/content-hash); the versioning
+  journey (delete → marker → undelete from Hidden Versions); the credential-screen regressions
+  BUG-018 (save-as-profile enablement), BUG-020 (save pre-connect), BUG-027 (post-disconnect form),
+  BUG-026 (region re-inference after profile load); and BUG-009 (a 403 on UploadPart aborts the
+  multipart session, leaving no orphan).
+- Mock server: batch `DeleteObjects` now creates delete markers on a versioned bucket; e2e files run
+  serially (`--test-concurrency=1`) to avoid browser-contention flakes.
+
 ## [1.26.1] — 2026-06-20 — End-to-end test coverage on the stateful mock S3 server
 
 Test-infrastructure release. Builds out the in-repo stateful mock S3 server into a thorough

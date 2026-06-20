@@ -4,6 +4,39 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-030 — Clicking a file's checkbox did not select the file (double-toggle no-op)
+
+**Date:** 2026-06-20
+
+**Symptom:**
+In the file browser, clicking the checkbox on a **file** row did nothing — the row did not become selected and the batch action bar did not appear. Selecting a file only worked by clicking the surrounding cell padding, not the checkbox itself. Folder-row checkboxes worked correctly. Discovered while writing the e2e batch-selection tests: Playwright reported "clicking the checkbox did not change its state."
+
+**Root cause:**
+The file-row checkbox cell wires the toggle on **both** the `<td>` and the `<input>`:
+
+```jsx
+<td class="col-check" onClick={e => toggleSelect(obj.Key, e)}>
+  <input type="checkbox" checked={isSelected} onChange={e => toggleSelect(obj.Key, e)} />
+</td>
+```
+
+Clicking the checkbox fires the input's `onChange` (toggle #1) **and** the click bubbles to the `<td>`'s `onClick` (toggle #2). The two `setSelectedKeys` functional updates cancel out — net no change. `toggleSelect` calls `e.stopPropagation()`, but that does not prevent the already-dispatched `change` handler from also running. The **folder** row was correct because its input carried `onClick={e => e.stopPropagation()}`, which prevents the click from reaching the `<td>` — so only one toggle fires. The file row was missing that guard.
+
+**Fix:**
+Add `onClick={e => e.stopPropagation()}` to the file-row checkbox input, matching the folder row:
+
+```jsx
+<input type="checkbox" checked={isSelected} onChange={e => toggleSelect(obj.Key, e)} onClick={e => e.stopPropagation()} />
+```
+
+Clicking the checkbox now fires `onChange` once and the click no longer bubbles to the cell — a single toggle. Clicking the cell padding (which does not hit the input) still toggles via the `<td>` handler.
+
+**Why it wasn't caught earlier:**
+No test exercised checkbox selection — component tests asserted on rendered structure, and the earlier e2e flows selected rows via action buttons, not checkboxes. The bug is also partially masked in manual use: clicking the cell area around the checkbox works, so a user who clicks slightly off-target sees selection succeed and may not notice that the checkbox glyph itself is dead.
+
+**Test case:**
+e2e (`test/e2e/browser/batch.test.mjs`): after upload, check a file row's checkbox and assert the row gains `file-row-selected` and the batch bar appears; batch-delete/move of multiple selected files reflects in real bucket state.
+
 ## BUG-029 — Upload completion teleports user to bucket root
 
 **Date:** 2026-06-16
