@@ -16,6 +16,7 @@ import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Modal } from './Modal.jsx';
 import { formatBytes, leafName } from '../lib/format.js';
+import { presignGetParams } from '../lib/presign-params.js';
 import { PRESIGN_EXPIRES, DEDUP_VERIFY_MAX_BYTES } from '../lib/constants.js';
 import { scanForDuplicates } from '../lib/dedup-scan.js';
 import { providerChecksumAdapter } from '../lib/provider-checksum.js';
@@ -124,7 +125,7 @@ export function DuplicatesReport({ groups, capabilities, onSelectKeeper, onVerif
 // ── S3-backed read-only implementations (production path; tests inject overrides) ──
 
 async function presign(client, bucket, key, extra) {
-  return getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: key, ...extra }), { expiresIn: PRESIGN_EXPIRES });
+  return getSignedUrl(client, new GetObjectCommand(presignGetParams({ Bucket: bucket, Key: key, ...extra })), { expiresIn: PRESIGN_EXPIRES });
 }
 
 async function downloadObject(client, bucket, key) {

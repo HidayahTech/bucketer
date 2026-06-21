@@ -10,6 +10,7 @@ import { ListObjectsV2Command, GetObjectCommand, HeadObjectCommand, PutObjectCom
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { formatBytes, leafName, isPermissionError } from '../lib/format.js';
 import { usePreview } from '../lib/usePreview.js';
+import { presignGetParams } from '../lib/presign-params.js';
 import { Modal } from './Modal.jsx';
 import { PreviewMedia } from './PreviewMedia.jsx';
 import { defaultMaxKeys } from '../lib/provider.js';
@@ -582,7 +583,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
       if (kind === 'text') {
         const url = await getSignedUrl(
           client,
-          new GetObjectCommand({ Bucket: bucket, Key: item.Key, ResponseContentDisposition: 'inline', ResponseContentType: 'text/plain; charset=utf-8' }),
+          new GetObjectCommand(presignGetParams({ Bucket: bucket, Key: item.Key, ResponseContentDisposition: 'inline', ResponseContentType: 'text/plain; charset=utf-8' })),
           { expiresIn: PRESIGN_EXPIRES },
         );
         const entry = { url, expiresAt, kind, contentType };
@@ -597,7 +598,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
       } else {
         const url = await getSignedUrl(
           client,
-          new GetObjectCommand({ Bucket: bucket, Key: item.Key, ResponseContentDisposition: 'inline', ...(contentType ? { ResponseContentType: contentType } : {}) }),
+          new GetObjectCommand(presignGetParams({ Bucket: bucket, Key: item.Key, ResponseContentDisposition: 'inline', ...(contentType ? { ResponseContentType: contentType } : {}) })),
           { expiresIn: PRESIGN_EXPIRES },
         );
         previewUrlCacheRef.current.set(item.Key, { url, expiresAt, kind, contentType });

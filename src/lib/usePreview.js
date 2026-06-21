@@ -8,6 +8,7 @@ import { useState, useRef, useEffect } from 'preact/hooks';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { HeadObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { mediaKind, mimeType, mimeKind } from './media.js';
+import { presignGetParams } from './presign-params.js';
 
 const PRESIGN_EXPIRES = 3600;
 const TEXT_PREVIEW_LIMIT = 100 * 1024;
@@ -105,11 +106,11 @@ export function usePreview(client, bucket) {
       if (kind === 'text') {
         const url = await getSignedUrl(
           client,
-          new GetObjectCommand({
+          new GetObjectCommand(presignGetParams({
             Bucket: bucket, Key: obj.Key,
             ResponseContentDisposition: 'inline',
             ResponseContentType: 'text/plain; charset=utf-8',
-          }),
+          })),
           { expiresIn: PRESIGN_EXPIRES },
         );
         previewUrlCacheRef.current.set(obj.Key, { url, expiresAt, kind, contentType });
@@ -121,11 +122,11 @@ export function usePreview(client, bucket) {
       } else {
         const url = await getSignedUrl(
           client,
-          new GetObjectCommand({
+          new GetObjectCommand(presignGetParams({
             Bucket: bucket, Key: obj.Key,
             ResponseContentDisposition: 'inline',
             ...(contentType ? { ResponseContentType: contentType } : {}),
-          }),
+          })),
           { expiresIn: PRESIGN_EXPIRES },
         );
         previewUrlCacheRef.current.set(obj.Key, { url, expiresAt, kind, contentType });
