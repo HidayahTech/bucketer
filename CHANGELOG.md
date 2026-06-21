@@ -7,6 +7,18 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.27.0] — 2026-06-21 — Privacy: Referrer-Policy `no-referrer`
+
+First item shipped from the v1.26.3 next-level review roadmap (GitLab Epic #5 → #12).
+
+- **`<meta name="referrer" content="no-referrer">` added to the document head.** Presigned S3 URLs and
+  bucket/prefix names — which live in the URL and hash fragment — no longer leak via the `Referer` header on
+  any outbound navigation, including the sandboxed PDF preview iframe. Static hosting (S3/R2/B2) cannot set a
+  `Referrer-Policy` response header, so the meta tag delivers the guarantee with no server configuration.
+  Placed immediately after the `app-version` tag so the update-check byte-512 invariant is unaffected
+  (build-id and app-version still end at bytes 179/224).
+- **Build invariant** added to `build.test.js`: asserts the tag is present and set to `no-referrer`.
+
 ## [1.26.3] — 2026-06-20 — Fix: drag-dropped uploads landed at root; sub-folder not shown until reload
 
 Two user-reported bug fixes (GitLab #2, #4).

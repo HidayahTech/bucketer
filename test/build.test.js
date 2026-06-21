@@ -187,3 +187,20 @@ describe('Build output — meta Content-Security-Policy for static hosting (T5-4
     );
   });
 });
+
+describe('Build output — Referrer-Policy for privacy (#12)', () => {
+  // A <meta name="referrer" content="no-referrer"> stops presigned S3 URLs and
+  // bucket/prefix names — which live in the URL and hash fragment — from leaking
+  // via the Referer header on any outbound navigation, including the sandboxed
+  // PDF preview iframe. S3/R2/B2 static hosting cannot set a Referrer-Policy
+  // response header, so the meta tag provides the guarantee with no server config.
+  test('HTML head sets <meta name="referrer" content="no-referrer">', () => {
+    const match = html.match(/name="referrer"\s+content="([^"]+)"/);
+    assert.ok(
+      match,
+      'dist/index.html must include a <meta name="referrer"> tag — without it, ' +
+      'presigned URLs and bucket/prefix names can leak via the Referer header (#12)'
+    );
+    assert.equal(match[1], 'no-referrer', 'referrer policy must be "no-referrer"');
+  });
+});

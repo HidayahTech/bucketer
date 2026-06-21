@@ -1,9 +1,18 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.26.3';
+export const CURRENT_VERSION = '1.27.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.27.0",
+    "date": "2026-06-21",
+    "title": "Privacy: Referrer-Policy `no-referrer`",
+    "changes": [
+      "**<meta name=\"referrer\" content=\"no-referrer\"> added to the document head.** Presigned S3 URLs and",
+      "**Build invariant** added to build.test.js: asserts the tag is present and set to no-referrer."
+    ]
+  },
   {
     "version": "1.26.3",
     "date": "2026-06-20",
