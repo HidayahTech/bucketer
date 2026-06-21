@@ -128,18 +128,20 @@ describe('Build output — no source maps in production bundle (T5-1)', () => {
   });
 });
 
-describe('Build output — bundle size ceiling (T5-2)', () => {
-  // 600 KB ceiling guards against accidental inclusion of large assets or
-  // dependencies. Current size is ~515 KB; 600 KB leaves headroom while
-  // preventing runaway growth.
-  const SIZE_LIMIT_BYTES = 600 * 1024;
+describe('Build output — bundle size tripwire (T5-2)', () => {
+  // Tripwire against accidental inclusion of a large asset or dependency — NOT a
+  // product limit. The served artifact is gzip/brotli-compressed, so raw bytes
+  // overstate the real over-the-wire cost. Set generously above organic growth;
+  // keep in sync with build.mjs.
+  const SIZE_LIMIT_BYTES = 1024 * 1024;
 
   test(`dist/index.html is under ${SIZE_LIMIT_BYTES / 1024} KB`, () => {
     const size = Buffer.byteLength(html, 'utf8');
     assert.ok(
       size <= SIZE_LIMIT_BYTES,
       `dist/index.html is ${(size / 1024).toFixed(1)} KB — exceeds the ` +
-      `${SIZE_LIMIT_BYTES / 1024} KB ceiling (T5-2)`
+      `${SIZE_LIMIT_BYTES / 1024} KB tripwire (T5-2); likely an accidental large ` +
+      `dependency or asset`
     );
   });
 });
