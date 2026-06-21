@@ -19,6 +19,7 @@
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import logoUrl from '../assets/bucketer-logo.svg';
 import { BucketerLogo } from './BucketerLogo.jsx';
+import { ThemeToggle } from './ThemeToggle.jsx';
 import { createS3Client } from '../lib/s3-client.js';
 import { detectProvider, PROVIDER_LABELS } from '../lib/provider.js';
 import {
@@ -442,6 +443,7 @@ export function App() {
             Disconnect
           </button>
         )}
+        <ThemeToggle />
         <button class="btn-version" onClick={() => setChangelogOpen(true)} title="View changelog">
           v{CURRENT_VERSION}
         </button>

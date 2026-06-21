@@ -16,6 +16,8 @@
 // browsing mode and other restrictive contexts. The app degrades gracefully
 // (credentials are not persisted) rather than crashing.
 
+import { THEME_PREFS } from './theme.js';
+
 // Credential fields — wiped by clearCredentials() on disconnect.
 const CREDENTIAL_KEYS = {
   endpoint:       's3b_endpoint',
@@ -222,6 +224,17 @@ export function repairStorageInvariants() {
     }
   }
   if (dirty) saveProfilesData(data);
+}
+
+// Theme preference — standalone key (outside LS_KEYS) so it survives both
+// clearCredentials() and resetSettings(). Invalid/unset values resolve to 'system'.
+const LS_KEY_THEME = 's3b_theme';
+export function loadThemePref() {
+  const v = safeGet(localStorage, LS_KEY_THEME);
+  return THEME_PREFS.includes(v) ? v : 'system';
+}
+export function saveThemePref(pref) {
+  safeSet(localStorage, LS_KEY_THEME, THEME_PREFS.includes(pref) ? pref : 'system');
 }
 
 // Profile storage — keys are OUTSIDE LS_KEYS so clearCredentials() does not wipe them.

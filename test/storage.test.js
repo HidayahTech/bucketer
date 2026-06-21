@@ -498,3 +498,30 @@ describe('loadFileMtimeAutoLoad / saveFileMtimeAutoLoad', () => {
     assert.equal(loadFileMtimeAutoLoad(), false);
   });
 });
+
+import { loadThemePref, saveThemePref } from '../src/lib/storage.js';
+
+describe('loadThemePref / saveThemePref (#14)', () => {
+  beforeEach(() => { delete ls['s3b_theme']; });
+
+  test('defaults to system when unset', () => {
+    assert.equal(loadThemePref(), 'system');
+  });
+
+  test('round-trips a saved preference', () => {
+    saveThemePref('dark');
+    assert.equal(loadThemePref(), 'dark');
+    saveThemePref('light');
+    assert.equal(loadThemePref(), 'light');
+  });
+
+  test('an invalid stored value falls back to system', () => {
+    ls['s3b_theme'] = 'neon';
+    assert.equal(loadThemePref(), 'system');
+  });
+
+  test('saving an invalid preference stores system', () => {
+    saveThemePref('neon');
+    assert.equal(loadThemePref(), 'system');
+  });
+});

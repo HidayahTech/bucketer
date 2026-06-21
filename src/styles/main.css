@@ -29,8 +29,14 @@
 
 html { font-size: 15px; }
 
+/* Dark palette — applied two ways (see src/lib/theme.js + ThemeToggle.jsx):
+   (1) System preference: no data-theme attribute is set, so this media query
+       governs. It is correct even before JS runs (no FOUC) and tracks OS changes
+       live. The Light preference sets data-theme="light", excluding this rule.
+   (2) Explicit Dark preference: data-theme="dark".
+   The two selectors share the same declarations; keep them in sync. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme]) {
     --bg: #1a1b1e;
     --surface: #25262b;
     --surface-raised: #2c2e33;
@@ -51,6 +57,27 @@ html { font-size: 15px; }
     --info-bg: #0d2535;
     --shadow: 0 1px 3px rgba(0,0,0,.3);
   }
+}
+:root[data-theme="dark"] {
+  --bg: #1a1b1e;
+  --surface: #25262b;
+  --surface-raised: #2c2e33;
+  --border: #373a40;
+  --border-focus: #35c4e0;
+  --text: #c1c2c5;
+  --text-muted: #909296;
+  --text-danger: #ff6b6b;
+  --text-success: #69db7c;
+  --text-warn: #fcc419;
+  --accent: #22b8cf;
+  --accent-hover: #15aabf;
+  --danger: #fa5252;
+  --danger-hover: #f03e3e;
+  --success-bg: #0d2b14;
+  --warn-bg: #2b2100;
+  --danger-bg: #2b0f0f;
+  --info-bg: #0d2535;
+  --shadow: 0 1px 3px rgba(0,0,0,.3);
 }
 body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.5; }
 
