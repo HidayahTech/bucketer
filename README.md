@@ -4,6 +4,8 @@
 
 **→ [Try it live](https://bucketer.hidayahtech.net/)** &nbsp;·&nbsp; Canonical repository: [gitlab.com/hidayahtech/bucketer](https://gitlab.com/hidayahtech/bucketer)
 
+> **📍 Canonical home: GitLab.** All development, releases, and issue tracking happen at **[gitlab.com/hidayahtech/bucketer](https://gitlab.com/hidayahtech/bucketer)**. The [GitHub repository](https://github.com/HidayahTech/bucketer) is a **read-only mirror** — issues, pull requests, and discussions are disabled there. To **report a bug or contribute, please use GitLab**.
+
 ### ⚡ No install. No server. No backend. No third-party trust.
 
 Open a URL. Enter your credentials. You're managing your bucket. Close the tab when you're done — nothing lingers, nothing persists on a server you didn't ask for. There's no installation, no Docker container, no daemon to keep running. Just a URL.
