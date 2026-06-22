@@ -1081,3 +1081,25 @@ details[open] .sv-summary::before { transform: rotate(90deg); }
   border-radius: var(--radius); border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--border));
   margin-bottom: .75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+
+/* ── Toasts (#15) ─────────────────────────────────────────────────────────── */
+.toast-host {
+  position: fixed; bottom: 1rem; right: 1rem; z-index: 1000;
+  display: flex; flex-direction: column; gap: .5rem; align-items: flex-end;
+  pointer-events: none; /* container ignores clicks; individual toasts re-enable */
+}
+.toast {
+  pointer-events: auto;
+  font: inherit; font-size: .85rem; text-align: left;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-left: 3px solid var(--text-success);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: .55rem .8rem; max-width: min(90vw, 360px); cursor: pointer;
+  animation: toast-in 140ms ease;
+}
+.toast-success { border-left-color: var(--text-success); }
+.toast-error   { border-left-color: var(--danger); }
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(.5rem); }
+  to   { opacity: 1; transform: translateY(0); }
+}

@@ -20,6 +20,8 @@ import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import logoUrl from '../assets/bucketer-logo.svg';
 import { BucketerLogo } from './BucketerLogo.jsx';
 import { ThemeToggle } from './ThemeToggle.jsx';
+import { ToastHost } from './ToastHost.jsx';
+import { showToast } from '../lib/toast.js';
 import { createS3Client } from '../lib/s3-client.js';
 import { detectProvider, PROVIDER_LABELS } from '../lib/provider.js';
 import {
@@ -78,7 +80,6 @@ export function App() {
   const [currentPrefix, setCurrentPrefix] = useState('');
   const [browserKey, setBrowserKey] = useState(0); // force re-mount on reconnect
   const [logKey, setLogKey] = useState(0);         // incremented to refresh upload log
-  const [linkCopied, setLinkCopied] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { changelogOpen, setChangelogOpen, aboutOpen, setAboutOpen, storageOpen, setStorageOpen, duplicatesOpen, setDuplicatesOpen } = useModalStates();
   const [liveFormData, setLiveFormData] = useState(credentials);
@@ -236,6 +237,8 @@ export function App() {
           browserActionsRef.current?.invalidateCache(op.capturedPrefix);
           handleCapabilityChange('delete', 'permitted');
           if (update.errors.length === 0) {
+            const n = (op.files?.length || 0) + (op.prefixes?.length || 0);
+            showToast(`Deleted ${n} item${n === 1 ? '' : 's'}`);
             setTimeout(() => setDeleteOps(prev => prev.filter(o => o.id !== id)), 3000);
           }
         }
@@ -291,6 +294,7 @@ export function App() {
             handleCapabilityChange('delete', 'permitted');
           }
           if (update.errors.length === 0) {
+            showToast(`Moved ${update.moved} item${update.moved === 1 ? '' : 's'}`);
             setTimeout(() => setMoveOps(prev => prev.filter(o => o.id !== id)), 3000);
           }
         }
@@ -320,8 +324,7 @@ export function App() {
     if (!url) return;
     try {
       await navigator.clipboard.writeText(url);
-      setLinkCopied(true);
-      setTimeout(() => setLinkCopied(false), 2000);
+      showToast('Share link copied to clipboard');
     } catch { /* clipboard API unavailable */ }
   }
 
@@ -383,6 +386,7 @@ export function App() {
 
   return (
     <div id="app">
+      <ToastHost />
       {changelogOpen && <ChangelogModal onClose={() => setChangelogOpen(false)} />}
       {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}
       {storageOpen && <StorageModal onClose={() => setStorageOpen(false)} isConnected={session === 'connected'} />}
@@ -424,7 +428,6 @@ export function App() {
             >
               Copy link
             </button>
-            {linkCopied && <span style={{ fontSize: '.8rem', color: '#86efac' }}>✓ Copied</span>}
           </>
         )}
         {session === 'connected' && capabilities.list !== 'denied' && (

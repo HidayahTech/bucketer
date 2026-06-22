@@ -24,6 +24,7 @@ import { validateObjectName } from '../lib/validate-object-name.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
 import { HiddenVersions } from './HiddenVersions.jsx';
 import { CopyLinkPopover } from './CopyLinkPopover.jsx';
+import { showToast } from '../lib/toast.js';
 import { Breadcrumb } from './Breadcrumb.jsx';
 import { SortTh } from './SortTh.jsx';
 import { MovePickerModal } from './MovePickerModal.jsx';
@@ -491,6 +492,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
       invalidateCache(prefix);
       setItems(prev => prev.map(o => o.Key === oldKey ? { ...o, Key: newKey } : o));
       setRenamingKey(null);
+      showToast(`Renamed to "${newName}"`);
     } catch (err) {
       setRenameError(err.message || String(err));
     } finally {

@@ -266,7 +266,10 @@ describe('App.jsx — handleDeleteConfirm wraps runDeleteOperation in try/catch 
     // Find handleDeleteConfirm and assert try{ exists before the next function declaration
     const fnStart = source.indexOf('async function handleDeleteConfirm');
     assert.ok(fnStart !== -1, 'handleDeleteConfirm must exist in App.jsx');
-    const fnBody = source.slice(fnStart, fnStart + 900);
+    // Bound the slice by the next sibling function so the check is robust to the
+    // function growing (a fixed-length window silently drops the catch clause).
+    const fnEnd = source.indexOf('function handleDeleteDismiss', fnStart);
+    const fnBody = source.slice(fnStart, fnEnd === -1 ? fnStart + 1200 : fnEnd);
     assert.ok(
       /\btry\s*\{/.test(fnBody),
       'handleDeleteConfirm must wrap runDeleteOperation in try/catch — an uncaught throw ' +
