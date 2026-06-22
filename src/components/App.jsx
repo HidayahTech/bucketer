@@ -40,7 +40,7 @@ import { UploadQueue } from './UploadQueue.jsx';
 import { DeleteQueue } from './DeleteQueue.jsx';
 import { runDeleteOperation } from '../lib/delete-queue.js';
 import { MoveQueue } from './MoveQueue.jsx';
-import { runMoveOperation } from '../lib/move-queue.js';
+import { runMoveOperation, runCopyOperation } from '../lib/move-queue.js';
 import { CapabilityPanel } from './CapabilityPanel.jsx';
 import { SettingsPanel } from './SettingsPanel.jsx';
 import { UploadLog } from './UploadLog.jsx';
@@ -269,15 +269,16 @@ export function App() {
     setMoveOps(prev => prev.map(op => op.id === id ? { ...op, ...update } : op));
   }
 
-  async function handleMoveRequest({ files, prefixes, dest, capturedPrefix }) {
+  async function handleMoveRequest({ files, prefixes, dest, capturedPrefix, mode = 'move' }) {
     const id = String(Date.now() + Math.random());
     const op = {
-      id, phase: 'checking', files, prefixes, dest, capturedPrefix,
+      id, phase: 'checking', files, prefixes, dest, capturedPrefix, mode,
       bucket: credentials.bucket, moved: 0, total: null, errors: [], collapsed: false,
     };
     setMoveOps(prev => [...prev, op]);
+    const runOperation = mode === 'copy' ? runCopyOperation : runMoveOperation;
     try {
-      await runMoveOperation(client, op.bucket, op, (update) => {
+      await runOperation(client, op.bucket, op, (update) => {
         // Remove moved source rows incrementally (copy+delete confirmed for those keys).
         if (update.movedKeys?.length) {
           browserActionsRef.current?.removeItems(update.movedKeys, []);
@@ -291,10 +292,11 @@ export function App() {
           browserActionsRef.current?.invalidateCache(op.dest);
           if (update.moved > 0) {
             handleCapabilityChange('upload', 'permitted');
-            handleCapabilityChange('delete', 'permitted');
+            if (mode === 'move') handleCapabilityChange('delete', 'permitted');
           }
           if (update.errors.length === 0) {
-            showToast(`Moved ${update.moved} item${update.moved === 1 ? '' : 's'}`);
+            const verb = mode === 'copy' ? 'Copied' : 'Moved';
+            showToast(`${verb} ${update.moved} item${update.moved === 1 ? '' : 's'}`);
             setTimeout(() => setMoveOps(prev => prev.filter(o => o.id !== id)), 3000);
           }
         }

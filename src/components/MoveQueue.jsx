@@ -30,17 +30,21 @@ function MoveOpEntry({ op, onDismiss, onCollapse }) {
     pc > 0 && `${pc} folder${pc !== 1 ? 's' : ''}`,
   ].filter(Boolean).join(' and ');
 
+  const isCopy = op.mode === 'copy';
+  const doneVerb = isCopy ? 'Copied' : 'Moved';
+  const activeVerb = isCopy ? 'Copying' : 'Moving';
+
   const progressText = op.total != null ? ` · ${op.moved} / ${op.total}` : '';
   const skippedText  = skipped > 0 ? ` · ${skipped} skipped` : '';
   const failedText   = failed > 0 ? ` · ${failed} error${failed !== 1 ? 's' : ''}` : '';
 
   const summary = isDone
-    ? `Moved ${subject}${skippedText}${failedText}`
+    ? `${doneVerb} ${subject}${skippedText}${failedText}`
     : op.phase === 'discovering'
     ? 'Listing folder contents…'
     : op.phase === 'checking'
     ? 'Checking destination…'
-    : `Moving ${subject}${progressText}${skippedText}${failedText}`;
+    : `${activeVerb} ${subject}${progressText}${skippedText}${failedText}`;
 
   const hasErrors = op.errors.length > 0; // skips count as "errors" for the expandable detail list
 

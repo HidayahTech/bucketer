@@ -29,3 +29,15 @@ export function validateMove({ files = [], prefixes = [], dest = '' }) {
 
   return null;
 }
+
+// Copy guards (#17). Looser than validateMove: copying to the current location is a
+// valid action (it produces a renamed duplicate), so the no-op guards do not apply.
+// Only copying a folder into itself or a descendant is still blocked.
+export function validateCopy({ prefixes = [], dest = '' }) {
+  for (const p of prefixes) {
+    if (dest.startsWith(p)) {
+      return 'Cannot copy a folder into itself or one of its subfolders.';
+    }
+  }
+  return null;
+}

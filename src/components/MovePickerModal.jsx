@@ -10,9 +10,9 @@ import { ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { Modal } from './Modal.jsx';
 import { Breadcrumb } from './Breadcrumb.jsx';
 import { leafName } from '../lib/format.js';
-import { validateMove } from '../lib/move-guards.js';
+import { validateMove, validateCopy } from '../lib/move-guards.js';
 
-export function MovePickerModal({ client, bucket, selection, initialPrefix = '', onCancel, onMove }) {
+export function MovePickerModal({ client, bucket, selection, initialPrefix = '', onCancel, onMove, mode = 'move' }) {
   const [prefix, setPrefix]   = useState(initialPrefix);
   const [folders, setFolders] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -48,12 +48,16 @@ export function MovePickerModal({ client, bucket, selection, initialPrefix = '',
   }, [prefix, client, bucket]);
 
   const fileKeys = (selection.files || []).map(f => (typeof f === 'string' ? f : f.key));
-  const reason   = validateMove({ files: fileKeys, prefixes: selection.prefixes || [], dest: prefix });
+  const isCopy   = mode === 'copy';
+  const verb     = isCopy ? 'Copy' : 'Move';
+  const reason   = isCopy
+    ? validateCopy({ prefixes: selection.prefixes || [], dest: prefix })
+    : validateMove({ files: fileKeys, prefixes: selection.prefixes || [], dest: prefix });
   const count    = (selection.files?.length || 0) + (selection.prefixes?.length || 0);
 
   return (
     <Modal onClose={onCancel} class="move-dialog">
-      <div class="modal-title">Move {count} item{count !== 1 ? 's' : ''} to…</div>
+      <div class="modal-title">{verb} {count} item{count !== 1 ? 's' : ''} to…</div>
       <Breadcrumb prefix={prefix} onNavigate={setPrefix} />
       <div class="move-picker-list">
         {loading && <div class="move-picker-loading"><span class="spinner" /> Loading…</div>}
@@ -81,7 +85,7 @@ export function MovePickerModal({ client, bucket, selection, initialPrefix = '',
           disabled={!!reason || loading}
           onClick={() => onMove(prefix)}
         >
-          Move here
+          {verb} here
         </button>
       </div>
     </Modal>

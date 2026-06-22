@@ -17,7 +17,7 @@
 // Collision/skip errors carry `skipped: true` so the UI can show them apart from failures.
 import { ListObjectsV2Command, CopyObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { COPY_MULTIPART_THRESHOLD } from './constants.js';
-import { destKeyForFile, destKeyForFolderObject } from './move-key.js';
+import { destKeyForFile, destKeyForFolderObject, freeFileKey, freeFolderPrefix } from './move-key.js';
 import { copyObjectMultipart } from './move-multipart.js';
 import { sendWithRetry } from './s3-retry.js';
 
@@ -50,6 +50,17 @@ async function discoverPrefixObjects(client, bucket, prefixes) {
 }
 
 export async function runMoveOperation(client, bucket, op, onProgress) {
+  return runTransfer(client, bucket, op, onProgress, 'move');
+}
+
+export async function runCopyOperation(client, bucket, op, onProgress) {
+  return runTransfer(client, bucket, op, onProgress, 'copy');
+}
+
+// Shared core for move ('move') and copy-and-keep ('copy'). Copy renames on collision
+// (never overwrites) and skips the source delete; move skips colliding objects and
+// deletes each source only after its copy is confirmed.
+async function runTransfer(client, bucket, op, onProgress, mode) {
   const dest = op.dest ?? '';
   const looseFiles = (op.files || []).map(f => (typeof f === 'string' ? { key: f, size: 0 } : f));
   const prefixes = op.prefixes || [];
@@ -77,7 +88,7 @@ export async function runMoveOperation(client, bucket, op, onProgress) {
 
   // Nothing to move (e.g. empty op, or only empty folders): finish without a dest crawl.
   if (work.length === 0) {
-    onProgress({ phase: 'done', moved: 0, errors: [], movedPrefixes: [...prefixes] });
+    onProgress({ phase: 'done', moved: 0, errors: [], movedPrefixes: mode === 'move' ? [...prefixes] : [] });
     return;
   }
 
@@ -93,16 +104,45 @@ export async function runMoveOperation(client, bucket, op, onProgress) {
   }
 
   const errors = [];
-  const claimed = new Set();   // destKeys claimed earlier in this same batch (intra-batch collisions)
   const movable = [];
-  for (const item of work) {
-    if (item.destKey === item.sourceKey) {
-      errors.push({ key: item.sourceKey, message: 'Already in this location — skipped.', skipped: true });
-    } else if (existing.has(item.destKey) || claimed.has(item.destKey)) {
-      errors.push({ key: item.sourceKey, message: 'An object already exists at the destination — skipped.', skipped: true });
-    } else {
-      claimed.add(item.destKey);
+  if (mode === 'copy') {
+    // Rename on collision so a copy never overwrites. Folders are remapped coherently
+    // under one free folder prefix; loose files get a " (n)" suffix. `taken` grows as
+    // destinations are claimed so intra-batch collisions are also avoided.
+    const taken = new Set(existing);
+    const isTakenPrefix = (p) => { for (const k of taken) if (k.startsWith(p)) return true; return false; };
+    const folderGroups = new Map();
+    for (const item of work) {
+      if (item.prefix === null) continue;
+      if (!folderGroups.has(item.prefix)) folderGroups.set(item.prefix, []);
+      folderGroups.get(item.prefix).push(item);
+    }
+    for (const [pfx, group] of folderGroups) {
+      const folderTop = destKeyForFolderObject(pfx, pfx, dest);
+      const freeTop = freeFolderPrefix(folderTop, isTakenPrefix);
+      for (const item of group) {
+        item.destKey = freeTop + item.destKey.slice(folderTop.length);
+        taken.add(item.destKey);
+        movable.push(item);
+      }
+    }
+    for (const item of work) {
+      if (item.prefix !== null) continue;
+      item.destKey = freeFileKey(item.destKey, (k) => taken.has(k));
+      taken.add(item.destKey);
       movable.push(item);
+    }
+  } else {
+    const claimed = new Set();   // destKeys claimed earlier in this same batch (intra-batch collisions)
+    for (const item of work) {
+      if (item.destKey === item.sourceKey) {
+        errors.push({ key: item.sourceKey, message: 'Already in this location — skipped.', skipped: true });
+      } else if (existing.has(item.destKey) || claimed.has(item.destKey)) {
+        errors.push({ key: item.sourceKey, message: 'An object already exists at the destination — skipped.', skipped: true });
+      } else {
+        claimed.add(item.destKey);
+        movable.push(item);
+      }
     }
   }
 
@@ -128,28 +168,30 @@ export async function runMoveOperation(client, bucket, op, onProgress) {
         onProgress({ moved, errors: [...errors], movedKeys: [] });
         continue;
       }
-      // Copy confirmed — delete the source. A failure here means the object now exists in
-      // both places (a duplicate, not a move): report it specifically and leave both.
-      try {
-        await sendWithRetry(client, () => new DeleteObjectCommand({ Bucket: bucket, Key: item.sourceKey }));
-      } catch (err) {
-        errors.push({
-          key: item.sourceKey,
-          message: `Copied to the destination, but the source could not be deleted — it now exists in both places (${err.message || String(err)}).`,
-        });
-        onProgress({ moved, errors: [...errors], movedKeys: [] });
-        continue;
+      // Move only: copy confirmed — delete the source. A failure here means the object
+      // now exists in both places (a duplicate, not a move): report it and leave both.
+      if (mode === 'move') {
+        try {
+          await sendWithRetry(client, () => new DeleteObjectCommand({ Bucket: bucket, Key: item.sourceKey }));
+        } catch (err) {
+          errors.push({
+            key: item.sourceKey,
+            message: `Copied to the destination, but the source could not be deleted — it now exists in both places (${err.message || String(err)}).`,
+          });
+          onProgress({ moved, errors: [...errors], movedKeys: [] });
+          continue;
+        }
       }
       moved++;
-      onProgress({ moved, errors: [...errors], movedKeys: [item.sourceKey] });
+      onProgress({ moved, errors: [...errors], movedKeys: mode === 'move' ? [item.sourceKey] : [] });
     }
   }
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, movable.length) }, worker));
 
   const errorKeySet = new Set(errors.map(e => e.key));
-  const movedPrefixes = prefixes.filter(pfx =>
-    (prefixObjects.get(pfx) || []).every(o => !errorKeySet.has(o.key))
-  );
+  const movedPrefixes = mode === 'move'
+    ? prefixes.filter(pfx => (prefixObjects.get(pfx) || []).every(o => !errorKeySet.has(o.key)))
+    : [];
 
   onProgress({ phase: 'done', moved, errors: [...errors], movedPrefixes });
 }

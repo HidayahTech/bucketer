@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { runMoveOperation } from '../src/lib/move-queue.js';
+import { runMoveOperation, runCopyOperation } from '../src/lib/move-queue.js';
 
 // A move is per-object: server-side copy, then — only after that copy is confirmed —
 // delete the source. These tests pin the safety-critical behavior: ordering, collisions
@@ -321,4 +321,54 @@ describe('runMoveOperation — throttling retry', () => {
     assert.equal(copyCalls, 2, 'must retry the throttled copy exactly once');
     assert.equal(updates.find(u => u.phase === 'done').moved, 1);
   }));
+});
+
+// ── Copy-and-keep (#17) ──────────────────────────────────────────────────────────
+// A copy is a move minus the source delete, and collisions are renamed (never skipped,
+// never overwritten). Source rows must stay, so no movedKeys/movedPrefixes are emitted.
+
+async function copyAndCollect(client, bucket, op) {
+  const updates = [];
+  await runCopyOperation(client, bucket, op, u => updates.push({ ...u }));
+  return updates;
+}
+
+describe('runCopyOperation — copy-and-keep', () => {
+  test('copies a loose file and never deletes the source', async () => {
+    const client = mockClient({ listPages: emptyDest('archive/') });
+    const updates = await copyAndCollect(client, 'bk', { files: [{ key: 'docs/a.txt', size: 10 }], prefixes: [], dest: 'archive/' });
+    const copies = client.calls.filter(c => c.name === 'CopyObjectCommand');
+    assert.equal(copies.length, 1);
+    assert.equal(copies[0].input.Key, 'archive/a.txt');
+    assert.equal(client.calls.filter(c => c.name === 'DeleteObjectCommand').length, 0, 'copy must not delete the source');
+    const done = updates.find(u => u.phase === 'done');
+    assert.equal(done.moved, 1);
+  });
+
+  test('renames on collision instead of skipping (never overwrites)', async () => {
+    const client = mockClient({ listPages: new Map([['archive/', [{ objects: [{ Key: 'archive/a.txt' }, { Key: 'archive/a (1).txt' }], isTruncated: false }]]]) });
+    const updates = await copyAndCollect(client, 'bk', { files: [{ key: 'docs/a.txt', size: 5 }], prefixes: [], dest: 'archive/' });
+    const copies = client.calls.filter(c => c.name === 'CopyObjectCommand');
+    assert.equal(copies.length, 1);
+    assert.equal(copies[0].input.Key, 'archive/a (2).txt', 'collision suffixed to a free name');
+    const done = updates.find(u => u.phase === 'done');
+    assert.equal(done.moved, 1);
+    assert.equal(done.errors.length, 0, 'a collision is not an error for copy');
+  });
+
+  test('leaves source rows in place (no movedKeys / movedPrefixes)', async () => {
+    const client = mockClient({ listPages: emptyDest('archive/') });
+    const updates = await copyAndCollect(client, 'bk', { files: [{ key: 'a.txt', size: 1 }], prefixes: [], dest: 'archive/' });
+    assert.deepEqual(updates.flatMap(u => u.movedKeys || []), [], 'copy must not signal source-row removal');
+    assert.deepEqual(updates.find(u => u.phase === 'done').movedPrefixes, []);
+  });
+
+  test('routes large objects through multipart copy, still without deleting', async () => {
+    const big = 5 * 1024 * 1024 * 1024 + 1;
+    const client = mockClient({ listPages: emptyDest('archive/'), multipart: true });
+    const updates = await copyAndCollect(client, 'bk', { files: [{ key: 'big.bin', size: big }], prefixes: [], dest: 'archive/' });
+    assert.ok(client.calls.some(c => c.name === 'UploadPartCopyCommand'), 'large copy uses multipart');
+    assert.equal(client.calls.filter(c => c.name === 'DeleteObjectCommand').length, 0);
+    assert.equal(updates.find(u => u.phase === 'done').moved, 1);
+  });
 });

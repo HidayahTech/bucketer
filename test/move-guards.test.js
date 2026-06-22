@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { validateMove } from '../src/lib/move-guards.js';
+import { validateMove, validateCopy } from '../src/lib/move-guards.js';
 
 // Structural guards that depend ONLY on the selected keys and chosen destination
 // (not on what the destination actually contains — that's the runtime collision
@@ -52,5 +52,30 @@ describe('validateMove — valid moves return null', () => {
     // 'photos/' is not treated as inside 'photo/'.
     assert.equal(validateMove({ files: [], prefixes: ['photo/'], dest: 'photos/' }), null);
     assert.equal(validateMove({ files: [], prefixes: ['photos/'], dest: 'photo/' }), null);
+  });
+});
+
+// #17 — copy guards are looser than move: copying to the current location is valid
+// (it produces a renamed duplicate), so only the into-itself/descendant guard remains.
+describe('validateCopy', () => {
+  test('blocks copying a folder into itself or a descendant', () => {
+    assert.ok(validateCopy({ prefixes: ['photos/'], dest: 'photos/' }));
+    assert.ok(validateCopy({ prefixes: ['photos/'], dest: 'photos/2024/' }));
+  });
+
+  test('ALLOWS copying a folder into its current parent (a duplicate, not a no-op)', () => {
+    assert.equal(validateCopy({ prefixes: ['photos/2024/'], dest: 'photos/' }), null);
+  });
+
+  test('ALLOWS copying a file into its current prefix (a renamed duplicate)', () => {
+    assert.equal(validateCopy({ files: ['photos/a.jpg'], prefixes: [], dest: 'photos/' }), null);
+  });
+
+  test('allows a copy to an unrelated destination', () => {
+    assert.equal(validateCopy({ prefixes: ['photos/'], dest: 'archive/' }), null);
+  });
+
+  test('does NOT false-block a sibling sharing a string prefix', () => {
+    assert.equal(validateCopy({ prefixes: ['photo/'], dest: 'photos/' }), null);
   });
 });

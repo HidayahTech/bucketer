@@ -29,3 +29,40 @@ export function folderBase(folderPrefix) {
 export function destKeyForFolderObject(folderPrefix, objectKey, destPrefix) {
   return destPrefix + objectKey.slice(folderBase(folderPrefix).length);
 }
+
+// Copy-and-keep collision renaming (#17). A copy must never overwrite, so a colliding
+// destination is disambiguated with a " (n)" suffix rather than skipped.
+
+// Insert a " (n)" disambiguator before the file extension (or at the end if there is
+// none, including for leading-dot dotfiles).
+export function suffixName(name, n) {
+  const dot = name.lastIndexOf('.');
+  if (dot > 0) return `${name.slice(0, dot)} (${n})${name.slice(dot)}`;
+  return `${name} (${n})`;
+}
+
+// Non-colliding destination key for a file: keep it if free, else suffix its leaf name
+// (preserving the directory) until isTaken() returns false.
+export function freeFileKey(destKey, isTaken) {
+  if (!isTaken(destKey)) return destKey;
+  const leaf = leafName(destKey);
+  const dir  = destKey.slice(0, destKey.length - leaf.length);
+  for (let n = 1; ; n++) {
+    const candidate = dir + suffixName(leaf, n);
+    if (!isTaken(candidate)) return candidate;
+  }
+}
+
+// Non-colliding destination folder prefix (ends in '/'): keep it if free, else suffix the
+// leaf folder name (preserving the parent) until isTakenPrefix() returns false. Children
+// are then remapped under the returned prefix so the folder stays coherent.
+export function freeFolderPrefix(folderTop, isTakenPrefix) {
+  if (!isTakenPrefix(folderTop)) return folderTop;
+  const inner = folderTop.slice(0, -1);
+  const leaf  = leafName(inner);
+  const base  = inner.slice(0, inner.length - leaf.length);
+  for (let n = 1; ; n++) {
+    const candidate = `${base}${leaf} (${n})/`;
+    if (!isTakenPrefix(candidate)) return candidate;
+  }
+}

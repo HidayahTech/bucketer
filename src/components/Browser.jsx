@@ -674,6 +674,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const canList     = capabilities.list !== 'denied';
   // A move is a copy (write) + delete, so it needs both capabilities.
   const canMove     = capabilities.upload !== 'denied' && capabilities.delete !== 'denied';
+  const canCopy     = capabilities.upload !== 'denied';
 
   // Build the {key, size} list for the selected files from the current listing (Browser
   // already holds each object's Size). Used to open the move picker for the batch selection.
@@ -685,7 +686,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     const sel = moveSel;
     setMoveSel(null);
     if (!sel) return;
-    onMoveRequest?.({ files: sel.files, prefixes: sel.prefixes, dest, capturedPrefix: prefix });
+    onMoveRequest?.({ files: sel.files, prefixes: sel.prefixes, dest, capturedPrefix: prefix, mode: sel.mode || 'move' });
     // Clear the multi-select once a move is underway (matches delete's row removal flow).
     setSelectedKeys(new Set());
     setSelectedPrefixes(new Set());
@@ -865,6 +866,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
           client={client}
           bucket={bucket}
           selection={moveSel}
+          mode={moveSel.mode || 'move'}
           onCancel={() => setMoveSel(null)}
           onMove={handleMoveHere}
         />
@@ -1054,6 +1056,14 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
             title={!canMove ? 'Move needs both write and delete permissions' : 'Move to another folder'}
           >
             Move {selectedKeys.size + selectedPrefixes.size}
+          </button>
+          <button
+            class="btn btn-ghost btn-sm"
+            onClick={() => setMoveSel({ files: selectedFilesWithSize(), prefixes: [...selectedPrefixes], mode: 'copy' })}
+            disabled={!canCopy}
+            title={!canCopy ? 'Copy needs write permission' : 'Copy to another folder (keeps the originals)'}
+          >
+            Copy {selectedKeys.size + selectedPrefixes.size}
           </button>
           <button
             class="btn btn-danger btn-sm"
