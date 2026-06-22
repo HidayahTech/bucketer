@@ -25,6 +25,7 @@ import { ErrorBlock } from './ErrorBlock.jsx';
 import { HiddenVersions } from './HiddenVersions.jsx';
 import { CopyLinkPopover } from './CopyLinkPopover.jsx';
 import { showToast } from '../lib/toast.js';
+import { resolveShortcut, isEditableTarget } from '../lib/keyboard-shortcuts.js';
 import { Breadcrumb } from './Breadcrumb.jsx';
 import { SortTh } from './SortTh.jsx';
 import { MovePickerModal } from './MovePickerModal.jsx';
@@ -102,6 +103,8 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const batchCopyWrapRef = useRef(null);
   // Always-current reference to navigateTo for the popstate handler (which has [] deps)
   const navigateRef = useRef(null);
+  const filterInputRef = useRef(null);
+  const shortcutHandlerRef = useRef(null);
   // Always-current reference to preview navigator, updated after sortedItems is computed
   const navigatePreviewRef = useRef(null);
   // Capture the prefix value at mount time for the initial history replaceState
@@ -547,6 +550,15 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     return () => window.removeEventListener('keydown', onKey);
   }, [previewItem]);
 
+  // Global browser shortcuts (see src/lib/keyboard-shortcuts.js). The listener is
+  // stable; it delegates to a ref reassigned each render so it always sees the
+  // current selection and visible items.
+  useEffect(() => {
+    const onKey = (e) => shortcutHandlerRef.current?.(e);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
   // Prefetch adjacent items after the current one is ready.
   // prevNextRef is updated during render so the effect always sees the latest neighbours
   // without needing them as deps (which would cause spurious re-runs on every listing change).
@@ -778,6 +790,27 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     if (target) handlePreview(target);
   };
 
+  // Reassigned every render so the stable keydown listener sees current state.
+  shortcutHandlerRef.current = (e) => {
+    const action = resolveShortcut(e, {
+      inTextField: isEditableTarget(e.target),
+      hasSelection: selectedKeys.size > 0 || selectedPrefixes.size > 0,
+      previewOpen: !!previewItem,
+    });
+    if (!action) return;
+    if (action === 'focus-filter') {
+      e.preventDefault();
+      filterInputRef.current?.focus();
+    } else if (action === 'select-all') {
+      e.preventDefault();
+      toggleSelectAll(visibleFolders, visibleItems);
+    } else if (action === 'delete') {
+      if (!canDelete) return;
+      e.preventDefault();
+      onDeleteRequest({ files: [...selectedKeys], prefixes: [...selectedPrefixes], capturedPrefix: prefix });
+    }
+  };
+
   if (!canList && listError) {
     return (
       <div>
@@ -966,9 +999,10 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
         {(sortedItems.length > 0 || sortedFolders.length > 0 || filterQ) && (
           <div class="filter-bar">
             <input
+              ref={filterInputRef}
               class="filter-input"
               type="search"
-              placeholder="Filter by name…"
+              placeholder="Filter by name…  ( / )"
               value={filterQuery}
               onInput={e => setFilterQuery(e.target.value)}
             />
