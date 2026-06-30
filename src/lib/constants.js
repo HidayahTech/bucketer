@@ -37,12 +37,20 @@ export const ADAPTIVE_CONNECTION_BUDGET = 16;
 // for a meaningful two-phase throughput comparison.
 export const PROBE_THRESHOLD_PARTS = 20;
 
-// Adaptive mode: maximum total bytes held in ArrayBuffer across all concurrent
-// parts for a single file. Caps part concurrency when calcPartSize raises the part
-// size for very large files, preventing runaway memory usage that crashes the tab.
-// At default 5 MiB parts this allows up to 40 concurrent parts (capped to 16 by
-// ADAPTIVE_CONNECTION_BUDGET). At 50 MiB parts it caps to 4 concurrent.
-export const MAX_ADAPTIVE_MEMORY_BYTES = 200 * 1024 * 1024; // 200 MiB
+// Default ceiling on the total bytes held in ArrayBuffers across all concurrently
+// uploading parts (summed over every active file). Caps part concurrency so that
+// concurrency × partSize stays within budget — preventing runaway memory that crashes
+// the tab. Overridable per-user via the "Upload memory budget" setting (loadUploadMemoryMB);
+// this constant is the fallback default and the source of truth for that default.
+//
+// BUG-033: the previous 200 MiB default divided into a user-chosen large part size
+// (floor(200 / 128) = 1 for 128 MiB parts) silently collapsed concurrency to a single
+// sequential stream — the user's explicit concurrency was ignored. 1 GiB keeps large
+// parts parallel: 128 MiB → 8 concurrent, 64 MiB → 16, 50 MiB → 20 (both capped to 16
+// by ADAPTIVE_CONNECTION_BUDGET). Peak RAM is only approached when the part size is
+// large; ordinary 5 MiB uploads stay near 80 MiB regardless of this value.
+export const DEFAULT_UPLOAD_MEMORY_MB = 1024; // 1 GiB
+export const MAX_ADAPTIVE_MEMORY_BYTES = DEFAULT_UPLOAD_MEMORY_MB * 1024 * 1024;
 
 // Presigned URL lifetime in seconds. 1 hour: long enough for interactive use
 // but short enough that a leaked URL expires overnight without manual rotation.

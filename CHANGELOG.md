@@ -7,6 +7,21 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.29.0] — 2026-06-30 — Fix: large part sizes collapsed upload concurrency to 1; configurable memory budget
+
+- **BUG-033: a large part size silently forced fully sequential uploads.** Part concurrency is bounded by
+  a memory budget (`concurrency × partSize` must fit within it), and that budget defaulted to 200 MiB.
+  With a user-chosen 128 MiB part size, `floor(200 MiB / 128 MiB) = 1` clamped concurrency to a single
+  stream regardless of the configured value — so a 20 GB file uploaded **one part at a time**, and choosing
+  a *larger* part size made it slower, not faster. The default budget is now **1 GiB**, which keeps large
+  parts parallel (128 MiB parts → 8 concurrent). Ordinary 5 MiB uploads are unaffected (peak ~80 MiB either
+  way). The fix applies to both fresh and resumed multipart uploads.
+- **New "Upload memory budget (MiB)" setting** (range 64–8192, default 1024) exposes the ceiling on total
+  RAM held by in-flight upload parts, making the part-size / concurrency / memory tradeoff tunable instead
+  of a silent cap. Settings → Upload memory budget.
+- **Tests:** a regression assertion in `concurrency-strategy.test.js` (fails at the old 200 MiB default,
+  passes at 1 GiB), a `storage.test.js` accessor round-trip, and a `settings-panel.test.jsx` field render.
+
 ## [1.28.0] — 2026-06-30 — Upload throughput: drop the redundant per-part CRC32
 
 First step of an upload-performance pass for large and very-large files.

@@ -4,6 +4,27 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-033 — Large part sizes silently collapse multipart upload concurrency to 1 (fully sequential)
+
+**Date:** 2026-06-30
+
+**Symptom:**
+Uploading a large file (e.g. 20 GB) with a configured part size of 128 MiB uploaded its parts **one network request at a time** — fully sequential — even though a higher part concurrency (8) was selected. On a fast link this pinned per-file throughput to a single stream (~20 MB/s), and choosing a *larger* part size made it worse, not better. Multipart itself worked (parts uploaded, completed, saved); only the parallelism was missing.
+
+**Root cause:**
+`uploadMultipart` (and the resume path) bound part concurrency with `capConcurrencyByMemory(requested, partSize, perFileBudget)`, where `perFileBudget = MAX_ADAPTIVE_MEMORY_BYTES / activeFiles`. `MAX_ADAPTIVE_MEMORY_BYTES` was **200 MiB**. With a 128 MiB part size and one active file, `floor(200 MiB / 128 MiB) = 1`, clamping concurrency to 1 regardless of the user's explicit setting. The cap legitimately bounds resident ArrayBuffer memory, but its default was small enough that any user-chosen part size above ~100 MiB (the UI allows up to 512 MiB) collapsed concurrency toward a single sequential stream — silently overriding the user's choice.
+
+**Fix:**
+Raised the default budget to **1 GiB** (`DEFAULT_UPLOAD_MEMORY_MB = 1024`; `MAX_ADAPTIVE_MEMORY_BYTES` now derives from it) and exposed it as a user-tunable **"Upload memory budget (MiB)"** setting (`loadUploadMemoryMB`/`saveUploadMemoryMB`, range 64–8192, default 1024). Both the fresh and resume upload paths read the configured budget. At 128 MiB parts, a 1 GiB budget allows 8 concurrent parts.
+
+**Why it wasn't caught earlier:**
+`capConcurrencyByMemory` was unit-tested only with small (5/50 MiB) part sizes against an explicit 200 MiB budget, where the cap behaves benignly. No test exercised the *default* budget against a large, user-selectable part size, so the collapse-to-1 interaction was invisible. The part-size field (up to 512 MiB) and the memory budget were never tested together. Found by a real upload on the author's own machine.
+
+**Test case:**
+`test/concurrency-strategy.test.js` — "default budget keeps large (128 MiB) parts parallel": asserts `capConcurrencyByMemory(8, 128 MiB, MAX_ADAPTIVE_MEMORY_BYTES) >= 6`. Fails at the old 200 MiB default (yields 1), passes at 1 GiB (yields 8). Plus a `test/storage.test.js` round-trip for the new accessor and a `test/components/settings-panel.test.jsx` render assertion for the field.
+
+---
+
 ## BUG-031 — Drag-and-dropped uploads always land at the bucket root, ignoring the current folder
 
 **Date:** 2026-06-20 · **GitLab:** #2

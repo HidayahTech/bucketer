@@ -45,6 +45,15 @@ describe('SettingsPanel — field rendering', () => {
     cleanup();
   });
 
+  test('renders an input for upload memory budget', () => {
+    const { text, cleanup } = mount(h(SettingsPanel, defaultProps()));
+    assert.ok(
+      text().toLowerCase().includes('memory budget') || text().toLowerCase().includes('upload memory'),
+      'upload memory budget setting must be labeled'
+    );
+    cleanup();
+  });
+
   test('renders an input for part concurrency', () => {
     const { text, cleanup } = mount(h(SettingsPanel, defaultProps()));
     assert.ok(

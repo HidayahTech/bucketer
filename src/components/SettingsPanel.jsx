@@ -1,8 +1,9 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // Application settings (page size, upload concurrency, part size) (§4.7)
 import { useState } from 'preact/hooks';
-import { loadMaxKeys, saveMaxKeys, loadPartConcurrency, savePartConcurrency, loadPartSizeMB, savePartSizeMB, loadFileConcurrency, saveFileConcurrency, loadListingCacheTTL, saveListingCacheTTL, loadUpdateCheckEnabled, saveUpdateCheckEnabled, loadPrefetchSizeLimit, savePrefetchSizeLimit, loadUploadExpandThreshold, saveUploadExpandThreshold, loadAdaptiveMode, saveAdaptiveMode, loadFileMtimeAutoLoad, saveFileMtimeAutoLoad } from '../lib/storage.js';
+import { loadMaxKeys, saveMaxKeys, loadPartConcurrency, savePartConcurrency, loadPartSizeMB, savePartSizeMB, loadUploadMemoryMB, saveUploadMemoryMB, loadFileConcurrency, saveFileConcurrency, loadListingCacheTTL, saveListingCacheTTL, loadUpdateCheckEnabled, saveUpdateCheckEnabled, loadPrefetchSizeLimit, savePrefetchSizeLimit, loadUploadExpandThreshold, saveUploadExpandThreshold, loadAdaptiveMode, saveAdaptiveMode, loadFileMtimeAutoLoad, saveFileMtimeAutoLoad } from '../lib/storage.js';
 import { defaultMaxKeys } from '../lib/provider.js';
+import { DEFAULT_UPLOAD_MEMORY_MB } from '../lib/constants.js';
 
 const DEFAULT_PART_CONCURRENCY     = 4;
 const DEFAULT_PART_SIZE_MB         = 5;
@@ -22,6 +23,9 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
   const [partSizeValue, setPartSizeValue] = useState(() => {
     const v = loadPartSizeMB(); return String(v ?? DEFAULT_PART_SIZE_MB);
   });
+  const [uploadMemoryValue, setUploadMemoryValue] = useState(() => {
+    const v = loadUploadMemoryMB(); return String(v ?? DEFAULT_UPLOAD_MEMORY_MB);
+  });
   const [fileConcurrencyValue, setFileConcurrencyValue] = useState(() => {
     const v = loadFileConcurrency(); return String(v ?? DEFAULT_FILE_CONCURRENCY);
   });
@@ -35,6 +39,7 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
   // Tracks what's actually persisted — updated on every successful save
   const [activeConcurrency, setActiveConcurrency] = useState(() => loadPartConcurrency() ?? DEFAULT_PART_CONCURRENCY);
   const [activePartSize, setActivePartSize] = useState(() => loadPartSizeMB() ?? DEFAULT_PART_SIZE_MB);
+  const [activeUploadMemory, setActiveUploadMemory] = useState(() => loadUploadMemoryMB() ?? DEFAULT_UPLOAD_MEMORY_MB);
   const [activeFileConcurrency, setActiveFileConcurrency] = useState(() => loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY);
 
   const [adaptiveMode, setAdaptiveMode] = useState(() => loadAdaptiveMode());
@@ -51,24 +56,28 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
     const n  = maxKeysValue ? parseInt(maxKeysValue, 10) : providerDefault;
     const c  = parseInt(concurrencyValue, 10);
     const p  = parseInt(partSizeValue, 10);
+    const um = parseInt(uploadMemoryValue, 10);
     const f  = parseInt(fileConcurrencyValue, 10);
     const et = parseInt(uploadExpandThresholdValue, 10);
 
     if (isNaN(n)  || n < 1   || n > 100000) { setError('Page size must be 1–100,000.'); return; }
     if (isNaN(c)  || c < 1   || c > 16)     { setError('Upload part concurrency must be 1–16.'); return; }
     if (isNaN(p)  || p < 5   || p > 512)    { setError('Part size must be 5–512 MB.'); return; }
+    if (isNaN(um) || um < 64 || um > 8192)  { setError('Upload memory budget must be 64–8192 MiB.'); return; }
     if (isNaN(f)  || f < 1   || f > 16)     { setError('File concurrency must be 1–16.'); return; }
     if (isNaN(et) || et < 0  || et > 1000)  { setError('Upload expand threshold must be 0–1000.'); return; }
 
     saveMaxKeys(n);
     savePartConcurrency(c);
     savePartSizeMB(p);
+    saveUploadMemoryMB(um);
     saveFileConcurrency(f);
     saveListingCacheTTL(parseInt(cacheTTLValue, 10));
     saveUploadExpandThreshold(et);
 
     setActiveConcurrency(c);
     setActivePartSize(p);
+    setActiveUploadMemory(um);
     setActiveFileConcurrency(f);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -79,12 +88,14 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
     setMaxKeysValue('');
     setConcurrencyValue(String(DEFAULT_PART_CONCURRENCY));
     setPartSizeValue(String(DEFAULT_PART_SIZE_MB));
+    setUploadMemoryValue(String(DEFAULT_UPLOAD_MEMORY_MB));
     setFileConcurrencyValue(String(DEFAULT_FILE_CONCURRENCY));
     setCacheTTLValue(String(DEFAULT_LISTING_CACHE_TTL));
     setUploadExpandThresholdValue(String(DEFAULT_UPLOAD_EXPAND_THRESHOLD));
     saveMaxKeys(providerDefault);
     savePartConcurrency(DEFAULT_PART_CONCURRENCY);
     savePartSizeMB(DEFAULT_PART_SIZE_MB);
+    saveUploadMemoryMB(DEFAULT_UPLOAD_MEMORY_MB);
     saveFileConcurrency(DEFAULT_FILE_CONCURRENCY);
     saveListingCacheTTL(DEFAULT_LISTING_CACHE_TTL);
     saveUploadExpandThreshold(DEFAULT_UPLOAD_EXPAND_THRESHOLD);
@@ -94,6 +105,7 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
     setAdaptiveMode(true);
     setActiveConcurrency(DEFAULT_PART_CONCURRENCY);
     setActivePartSize(DEFAULT_PART_SIZE_MB);
+    setActiveUploadMemory(DEFAULT_UPLOAD_MEMORY_MB);
     setActiveFileConcurrency(DEFAULT_FILE_CONCURRENCY);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
@@ -151,6 +163,28 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
           </span>
           <span class="hint" style={{ color: 'var(--accent)' }}>
             Active: <strong>{activePartSize} MiB</strong>
+          </span>
+        </div>
+        <div class="form-group">
+          <label htmlFor="setting-upload-memory">Upload memory budget (MiB)</label>
+          <input
+            id="setting-upload-memory"
+            type="number"
+            value={uploadMemoryValue}
+            onInput={e => setUploadMemoryValue(e.target.value)}
+            min="64"
+            max="8192"
+          />
+          <span class="hint">
+            Ceiling on total RAM held by in-flight upload parts — roughly part size ×
+            concurrency, summed across all active files. Concurrency is reduced so this
+            limit is never exceeded, so a <em>larger part size needs a larger budget to
+            stay parallel</em>. At 128 MiB parts, a 1024 MiB budget allows 8 concurrent
+            parts; a 200 MiB budget would force them one at a time. Range 64–8192 MiB.
+            Default: {DEFAULT_UPLOAD_MEMORY_MB}.
+          </span>
+          <span class="hint" style={{ color: 'var(--accent)' }}>
+            Active: <strong>{activeUploadMemory} MiB</strong>
           </span>
         </div>
         <div class="form-group">

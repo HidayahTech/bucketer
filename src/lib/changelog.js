@@ -1,9 +1,19 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.28.0';
+export const CURRENT_VERSION = '1.29.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.29.0",
+    "date": "2026-06-30",
+    "title": "Fix: large part sizes collapsed upload concurrency to 1; configurable memory budget",
+    "changes": [
+      "**BUG-033: a large part size silently forced fully sequential uploads.** Part concurrency is bounded by",
+      "**New \"Upload memory budget (MiB)\" setting** (range 64–8192, default 1024) exposes the ceiling on total",
+      "**Tests:** a regression assertion in concurrency-strategy.test.js (fails at the old 200 MiB default,"
+    ]
+  },
   {
     "version": "1.28.0",
     "date": "2026-06-30",

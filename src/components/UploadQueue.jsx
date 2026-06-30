@@ -29,8 +29,8 @@ import {
   saveUploadLogEntry,
 } from '../lib/indexeddb.js';
 import { UploadQueue as Queue, calcPartSize, collectParts, preparePutBody, uploadPartsWithPool } from '../lib/upload-queue.js';
-import { loadPartConcurrency, loadPartSizeMB, loadFileConcurrency, loadUploadExpandThreshold, loadAdaptiveMode } from '../lib/storage.js';
-import { MULTIPART_THRESHOLD, DEFAULT_FILE_CONCURRENCY, PART_CONCURRENCY, ADAPTIVE_CONNECTION_BUDGET, PROBE_THRESHOLD_PARTS, MAX_ADAPTIVE_MEMORY_BYTES } from '../lib/constants.js';
+import { loadPartConcurrency, loadPartSizeMB, loadUploadMemoryMB, loadFileConcurrency, loadUploadExpandThreshold, loadAdaptiveMode } from '../lib/storage.js';
+import { MULTIPART_THRESHOLD, DEFAULT_FILE_CONCURRENCY, PART_CONCURRENCY, ADAPTIVE_CONNECTION_BUDGET, PROBE_THRESHOLD_PARTS, DEFAULT_UPLOAD_MEMORY_MB } from '../lib/constants.js';
 import { buildUploadMetadata } from '../lib/upload-metadata.js';
 import { buildContentHashValue } from '../lib/content-hash.js';
 import { calcAdaptiveConcurrency, createProbeState, resolveProbe, capConcurrencyByMemory } from '../lib/concurrency-strategy.js';
@@ -392,9 +392,12 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     }
 
     // Divide the total memory budget across all concurrently-uploading files so the
-    // combined ArrayBuffer footprint stays within MAX_ADAPTIVE_MEMORY_BYTES total.
+    // combined ArrayBuffer footprint stays within the configured budget total. The budget
+    // is user-tunable (loadUploadMemoryMB); a too-small budget relative to the part size
+    // collapses concurrency toward 1 (BUG-033), so the default is generous (1 GiB).
     const activeCount = Object.keys(activeUploadsRef.current).length;
-    const perFileBudget = Math.floor(MAX_ADAPTIVE_MEMORY_BYTES / Math.max(1, activeCount));
+    const budgetBytes = (loadUploadMemoryMB() ?? DEFAULT_UPLOAD_MEMORY_MB) * 1024 * 1024;
+    const perFileBudget = Math.floor(budgetBytes / Math.max(1, activeCount));
     const baseline = capConcurrencyByMemory(getEffectivePartConcurrency(), partSize, perFileBudget);
     const candidate = capConcurrencyByMemory(Math.min(16, baseline + 4), partSize, perFileBudget);
     const shouldProbe = loadAdaptiveMode()
@@ -513,7 +516,8 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       activeUploadsRef.current[id] = { abort: () => abortController.abort() };
 
       const activeCount = Object.keys(activeUploadsRef.current).length;
-      const perFileBudget = Math.floor(MAX_ADAPTIVE_MEMORY_BYTES / Math.max(1, activeCount));
+      const budgetBytes = (loadUploadMemoryMB() ?? DEFAULT_UPLOAD_MEMORY_MB) * 1024 * 1024;
+      const perFileBudget = Math.floor(budgetBytes / Math.max(1, activeCount));
       const concurrency = capConcurrencyByMemory(getEffectivePartConcurrency(), partSize, perFileBudget);
       await uploadPartsWithPool(remainingParts, async (partNumber) => {
         if (abortController.signal.aborted) throw new Error('Upload aborted');

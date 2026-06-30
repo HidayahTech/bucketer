@@ -27,6 +27,7 @@ import {
   loadMaxKeys, saveMaxKeys,
   loadPartConcurrency, savePartConcurrency,
   loadPartSizeMB, savePartSizeMB,
+  loadUploadMemoryMB, saveUploadMemoryMB,
   loadFileConcurrency, saveFileConcurrency,
   loadListingCacheTTL, saveListingCacheTTL,
   loadCapabilities, saveCapabilities, clearCapabilities,
@@ -203,6 +204,17 @@ describe('savePartSizeMB / loadPartSizeMB', () => {
 
   test('returns null when not set', () => {
     assert.equal(loadPartSizeMB(), null);
+  });
+});
+
+describe('saveUploadMemoryMB / loadUploadMemoryMB', () => {
+  test('round-trips a number', () => {
+    saveUploadMemoryMB(2048);
+    assert.equal(loadUploadMemoryMB(), 2048);
+  });
+
+  test('returns null when not set (caller falls back to DEFAULT_UPLOAD_MEMORY_MB)', () => {
+    assert.equal(loadUploadMemoryMB(), null);
   });
 });
 

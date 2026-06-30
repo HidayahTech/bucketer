@@ -32,6 +32,7 @@ const SETTINGS_KEYS = {
   maxKeys:               's3b_max_keys',
   partConcurrency:       's3b_part_concurrency',
   partSizeMB:            's3b_part_size_mb',
+  uploadMemoryMB:        's3b_upload_memory_mb',
   fileConcurrency:       's3b_file_concurrency',
   listingCacheTTL:       's3b_listing_cache_ttl',
   updateCheckEnabled:    's3b_update_check_enabled',
@@ -117,6 +118,10 @@ const _partSizeMB = makeSettingAccessors(
   LS_KEYS.partSizeMB,
   v => v ? parseInt(v, 10) : null,
 );
+const _uploadMemoryMB = makeSettingAccessors(
+  LS_KEYS.uploadMemoryMB,
+  v => v ? parseInt(v, 10) : null,        // null → caller uses DEFAULT_UPLOAD_MEMORY_MB
+);
 const _fileConcurrency = makeSettingAccessors(
   LS_KEYS.fileConcurrency,
   v => v ? parseInt(v, 10) : null,
@@ -153,6 +158,8 @@ export const loadPartConcurrency       = _partConcurrency.load;
 export const savePartConcurrency       = _partConcurrency.save;
 export const loadPartSizeMB            = _partSizeMB.load;
 export const savePartSizeMB            = _partSizeMB.save;
+export const loadUploadMemoryMB        = _uploadMemoryMB.load;
+export const saveUploadMemoryMB        = _uploadMemoryMB.save;
 export const loadFileConcurrency       = _fileConcurrency.load;
 export const saveFileConcurrency       = _fileConcurrency.save;
 export const loadListingCacheTTL       = _listingCacheTTL.load;

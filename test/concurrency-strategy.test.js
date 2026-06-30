@@ -6,6 +6,7 @@ import {
   resolveProbe,
   capConcurrencyByMemory,
 } from '../src/lib/concurrency-strategy.js';
+import { MAX_ADAPTIVE_MEMORY_BYTES } from '../src/lib/constants.js';
 
 describe('capConcurrencyByMemory', () => {
   const MB = 1024 * 1024;
@@ -43,6 +44,15 @@ describe('capConcurrencyByMemory', () => {
     const concPerFile = capConcurrencyByMemory(5, 50 * MB, perFile);
     assert.equal(concPerFile, 2);
     assert.ok(concPerFile * 50 * MB * 2 <= 200 * MB, 'total across 2 files must not exceed 200 MiB');
+  });
+
+  test('default budget keeps large (128 MiB) parts parallel — regression for BUG-033', () => {
+    // BUG-033: the old 200 MiB default budget yielded floor(200/128) = 1 for a 128 MiB
+    // part size, silently forcing fully sequential uploads (one request at a time) even
+    // when the user explicitly requested higher concurrency. The default budget must
+    // permit meaningful parallelism at the large part sizes the UI allows (up to 512 MiB).
+    const conc = capConcurrencyByMemory(8, 128 * MB, MAX_ADAPTIVE_MEMORY_BYTES);
+    assert.ok(conc >= 6, `expected >= 6 concurrent at 128 MiB parts under the default budget, got ${conc}`);
   });
 });
 
