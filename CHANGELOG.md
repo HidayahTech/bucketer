@@ -7,6 +7,21 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.28.0] — 2026-06-30 — Upload throughput: drop the redundant per-part CRC32
+
+First step of an upload-performance pass for large and very-large files.
+
+- **`requestChecksumCalculation: 'WHEN_REQUIRED'` set on the S3 client** (`src/lib/s3-client.js`). Since
+  AWS SDK for JavaScript v3.729.0 the flexible-checksums middleware defaults to `WHEN_SUPPORTED`, which
+  attaches an automatic CRC32 checksum to every `PutObject` and `UploadPart`. Bucketer never requests an
+  upload checksum, so that CRC32 was pure overhead — a second full traversal of each part's bytes on the
+  main thread, on top of the SigV4 `x-amz-content-sha256` SHA-256 — and the unsolicited
+  `x-amz-checksum-crc32` header has been rejected by some S3-compatible providers (Cloudflare R2,
+  Backblaze B2). `WHEN_REQUIRED` keeps checksums only for operations that mandate them; multipart object
+  integrity remains ETag-based. Backward-compatible.
+- **Test** (`test/s3-client.test.js`): asserts the client resolves `requestChecksumCalculation` to
+  `WHEN_REQUIRED`.
+
 ## [1.27.0] — 2026-06-21 — Privacy: Referrer-Policy `no-referrer`
 
 First item shipped from the v1.26.3 next-level review roadmap (GitLab Epic #5 → #12).

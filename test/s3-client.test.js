@@ -74,6 +74,20 @@ describe('createS3Client — forcePathStyle', () => {
   });
 });
 
+// ── Request checksum calculation ──────────────────────────────────────────────
+// The factory opts out of the SDK's default automatic CRC32 on uploads (WHEN_SUPPORTED
+// since v3.729.0): we never request a checksum, so it is redundant per-part work and
+// has broken some S3-compatible providers. WHEN_REQUIRED disables the optional CRC32.
+
+describe('createS3Client — request checksum calculation', () => {
+  test('configures WHEN_REQUIRED to suppress the automatic per-part CRC32', async () => {
+    const c = createS3Client({ ...CREDS, endpoint: 'https://s3.us-west-004.backblazeb2.com', provider: 'b2' });
+    const v = c.config.requestChecksumCalculation;
+    const resolved = typeof v === 'function' ? await v() : v;
+    assert.equal(resolved, 'WHEN_REQUIRED');
+  });
+});
+
 // ── Instance type ─────────────────────────────────────────────────────────────
 
 describe('createS3Client — return type', () => {

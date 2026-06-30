@@ -16,5 +16,12 @@ export function createS3Client({ endpoint, bucket, keyId, secretKey, provider, r
     region,
     credentials: { accessKeyId: keyId, secretAccessKey: secretKey },
     forcePathStyle: requiresPathStyle(provider),
+    // Opt out of the SDK's default (WHEN_SUPPORTED, since v3.729.0) automatic CRC32
+    // checksum on PutObject/UploadPart. We never request a checksum on uploads, so the
+    // CRC32 is pure overhead — a second per-part body traversal on the main thread on
+    // top of the SigV4 SHA-256 — and S3-compatible providers (R2/B2) have rejected the
+    // unsolicited x-amz-checksum-crc32 header. WHEN_REQUIRED keeps checksums only for
+    // operations that mandate them. Object integrity on multipart is ETag-based.
+    requestChecksumCalculation: 'WHEN_REQUIRED',
   });
 }

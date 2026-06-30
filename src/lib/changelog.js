@@ -1,9 +1,18 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.27.0';
+export const CURRENT_VERSION = '1.28.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.28.0",
+    "date": "2026-06-30",
+    "title": "Upload throughput: drop the redundant per-part CRC32",
+    "changes": [
+      "**requestChecksumCalculation: 'WHEN_REQUIRED' set on the S3 client** (src/lib/s3-client.js). Since",
+      "**Test** (test/s3-client.test.js): asserts the client resolves requestChecksumCalculation to"
+    ]
+  },
   {
     "version": "1.27.0",
     "date": "2026-06-21",
