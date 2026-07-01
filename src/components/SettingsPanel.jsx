@@ -1,7 +1,7 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // Application settings (page size, upload concurrency, part size) (§4.7)
 import { useState } from 'preact/hooks';
-import { loadMaxKeys, saveMaxKeys, loadPartConcurrency, savePartConcurrency, loadPartSizeMB, savePartSizeMB, loadUploadMemoryMB, saveUploadMemoryMB, loadFileConcurrency, saveFileConcurrency, loadListingCacheTTL, saveListingCacheTTL, loadUpdateCheckEnabled, saveUpdateCheckEnabled, loadPrefetchSizeLimit, savePrefetchSizeLimit, loadUploadExpandThreshold, saveUploadExpandThreshold, loadAdaptiveMode, saveAdaptiveMode, loadFileMtimeAutoLoad, saveFileMtimeAutoLoad } from '../lib/storage.js';
+import { loadMaxKeys, saveMaxKeys, loadPartConcurrency, savePartConcurrency, loadPartSizeMB, savePartSizeMB, loadUploadMemoryMB, saveUploadMemoryMB, loadFileConcurrency, saveFileConcurrency, loadListingCacheTTL, saveListingCacheTTL, loadUpdateCheckEnabled, saveUpdateCheckEnabled, loadPrefetchSizeLimit, savePrefetchSizeLimit, loadUploadExpandThreshold, saveUploadExpandThreshold, loadAdaptiveMode, saveAdaptiveMode, loadFileMtimeAutoLoad, saveFileMtimeAutoLoad, loadMultiOriginUpload, saveMultiOriginUpload } from '../lib/storage.js';
 import { defaultMaxKeys } from '../lib/provider.js';
 import { DEFAULT_UPLOAD_MEMORY_MB } from '../lib/constants.js';
 
@@ -44,6 +44,7 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
 
   const [adaptiveMode, setAdaptiveMode] = useState(() => loadAdaptiveMode());
   const [fileMtimeAutoLoad, setFileMtimeAutoLoad] = useState(() => loadFileMtimeAutoLoad());
+  const [multiOriginUpload, setMultiOriginUpload] = useState(() => loadMultiOriginUpload());
 
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
@@ -290,6 +291,27 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
           reduce or disable on metered connections.
         </span>
       </div>
+
+      {provider === 'b2' && (
+        <div class="form-group" style={{ marginTop: '.75rem' }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={multiOriginUpload}
+              onChange={e => { saveMultiOriginUpload(e.target.checked); setMultiOriginUpload(e.target.checked); }}
+            />
+            Parallel upload connections (experimental)
+          </label>
+          <span class="hint">
+            Splits each large file's parts across two B2 addresses — path-style
+            (<code>s3.…/bucket</code>) and virtual-hosted (<code>bucket.s3.…</code>) — so the
+            browser opens two connection pools instead of one (~6 connections each), roughly
+            doubling throughput toward your link speed. B2 only; the bucket name must be a valid
+            hostname label (lowercase, no dots, or it silently stays single-origin). Raise the
+            Upload memory budget to match (2 × concurrency × part size). Takes effect on your next upload.
+          </span>
+        </div>
+      )}
 
       <div class="form-group" style={{ marginTop: '.75rem' }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', cursor: 'pointer' }}>

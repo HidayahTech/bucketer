@@ -7,6 +7,32 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.30.0] — 2026-06-30 — Upload reliability: transient-error retry + resume-on-failure; experimental multi-origin sharding
+
+### Reliability (BUG-034)
+
+- **A transient network error no longer fails an entire large upload.** Every `UploadPart` and the final
+  `CompleteMultipartUpload` now retry on transient fetch/connection errors (Firefox "NetworkError when
+  attempting to fetch resource.", Chromium "Failed to fetch", timeouts, connection resets) with exponential
+  backoff + jitter — abort-aware, in both the fresh and resume paths. Previously a single blip on any of
+  thousands of parts (or on the one completion call) killed the whole upload, because the AWS SDK does not
+  classify a bare fetch `TypeError` as retryable.
+- **Failed uploads can now Resume, not just Restart.** A multipart upload that fails on a transient
+  (non-permission) error keeps its server-side session and uploaded parts; the failed item now offers
+  **Resume** (uploads only the missing parts) alongside **Restart** (re-uploads from zero). Recovering a
+  near-complete 235 GiB upload becomes seconds instead of a full re-transfer.
+
+### Experimental
+
+- **Multi-origin upload sharding** (Settings → "Parallel upload connections", **B2 only, default off**).
+  Splits a large file's parts across two origins — path-style (`s3.<region>.…/bucket`) and virtual-hosted
+  (`bucket.s3.<region>.…`) — so the browser opens two ~6-connection pools instead of one, roughly doubling
+  per-file concurrency toward link speed. B2's cert and routing accept both addressing styles; **this path
+  is not yet validated end-to-end against a live signed upload — enable for testing only.** Gated to
+  DNS-safe bucket names; silently stays single-origin otherwise.
+- **`createS3Client` gains an optional `{ forcePathStyle }` override**, used to build the virtual-hosted
+  client for sharding.
+
 ## [1.29.0] — 2026-06-30 — Fix: large part sizes collapsed upload concurrency to 1; configurable memory budget
 
 - **BUG-033: a large part size silently forced fully sequential uploads.** Part concurrency is bounded by

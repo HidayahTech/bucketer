@@ -4,7 +4,7 @@
 import { S3Client } from '@aws-sdk/client-s3';
 import { requiresPathStyle, extractRegion, PROVIDERS } from './provider.js';
 
-export function createS3Client({ endpoint, bucket, keyId, secretKey, provider, regionOverride }) {
+export function createS3Client({ endpoint, bucket, keyId, secretKey, provider, regionOverride }, { forcePathStyle } = {}) {
   // Region resolution order (first non-null wins):
   //   1. regionOverride — user's explicit input from CredentialForm
   //   2. extractRegion() — auto-extracted from the endpoint URL structure (§5 Group B)
@@ -15,7 +15,10 @@ export function createS3Client({ endpoint, bucket, keyId, secretKey, provider, r
     endpoint,
     region,
     credentials: { accessKeyId: keyId, secretAccessKey: secretKey },
-    forcePathStyle: requiresPathStyle(provider),
+    // forcePathStyle defaults to the provider's requirement, but an explicit override
+    // wins — the multi-origin sharding path builds a second client with
+    // forcePathStyle:false to address the same bucket virtual-hosted (a distinct origin).
+    forcePathStyle: forcePathStyle !== undefined ? forcePathStyle : requiresPathStyle(provider),
     // Opt out of the SDK's default (WHEN_SUPPORTED, since v3.729.0) automatic CRC32
     // checksum on PutObject/UploadPart. We never request a checksum on uploads, so the
     // CRC32 is pure overhead — a second per-part body traversal on the main thread on

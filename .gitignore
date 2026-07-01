@@ -5,3 +5,6 @@ dist/*
 !dist/og-image.png
 perf/output/
 perf/index.html
+
+# Claude Code scratch (transient, never committed)
+.claude-scratch/

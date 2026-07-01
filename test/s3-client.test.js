@@ -74,6 +74,28 @@ describe('createS3Client — forcePathStyle', () => {
   });
 });
 
+// ── forcePathStyle override (multi-origin sharding) ───────────────────────────
+// The sharded upload path builds a second client that addresses the same bucket
+// virtual-hosted (forcePathStyle:false) to obtain a second connection-pool origin.
+// createS3Client accepts an explicit override that wins over the provider default.
+
+describe('createS3Client — forcePathStyle override', () => {
+  test('explicit forcePathStyle:false overrides the provider path-style default (B2)', () => {
+    const c = createS3Client({ ...CREDS, endpoint: 'https://s3.us-west-004.backblazeb2.com', provider: 'b2' }, { forcePathStyle: false });
+    assert.equal(c.config.forcePathStyle, false);
+  });
+
+  test('explicit forcePathStyle:true overrides a virtual-hosted provider default (R2)', () => {
+    const c = createS3Client({ ...CREDS, endpoint: 'https://abc123.r2.cloudflarestorage.com', provider: 'r2' }, { forcePathStyle: true });
+    assert.equal(c.config.forcePathStyle, true);
+  });
+
+  test('omitting the override keeps the provider default', () => {
+    const c = createS3Client({ ...CREDS, endpoint: 'https://s3.us-west-004.backblazeb2.com', provider: 'b2' });
+    assert.equal(c.config.forcePathStyle, true);
+  });
+});
+
 // ── Request checksum calculation ──────────────────────────────────────────────
 // The factory opts out of the SDK's default automatic CRC32 on uploads (WHEN_SUPPORTED
 // since v3.729.0): we never request a checksum, so it is redundant per-part work and

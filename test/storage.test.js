@@ -28,6 +28,7 @@ import {
   loadPartConcurrency, savePartConcurrency,
   loadPartSizeMB, savePartSizeMB,
   loadUploadMemoryMB, saveUploadMemoryMB,
+  loadMultiOriginUpload, saveMultiOriginUpload,
   loadFileConcurrency, saveFileConcurrency,
   loadListingCacheTTL, saveListingCacheTTL,
   loadCapabilities, saveCapabilities, clearCapabilities,
@@ -215,6 +216,17 @@ describe('saveUploadMemoryMB / loadUploadMemoryMB', () => {
 
   test('returns null when not set (caller falls back to DEFAULT_UPLOAD_MEMORY_MB)', () => {
     assert.equal(loadUploadMemoryMB(), null);
+  });
+});
+
+describe('saveMultiOriginUpload / loadMultiOriginUpload', () => {
+  test('round-trips true', () => {
+    saveMultiOriginUpload(true);
+    assert.equal(loadMultiOriginUpload(), true);
+  });
+
+  test('defaults to false when unset', () => {
+    assert.equal(loadMultiOriginUpload(), false);
   });
 });
 

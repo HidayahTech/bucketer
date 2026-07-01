@@ -104,6 +104,27 @@ describe('UploadItem — active state', () => {
   });
 });
 
+describe('UploadItem — failed state with resume record (BUG-034)', () => {
+  const record = { uploadId: 'u1', partSize: 5, fileIdentity: {}, destinationKey: 'k' };
+
+  test('offers Resume when a failed multipart item has a resume record', () => {
+    const { text, cleanup } = mount(h(UploadItem, {
+      item: makeItem({ status: 'error', resumeRecord: record }), provider: 'b2', ...NO_CALLBACKS,
+    }));
+    assert.ok(text().includes('Resume'), 'a failed item with a resume record must offer Resume (upload only missing parts)');
+    cleanup();
+  });
+
+  test('a failed item without a resume record shows only Retry', () => {
+    const { text, cleanup } = mount(h(UploadItem, {
+      item: makeItem({ status: 'error', resumeRecord: null }), provider: 'b2', ...NO_CALLBACKS,
+    }));
+    assert.ok(text().includes('Retry'), 'failed item without a record still offers Retry');
+    assert.ok(!text().includes('Resume'), 'no Resume without a resume record');
+    cleanup();
+  });
+});
+
 describe('UploadItem — done state', () => {
   test('shows "Done" status label', () => {
     const { text, cleanup } = mount(h(UploadItem, { item: makeItem({ status: 'done', bytesUploaded: 1024 }), provider: 'r2', ...NO_CALLBACKS }));

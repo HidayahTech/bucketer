@@ -59,7 +59,16 @@ export function UploadItem({ item, onResume, onRestart, onCancel, onRemove, onDi
             </>
           )}
           {status === 'error' && (
-            <button class="btn btn-ghost btn-sm" onClick={onRestart}>Retry</button>
+            resumeRecord ? (
+              // A resumable failure (transient network error on multipart): Resume uploads
+              // only the missing parts. Restart re-uploads the whole file (BUG-034).
+              <>
+                <button class="btn btn-primary btn-sm" onClick={onResume}>Resume</button>
+                <button class="btn btn-ghost btn-sm" onClick={onRestart}>Restart</button>
+              </>
+            ) : (
+              <button class="btn btn-ghost btn-sm" onClick={onRestart}>Retry</button>
+            )
           )}
           {(status === 'done' || status === 'error' || status === 'aborted') && (
             <button class="btn btn-ghost btn-sm" onClick={onRemove}>✕</button>

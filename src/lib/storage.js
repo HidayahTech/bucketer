@@ -33,6 +33,7 @@ const SETTINGS_KEYS = {
   partConcurrency:       's3b_part_concurrency',
   partSizeMB:            's3b_part_size_mb',
   uploadMemoryMB:        's3b_upload_memory_mb',
+  multiOriginUpload:     's3b_multi_origin_upload',
   fileConcurrency:       's3b_file_concurrency',
   listingCacheTTL:       's3b_listing_cache_ttl',
   updateCheckEnabled:    's3b_update_check_enabled',
@@ -151,6 +152,10 @@ const _fileMtimeAutoLoad = makeSettingAccessors(
   LS_KEYS.fileMtimeAutoLoad,
   v => v === '' ? false : v === 'true',      // default false
 );
+const _multiOriginUpload = makeSettingAccessors(
+  LS_KEYS.multiOriginUpload,
+  v => v === '' ? false : v === 'true',      // default false (experimental)
+);
 
 export const loadMaxKeys               = _maxKeys.load;
 export const saveMaxKeys               = _maxKeys.save;
@@ -174,6 +179,8 @@ export const loadAdaptiveMode          = _adaptiveMode.load;
 export const saveAdaptiveMode          = _adaptiveMode.save;
 export const loadFileMtimeAutoLoad     = _fileMtimeAutoLoad.load;
 export const saveFileMtimeAutoLoad     = _fileMtimeAutoLoad.save;
+export const loadMultiOriginUpload     = _multiOriginUpload.load;
+export const saveMultiOriginUpload     = _multiOriginUpload.save;
 
 // Per-operation permission state (§4.12). Each of { list, download, upload, delete }
 // starts as 'unknown' (assumed permitted) and transitions to 'denied' only after an

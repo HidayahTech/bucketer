@@ -54,6 +54,24 @@ describe('SettingsPanel — field rendering', () => {
     cleanup();
   });
 
+  test('renders the multi-origin upload toggle for B2', () => {
+    const { text, cleanup } = mount(h(SettingsPanel, defaultProps({ provider: 'b2' })));
+    assert.ok(
+      text().toLowerCase().includes('parallel upload connections'),
+      'multi-origin upload toggle must be labeled for B2'
+    );
+    cleanup();
+  });
+
+  test('hides the multi-origin upload toggle for non-B2 providers', () => {
+    const { text, cleanup } = mount(h(SettingsPanel, defaultProps({ provider: 'r2' })));
+    assert.ok(
+      !text().toLowerCase().includes('parallel upload connections'),
+      'multi-origin upload toggle must be hidden for providers other than B2'
+    );
+    cleanup();
+  });
+
   test('renders an input for part concurrency', () => {
     const { text, cleanup } = mount(h(SettingsPanel, defaultProps()));
     assert.ok(

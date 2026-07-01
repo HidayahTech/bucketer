@@ -1,9 +1,20 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.29.0';
+export const CURRENT_VERSION = '1.30.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.30.0",
+    "date": "2026-06-30",
+    "title": "Upload reliability: transient-error retry + resume-on-failure; experimental multi-origin sharding",
+    "changes": [
+      "**A transient network error no longer fails an entire large upload.** Every UploadPart and the final",
+      "**Failed uploads can now Resume, not just Restart.** A multipart upload that fails on a transient",
+      "**Multi-origin upload sharding** (Settings → \"Parallel upload connections\", **B2 only, default off**).",
+      "**createS3Client gains an optional { forcePathStyle } override**, used to build the virtual-hosted"
+    ]
+  },
   {
     "version": "1.29.0",
     "date": "2026-06-30",

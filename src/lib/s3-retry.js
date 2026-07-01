@@ -16,6 +16,52 @@ export function isThrottlingError(err) {
          code === 'ThrottlingException' || status === 503 || status === 429;
 }
 
+// Browser fetch failures surface as a TypeError with a browser-specific message
+// ("NetworkError when attempting to fetch resource." in Firefox, "Failed to fetch" in
+// Chromium, "Load failed" in Safari), or as a TimeoutError / connection-reset code.
+// These are transient — a dropped/reset connection, a momentary DNS or routing blip —
+// and safe to retry for idempotent S3 part uploads and multipart completion. AbortError
+// (a deliberate user cancel) is explicitly NOT transient and must never be retried.
+const TRANSIENT_CODES = ['ECONNRESET', 'ETIMEDOUT', 'EPIPE', 'ENOTFOUND', 'ECONNREFUSED', 'EAI_AGAIN'];
+
+export function isTransientNetworkError(err) {
+  if (!err) return false;
+  const name = err.name || '';
+  if (name === 'AbortError') return false;
+  if (name === 'TimeoutError') return true;
+  const msg = (err.message || '').toLowerCase();
+  if (name === 'TypeError' && /networkerror|failed to fetch|load failed|network request failed/.test(msg)) return true;
+  return TRANSIENT_CODES.includes(err.code || err.Code || '');
+}
+
+// Errors worth retrying on the upload path: server throttling OR a transient network blip.
+export function isRetryableUploadError(err) {
+  return isThrottlingError(err) || isTransientNetworkError(err);
+}
+
+// Retries an idempotent async operation on throttling/transient-network errors with
+// exponential backoff + jitter. The multipart upload path (part uploads + completion)
+// otherwise fails an entire large upload on a single transient blip, because the raw SDK
+// send does not reliably retry a fetch TypeError. `run` is an async thunk; an optional
+// abort `signal` short-circuits retries the moment the upload is cancelled.
+export async function withUploadRetry(run, { maxRetries = MAX_RETRIES, baseMs = RETRY_BASE_MS, signal } = {}) {
+  let attempt = 0;
+  for (;;) {
+    try {
+      return await run();
+    } catch (err) {
+      if (attempt < maxRetries && isRetryableUploadError(err) && !signal?.aborted) {
+        const base  = baseMs * 2 ** attempt;
+        const delay = Math.round(base * (0.75 + Math.random() * 0.5));
+        await new Promise(r => setTimeout(r, delay));
+        attempt++;
+      } else {
+        throw err;
+      }
+    }
+  }
+}
+
 // Sends the command produced by makeCommand(), retrying only on throttling errors.
 // makeCommand is a thunk (not a prebuilt command) so each attempt gets a fresh command
 // instance, matching how the AWS SDK expects commands to be single-use.

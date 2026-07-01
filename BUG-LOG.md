@@ -4,6 +4,30 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-034 — One transient network error fails an entire large upload; "Retry" then re-uploads from zero
+
+**Date:** 2026-06-30
+
+**Symptom:**
+A 235.7 GiB upload (all parts already transferred — progress showed full size) failed at the very end with `TypeError: "NetworkError when attempting to fetch resource."` (status `null`, requestId `null`). The only recovery offered was a "Retry" button that restarts the whole upload from zero.
+
+**Root cause:**
+Two independent gaps, both surfaced once uploads got fast (16 connections, ~16 min of transfer):
+1. **No transient-error retry.** Each `UploadPartCommand` and the final `CompleteMultipartUploadCommand` used a raw `client.send()`. The AWS SDK's retry classifier does not treat a browser fetch `TypeError` ("NetworkError…" / "Failed to fetch") as retryable, and the project's `sendWithRetry` (throttling-only, and unused on the upload path) didn't cover it either. So one transient blip on any of ~1,900 parts — or on the single completion call — throws straight out and fails the entire upload.
+2. **Failed-upload recovery was destructive.** A failed item's "Retry" button calls `handleRestart`, which aborts the multipart session (discarding every uploaded part) and re-uploads from scratch. The resume machinery (`handleResume` + `collectParts` → upload only missing parts) existed but was wired only to the `paused` re-select flow, never to failed uploads.
+
+**Fix:**
+1. Added `isTransientNetworkError` + `isRetryableUploadError` + `withUploadRetry` (exponential backoff + jitter, abort-aware) to `s3-retry.js`, and wrapped every `UploadPart` and `CompleteMultipartUpload` send (fresh **and** resume paths) with it.
+2. On a multipart, non-permission failure, attach the surviving resume record to the failed item and offer a **Resume** button (upload only the missing parts), keeping **Restart** as the secondary action.
+
+**Why it wasn't caught earlier:**
+Small/fast test uploads rarely hit a transient network error, and the upload path had no retry test. The gap only bites on long, high-throughput, many-part uploads — which became common only after the connection/concurrency fixes (BUG-033 + the browser connection cap) made uploads fast. The destructive-Retry behaviour was masked because resume "worked" via the separate re-select flow.
+
+**Test case:**
+`test/s3-retry.test.js` — `isTransientNetworkError` recognises Firefox/Chromium/Safari fetch errors and excludes `AbortError`; `withUploadRetry` retries transient errors, gives up after `maxRetries`, and does not retry non-retryable or aborted operations. `test/components/upload-queue-ui.test.jsx` — a failed item with a resume record offers Resume; without one, only Retry.
+
+---
+
 ## BUG-033 — Large part sizes silently collapse multipart upload concurrency to 1 (fully sequential)
 
 **Date:** 2026-06-30
