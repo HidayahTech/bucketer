@@ -244,6 +244,9 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     }
 
     let uploadAnnotation = null;
+    // Diagnostics captured by uploadMultipart (part size, part count, transient retry count).
+    // Populated early so it's available for the log even if the upload later fails.
+    const diag = {};
 
     try {
       if (file.size < MULTIPART_THRESHOLD) {
@@ -251,7 +254,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         await uploadSmall(id, file, destinationKey, updateProgress);
       } else {
         // Large file — manual multipart with resume state
-        uploadAnnotation = await uploadMultipart(id, file, destinationKey, updateProgress);
+        uploadAnnotation = await uploadMultipart(id, file, destinationKey, updateProgress, diag);
       }
 
       const completedAt = Date.now();
@@ -276,6 +279,10 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         peakPartConcurrency: uploadAnnotation?.peakPartConcurrency ?? null,
         sharded:             uploadAnnotation?.sharded ?? false,
         probeResult:         uploadAnnotation?.probeResult ?? null,
+        partSize:            diag.partSize ?? null,
+        totalParts:          diag.totalParts ?? null,
+        retries:             diag.retries ?? 0,
+        provider, endpoint:  credentials.endpoint, bucket,
       }).then(() => onLogEntry?.()).catch(() => {});
 
     } catch (err) {
@@ -298,7 +305,12 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         errorMessage: err?.message || String(err),
         concurrencyMode:     loadAdaptiveMode() ? 'adaptive' : 'manual',
         peakPartConcurrency: uploadAnnotation?.peakPartConcurrency ?? null,
+        sharded:             uploadAnnotation?.sharded ?? false,
         probeResult:         null,
+        partSize:            diag.partSize ?? null,
+        totalParts:          diag.totalParts ?? null,
+        retries:             diag.retries ?? 0,
+        provider, endpoint:  credentials.endpoint, bucket,
       }).then(() => onLogEntry?.()).catch(() => {});
       if (isPermissionError(err)) {
         onCapabilityChange('upload', 'denied');
@@ -349,10 +361,14 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     onProgress(file.size, file.size);
   }
 
-  async function uploadMultipart(id, file, destinationKey, onProgress) {
+  async function uploadMultipart(id, file, destinationKey, onProgress, diag = {}) {
     const preferredBytes = (loadPartSizeMB() ?? 5) * 1024 * 1024;
     const partSize = calcPartSize(file.size, preferredBytes);
     const totalParts = Math.ceil(file.size / partSize);
+    // Populate diagnostics up front so runUpload can log them even if the upload later fails.
+    diag.partSize = partSize;
+    diag.totalParts = totalParts;
+    diag.retries = 0;
 
     // Compute the content hash once, up front: it stamps the object metadata (a cheap
     // duplicate-detection filter) and is reused for the resume record below — avoiding a
@@ -399,7 +415,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
           }),
           { abortSignal: abortController.signal },
         ),
-        { signal: abortController.signal },
+        { signal: abortController.signal, onRetry: () => { diag.retries = (diag.retries ?? 0) + 1; } },
       );
       parts[partNumber - 1] = { PartNumber: partNumber, ETag: resp.ETag };
       bytesUploaded += end - start;
@@ -484,7 +500,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     await withUploadRetry(() => client.send(new CompleteMultipartUploadCommand({
       Bucket: bucket, Key: destinationKey, UploadId: uploadId,
       MultipartUpload: { Parts: parts },
-    })), { signal: abortController.signal });
+    })), { signal: abortController.signal, onRetry: () => { diag.retries = (diag.retries ?? 0) + 1; } });
 
     await deleteResumeRecord({ provider, endpoint: credentials.endpoint, bucket, destinationKey }).catch(() => {});
     delete activeUploadsRef.current[id];

@@ -44,7 +44,7 @@ export function isRetryableUploadError(err) {
 // otherwise fails an entire large upload on a single transient blip, because the raw SDK
 // send does not reliably retry a fetch TypeError. `run` is an async thunk; an optional
 // abort `signal` short-circuits retries the moment the upload is cancelled.
-export async function withUploadRetry(run, { maxRetries = MAX_RETRIES, baseMs = RETRY_BASE_MS, signal } = {}) {
+export async function withUploadRetry(run, { maxRetries = MAX_RETRIES, baseMs = RETRY_BASE_MS, signal, onRetry } = {}) {
   let attempt = 0;
   for (;;) {
     try {
@@ -55,6 +55,7 @@ export async function withUploadRetry(run, { maxRetries = MAX_RETRIES, baseMs = 
         const delay = Math.round(base * (0.75 + Math.random() * 0.5));
         await new Promise(r => setTimeout(r, delay));
         attempt++;
+        onRetry?.(attempt, err);   // diagnostics: count transient retries for the upload log
       } else {
         throw err;
       }

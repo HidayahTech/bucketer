@@ -12,9 +12,12 @@
 // WHAT DOES NOT BELONG HERE: resume record CRUD (resume-records.js), file identity
 // (file-identity.js), or cross-tab tracking (active-uploads.js).
 //
-// Each entry: { fileName, destinationKey, fileSize, status, startedAt,
-//               completedAt, durationSec, avgSpeedBps, errorMessage,
-//               concurrencyMode, peakPartConcurrency, probeResult }
+// Each entry: { fileName, destinationKey, fileSize, status, startedAt, completedAt,
+//               durationSec, avgSpeedBps, errorMessage, concurrencyMode,
+//               peakPartConcurrency, sharded, probeResult,
+//               partSize, totalParts, retries, provider, endpoint, bucket }
+// The store is schema-flexible (IndexedDB .add) — new diagnostic fields can be appended
+// without a migration; older entries simply lack them and the UI omits absent fields.
 
 import { openDB, LOG_STORE } from './indexeddb-core.js';
 

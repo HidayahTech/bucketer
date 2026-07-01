@@ -1,9 +1,19 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.31.0';
+export const CURRENT_VERSION = '1.32.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.32.0",
+    "date": "2026-07-01",
+    "title": "Upload history: richer diagnostics + expandable per-row detail",
+    "changes": [
+      "**The upload history now records full per-upload diagnostics** — part size, part count, transient",
+      "**Compact default line, expand for the rest.** The Strategy column stays a concise one-liner — e.g.",
+      "withUploadRetry gained an onRetry hook so the transient-retry count — a flaky-network signal — is"
+    ]
+  },
   {
     "version": "1.31.0",
     "date": "2026-06-30",

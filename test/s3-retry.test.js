@@ -118,4 +118,15 @@ describe('withUploadRetry', () => {
     );
     assert.equal(calls, 1, 'aborted upload must not keep retrying');
   });
+
+  test('calls onRetry once per retry with the attempt number (diagnostics)', async () => {
+    const attempts = [];
+    let calls = 0;
+    await withUploadRetry(async () => {
+      calls++;
+      if (calls < 3) throw new TypeError('Failed to fetch');
+      return 'ok';
+    }, { baseMs: 1, onRetry: (n) => attempts.push(n) });
+    assert.deepEqual(attempts, [1, 2], 'two retries before the 3rd attempt succeeds');
+  });
 });

@@ -7,6 +7,21 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.32.0] — 2026-07-01 — Upload history: richer diagnostics + expandable per-row detail
+
+- **The upload history now records full per-upload diagnostics** — part size, part count, transient
+  retry count, provider, endpoint, and bucket — on top of the existing mode / concurrency / sharding /
+  speed. The IndexedDB log store is schema-flexible, so older entries are unaffected (absent fields are
+  simply omitted).
+- **Compact default line, expand for the rest.** The Strategy column stays a concise one-liner — e.g.
+  `manual · 32 MiB · 32 conns · sharded ×2` (now disambiguating part **size** from **concurrency**, which
+  the old "N parts" conflated) — and **clicking any row reveals a full diagnostic breakdown**: part size,
+  part count, peak concurrency, transient retries, avg speed, duration, provider/bucket/endpoint, probe
+  result, and the error message for failed uploads. Useful for problem-solving without cluttering the
+  everyday view.
+- `withUploadRetry` gained an `onRetry` hook so the transient-retry count — a flaky-network signal — is
+  captured for the log.
+
 ## [1.31.0] — 2026-06-30 — Multi-origin sharding on by default (B2) with graceful fallback; fix BUG-035
 
 ### Multi-origin upload sharding — now a first-class feature
