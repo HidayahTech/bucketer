@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { isVhostShardable, uploadPartsAcrossLanes, shouldFallbackFromVhost, uploadPartsSharded } from '../src/lib/upload-sharding.js';
+import { isVhostShardable, uploadPartsAcrossLanes, shouldFallbackFromVhost, uploadPartsSharded, isShardCapableProvider } from '../src/lib/upload-sharding.js';
 
 // ── isVhostShardable ──────────────────────────────────────────────────────────
 // Multi-origin sharding routes some parts via virtual-hosted addressing
@@ -10,6 +10,10 @@ import { isVhostShardable, uploadPartsAcrossLanes, shouldFallbackFromVhost, uplo
 describe('isVhostShardable', () => {
   test('accepts a simple DNS-safe bucket on B2', () => {
     assert.equal(isVhostShardable('mybucket', 'b2'), true);
+  });
+
+  test('accepts a DNS-safe bucket on AWS (HTTP/1.1 + vhost cert verified)', () => {
+    assert.equal(isVhostShardable('mybucket', 'aws'), true);
   });
 
   test('accepts hyphenated lowercase names', () => {
@@ -42,6 +46,16 @@ describe('isVhostShardable', () => {
     assert.equal(isVhostShardable('mybucket', 'r2'), false);
     assert.equal(isVhostShardable('mybucket', 'minio'), false);
     assert.equal(isVhostShardable('mybucket', 'generic'), false);
+  });
+});
+
+describe('isShardCapableProvider', () => {
+  test('true for B2 and AWS, false otherwise (drives the Settings toggle visibility)', () => {
+    assert.equal(isShardCapableProvider('b2'), true);
+    assert.equal(isShardCapableProvider('aws'), true);
+    assert.equal(isShardCapableProvider('r2'), false);
+    assert.equal(isShardCapableProvider('minio'), false);
+    assert.equal(isShardCapableProvider(null), false);
   });
 });
 
@@ -138,8 +152,10 @@ describe('shouldFallbackFromVhost', () => {
 // ── uploadPartsSharded ────────────────────────────────────────────────────────
 
 describe('uploadPartsSharded', () => {
+  // fallbackClient = the provider's DEFAULT origin (always works); probeClient = the ADDED
+  // second origin (uncertain). The probe tests the added origin and falls back to the default.
   const mkOpts = (over = {}) => ({
-    pathClient: { id: 'path' }, vhostClient: { id: 'vhost' },
+    fallbackClient: { id: 'fallback' }, probeClient: { id: 'probe' },
     shardConcurrency: 2, poolConcurrency: 2, ...over,
   });
 
@@ -152,29 +168,29 @@ describe('uploadPartsSharded', () => {
       seen.add(n);
     }, opts);
     assert.equal(sharded, true);
-    assert.equal(firstClient, 'vhost', 'part 1 must probe the vhost origin');
+    assert.equal(firstClient, 'probe', 'part 1 must probe the added (second) origin');
     assert.deepEqual([...seen].sort((a, b) => a - b), [1, 2, 3, 4, 5, 6]);
-    assert.ok(byClient.get('vhost') > 1 && byClient.get('path') > 0, 'both origins used');
+    assert.ok(byClient.get('probe') > 1 && byClient.get('fallback') > 0, 'both origins used');
   });
 
-  test('probe fails (non-abort) → falls back to single-origin (path only)', async () => {
+  test('probe fails (non-abort) → falls back to the default origin only', async () => {
     const opts = mkOpts();
     const usedClients = new Set(); const seen = [];
     const { sharded } = await uploadPartsSharded([1, 2, 3, 4], async (n, client) => {
-      if (n === 1 && client.id === 'vhost') throw new Error('SignatureDoesNotMatch'); // vhost rejects
+      if (n === 1 && client.id === 'probe') throw new Error('SignatureDoesNotMatch'); // added origin rejects
       usedClients.add(client.id);
       seen.push(n);
     }, opts);
     assert.equal(sharded, false, 'must report single-origin after fallback');
     assert.deepEqual(seen.sort((a, b) => a - b), [1, 2, 3, 4], 'all parts still uploaded');
-    assert.deepEqual([...usedClients], ['path'], 'only the path-style origin used after fallback');
+    assert.deepEqual([...usedClients], ['fallback'], 'only the default origin used after fallback');
   });
 
   test('probe abort propagates (no fallback)', async () => {
     const opts = mkOpts();
     await assert.rejects(
       uploadPartsSharded([1, 2, 3], async (n, client) => {
-        if (client.id === 'vhost') { const e = new Error('aborted'); e.name = 'AbortError'; throw e; }
+        if (client.id === 'probe') { const e = new Error('aborted'); e.name = 'AbortError'; throw e; }
       }, opts),
       { name: 'AbortError' },
     );

@@ -4,6 +4,7 @@ import { useState } from 'preact/hooks';
 import { loadMaxKeys, saveMaxKeys, loadPartConcurrency, savePartConcurrency, loadPartSizeMB, savePartSizeMB, loadUploadMemoryMB, saveUploadMemoryMB, loadFileConcurrency, saveFileConcurrency, loadListingCacheTTL, saveListingCacheTTL, loadUpdateCheckEnabled, saveUpdateCheckEnabled, loadPrefetchSizeLimit, savePrefetchSizeLimit, loadUploadExpandThreshold, saveUploadExpandThreshold, loadAdaptiveMode, saveAdaptiveMode, loadFileMtimeAutoLoad, saveFileMtimeAutoLoad, loadMultiOriginUpload, saveMultiOriginUpload } from '../lib/storage.js';
 import { defaultMaxKeys } from '../lib/provider.js';
 import { DEFAULT_UPLOAD_MEMORY_MB } from '../lib/constants.js';
+import { isShardCapableProvider } from '../lib/upload-sharding.js';
 
 const DEFAULT_PART_CONCURRENCY     = 4;
 const DEFAULT_PART_SIZE_MB         = 5;
@@ -292,7 +293,7 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
         </span>
       </div>
 
-      {provider === 'b2' && (
+      {isShardCapableProvider(provider) && (
         <div class="form-group" style={{ marginTop: '.75rem' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: '.5rem', cursor: 'pointer' }}>
             <input
@@ -303,13 +304,14 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
             Parallel upload connections
           </label>
           <span class="hint">
-            <strong>On by default.</strong> Splits each large file's parts across two B2 addresses —
+            <strong>On by default.</strong> Splits each large file's parts across two addresses —
             path-style (<code>s3.…/bucket</code>) and virtual-hosted (<code>bucket.s3.…</code>) — so
             the browser opens two connection pools instead of one (~6 connections each), roughly
             doubling throughput toward your link speed. Each upload probes the second address first
             and silently falls back to single-origin if it's rejected, so this can only help, never
-            fail. B2 only, and only for bucket names that are valid hostname labels (lowercase, no
-            dots). Very large part sizes may need a higher Upload memory budget for the full effect.
+            fail. Supported on Backblaze B2 and AWS S3, for bucket names that are valid hostname
+            labels (lowercase, no dots). Very large part sizes may need a higher Upload memory budget
+            for the full effect.
           </span>
         </div>
       )}

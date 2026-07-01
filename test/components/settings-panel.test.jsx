@@ -63,11 +63,20 @@ describe('SettingsPanel — field rendering', () => {
     cleanup();
   });
 
-  test('hides the multi-origin upload toggle for non-B2 providers', () => {
+  test('renders the multi-origin upload toggle for AWS', () => {
+    const { text, cleanup } = mount(h(SettingsPanel, defaultProps({ provider: 'aws' })));
+    assert.ok(
+      text().toLowerCase().includes('parallel upload connections'),
+      'multi-origin upload toggle must be shown for AWS'
+    );
+    cleanup();
+  });
+
+  test('hides the multi-origin upload toggle for non-shard-capable providers', () => {
     const { text, cleanup } = mount(h(SettingsPanel, defaultProps({ provider: 'r2' })));
     assert.ok(
       !text().toLowerCase().includes('parallel upload connections'),
-      'multi-origin upload toggle must be hidden for providers other than B2'
+      'multi-origin upload toggle must be hidden for providers other than B2/AWS'
     );
     cleanup();
   });

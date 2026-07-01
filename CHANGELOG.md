@@ -7,6 +7,21 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.33.0] — 2026-07-01 — Multi-origin sharding extended to AWS S3
+
+- **AWS S3 now supports parallel upload connections** (Settings → "Parallel upload connections", on by
+  default), joining Backblaze B2. Verified AWS is HTTP/1.1 with `*.s3.<region>.amazonaws.com` cert
+  coverage, so a bucket is reachable via two distinct origins — path-style (`s3.<region>.…/bucket`) and
+  virtual-hosted (`bucket.s3.<region>.…`) — for two ~6-connection pools.
+- **Sharding is now default-origin aware.** Each provider has a guaranteed default addressing style
+  (path-style for B2, virtual-hosted for AWS); the second origin uses the opposite style, and part 1
+  probes that added origin, silently falling back to the default if it's rejected. So on any provider the
+  worst case is single-origin (unchanged behaviour), never a failure. This also **fixes a latent issue
+  where AWS would have placed both lanes on the same virtual-hosted origin** (no speedup), since the
+  connected client already uses virtual-hosting for AWS.
+- Still excluded: HTTP/2 providers (Cloudflare R2), where sharding gives no benefit, and MinIO/generic,
+  where virtual-hosting is deployment-specific.
+
 ## [1.32.0] — 2026-07-01 — Upload history: richer diagnostics + expandable per-row detail
 
 - **The upload history now records full per-upload diagnostics** — part size, part count, transient

@@ -36,6 +36,7 @@ import { buildContentHashValue } from '../lib/content-hash.js';
 import { calcAdaptiveConcurrency, createProbeState, resolveProbe, capConcurrencyByMemory } from '../lib/concurrency-strategy.js';
 import { isVhostShardable, uploadPartsSharded } from '../lib/upload-sharding.js';
 import { createS3Client } from '../lib/s3-client.js';
+import { requiresPathStyle } from '../lib/provider.js';
 import { withUploadRetry } from '../lib/s3-retry.js';
 import { isActive as itemIsActive, isFailed as itemIsFailed, isPaused as itemIsPaused } from '../lib/upload-status.js';
 import { abortMultipartSession } from '../lib/upload-cleanup.js';
@@ -436,16 +437,17 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
 
     if (loadMultiOriginUpload() && isVhostShardable(bucket, provider)) {
       // Multi-origin sharding: the browser caps connections at ~6 per origin. Split this
-      // file's parts across two origins — the connected path-style client and a virtual-
-      // hosted client (bucket.s3.<region>.<host>) — so two ~6-connection pools run in
-      // parallel. uploadPartsSharded probes the vhost origin with part 1 and falls back to
-      // single-origin if the provider rejects it, so sharding can never cause a failure.
+      // file's parts across two origins to get two ~6-connection pools in parallel. The
+      // connected `client` addresses the bucket via the provider's DEFAULT style; the probe
+      // client uses the OPPOSITE style for the second origin (B2 default path → add vhost;
+      // AWS default vhost → add path). uploadPartsSharded probes the added origin with part 1
+      // and falls back to the default if it's rejected, so sharding can never cause a failure.
       // The memory budget is split across the two lanes. See src/lib/upload-sharding.js.
-      const vhostClient = createS3Client(credentials, { forcePathStyle: false });
+      const probeClient = createS3Client(credentials, { forcePathStyle: !requiresPathStyle(provider) });
       const shardConcurrency = capConcurrencyByMemory(getEffectivePartConcurrency(), partSize, Math.floor(perFileBudget / 2));
       const poolConcurrency  = capConcurrencyByMemory(getEffectivePartConcurrency(), partSize, perFileBudget);
       const result = await uploadPartsSharded(allPartNumbers, uploadPart, {
-        pathClient: client, vhostClient, shardConcurrency, poolConcurrency,
+        fallbackClient: client, probeClient, shardConcurrency, poolConcurrency,
       });
       sharded = result.sharded;
       peakPartConcurrency = sharded ? shardConcurrency * 2 : poolConcurrency;

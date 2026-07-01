@@ -1,9 +1,19 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.32.0';
+export const CURRENT_VERSION = '1.33.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.33.0",
+    "date": "2026-07-01",
+    "title": "Multi-origin sharding extended to AWS S3",
+    "changes": [
+      "**AWS S3 now supports parallel upload connections** (Settings → \"Parallel upload connections\", on by",
+      "**Sharding is now default-origin aware.** Each provider has a guaranteed default addressing style",
+      "Still excluded: HTTP/2 providers (Cloudflare R2), where sharding gives no benefit, and MinIO/generic,"
+    ]
+  },
   {
     "version": "1.32.0",
     "date": "2026-07-01",

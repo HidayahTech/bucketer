@@ -10,10 +10,20 @@ import { uploadPartsWithPool } from './upload-queue.js';
 // and both addressing styles route to the same bucket (the AWS SDK builds
 // bucket.s3.<region>.backblazeb2.com under forcePathStyle:false). Pure, S3-free, unit-testable.
 
-// Providers verified to accept BOTH path-style and virtual-hosted addressing with a TLS
-// cert that covers the bucket-as-subdomain name. Conservative allowlist — extend only
-// after verifying a provider's cert + routing (R2/MinIO are NOT verified for this).
-const VHOST_SHARDABLE_PROVIDERS = new Set(['b2']);
+// Providers verified to be HTTP/1.1 AND to accept BOTH path-style and virtual-hosted
+// addressing with a TLS cert that covers the bucket-as-subdomain name. Conservative
+// allowlist — extend only after verifying a provider's protocol + cert + routing:
+//   b2  — s3.<region>.backblazeb2.com is HTTP/1.1; cert *.s3.<region>.backblazeb2.com.
+//   aws — s3.<region>.amazonaws.com is HTTP/1.1; cert *.s3.<region>.amazonaws.com.
+// R2 is HTTP/2 (Cloudflare edge) → sharding gives no benefit (coalescing/multiplexing);
+// MinIO/generic are deployment-specific. Sharding never *breaks* an excluded provider — it
+// just isn't attempted (and the per-upload probe would fall back anyway).
+const VHOST_SHARDABLE_PROVIDERS = new Set(['b2', 'aws']);
+
+// Provider-only capability check (no bucket) — drives the Settings toggle visibility.
+export function isShardCapableProvider(provider) {
+  return VHOST_SHARDABLE_PROVIDERS.has(provider);
+}
 
 // A bucket name is virtual-host shardable only if it is a single valid DNS label: the
 // cert wildcard is one level (*.s3.<region>.<host>), so a dotted name would fail TLS,
@@ -49,41 +59,43 @@ export async function uploadPartsAcrossLanes(partNumbers, lanes, workFn) {
   await Promise.all(workers);
 }
 
-// After the vhost probe (part 1) fails, decide whether to fall back to single-origin or
-// propagate. We fall back for ANY provider/vhost rejection — signature/host/CORS/4xx, or an
-// exhausted transient blip — because path-style is always available and falling back only
-// forfeits the speedup, never correctness. A user abort must NOT fall back: it has to
-// propagate so the upload actually stops.
+// After the probe (part 1 on the added origin) fails, decide whether to fall back to
+// single-origin or propagate. We fall back for ANY provider rejection — signature/host/CORS/
+// 4xx, or an exhausted transient blip — because the default origin is always available and
+// falling back only forfeits the speedup, never correctness. A user abort must NOT fall back:
+// it has to propagate so the upload actually stops.
 export function shouldFallbackFromVhost(err) {
   if (!err) return false;
   return !(err.name === 'AbortError' || err.message === 'Upload aborted');
 }
 
 // Uploads partNumbers across two origins when the provider accepts it, else a single pool.
-// Probes the virtual-hosted origin with the FIRST part; if it is rejected (anything but an
-// abort), the whole file continues single-origin — so enabling sharding can never cause a
-// failure, only a missed speedup. workFn(partNumber, client) performs the actual send.
-// Returns { sharded } indicating whether the two-origin path was used.
-export async function uploadPartsSharded(partNumbers, workFn, { pathClient, vhostClient, shardConcurrency, poolConcurrency }) {
+// `fallbackClient` addresses the bucket via the provider's DEFAULT style (path-style for B2,
+// virtual-hosted for AWS) — the origin guaranteed to work. `probeClient` addresses it via the
+// OTHER style, giving a second connection-pool origin. Part 1 probes the added origin; if it
+// is rejected (anything but an abort), the whole file continues single-origin on the default —
+// so enabling sharding can never cause a failure, only a missed speedup.
+// workFn(partNumber, client) performs the actual send. Returns { sharded }.
+export async function uploadPartsSharded(partNumbers, workFn, { fallbackClient, probeClient, shardConcurrency, poolConcurrency }) {
   if (!partNumbers.length) return { sharded: false };
   const [first, ...rest] = partNumbers;
 
   let sharded = true;
   try {
-    await workFn(first, vhostClient);      // probe the vhost origin
+    await workFn(first, probeClient);      // probe the added (second) origin
   } catch (err) {
     if (!shouldFallbackFromVhost(err)) throw err;   // abort → propagate, don't fall back
     sharded = false;
-    await workFn(first, pathClient);       // re-upload part 1 on the always-available origin
+    await workFn(first, fallbackClient);   // re-upload part 1 on the always-available default origin
   }
 
   if (sharded) {
     await uploadPartsAcrossLanes(rest, [
-      { client: pathClient,  concurrency: shardConcurrency },
-      { client: vhostClient, concurrency: shardConcurrency },
+      { client: fallbackClient, concurrency: shardConcurrency },
+      { client: probeClient,    concurrency: shardConcurrency },
     ], workFn);
   } else {
-    await uploadPartsWithPool(rest, (n) => workFn(n, pathClient), poolConcurrency);
+    await uploadPartsWithPool(rest, (n) => workFn(n, fallbackClient), poolConcurrency);
   }
   return { sharded };
 }
