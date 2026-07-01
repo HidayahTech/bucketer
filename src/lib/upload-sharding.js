@@ -13,12 +13,13 @@ import { uploadPartsWithPool } from './upload-queue.js';
 // Providers verified to be HTTP/1.1 AND to accept BOTH path-style and virtual-hosted
 // addressing with a TLS cert that covers the bucket-as-subdomain name. Conservative
 // allowlist — extend only after verifying a provider's protocol + cert + routing:
-//   b2  — s3.<region>.backblazeb2.com is HTTP/1.1; cert *.s3.<region>.backblazeb2.com.
-//   aws — s3.<region>.amazonaws.com is HTTP/1.1; cert *.s3.<region>.amazonaws.com.
+//   b2     — s3.<region>.backblazeb2.com is HTTP/1.1; cert *.s3.<region>.backblazeb2.com.
+//   aws    — s3.<region>.amazonaws.com is HTTP/1.1; cert *.s3.<region>.amazonaws.com.
+//   wasabi — s3.<region>.wasabisys.com is HTTP/1.1; cert *.s3.<region>.wasabisys.com.
 // R2 is HTTP/2 (Cloudflare edge) → sharding gives no benefit (coalescing/multiplexing);
 // MinIO/generic are deployment-specific. Sharding never *breaks* an excluded provider — it
 // just isn't attempted (and the per-upload probe would fall back anyway).
-const VHOST_SHARDABLE_PROVIDERS = new Set(['b2', 'aws']);
+const VHOST_SHARDABLE_PROVIDERS = new Set(['b2', 'aws', 'wasabi']);
 
 // Provider-only capability check (no bucket) — drives the Settings toggle visibility.
 export function isShardCapableProvider(provider) {

@@ -309,9 +309,9 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
             the browser opens two connection pools instead of one (~6 connections each), roughly
             doubling throughput toward your link speed. Each upload probes the second address first
             and silently falls back to single-origin if it's rejected, so this can only help, never
-            fail. Supported on Backblaze B2 and AWS S3, for bucket names that are valid hostname
-            labels (lowercase, no dots). Very large part sizes may need a higher Upload memory budget
-            for the full effect.
+            fail. Supported on Backblaze B2, AWS S3, and Wasabi, for bucket names that are valid
+            hostname labels (lowercase, no dots). Very large part sizes may need a higher Upload memory
+            budget for the full effect.
           </span>
         </div>
       )}

@@ -7,6 +7,15 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.34.0] — 2026-07-01 — Multi-origin sharding: add Wasabi
+
+- **Wasabi now supports parallel upload connections** (on by default), joining Backblaze B2 and AWS S3.
+  Verified Wasabi is HTTP/1.1 across regions (`s3.<region>.wasabisys.com`) with `*.s3.<region>.wasabisys.com`
+  cert coverage. It reuses the default-origin-aware model — Wasabi defaults to virtual-hosted addressing,
+  so the added second origin is path-style, probed on part 1 with graceful fallback to single-origin.
+- Provider support is now: B2, AWS, Wasabi (all HTTP/1.1). Still excluded: Cloudflare R2 (HTTP/2 — no
+  benefit) and MinIO/generic (virtual-hosting is deployment-specific).
+
 ## [1.33.0] — 2026-07-01 — Multi-origin sharding extended to AWS S3
 
 - **AWS S3 now supports parallel upload connections** (Settings → "Parallel upload connections", on by

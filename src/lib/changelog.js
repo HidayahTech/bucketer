@@ -1,9 +1,18 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.33.0';
+export const CURRENT_VERSION = '1.34.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.34.0",
+    "date": "2026-07-01",
+    "title": "Multi-origin sharding: add Wasabi",
+    "changes": [
+      "**Wasabi now supports parallel upload connections** (on by default), joining Backblaze B2 and AWS S3.",
+      "Provider support is now: B2, AWS, Wasabi (all HTTP/1.1). Still excluded: Cloudflare R2 (HTTP/2 — no"
+    ]
+  },
   {
     "version": "1.33.0",
     "date": "2026-07-01",

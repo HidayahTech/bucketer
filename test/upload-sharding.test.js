@@ -16,6 +16,10 @@ describe('isVhostShardable', () => {
     assert.equal(isVhostShardable('mybucket', 'aws'), true);
   });
 
+  test('accepts a DNS-safe bucket on Wasabi (HTTP/1.1 + vhost cert verified)', () => {
+    assert.equal(isVhostShardable('mybucket', 'wasabi'), true);
+  });
+
   test('accepts hyphenated lowercase names', () => {
     assert.equal(isVhostShardable('my-bucket-123', 'b2'), true);
   });
@@ -50,9 +54,10 @@ describe('isVhostShardable', () => {
 });
 
 describe('isShardCapableProvider', () => {
-  test('true for B2 and AWS, false otherwise (drives the Settings toggle visibility)', () => {
+  test('true for B2, AWS and Wasabi, false otherwise (drives the Settings toggle visibility)', () => {
     assert.equal(isShardCapableProvider('b2'), true);
     assert.equal(isShardCapableProvider('aws'), true);
+    assert.equal(isShardCapableProvider('wasabi'), true);
     assert.equal(isShardCapableProvider('r2'), false);
     assert.equal(isShardCapableProvider('minio'), false);
     assert.equal(isShardCapableProvider(null), false);
