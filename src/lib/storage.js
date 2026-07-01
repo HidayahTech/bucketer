@@ -154,7 +154,7 @@ const _fileMtimeAutoLoad = makeSettingAccessors(
 );
 const _multiOriginUpload = makeSettingAccessors(
   LS_KEYS.multiOriginUpload,
-  v => v === '' ? false : v === 'true',      // default false (experimental)
+  v => v === '' ? true : v === 'true',       // default ON (only acts on capable providers, e.g. B2)
 );
 
 export const loadMaxKeys               = _maxKeys.load;

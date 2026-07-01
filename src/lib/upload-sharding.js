@@ -1,5 +1,6 @@
 // Copyright (C) 2026 HidayahTech, LLC
-// Multi-origin upload sharding (experimental). Browsers cap concurrent connections
+import { uploadPartsWithPool } from './upload-queue.js';
+// Multi-origin upload sharding. Browsers cap concurrent connections
 // at ~6 per origin (HTTP/1.1). The same bucket is reachable via two distinct origins —
 // path-style (s3.<region>.<host>/bucket) and virtual-hosted (bucket.s3.<region>.<host>) —
 // and each origin gets its own connection pool. Splitting a multipart upload's parts
@@ -46,4 +47,43 @@ export async function uploadPartsAcrossLanes(partNumbers, lanes, workFn) {
     for (let i = 0; i < n; i++) workers.push(worker(lane.client));
   }
   await Promise.all(workers);
+}
+
+// After the vhost probe (part 1) fails, decide whether to fall back to single-origin or
+// propagate. We fall back for ANY provider/vhost rejection — signature/host/CORS/4xx, or an
+// exhausted transient blip — because path-style is always available and falling back only
+// forfeits the speedup, never correctness. A user abort must NOT fall back: it has to
+// propagate so the upload actually stops.
+export function shouldFallbackFromVhost(err) {
+  if (!err) return false;
+  return !(err.name === 'AbortError' || err.message === 'Upload aborted');
+}
+
+// Uploads partNumbers across two origins when the provider accepts it, else a single pool.
+// Probes the virtual-hosted origin with the FIRST part; if it is rejected (anything but an
+// abort), the whole file continues single-origin — so enabling sharding can never cause a
+// failure, only a missed speedup. workFn(partNumber, client) performs the actual send.
+// Returns { sharded } indicating whether the two-origin path was used.
+export async function uploadPartsSharded(partNumbers, workFn, { pathClient, vhostClient, shardConcurrency, poolConcurrency }) {
+  if (!partNumbers.length) return { sharded: false };
+  const [first, ...rest] = partNumbers;
+
+  let sharded = true;
+  try {
+    await workFn(first, vhostClient);      // probe the vhost origin
+  } catch (err) {
+    if (!shouldFallbackFromVhost(err)) throw err;   // abort → propagate, don't fall back
+    sharded = false;
+    await workFn(first, pathClient);       // re-upload part 1 on the always-available origin
+  }
+
+  if (sharded) {
+    await uploadPartsAcrossLanes(rest, [
+      { client: pathClient,  concurrency: shardConcurrency },
+      { client: vhostClient, concurrency: shardConcurrency },
+    ], workFn);
+  } else {
+    await uploadPartsWithPool(rest, (n) => workFn(n, pathClient), poolConcurrency);
+  }
+  return { sharded };
 }

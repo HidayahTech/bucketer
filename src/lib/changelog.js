@@ -1,9 +1,21 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.30.0';
+export const CURRENT_VERSION = '1.31.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.31.0",
+    "date": "2026-06-30",
+    "title": "Multi-origin sharding on by default (B2) with graceful fallback; fix BUG-035",
+    "changes": [
+      "**On by default for Backblaze B2** (Settings → \"Parallel upload connections\", still toggleable). Splits",
+      "**Probe-based graceful fallback:** each sharded upload probes the virtual-hosted origin with part 1; if",
+      "Gated to DNS-safe bucket names; the upload log's strategy column now shows \"sharded ×2\" when it engaged.",
+      "**BUG-035:** a non-probe multipart upload (manual mode, small multipart, or sharded) threw",
+      "Fixed a stale browser-e2e selector (the filter-box placeholder gained a \"( / )\" shortcut hint); the"
+    ]
+  },
   {
     "version": "1.30.0",
     "date": "2026-06-30",

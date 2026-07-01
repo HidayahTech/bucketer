@@ -34,7 +34,7 @@ import { MULTIPART_THRESHOLD, DEFAULT_FILE_CONCURRENCY, PART_CONCURRENCY, ADAPTI
 import { buildUploadMetadata } from '../lib/upload-metadata.js';
 import { buildContentHashValue } from '../lib/content-hash.js';
 import { calcAdaptiveConcurrency, createProbeState, resolveProbe, capConcurrencyByMemory } from '../lib/concurrency-strategy.js';
-import { isVhostShardable, uploadPartsAcrossLanes } from '../lib/upload-sharding.js';
+import { isVhostShardable, uploadPartsSharded } from '../lib/upload-sharding.js';
 import { createS3Client } from '../lib/s3-client.js';
 import { withUploadRetry } from '../lib/s3-retry.js';
 import { isActive as itemIsActive, isFailed as itemIsFailed, isPaused as itemIsPaused } from '../lib/upload-status.js';
@@ -274,6 +274,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         errorMessage: null,
         concurrencyMode:     loadAdaptiveMode() ? 'adaptive' : 'manual',
         peakPartConcurrency: uploadAnnotation?.peakPartConcurrency ?? null,
+        sharded:             uploadAnnotation?.sharded ?? false,
         probeResult:         uploadAnnotation?.probeResult ?? null,
       }).then(() => onLogEntry?.()).catch(() => {});
 
@@ -414,22 +415,25 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     const perFileBudget = Math.floor(budgetBytes / Math.max(1, activeCount));
 
     let peakPartConcurrency;
+    let sharded = false;
+    let probeResolved = null;   // read by the completion annotation below (BUG-035: keep at fn scope)
 
     if (loadMultiOriginUpload() && isVhostShardable(bucket, provider)) {
-      // Multi-origin sharding (experimental): the browser caps connections at ~6 per
-      // origin. Split this file's parts across two origins — the connected path-style
-      // client and a virtual-hosted client (bucket.s3.<region>.<host>) — so two ~6-conn
-      // pools run in parallel. The memory budget is split across the two lanes; this path
-      // bypasses the probe (which tunes a single pool). See src/lib/upload-sharding.js.
+      // Multi-origin sharding: the browser caps connections at ~6 per origin. Split this
+      // file's parts across two origins — the connected path-style client and a virtual-
+      // hosted client (bucket.s3.<region>.<host>) — so two ~6-connection pools run in
+      // parallel. uploadPartsSharded probes the vhost origin with part 1 and falls back to
+      // single-origin if the provider rejects it, so sharding can never cause a failure.
+      // The memory budget is split across the two lanes. See src/lib/upload-sharding.js.
       const vhostClient = createS3Client(credentials, { forcePathStyle: false });
-      const perLane = capConcurrencyByMemory(getEffectivePartConcurrency(), partSize, Math.floor(perFileBudget / 2));
-      const lanes = [
-        { client, concurrency: perLane },
-        { client: vhostClient, concurrency: perLane },
-      ];
-      peakPartConcurrency = perLane * lanes.length;
-      debugConcurrency('shard-start', { file: file.name, totalParts, perLane, origins: lanes.length, peak: peakPartConcurrency });
-      await uploadPartsAcrossLanes(allPartNumbers, lanes, uploadPart);
+      const shardConcurrency = capConcurrencyByMemory(getEffectivePartConcurrency(), partSize, Math.floor(perFileBudget / 2));
+      const poolConcurrency  = capConcurrencyByMemory(getEffectivePartConcurrency(), partSize, perFileBudget);
+      const result = await uploadPartsSharded(allPartNumbers, uploadPart, {
+        pathClient: client, vhostClient, shardConcurrency, poolConcurrency,
+      });
+      sharded = result.sharded;
+      peakPartConcurrency = sharded ? shardConcurrency * 2 : poolConcurrency;
+      debugConcurrency('shard-done', { file: file.name, totalParts, sharded, shardConcurrency, poolConcurrency, peak: peakPartConcurrency });
     } else {
       const baseline = capConcurrencyByMemory(getEffectivePartConcurrency(), partSize, perFileBudget);
       const candidate = capConcurrencyByMemory(Math.min(16, baseline + 4), partSize, perFileBudget);
@@ -460,7 +464,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         state.baselineMs     = baselineMs;
         state.candidateBytes = 3 * partSize;
         state.candidateMs    = candidateMs;
-        const probeResolved = resolveProbe(state);
+        probeResolved = resolveProbe(state);
         peakPartConcurrency = probeResolved.winner;
 
         debugConcurrency('probe-result', {
@@ -486,6 +490,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     delete activeUploadsRef.current[id];
     return {
       peakPartConcurrency,
+      sharded,
       probeResult: probeResolved
         ? {
             baseline: probeResolved.baseline,

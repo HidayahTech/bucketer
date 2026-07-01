@@ -220,13 +220,13 @@ describe('saveUploadMemoryMB / loadUploadMemoryMB', () => {
 });
 
 describe('saveMultiOriginUpload / loadMultiOriginUpload', () => {
-  test('round-trips true', () => {
-    saveMultiOriginUpload(true);
-    assert.equal(loadMultiOriginUpload(), true);
+  test('round-trips false (explicit opt-out)', () => {
+    saveMultiOriginUpload(false);
+    assert.equal(loadMultiOriginUpload(), false);
   });
 
-  test('defaults to false when unset', () => {
-    assert.equal(loadMultiOriginUpload(), false);
+  test('defaults to true when unset (on by default; only acts on capable providers)', () => {
+    assert.equal(loadMultiOriginUpload(), true);
   });
 });
 

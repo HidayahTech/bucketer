@@ -56,7 +56,8 @@ function formatStrategyAnnotation(entry) {
   if (probe) return probe;
   if (!entry.concurrencyMode) return '—';
   const parts = entry.peakPartConcurrency != null ? ` · ${entry.peakPartConcurrency} parts` : '';
-  return `${entry.concurrencyMode}${parts}`;
+  const shard = entry.sharded ? ' · sharded ×2' : '';
+  return `${entry.concurrencyMode}${parts}${shard}`;
 }
 
 export function UploadLog({ refreshKey }) {

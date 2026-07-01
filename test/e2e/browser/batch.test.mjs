@@ -101,7 +101,8 @@ describe('select-all, filter, sort', () => {
     const { context, page } = await freshSession();
     try {
       await uploadFiles(page, ['apple.txt', 'banana.txt', 'apricot.txt']);
-      await page.locator('input[placeholder="Filter by name…"]').fill('ap');
+      // Starts-with match: the placeholder carries a "( / )" shortcut-hint suffix.
+      await page.locator('input[placeholder^="Filter by name"]').fill('ap');
       // Only the two "ap…" files remain visible.
       await page.locator('[data-testid="file-row:banana.txt"]').waitFor({ state: 'detached', timeout: 5000 });
       assert.equal(await page.locator('[data-testid="file-row:apple.txt"]').count(), 1);

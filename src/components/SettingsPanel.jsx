@@ -300,15 +300,16 @@ export function SettingsPanel({ provider, updateCheckEnabled, onUpdateCheckChang
               checked={multiOriginUpload}
               onChange={e => { saveMultiOriginUpload(e.target.checked); setMultiOriginUpload(e.target.checked); }}
             />
-            Parallel upload connections (experimental)
+            Parallel upload connections
           </label>
           <span class="hint">
-            Splits each large file's parts across two B2 addresses — path-style
-            (<code>s3.…/bucket</code>) and virtual-hosted (<code>bucket.s3.…</code>) — so the
-            browser opens two connection pools instead of one (~6 connections each), roughly
-            doubling throughput toward your link speed. B2 only; the bucket name must be a valid
-            hostname label (lowercase, no dots, or it silently stays single-origin). Raise the
-            Upload memory budget to match (2 × concurrency × part size). Takes effect on your next upload.
+            <strong>On by default.</strong> Splits each large file's parts across two B2 addresses —
+            path-style (<code>s3.…/bucket</code>) and virtual-hosted (<code>bucket.s3.…</code>) — so
+            the browser opens two connection pools instead of one (~6 connections each), roughly
+            doubling throughput toward your link speed. Each upload probes the second address first
+            and silently falls back to single-origin if it's rejected, so this can only help, never
+            fail. B2 only, and only for bucket names that are valid hostname labels (lowercase, no
+            dots). Very large part sizes may need a higher Upload memory budget for the full effect.
           </span>
         </div>
       )}

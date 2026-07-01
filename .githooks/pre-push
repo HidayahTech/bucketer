@@ -1,9 +1,15 @@
 #!/bin/sh
-# Pre-push hook — builds, runs the full test suite, and ensures the current
-# version tag exists and is pushed to the remote immediately.
+# Pre-push hook — builds, runs the full test suite (unit + component + e2e), and ensures
+# the current version tag exists and is pushed to the remote immediately.
 #
-# Reads stdin to detect tag-only pushes (recursive calls when the hook pushes
-# the version tag itself) and skips the build/test cycle in those cases.
+# Reads stdin to detect tag-only pushes (recursive calls when the hook pushes the version
+# tag itself) and skips the build/test cycle in those cases.
+#
+# The e2e browser layer is the ONLY suite that exercises the multipart upload-completion
+# path (uploadMultipart runs inside the UploadQueue component closure, unreachable from
+# unit/component tests). BUG-035 — a ReferenceError on every non-probe multipart
+# completion — shipped in v1.29.0/v1.30.0 precisely because e2e was not gating pushes.
+# npm run test:e2e self-builds to perf/ (gitignored), so it does not touch dist/.
 #
 # To override in an emergency (human operator only):
 #   git push --no-verify
@@ -21,6 +27,12 @@ if [ "$branch_refs" -gt 0 ]; then
 
   echo "Running tests..."
   npm test
+
+  echo "Running component tests..."
+  npm run test:ui
+
+  echo "Running e2e (node + browser)..."
+  npm run test:e2e
 
   echo "Tests passed — push proceeding."
 fi

@@ -7,6 +7,29 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.31.0] — 2026-06-30 — Multi-origin sharding on by default (B2) with graceful fallback; fix BUG-035
+
+### Multi-origin upload sharding — now a first-class feature
+
+- **On by default for Backblaze B2** (Settings → "Parallel upload connections", still toggleable). Splits
+  each large file's parts across two origins — path-style (`s3.<region>.…/bucket`) and virtual-hosted
+  (`bucket.s3.<region>.…`) — for two ~6-connection pools, roughly doubling per-file throughput toward link
+  speed with **no browser configuration required**.
+- **Probe-based graceful fallback:** each sharded upload probes the virtual-hosted origin with part 1; if
+  the provider rejects it, the file silently continues single-origin. Sharding can only help, never fail.
+- Gated to DNS-safe bucket names; the upload log's strategy column now shows "sharded ×2" when it engaged.
+  (The resume path remains single-origin for now.)
+
+### Fixes
+
+- **BUG-035:** a non-probe multipart upload (manual mode, small multipart, or sharded) threw
+  `ReferenceError: probeResolved is not defined` at completion — the object uploaded but the item showed as
+  failed. Introduced by the BUG-033 refactor in v1.29.0; restored the variable to function scope. The
+  browser e2e suite is the only layer that exercises this path, so the **pre-push hook now runs the
+  component and e2e suites** (not just unit tests) — an upload-completion regression can no longer ship.
+- Fixed a stale browser-e2e selector (the filter-box placeholder gained a "( / )" shortcut hint); the
+  browser e2e suite is green again.
+
 ## [1.30.0] — 2026-06-30 — Upload reliability: transient-error retry + resume-on-failure; experimental multi-origin sharding
 
 ### Reliability (BUG-034)

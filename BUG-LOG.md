@@ -4,6 +4,27 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-035 — ReferenceError on multipart completion for the non-probe path (manual mode, small multipart, sharded)
+
+**Date:** 2026-06-30
+
+**Symptom:**
+A multipart upload that did **not** run the throughput probe — manual concurrency mode, an adaptive upload with fewer than 20 parts, or the new sharded path — threw `ReferenceError: probeResolved is not defined` at the very end of `uploadMultipart`, *after* `CompleteMultipartUpload` had already succeeded. The object landed on the server but the item showed as failed.
+
+**Root cause:**
+The BUG-033 refactor (v1.29.0) restructured the concurrency block and moved `probeResolved` from an outer `let probeResolved = null;` to a `const probeResolved` scoped **inside** the `if (shouldProbe)` block. The completion annotation `return { … probeResult: probeResolved ? … : null }` still references it at function scope. When `shouldProbe` is false, that block never executes and the identifier is out of scope → ReferenceError. Shipped in v1.29.0 and v1.30.0.
+
+**Fix:**
+Restore `let probeResolved = null;` at function scope and change the inner statement to a plain assignment (`probeResolved = resolveProbe(state);`).
+
+**Why it wasn't caught earlier:**
+`npm test` (unit + component) never executes `uploadMultipart` — it is a closure inside the `UploadQueue` component that needs the full upload flow against a live/mock S3 client. Only the **browser e2e** suite exercises it, and that suite is not run by the pre-push hook (and was itself red from an unrelated stale selector, masking its value). The probe path (adaptive, ≥ 20 parts) worked, so large adaptive uploads were unaffected — which hid the bug.
+
+**Test case:**
+The browser e2e multipart path (`test/e2e/browser/*.test.mjs`) exercises `uploadMultipart` end-to-end and now passes; a minimal block-scope repro confirmed both the fault and the fix. **Prevention: run `npm run test:e2e:browser` before shipping upload-path changes** (the unit/component suites structurally cannot cover the completion path).
+
+---
+
 ## BUG-034 — One transient network error fails an entire large upload; "Retry" then re-uploads from zero
 
 **Date:** 2026-06-30
