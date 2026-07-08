@@ -46,13 +46,13 @@ async function listAllKeysForPrefix(client, bucket, pfx) {
   return keys;
 }
 
-async function discoverPrefixKeys(client, bucket, prefixes) {
+async function discoverPrefixKeys(client, bucket, prefixes, shouldCancel = () => false) {
   const prefixKeys = new Map();
   // Worker-pool: cap concurrent ListObjectsV2 crawls at CONCURRENCY to avoid
   // saturating the connection pool and triggering 503 throttling on large prefix sets.
   let idx = 0;
   async function worker() {
-    while (idx < prefixes.length) {
+    while (idx < prefixes.length && !shouldCancel()) {
       const pfx = prefixes[idx++];
       prefixKeys.set(pfx, await listAllKeysForPrefix(client, bucket, pfx));
     }
@@ -68,41 +68,54 @@ async function discoverPrefixKeys(client, bucket, prefixes) {
 //   { phase: 'discovering' }
 //   { phase: 'deleting', total: N }
 //   { deleted: N, errors: [...], deletedKeys: [...] }   — after each batch group
-//   { phase: 'done', deleted: N, errors: [...], deletedPrefixes: [...] }
+//   { phase: 'done', deleted: N, errors: [...], deletedPrefixes: [...], cancelled: bool }
 //
 // deletedKeys in incremental updates allows the caller to update UI state
 // incrementally rather than waiting for the full operation to complete.
 // deletedPrefixes in the done update lists prefixes whose entire contents
 // were successfully deleted (safe to remove from the folder listing).
-export async function runDeleteOperation(client, bucket, op, onProgress) {
+// shouldCancel() is polled between prefix crawls and batch groups; work already
+// in flight completes. cancelled:true on the done update means work was skipped.
+export async function runDeleteOperation(client, bucket, op, onProgress, shouldCancel = () => false) {
   const allKeys    = [...op.files];
   let prefixKeys   = new Map();
 
   if (op.prefixes.length > 0) {
     onProgress({ phase: 'discovering' });
     try {
-      prefixKeys = await discoverPrefixKeys(client, bucket, op.prefixes);
+      prefixKeys = await discoverPrefixKeys(client, bucket, op.prefixes, shouldCancel);
       prefixKeys.forEach(keys => allKeys.push(...keys));
     } catch (err) {
-      onProgress({ phase: 'done', deleted: 0, errors: [{ key: '(listing)', message: err.message }], deletedPrefixes: [] });
+      onProgress({ phase: 'done', deleted: 0, errors: [{ key: '(listing)', message: err.message }], deletedPrefixes: [], cancelled: false });
       return;
     }
   }
 
+  if (shouldCancel()) {
+    onProgress({ phase: 'done', deleted: 0, errors: [], deletedPrefixes: [], cancelled: true });
+    return;
+  }
+
   if (allKeys.length === 0) {
-    onProgress({ phase: 'done', deleted: 0, errors: [], deletedPrefixes: [...op.prefixes] });
+    onProgress({ phase: 'done', deleted: 0, errors: [], deletedPrefixes: [...op.prefixes], cancelled: false });
     return;
   }
 
   onProgress({ phase: 'deleting', total: allKeys.length });
 
   const errors = [];
+  const deletedKeySet = new Set();
   let deleted = 0;
   const batches = [];
   for (let i = 0; i < allKeys.length; i += BATCH_SIZE) {
     batches.push(allKeys.slice(i, i + BATCH_SIZE).map(Key => ({ Key })));
   }
 
+  // Cancellation is cooperative and batch-boundary honest: a group already in
+  // flight completes (an issued DeleteObjectsCommand cannot be recalled); the
+  // check runs after each completed group and marks the run cancelled only when
+  // further groups remain (a cancel during the final group skips nothing).
+  let cancelled = false;
   for (let i = 0; i < batches.length; i += CONCURRENCY) {
     await Promise.all(
       batches.slice(i, i + CONCURRENCY).map(async batch => {
@@ -116,15 +129,19 @@ export async function runDeleteOperation(client, bucket, op, onProgress) {
           batch.forEach(o => { if (!errorKeySet.has(o.Key)) batchDeletedKeys.push(o.Key); });
           deleted += batch.length - respErrors.length;
         }
+        batchDeletedKeys.forEach(k => deletedKeySet.add(k));
         onProgress({ deleted, errors: [...errors], deletedKeys: batchDeletedKeys });
       })
     );
+    if (shouldCancel() && i + CONCURRENCY < batches.length) { cancelled = true; break; }
   }
 
-  const errorKeySet = new Set(errors.map(e => e.key));
+  // A prefix is complete only when every key in it was confirmed deleted.
+  // (Equivalent to the old "no errors" rule when the run wasn't cancelled;
+  // strictly safer when it was — unattempted keys are neither errors nor deleted.)
   const deletedPrefixes = op.prefixes.filter(pfx =>
-    (prefixKeys.get(pfx) || []).every(k => !errorKeySet.has(k))
+    (prefixKeys.get(pfx) || []).every(k => deletedKeySet.has(k))
   );
 
-  onProgress({ phase: 'done', deleted, errors: [...errors], deletedPrefixes });
+  onProgress({ phase: 'done', deleted, errors: [...errors], deletedPrefixes, cancelled });
 }

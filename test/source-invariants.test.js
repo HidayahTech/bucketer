@@ -133,18 +133,10 @@ describe('App.jsx — selectedProfileId declared before credentials (BUG-017)', 
 // ── T3-1: Wasabi billing warning must appear in delete confirmation dialogs ───────────
 // Wasabi charges for a minimum of 90 days per object. A user who deletes test data
 // minutes after uploading is billed for the remainder of the retention window.
-
-describe('DeleteQueue.jsx — Wasabi 90-day billing warning present (T3-1)', () => {
-  const source = src('components/DeleteQueue.jsx');
-
-  test('warning text mentions Wasabi and 90 days', () => {
-    assert.ok(
-      /[Ww]asabi/.test(source) && /90.day/.test(source),
-      'DeleteQueue.jsx must include Wasabi 90-day retention warning — users deleting ' +
-      'test objects will be billed for up to 89 more days after deletion'
-    );
-  });
-});
+// The delete confirmation moved from DeleteQueue.jsx onto DeleteConfirmModal.jsx (the
+// pre-queue confirm step); its Wasabi/90-day warning is asserted by the rendering test
+// test/components/delete-confirm-modal.test.jsx (Task 5), which is stronger than a
+// source regex, so the source invariant that guarded DeleteQueue.jsx is retired here.
 
 describe('HiddenVersions.jsx — Wasabi 90-day billing warning in purge-all (T3-1)', () => {
   const source = src('components/HiddenVersions.jsx');
@@ -268,7 +260,7 @@ describe('App.jsx — handleDeleteConfirm wraps runDeleteOperation in try/catch 
     assert.ok(fnStart !== -1, 'handleDeleteConfirm must exist in App.jsx');
     // Bound the slice by the next sibling function so the check is robust to the
     // function growing (a fixed-length window silently drops the catch clause).
-    const fnEnd = source.indexOf('function handleDeleteDismiss', fnStart);
+    const fnEnd = source.indexOf('async function handleMoveRequest', fnStart);
     const fnBody = source.slice(fnStart, fnEnd === -1 ? fnStart + 1200 : fnEnd);
     assert.ok(
       /\btry\s*\{/.test(fnBody),
@@ -471,21 +463,12 @@ describe('Browser.jsx — empty-bucket and empty-prefix have distinct copy (T5-6
   });
 });
 
-// ── T5-7: DeleteQueue.jsx ConfirmContent must show filename for single-file delete ─────
-// When deleting a single file, the modal only shows "Delete 1 file?" — the user can't
-// confirm which file without looking away from the dialog.
-
-describe('DeleteQueue.jsx — shows filename when deleting a single file (T5-7)', () => {
-  const source = src('components/DeleteQueue.jsx');
-
-  test('ConfirmContent references op.files[0] to show the filename for single-file deletes', () => {
-    assert.ok(
-      /op\.files\[0\]/.test(source),
-      'DeleteQueue.jsx ConfirmContent must surface op.files[0] when deleting a single file — ' +
-      'currently the modal only says "Delete 1 file?" with no filename visible'
-    );
-  });
-});
+// ── T5-7: single-file delete confirmation must show the filename ──────────────────────
+// When deleting a single file, the modal only showed "Delete 1 file?" — the user can't
+// confirm which file without looking away from the dialog. The confirmation moved from
+// DeleteQueue.jsx onto DeleteConfirmModal.jsx; the filename-display invariant is now
+// asserted by the rendering test test/components/delete-confirm-modal.test.jsx (Task 5),
+// so the source regex that guarded DeleteQueue.jsx is retired here.
 
 // ── T5-8: CapabilityPanel must explain the ? (unknown) state inline ───────────────────
 // A tooltip title "Not yet tested" is insufficient — inline hint needed explaining that

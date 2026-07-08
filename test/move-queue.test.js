@@ -372,3 +372,56 @@ describe('runCopyOperation — copy-and-keep', () => {
     assert.equal(updates.find(u => u.phase === 'done').moved, 1);
   });
 });
+
+// ── Cooperative cancellation ──────────────────────────────────────────────────
+
+describe('runMoveOperation — cooperative cancel', () => {
+  test('cancel after the first moved object stops the remaining work', async () => {
+    // 20 loose files; the cancel flag flips when the first movedKeys update
+    // arrives. Workers stop claiming; done reports cancelled with moved < 20.
+    const files = Array.from({ length: 20 }, (_, i) => ({ key: `f${i}.txt`, size: 1 }));
+    const listPages = new Map([['d/', [{ objects: [], isTruncated: false }]]]);
+    const client = mockClient({ listPages });
+    let cancelled = false;
+    const updates = [];
+    await runMoveOperation(client, 'b', { files, prefixes: [], dest: 'd/' }, (u) => {
+      updates.push({ ...u });
+      if (u.movedKeys?.length) cancelled = true;
+    }, () => cancelled);
+    const done = updates.find(u => u.phase === 'done');
+    assert.equal(done.cancelled, true);
+    assert.ok(done.moved < 20, `moved ${done.moved}, expected fewer than 20`);
+  });
+
+  test('cancelled run never lists a partially-moved prefix in movedPrefixes', async () => {
+    // Prefix with 20 objects; cancel after first movedKeys update → some
+    // objects unmoved → prefix must not be reported complete.
+    const objects = Array.from({ length: 20 }, (_, i) => ({ Key: `p/f${i}.txt`, Size: 1 }));
+    const listPages = new Map([
+      ['p/', [{ objects, isTruncated: false }]],
+      ['d/', [{ objects: [], isTruncated: false }]],
+    ]);
+    const client = mockClient({ listPages });
+    let cancelled = false;
+    const updates = [];
+    await runMoveOperation(client, 'b', { files: [], prefixes: ['p/'], dest: 'd/' }, (u) => {
+      updates.push({ ...u });
+      if (u.movedKeys?.length) cancelled = true;
+    }, () => cancelled);
+    const done = updates.find(u => u.phase === 'done');
+    assert.equal(done.cancelled, true);
+    assert.deepEqual(done.movedPrefixes, []);
+  });
+
+  test('uncancelled runs report cancelled=false with behavior unchanged', async () => {
+    const listPages = new Map([['d/', [{ objects: [], isTruncated: false }]]]);
+    const client = mockClient({ listPages });
+    const updates = [];
+    await runMoveOperation(client, 'b', { files: [{ key: 'a.txt', size: 1 }], prefixes: [], dest: 'd/' }, (u) => {
+      updates.push({ ...u });
+    });
+    const done = updates.find(u => u.phase === 'done');
+    assert.equal(done.cancelled, false);
+    assert.equal(done.moved, 1);
+  });
+});

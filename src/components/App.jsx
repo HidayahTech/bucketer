@@ -37,10 +37,12 @@ import { FileBanner } from './FileBanner.jsx';
 import { CredentialForm } from './CredentialForm.jsx';
 import { Browser } from './Browser.jsx';
 import { UploadQueue } from './UploadQueue.jsx';
-import { DeleteQueue } from './DeleteQueue.jsx';
+import { DeleteConfirmModal } from './DeleteConfirmModal.jsx';
+import { MasterQueue } from './MasterQueue.jsx';
 import { runDeleteOperation } from '../lib/delete-queue.js';
-import { MoveQueue } from './MoveQueue.jsx';
 import { runMoveOperation, runCopyOperation } from '../lib/move-queue.js';
+import { taskStore } from '../lib/task-store.js';
+import { createDeleteTask, createTransferTask, engineUpdateToPatch } from '../lib/queue-tasks.js';
 import { CapabilityPanel } from './CapabilityPanel.jsx';
 import { SettingsPanel } from './SettingsPanel.jsx';
 import { UploadLog } from './UploadLog.jsx';
@@ -86,8 +88,10 @@ export function App() {
   const [updateCheckEnabled, setUpdateCheckEnabled] = useState(() => loadUpdateCheckEnabled());
   const [prefetchSizeLimit, setPrefetchSizeLimit] = useState(() => loadPrefetchSizeLimit());
   const [profiles, setProfiles] = useState(() => loadProfiles().profiles);
-  const [deleteOps, setDeleteOps] = useState([]);
-  const [moveOps, setMoveOps] = useState([]);
+  // Delete requests confirm BEFORE entering the master queue (a queued task is
+  // always already authorized). One pending request at a time; a new request
+  // replaces an unconfirmed one.
+  const [pendingDelete, setPendingDelete] = useState(null);
   const addFilesRef = useRef(null);
   const browserActionsRef = useRef(null);
   const logKeyDebounceRef = useRef(null);
@@ -204,29 +208,16 @@ export function App() {
   });
 
   function handleDeleteRequest({ files, prefixes, capturedPrefix }) {
-    setDeleteOps(prev => [...prev, {
-      id: String(Date.now() + Math.random()),
-      phase: 'confirm',
-      files,
-      prefixes,
-      capturedPrefix,
-      bucket: credentials.bucket,
-      total: null,
-      deleted: 0,
-      errors: [],
-      collapsed: false,
-    }]);
+    setPendingDelete({ files, prefixes, capturedPrefix });
   }
 
-  function updateDeleteOp(id, update) {
-    setDeleteOps(prev => prev.map(op => op.id === id ? { ...op, ...update } : op));
-  }
-
-  async function handleDeleteConfirm(id) {
-    const op = deleteOps.find(o => o.id === id);
-    if (!op) return;
+  async function handleDeleteConfirm() {
+    const req = pendingDelete;
+    setPendingDelete(null);
+    const task = createDeleteTask({ ...req, bucket: credentials.bucket });
+    const id = taskStore.add(task);
     try {
-      await runDeleteOperation(client, op.bucket, op, (update) => {
+      await runDeleteOperation(client, task.bucket, task, (update) => {
         if (update.deletedKeys?.length) {
           browserActionsRef.current?.removeItems(update.deletedKeys, []);
         }
@@ -234,51 +225,34 @@ export function App() {
           if (update.deletedPrefixes?.length) {
             browserActionsRef.current?.removeItems([], update.deletedPrefixes);
           }
-          browserActionsRef.current?.invalidateCache(op.capturedPrefix);
-          handleCapabilityChange('delete', 'permitted');
-          if (update.errors.length === 0) {
-            const n = (op.files?.length || 0) + (op.prefixes?.length || 0);
+          browserActionsRef.current?.invalidateCache(task.capturedPrefix);
+          // A run cancelled before any request proves nothing about permissions.
+          if (update.deleted > 0 || !update.cancelled) {
+            handleCapabilityChange('delete', 'permitted');
+          }
+          if (update.errors.length === 0 && !update.cancelled) {
+            const n = req.files.length + req.prefixes.length;
             showToast(`Deleted ${n} item${n === 1 ? '' : 's'}`);
-            setTimeout(() => setDeleteOps(prev => prev.filter(o => o.id !== id)), 3000);
           }
         }
-        updateDeleteOp(id, update);
-      });
+        taskStore.update(id, engineUpdateToPatch(update, 'deleted'), !!update.phase);
+      }, () => taskStore.isCancelRequested(id));
     } catch (err) {
-      updateDeleteOp(id, {
-        phase: 'done',
+      taskStore.update(id, {
+        status: 'done', subPhase: null,
         errors: [{ key: '(unexpected)', message: err.message || String(err) }],
-        deletedPrefixes: [],
-      });
+      }, true);
     }
   }
 
-  function handleDeleteDismiss(id) {
-    setDeleteOps(prev => prev.filter(o => o.id !== id));
-  }
-
-  function handleDeleteCollapse(id) {
-    setDeleteOps(prev => prev.map(op =>
-      op.id === id ? { ...op, collapsed: !op.collapsed } : op
-    ));
-  }
-
-  // Move ops are owned by App (like delete ops) so they survive folder navigation. The
-  // MovePickerModal is the confirmation step, so a request starts the operation directly.
-  function updateMoveOp(id, update) {
-    setMoveOps(prev => prev.map(op => op.id === id ? { ...op, ...update } : op));
-  }
-
+  // The MovePickerModal is the confirmation step, so a move/copy request starts
+  // its task directly.
   async function handleMoveRequest({ files, prefixes, dest, capturedPrefix, mode = 'move' }) {
-    const id = String(Date.now() + Math.random());
-    const op = {
-      id, phase: 'checking', files, prefixes, dest, capturedPrefix, mode,
-      bucket: credentials.bucket, moved: 0, total: null, errors: [], collapsed: false,
-    };
-    setMoveOps(prev => [...prev, op]);
+    const task = createTransferTask({ files, prefixes, dest, capturedPrefix, bucket: credentials.bucket, mode });
+    const id = taskStore.add(task);
     const runOperation = mode === 'copy' ? runCopyOperation : runMoveOperation;
     try {
-      await runOperation(client, op.bucket, op, (update) => {
+      await runOperation(client, task.bucket, task, (update) => {
         // Remove moved source rows incrementally (copy+delete confirmed for those keys).
         if (update.movedKeys?.length) {
           browserActionsRef.current?.removeItems(update.movedKeys, []);
@@ -288,37 +262,25 @@ export function App() {
             browserActionsRef.current?.removeItems([], update.movedPrefixes);
           }
           // Invalidate both the source view and the destination so each refetches.
-          browserActionsRef.current?.invalidateCache(op.capturedPrefix);
-          browserActionsRef.current?.invalidateCache(op.dest);
+          browserActionsRef.current?.invalidateCache(task.capturedPrefix);
+          browserActionsRef.current?.invalidateCache(task.dest);
           if (update.moved > 0) {
             handleCapabilityChange('upload', 'permitted');
             if (mode === 'move') handleCapabilityChange('delete', 'permitted');
           }
-          if (update.errors.length === 0) {
+          if (update.errors.length === 0 && !update.cancelled) {
             const verb = mode === 'copy' ? 'Copied' : 'Moved';
             showToast(`${verb} ${update.moved} item${update.moved === 1 ? '' : 's'}`);
-            setTimeout(() => setMoveOps(prev => prev.filter(o => o.id !== id)), 3000);
           }
         }
-        updateMoveOp(id, update);
-      });
+        taskStore.update(id, engineUpdateToPatch(update, 'moved'), !!update.phase);
+      }, () => taskStore.isCancelRequested(id));
     } catch (err) {
-      updateMoveOp(id, {
-        phase: 'done',
+      taskStore.update(id, {
+        status: 'done', subPhase: null,
         errors: [{ key: '(unexpected)', message: err.message || String(err) }],
-        movedPrefixes: [],
-      });
+      }, true);
     }
-  }
-
-  function handleMoveDismiss(id) {
-    setMoveOps(prev => prev.filter(o => o.id !== id));
-  }
-
-  function handleMoveCollapse(id) {
-    setMoveOps(prev => prev.map(op =>
-      op.id === id ? { ...op, collapsed: !op.collapsed } : op
-    ));
   }
 
   async function handleCopyLink() {
@@ -402,6 +364,14 @@ export function App() {
           capabilities={capabilities}
           onDeleteRequest={handleDeleteRequest}
           onClose={() => setDuplicatesOpen(false)}
+        />
+      )}
+      {pendingDelete && (
+        <DeleteConfirmModal
+          request={pendingDelete}
+          provider={credentials.provider}
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setPendingDelete(null)}
         />
       )}
       <header class="app-header">
@@ -598,19 +568,7 @@ export function App() {
               onMount={({ addFiles }) => { addFilesRef.current = addFiles; }}
             />
 
-            <DeleteQueue
-              ops={deleteOps}
-              onConfirm={handleDeleteConfirm}
-              onDismiss={handleDeleteDismiss}
-              onCollapse={handleDeleteCollapse}
-              provider={credentials.provider}
-            />
-
-            <MoveQueue
-              ops={moveOps}
-              onDismiss={handleMoveDismiss}
-              onCollapse={handleMoveCollapse}
-            />
+            <MasterQueue />
 
             <UploadLog refreshKey={logKey} />
 

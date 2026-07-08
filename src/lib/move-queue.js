@@ -10,11 +10,12 @@
 //   { phase: 'checking' }                                     — destination collision scan
 //   { phase: 'moving', total: N }
 //   { moved, errors: [...], movedKeys: [...] }                — per completed object
-//   { phase: 'done', moved, errors: [...], movedPrefixes }
+//   { phase: 'done', moved, errors: [...], movedPrefixes, cancelled }
 //
 // movedKeys are SOURCE keys whose copy+delete both succeeded (caller removes those rows).
 // movedPrefixes are source folders whose every key moved cleanly (caller removes the row).
 // Collision/skip errors carry `skipped: true` so the UI can show them apart from failures.
+// shouldCancel() is polled between objects; in-flight copies complete.
 import { ListObjectsV2Command, CopyObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { COPY_MULTIPART_THRESHOLD } from './constants.js';
 import { destKeyForFile, destKeyForFolderObject, freeFileKey, freeFolderPrefix } from './move-key.js';
@@ -36,11 +37,11 @@ async function listAllObjectsForPrefix(client, bucket, pfx) {
   return objs;
 }
 
-async function discoverPrefixObjects(client, bucket, prefixes) {
+async function discoverPrefixObjects(client, bucket, prefixes, shouldCancel = () => false) {
   const map = new Map();
   let idx = 0;
   async function worker() {
-    while (idx < prefixes.length) {
+    while (idx < prefixes.length && !shouldCancel()) {
       const pfx = prefixes[idx++];
       map.set(pfx, await listAllObjectsForPrefix(client, bucket, pfx));
     }
@@ -49,18 +50,18 @@ async function discoverPrefixObjects(client, bucket, prefixes) {
   return map;
 }
 
-export async function runMoveOperation(client, bucket, op, onProgress) {
-  return runTransfer(client, bucket, op, onProgress, 'move');
+export async function runMoveOperation(client, bucket, op, onProgress, shouldCancel = () => false) {
+  return runTransfer(client, bucket, op, onProgress, 'move', shouldCancel);
 }
 
-export async function runCopyOperation(client, bucket, op, onProgress) {
-  return runTransfer(client, bucket, op, onProgress, 'copy');
+export async function runCopyOperation(client, bucket, op, onProgress, shouldCancel = () => false) {
+  return runTransfer(client, bucket, op, onProgress, 'copy', shouldCancel);
 }
 
 // Shared core for move ('move') and copy-and-keep ('copy'). Copy renames on collision
 // (never overwrites) and skips the source delete; move skips colliding objects and
 // deletes each source only after its copy is confirmed.
-async function runTransfer(client, bucket, op, onProgress, mode) {
+async function runTransfer(client, bucket, op, onProgress, mode, shouldCancel) {
   const dest = op.dest ?? '';
   const looseFiles = (op.files || []).map(f => (typeof f === 'string' ? { key: f, size: 0 } : f));
   const prefixes = op.prefixes || [];
@@ -74,9 +75,13 @@ async function runTransfer(client, bucket, op, onProgress, mode) {
   if (prefixes.length > 0) {
     onProgress({ phase: 'discovering' });
     try {
-      prefixObjects = await discoverPrefixObjects(client, bucket, prefixes);
+      prefixObjects = await discoverPrefixObjects(client, bucket, prefixes, shouldCancel);
     } catch (err) {
-      onProgress({ phase: 'done', moved: 0, errors: [{ key: '(listing)', message: err.message }], movedPrefixes: [] });
+      onProgress({ phase: 'done', moved: 0, errors: [{ key: '(listing)', message: err.message }], movedPrefixes: [], cancelled: false });
+      return;
+    }
+    if (shouldCancel()) {
+      onProgress({ phase: 'done', moved: 0, errors: [], movedPrefixes: [], cancelled: true });
       return;
     }
     for (const pfx of prefixes) {
@@ -88,7 +93,7 @@ async function runTransfer(client, bucket, op, onProgress, mode) {
 
   // Nothing to move (e.g. empty op, or only empty folders): finish without a dest crawl.
   if (work.length === 0) {
-    onProgress({ phase: 'done', moved: 0, errors: [], movedPrefixes: mode === 'move' ? [...prefixes] : [] });
+    onProgress({ phase: 'done', moved: 0, errors: [], movedPrefixes: mode === 'move' ? [...prefixes] : [], cancelled: false });
     return;
   }
 
@@ -99,7 +104,11 @@ async function runTransfer(client, bucket, op, onProgress, mode) {
     const destObjs = await listAllObjectsForPrefix(client, bucket, dest);
     existing = new Set(destObjs.map(o => o.key));
   } catch (err) {
-    onProgress({ phase: 'done', moved: 0, errors: [{ key: '(listing)', message: err.message }], movedPrefixes: [] });
+    onProgress({ phase: 'done', moved: 0, errors: [{ key: '(listing)', message: err.message }], movedPrefixes: [], cancelled: false });
+    return;
+  }
+  if (shouldCancel()) {
+    onProgress({ phase: 'done', moved: 0, errors: [], movedPrefixes: [], cancelled: true });
     return;
   }
 
@@ -151,8 +160,11 @@ async function runTransfer(client, bucket, op, onProgress, mode) {
 
   let moved = 0;
   let mi = 0;
+  let cancelled = false;
+  const movedKeySet = new Set();
   async function worker() {
     while (mi < movable.length) {
+      if (shouldCancel()) { cancelled = true; return; }
       const item = movable[mi++];
       try {
         if (item.size > COPY_MULTIPART_THRESHOLD) {
@@ -181,6 +193,7 @@ async function runTransfer(client, bucket, op, onProgress, mode) {
           onProgress({ moved, errors: [...errors], movedKeys: [] });
           continue;
         }
+        movedKeySet.add(item.sourceKey);
       }
       moved++;
       onProgress({ moved, errors: [...errors], movedKeys: mode === 'move' ? [item.sourceKey] : [] });
@@ -188,10 +201,12 @@ async function runTransfer(client, bucket, op, onProgress, mode) {
   }
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, movable.length) }, worker));
 
-  const errorKeySet = new Set(errors.map(e => e.key));
+  // A source folder is complete only when every object in it was confirmed
+  // moved (copy + delete). Equivalent to the old "no errors" rule when the run
+  // wasn't cancelled; strictly safer when it was.
   const movedPrefixes = mode === 'move'
-    ? prefixes.filter(pfx => (prefixObjects.get(pfx) || []).every(o => !errorKeySet.has(o.key)))
+    ? prefixes.filter(pfx => (prefixObjects.get(pfx) || []).every(o => movedKeySet.has(o.key)))
     : [];
 
-  onProgress({ phase: 'done', moved, errors: [...errors], movedPrefixes });
+  onProgress({ phase: 'done', moved, errors: [...errors], movedPrefixes, cancelled });
 }

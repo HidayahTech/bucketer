@@ -377,22 +377,24 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 .batch-status-err  { color: var(--text-danger); }
 .batch-inflight { display: flex; flex-direction: column; gap: .4rem; border-top: 1px solid var(--border); padding-top: .4rem; margin-top: .1rem; }
 
-/* ── Delete queue ─────────────────────────────────────────────────────────── */
-.delete-queue { display: flex; flex-direction: column; gap: .5rem; }
-.delete-op {
+/* ── Master queue (unified operations panel — delete/move/copy tasks) ─────── */
+.queue-panel { display: flex; flex-direction: column; gap: .5rem; }
+.queue-panel-actions { display: flex; justify-content: flex-end; }
+.queue-op {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: .6rem .75rem;
   font-size: .85rem;
 }
-.delete-op-expanded { padding-bottom: .5rem; }
-.delete-op-header { display: flex; align-items: center; gap: .5rem; }
-.delete-op-summary { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.delete-op-icon { font-size: .9rem; flex-shrink: 0; }
-.delete-op-ok  { color: var(--text-success); }
-.delete-op-err { color: var(--text-danger); }
-.delete-op-errors {
+.queue-op-expanded { padding-bottom: .5rem; }
+.queue-op-header { display: flex; align-items: center; gap: .5rem; }
+.queue-op-summary { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.queue-op-icon { font-size: .9rem; flex-shrink: 0; }
+.queue-op-ok  { color: var(--text-success); }
+.queue-op-err { color: var(--text-danger); }
+.queue-op-cancelled { color: var(--text-muted); }
+.queue-op-errors {
   margin-top: .4rem;
   border-top: 1px solid var(--border);
   padding-top: .4rem;
@@ -400,62 +402,21 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
   flex-direction: column;
   gap: .2rem;
 }
-.delete-op-error-row {
-  display: flex;
-  gap: .5rem;
-  font-size: .78rem;
-  align-items: baseline;
-}
-.delete-op-error-key {
+.queue-op-error-row { display: flex; gap: .5rem; font-size: .78rem; align-items: baseline; }
+.queue-op-error-key {
   color: var(--text-muted);
-  min-width: 0;
-  flex-shrink: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0; flex-shrink: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-family: var(--mono);
 }
-.delete-op-error-msg { color: var(--text-danger); flex-shrink: 0; }
-.delete-op-error-more { color: var(--text-muted); font-style: italic; }
+.queue-op-error-msg  { color: var(--text-danger); flex-shrink: 0; }
+.queue-op-error-skip { color: var(--text-muted); flex-shrink: 0; }
+.queue-op-error-more { color: var(--text-muted); font-style: italic; }
 .delete-confirm-prefixes {
   display: flex;
   flex-direction: column;
   gap: .2rem;
   margin: .3rem 0 .5rem;
 }
-
-/* ── Move queue (mirrors the delete-op visual language) ───────────────────── */
-.move-queue { display: flex; flex-direction: column; gap: .5rem; }
-.move-op {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: .6rem .75rem;
-  font-size: .85rem;
-}
-.move-op-expanded { padding-bottom: .5rem; }
-.move-op-header { display: flex; align-items: center; gap: .5rem; }
-.move-op-summary { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.move-op-icon { font-size: .9rem; flex-shrink: 0; }
-.move-op-ok  { color: var(--text-success); }
-.move-op-err { color: var(--text-danger); }
-.move-op-errors {
-  margin-top: .4rem;
-  border-top: 1px solid var(--border);
-  padding-top: .4rem;
-  display: flex;
-  flex-direction: column;
-  gap: .2rem;
-}
-.move-op-error-row { display: flex; gap: .5rem; font-size: .78rem; align-items: baseline; }
-.move-op-error-key {
-  color: var(--text-muted);
-  min-width: 0; flex-shrink: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-family: var(--mono);
-}
-.move-op-error-msg  { color: var(--text-danger); flex-shrink: 0; }
-.move-op-error-skip { color: var(--text-muted); flex-shrink: 0; }
-.move-op-error-more { color: var(--text-muted); font-style: italic; }
 
 /* ── Move destination picker ──────────────────────────────────────────────── */
 .move-picker-list {

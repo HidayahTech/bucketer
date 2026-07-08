@@ -350,6 +350,85 @@ describe('runDeleteOperation — throttling retry', () => {
   }));
 });
 
+// ── Cooperative cancellation ──────────────────────────────────────────────────
+
+describe('runDeleteOperation — cooperative cancel', () => {
+  test('shouldCancel=true after the first batch group stops before the next group', async () => {
+    // 8001 keys → 9 batches of ≤1000 → 2 groups (8 + 1). Cancel flips true
+    // during the first group, so the 9th batch must never be sent.
+    const keys = Array.from({ length: 8001 }, (_, i) => `k${i}.txt`);
+    const deleteResults = Array.from({ length: 9 }, () => ({ errors: [] }));
+    const client = mockClient({ deleteResults });
+    let cancelled = false;
+    const updates = [];
+    await runDeleteOperation(client, 'b', { files: keys, prefixes: [] }, (u) => {
+      updates.push({ ...u });
+      cancelled = true; // first incremental update flips the flag
+    }, () => cancelled);
+
+    const done = updates.find(u => u.phase === 'done');
+    assert.equal(done.cancelled, true);
+    assert.equal(done.deleted, 8000, 'first group of 8 batches completed; 9th skipped');
+  });
+
+  test('cancel during discovery finishes with nothing deleted and cancelled=true', async () => {
+    const listPages = new Map([['p/', [{ keys: ['p/a.txt'] }]]]);
+    const client = mockClient({ listPages, deleteResults: [{ errors: [] }] });
+    const updates = [];
+    // Cancelled from the start: discovery workers stop claiming, run ends early.
+    await runDeleteOperation(client, 'b', { files: [], prefixes: ['p/'] },
+      u => updates.push({ ...u }), () => true);
+    const done = updates.find(u => u.phase === 'done');
+    assert.equal(done.cancelled, true);
+    assert.equal(done.deleted, 0);
+    assert.deepEqual(done.deletedPrefixes, []);
+  });
+
+  test('a cancelled run never lists a partially-deleted prefix in deletedPrefixes', async () => {
+    // Prefix with 8001 keys spanning 2 batch groups; cancel after group 1 →
+    // some keys undeleted → the prefix must NOT be reported as fully deleted.
+    const keys = Array.from({ length: 8001 }, (_, i) => `p/k${i}.txt`);
+    const listPages = new Map([['p/', [{ keys }]]]);
+    const deleteResults = Array.from({ length: 9 }, () => ({ errors: [] }));
+    const client = mockClient({ listPages, deleteResults });
+    let cancelled = false;
+    const updates = [];
+    await runDeleteOperation(client, 'b', { files: [], prefixes: ['p/'] }, (u) => {
+      updates.push({ ...u });
+      if (u.deletedKeys?.length) cancelled = true;
+    }, () => cancelled);
+    const done = updates.find(u => u.phase === 'done');
+    assert.equal(done.cancelled, true);
+    assert.deepEqual(done.deletedPrefixes, [], 'partially-deleted prefix must not be reported complete');
+  });
+
+  test('uncancelled runs report cancelled=false and unchanged behavior', async () => {
+    const client = mockClient({ deleteResults: [{ errors: [] }] });
+    const updates = [];
+    await runDeleteOperation(client, 'b', { files: ['a.txt'], prefixes: [] },
+      u => updates.push({ ...u }));
+    const done = updates.find(u => u.phase === 'done');
+    assert.equal(done.cancelled, false);
+    assert.equal(done.deleted, 1);
+  });
+
+  test('cancel arriving during the final batch group reports cancelled=false (nothing skipped)', async () => {
+    // 2000 keys → 2 batches → ONE group (min(8, 2)). The flag flips as soon as
+    // deletions start reporting, but no further group exists to skip.
+    const keys = Array.from({ length: 2000 }, (_, i) => `k${i}.txt`);
+    const client = mockClient({ deleteResults: [{ errors: [] }, { errors: [] }] });
+    let cancelled = false;
+    const updates = [];
+    await runDeleteOperation(client, 'b', { files: keys, prefixes: [] }, (u) => {
+      updates.push({ ...u });
+      if (u.deletedKeys?.length) cancelled = true;
+    }, () => cancelled);
+    const done = updates.find(u => u.phase === 'done');
+    assert.equal(done.cancelled, false, 'nothing was skipped, so the run is done, not cancelled');
+    assert.equal(done.deleted, 2000);
+  });
+});
+
 // ── Batch chunking ────────────────────────────────────────────────────────────
 
 describe('runDeleteOperation — batch chunking', () => {

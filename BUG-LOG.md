@@ -4,6 +4,48 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-037 — Cancelling a delete/move during its final batch group falsely reports "Cancelled"
+
+**Date:** 2026-07-08
+
+**Symptom:**
+When the master-queue cancellation feature (v1.35.0) was first wired, a delete or move that received a cancel request while its *last* batch group was already in flight completed all its work but reported the operation as **cancelled** — the row read "Cancelled — deleted N of N" for an operation where nothing was actually skipped. Users would think objects were left behind when the operation had in fact finished cleanly.
+
+**Root cause:**
+The delete engine's batch loop checked `shouldCancel()` after each group of `CONCURRENCY` batches and, if true, set `cancelled = true` and broke. When the request arrived during the final group, the check fired after that group completed — but the loop was about to exit anyway, so `cancelled` was set despite zero remaining work. The contract is that `cancelled: true` must mean work was genuinely skipped.
+
+**Fix:**
+Guard the flag with a remaining-work check: `if (shouldCancel() && i + CONCURRENCY < batches.length) { cancelled = true; break; }`. A cancel during the final group now reports `cancelled: false` (a clean completion). The move/copy engine's per-item worker model was already correct by construction (it checks at claim time, so once all items are claimed the workers exit via the loop condition without flipping the flag).
+
+**Why it wasn't caught earlier:**
+The feature was new; the first cancellation tests only exercised a cancel arriving with multiple groups still pending (the common case), where the flag is correct. The single-group / final-group boundary is the edge that the "check after the group" structure got wrong.
+
+**Test case:**
+`test/delete-queue.test.js` — "cancel arriving during the final batch group reports cancelled=false (nothing skipped)": 2000 keys → one batch group; the cancel flag flips as soon as deletions report, but no further group exists to skip, so `done.cancelled === false` and `done.deleted === 2000`.
+
+---
+
+## BUG-036 — Task store notifies subscribers twice when a task with pending progress is removed
+
+**Date:** 2026-07-08
+
+**Symptom:**
+Removing (dismissing) a master-queue task that still had a coalesced progress update pending fired the store's subscribers **twice** for one logical removal — once with the task still present (the flushed pending patch) and once with it gone. A single "Dismiss" produced two React renders; the intermediate render briefly showed the task with stale progress.
+
+**Root cause:**
+`remove(id)` calls `batcher.flush()` first (to apply any pending patches before dropping the task, so a queued patch can't resurrect a removed entry), then filters the task out and calls `emit()`. The internal `setItems` adapter passed to the update-batcher itself calls `emit()`, so when pending patches existed the flush emitted once and the subsequent filter emitted again.
+
+**Fix:**
+Add a `suppressEmit` flag set around the internal flush inside `remove()`: the pre-remove flush applies pending patches silently, and the single post-filter `emit()` is the one notification. `remove()` is one logical event and now notifies exactly once. The flag is reset before the notifying `emit()` and cannot leak (the only code between set and reset is a pure array patch-merge that cannot throw in practice).
+
+**Why it wasn't caught earlier:**
+The store was brand-new; the initial "update for a removed task is dropped" test only asserted final store contents (`get().length === 0`), never the subscriber call count, so the extra notification was invisible to it.
+
+**Test case:**
+`test/task-store.test.js` — "remove with pending updates notifies subscribers exactly once": add a task, subscribe, queue a non-urgent `update`, then `remove`; assert the subscriber received exactly `[1, 0]` (one notification for the removal, none for the flushed patch).
+
+---
+
 ## BUG-035 — ReferenceError on multipart completion for the non-probe path (manual mode, small multipart, sharded)
 
 **Date:** 2026-06-30

@@ -1,9 +1,22 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.34.0';
+export const CURRENT_VERSION = '1.35.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.35.0",
+    "date": "2026-07-08",
+    "title": "Master queue: unified operations panel with cancellation",
+    "changes": [
+      "**New:** a unified operations panel replaces the separate delete and move panels — one",
+      "**New:** delete, move, and copy operations can now be **cancelled mid-run**. Cancellation",
+      "**New:** \"Dismiss all finished\" bulk action once two or more operations have settled.",
+      "**Changed:** finished operation rows now **persist until dismissed** instead of",
+      "**Fixed (hardening):** a cancelled folder delete/move can no longer report the folder as",
+      "Internal: new module-level task store with animation-frame-batched progress updates"
+    ]
+  },
   {
     "version": "1.34.0",
     "date": "2026-07-01",

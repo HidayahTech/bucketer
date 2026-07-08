@@ -7,6 +7,28 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.35.0] — 2026-07-08 — Master queue: unified operations panel with cancellation
+
+Phase 1 of the master-queue unification (`docs/intent/master-queue.md`): delete and
+move/copy operations now share one panel, one store, and one visual language — the
+foundation later phases (version purge, duplicate deletion, uploads) will build on.
+
+- **New:** a unified operations panel replaces the separate delete and move panels — one
+  row per operation with progress, expandable per-item error details, and controls.
+- **New:** delete, move, and copy operations can now be **cancelled mid-run**. Cancellation
+  is cooperative: work already in flight completes (Cancel stops at the next batch), and the
+  row reports exactly how much was done, e.g. "Cancelled — deleted 3,000 of 18,400".
+- **New:** "Dismiss all finished" bulk action once two or more operations have settled.
+- **Changed:** finished operation rows now **persist until dismissed** instead of
+  disappearing after 3 seconds — a delete result is evidence, not a fleeting notification.
+  Success toasts are unchanged.
+- **Fixed (hardening):** a cancelled folder delete/move can no longer report the folder as
+  fully completed — completion now requires every object confirmed deleted/moved, not merely
+  the absence of errors.
+- Internal: new module-level task store with animation-frame-batched progress updates
+  (delete/move progress no longer re-renders per object); delete confirmation extracted to a
+  pre-queue modal; the duplicated delete/move panel CSS and JSX were consolidated.
+
 ## [1.34.0] — 2026-07-01 — Multi-origin sharding: add Wasabi
 
 - **Wasabi now supports parallel upload connections** (on by default), joining Backblaze B2 and AWS S3.
