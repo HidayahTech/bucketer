@@ -8,3 +8,6 @@ perf/index.html
 
 # Claude Code scratch (transient, never committed)
 .claude-scratch/
+
+# aider tool artifacts
+.aider*
