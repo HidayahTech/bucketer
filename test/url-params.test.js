@@ -160,6 +160,21 @@ describe('readUrlParams', () => {
     loc.hash = '#bucket=my-valid-bucket-123';
     assert.equal(readUrlParams().bucket, 'my-valid-bucket-123');
   });
+
+  test('reads a valid keyId from the hash', () => {
+    loc.hash = '#keyId=AKID0123456789';
+    assert.equal(readUrlParams().keyId, 'AKID0123456789');
+  });
+
+  test('ignores a keyId containing whitespace', () => {
+    loc.hash = '#keyId=AKID+with+spaces';
+    assert.equal(readUrlParams().keyId, undefined);
+  });
+
+  test('ignores a keyId longer than 128 chars', () => {
+    loc.hash = '#keyId=' + 'A'.repeat(129);
+    assert.equal(readUrlParams().keyId, undefined);
+  });
 });
 
 describe('hasUrlParams', () => {
@@ -182,6 +197,11 @@ describe('hasUrlParams', () => {
   test('false when hash contains only unrecognised params', () => {
     loc.hash = '#foo=bar';
     assert.equal(hasUrlParams(), false);
+  });
+
+  test('true when only keyId is present', () => {
+    loc.hash = '#keyId=AKID123';
+    assert.equal(hasUrlParams(), true);
   });
 });
 

@@ -38,6 +38,12 @@ export function readUrlParams() {
     // a vector for corrupting the provider field.
     if (v && v.length <= 20 && !/\s/.test(v)) out.provider = v;
   }
+  if (p.has('keyId')) {
+    const v = p.get('keyId');
+    // Access key IDs are short identifiers with no whitespace. Reject overlong or
+    // whitespace-bearing values so a crafted link cannot inject free text into the form.
+    if (v && v.length <= 128 && !/\s/.test(v)) out.keyId = v;
+  }
   if (p.has('region'))   out.regionOverride = p.get('region');
   return out;
 }
@@ -45,7 +51,7 @@ export function readUrlParams() {
 // True when at least one config param is present in the current hash.
 export function hasUrlParams() {
   const p = hashParams();
-  return ['endpoint', 'bucket', 'provider', 'region'].some(k => p.has(k));
+  return ['endpoint', 'bucket', 'provider', 'region', 'keyId'].some(k => p.has(k));
 }
 
 // Build a shareable URL with the connection config in the hash. The secret key is
