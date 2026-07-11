@@ -7,9 +7,39 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createMockS3 } from './mock-s3/server.mjs';
 import { createS3Client } from '../../src/lib/s3-client.js';
+import { chromium, firefox, webkit, devices } from 'playwright';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const BUCKET = 'test-bucket';
+
+// ── Cross-engine + mobile matrix ────────────────────────────────────────────
+// Browser specs launch via launchBrowser()/newE2EContext() instead of hardcoding
+// chromium, so the whole suite runs across engines and device profiles. The engine
+// and device are selected by env vars the matrix runner (run.mjs) sets:
+//   E2E_ENGINE = chromium | firefox | webkit   (default chromium)
+//   E2E_DEVICE = a playwright.devices key, e.g. "Pixel 5" / "iPhone 13"  (default desktop)
+const ENGINES = { chromium, firefox, webkit };
+
+export function e2eEngineName() { return process.env.E2E_ENGINE || 'chromium'; }
+
+export function e2eDeviceName() { return process.env.E2E_DEVICE || null; }
+
+// Launch the selected engine. Throws if the engine binary/deps are missing — the runner
+// pre-flights and skips such engines, so this only throws when a spec is run directly.
+export function launchBrowser(opts = {}) {
+  const name = e2eEngineName();
+  const engine = ENGINES[name];
+  if (!engine) throw new Error(`Unknown E2E_ENGINE "${name}" (use chromium|firefox|webkit)`);
+  return engine.launch({ headless: true, ...opts });
+}
+
+// New context, applying the selected mobile device profile (viewport, UA, touch) when set.
+export function newE2EContext(browser, extra = {}) {
+  const dev = e2eDeviceName();
+  const profile = dev ? devices[dev] : null;
+  if (dev && !profile) throw new Error(`Unknown E2E_DEVICE "${dev}"`);
+  return browser.newContext({ ...(profile || {}), ...extra });
+}
 
 // Boot a mock S3 server on an ephemeral port and return it plus a real S3 client (built via
 // the app's own createS3Client) pointed at it. provider 'minio' forces path-style addressing.

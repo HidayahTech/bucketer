@@ -4,17 +4,16 @@
 // node --test + the `playwright` library (no @playwright/test framework). Requires a prior build.
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { chromium } from 'playwright';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET } from '../harness.mjs';
+import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext } from '../harness.mjs';
 
 let ctx, app, browser, context, page;
 
 before(async () => {
   ctx = await startMock();
   app = await startAppServer();
-  browser = await chromium.launch({ headless: true });
-  context = await browser.newContext();
+  browser = await launchBrowser();
+  context = await newE2EContext(browser);
   page = await context.newPage();
   page.on('pageerror', (e) => process.stderr.write(`[page error] ${e.message}\n`));
 });
