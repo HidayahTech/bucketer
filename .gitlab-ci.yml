@@ -21,21 +21,55 @@ test:
     expire_in: 1 day
     when: on_success
 
-# End-to-end tests against the in-repo stateful mock S3 server: the node-integration layer
-# (real lib functions over HTTP) and the browser layer (Playwright drives the built UI). The
-# Playwright image ships Chromium, so no browser download is needed. allow_failure keeps this
-# non-blocking while it stabilizes; flip it to required once it has a green track record.
-e2e:
+# End-to-end tests against the in-repo stateful mock S3. Split into the engine-agnostic
+# node-integration layer and a cross-engine + mobile browser matrix. The Playwright image
+# ships chromium+firefox+webkit with their deps, so all three run in CI (WebKit cannot run on
+# a stock host — see GitLab #47). allow_failure keeps the matrix advisory while it stabilizes;
+# flip to required once it has a green track record. JUnit -> MR test summary; screenshots +
+# console logs are uploaded on failure.
+.e2e-base:
   stage: test
   image: mcr.microsoft.com/playwright:v1.60.0-jammy
   allow_failure: true
-  rules:                                    # skip on the mirror-relock schedule
+  interruptible: true
+  rules:
     - if: '$RELOCK_MIRROR == "true"'
       when: never
     - when: on_success
-  script:
+  cache:
+    key:
+      files: [package-lock.json]
+    paths: [node_modules/]
+  variables:
+    E2E_JUNIT: "1"
+  before_script:
     - npm ci
-    - npm run test:e2e
+  artifacts:
+    when: always
+    reports:
+      junit: junit-e2e.xml
+    expire_in: 1 week
+
+e2e-node:
+  extends: .e2e-base
+  script:
+    - npm run test:e2e node
+
+e2e-browser:
+  extends: .e2e-base
+  parallel:
+    matrix:
+      - E2E_ENGINE: [chromium, firefox, webkit]
+        E2E_DEVICE: ["", "Pixel 5", "iPhone 13"]
+  script:
+    - npm run test:e2e browser
+  artifacts:
+    when: always
+    reports:
+      junit: junit-e2e.xml
+    paths:
+      - test/e2e/artifacts/
+    expire_in: 1 week
 
 # Re-applies the GitHub mirror's `collaborators_only` interaction limit, which GitHub auto-expires
 # after 6 months (there is no permanent setting on a public, non-archived repo). Runs ONLY from a
