@@ -3,10 +3,10 @@
 // opens the preview, and asserts the browser's PDF viewer actually renders INSIDE the
 // iframe (a canvas/page element appears). Runs across engines via the matrix (E2E_ENGINE);
 // in Firefox this fails on the old sandbox="" and passes on sandbox="allow-scripts".
-import { test, describe, before, after } from 'node:test';
+import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, e2eEngineName } from '../harness.mjs';
+import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest, e2eEngineName } from '../harness.mjs';
 
 // A minimal but valid single-page PDF. pdf.js reconstructs the xref if needed and renders
 // a blank page — enough for the viewer (canvas/page) to appear when scripts are allowed.
@@ -25,12 +25,12 @@ before(async () => {
   app = await startAppServer();
   browser = await launchBrowser();
   context = await newE2EContext(browser);
-  page = await context.newPage();
+  page = await newE2EPage(context);
 });
 after(async () => { await browser?.close(); await app?.close(); await ctx?.mock.close(); });
 
 describe(`browser e2e — PDF preview renders (BUG #46) [${e2eEngineName()}]`, () => {
-  test('opening a PDF renders the viewer inside the sandboxed iframe', async () => {
+  e2eTest('opening a PDF renders the viewer inside the sandboxed iframe', async () => {
     await ctx.client.send(new PutObjectCommand({
       Bucket: BUCKET, Key: 'doc.pdf', Body: MINIMAL_PDF, ContentType: 'application/pdf',
     }));

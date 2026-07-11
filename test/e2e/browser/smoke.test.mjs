@@ -2,10 +2,10 @@
 // mock S3 server, exercising the full stack — credential connect, SigV4 + CORS over the wire,
 // upload, listing, and delete — and asserting BOTH the DOM and the actual mock bucket state.
 // node --test + the `playwright` library (no @playwright/test framework). Requires a prior build.
-import { test, describe, before, after } from 'node:test';
+import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext } from '../harness.mjs';
+import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest } from '../harness.mjs';
 
 let ctx, app, browser, context, page;
 
@@ -14,8 +14,7 @@ before(async () => {
   app = await startAppServer();
   browser = await launchBrowser();
   context = await newE2EContext(browser);
-  page = await context.newPage();
-  page.on('pageerror', (e) => process.stderr.write(`[page error] ${e.message}\n`));
+  page = await newE2EPage(context);
 });
 after(async () => {
   await browser?.close();
@@ -37,14 +36,14 @@ async function waitForKeys(expected, timeout = 10000) {
 }
 
 describe('browser e2e — connect, upload, list, delete', () => {
-  test('connects to the mock through the real credential flow (CORS + SigV4)', async () => {
+  e2eTest('connects to the mock through the real credential flow (CORS + SigV4)', async () => {
     await page.goto(app.url, { waitUntil: 'domcontentloaded' });
     await connectApp(page, ctx.browserEndpoint);
     // Reaching the connected UI means the ListObjectsV2 probe succeeded over CORS.
     assert.ok(await page.locator('[data-testid="file-input"]').count() > 0, 'connected UI is shown');
   });
 
-  test('uploading a file stores it in the bucket and shows it in the listing', async () => {
+  e2eTest('uploading a file stores it in the bucket and shows it in the listing', async () => {
     await page.locator('[data-testid="file-input"]').setInputFiles({
       name: 'e2e-upload.txt', mimeType: 'text/plain', buffer: Buffer.from('hello from e2e'),
     });
@@ -56,7 +55,7 @@ describe('browser e2e — connect, upload, list, delete', () => {
     await page.getByText('e2e-upload.txt').first().waitFor({ timeout: 10000 });
   });
 
-  test('deleting the file removes it from the bucket and the listing', async () => {
+  e2eTest('deleting the file removes it from the bucket and the listing', async () => {
     const row = page.locator('tr.file-row', { hasText: 'e2e-upload.txt' });
     await row.locator('button[title="Delete"]').click({ force: true });
     // DeleteConfirmModal → confirm, then wait for the modal to close (confirm fired).

@@ -13,7 +13,7 @@ import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { devices } from 'playwright';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest, applyEngineQuirks, e2eEngineName } from '../harness.mjs';
+import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EPage, e2eTest, applyEngineQuirks, e2eEngineName } from '../harness.mjs';
 
 let ctx, app, browser;
 before(async () => {
