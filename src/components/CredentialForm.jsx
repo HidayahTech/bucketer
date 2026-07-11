@@ -1,5 +1,5 @@
 // Copyright (C) 2026 HidayahTech, LLC
-import { useState, useRef } from 'preact/hooks';
+import { useState, useRef, useEffect } from 'preact/hooks';
 import { detectProvider, extractRegion, buildEndpoint, PROVIDERS, PROVIDER_LABELS } from '../lib/provider.js';
 import { credentialErrors } from '../lib/credential-validation.js';
 import { SetupGuide } from './SetupGuide.jsx';
@@ -26,7 +26,7 @@ const PROVIDER_OPTIONS = [
   ...Object.entries(PROVIDER_LABELS).map(([v, l]) => ({ value: v, label: l })),
 ];
 
-export function CredentialForm({ initial, onSave, onFormChange, loading }) {
+export function CredentialForm({ initial, onSave, onFormChange, loading, autoFocusSecret }) {
   // Only treat stored provider as an explicit override if it differs from what
   // auto-detection returns for the stored endpoint. Auto-detected providers should
   // leave the dropdown at "Auto-detect from endpoint".
@@ -69,6 +69,13 @@ export function CredentialForm({ initial, onSave, onFormChange, loading }) {
     _infRegion:       !!(_initExtractedRegion &&
                         (!initial.regionOverride || initial.regionOverride === _initExtractedRegion)),
   });
+
+  // When a shared link pre-filled the key ID, focus the Secret Key field on mount so
+  // the recipient can type the one remaining value and connect.
+  const secretRef = useRef(null);
+  useEffect(() => {
+    if (autoFocusSecret) secretRef.current?.focus();
+  }, []);
 
   // applyChange: compute the next form state for a field change, including all
   // inference side-effects. Called by both `set` (input) and `onPaste`.
@@ -274,6 +281,7 @@ export function CredentialForm({ initial, onSave, onFormChange, loading }) {
         <label htmlFor="cred-secretkey">Secret Key</label>
         <input
           id="cred-secretkey"
+          ref={secretRef}
           type="password"
           value={form.secretKey}
           onInput={set('secretKey')}

@@ -88,6 +88,9 @@ export function App() {
   const [liveFormData, setLiveFormData] = useState(credentials);
   const [updateCheckEnabled, setUpdateCheckEnabled] = useState(() => loadUpdateCheckEnabled());
   const [prefetchSizeLimit, setPrefetchSizeLimit] = useState(() => loadPrefetchSizeLimit());
+  // True when the incoming share link pre-filled the access key ID — used to focus the
+  // Secret Key field and adapt the pre-fill banner. Computed once from the URL hash.
+  const [urlHadKeyId] = useState(() => !!readUrlParams().keyId);
   const [profiles, setProfiles] = useState(() => loadProfiles().profiles);
   // Delete requests confirm BEFORE entering the master queue (a queued task is
   // always already authorized). One pending request at a time; a new request
@@ -425,7 +428,9 @@ export function App() {
             {urlParamsPresent && (
               <div class="banner banner-info" style={{ marginBottom: '1rem' }}>
                 <div class="banner-body">
-                  Endpoint and bucket pre-filled from URL — enter your Key ID and Secret Key to connect.
+                  {urlHadKeyId
+                    ? 'Connection details pre-filled from URL — enter your Secret Key to connect.'
+                    : 'Endpoint and bucket pre-filled from URL — enter your Key ID and Secret Key to connect.'}
                 </div>
               </div>
             )}
@@ -435,6 +440,7 @@ export function App() {
               onSave={handleConnect}
               onFormChange={setLiveFormData}
               loading={session === 'connecting'}
+              autoFocusSecret={urlHadKeyId && !credentials.secretKey}
             />
             {session === 'failed' && connectionError && (
               <div style={{ marginTop: '1rem' }}>

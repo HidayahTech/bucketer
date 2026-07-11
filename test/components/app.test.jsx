@@ -63,3 +63,29 @@ describe('App — disconnected state', () => {
     clearAppStorage();
   });
 });
+
+describe('App — shared-link pre-fill banner', () => {
+  test('with a key ID in the URL, banner prompts for only the Secret Key', () => {
+    clearAppStorage();
+    window.location.hash = '#endpoint=https%3A%2F%2Fs3.example.com&bucket=my-bucket&keyId=AKID999';
+    const { text, cleanup } = mount(h(App, {}));
+    try {
+      assert.ok(text().includes('enter your Secret Key to connect'),
+        'banner must prompt for only the Secret Key when the link supplied a key ID');
+    } finally {
+      cleanup(); window.location.hash = ''; clearAppStorage();
+    }
+  });
+
+  test('without a key ID in the URL, banner prompts for Key ID and Secret Key', () => {
+    clearAppStorage();
+    window.location.hash = '#endpoint=https%3A%2F%2Fs3.example.com&bucket=my-bucket';
+    const { text, cleanup } = mount(h(App, {}));
+    try {
+      assert.ok(text().includes('enter your Key ID and Secret Key'),
+        'banner must prompt for both fields when the link omitted the key ID');
+    } finally {
+      cleanup(); window.location.hash = ''; clearAppStorage();
+    }
+  });
+});

@@ -285,3 +285,22 @@ describe('CredentialForm — form submission', () => {
     } finally { cleanup(); }
   });
 });
+
+describe('CredentialForm — autofocus secret', () => {
+  test('focuses the Secret Key field on mount when autoFocusSecret is set', async () => {
+    const initial = { endpoint: 'https://s3.example.com', bucket: 'b', keyId: 'AKID', secretKey: '', provider: null, regionOverride: '' };
+    const { query, cleanup } = mount(h(CredentialForm, defaultProps({ initial, autoFocusSecret: true })));
+    try {
+      await new Promise(r => setTimeout(r, 0));
+      assert.equal(document.activeElement, query('#cred-secretkey'), 'secret field must be focused');
+    } finally { cleanup(); }
+  });
+
+  test('does NOT focus the Secret Key field when autoFocusSecret is falsy', async () => {
+    const { query, cleanup } = mount(h(CredentialForm, defaultProps()));
+    try {
+      await new Promise(r => setTimeout(r, 0));
+      assert.notEqual(document.activeElement, query('#cred-secretkey'), 'secret field must not be auto-focused');
+    } finally { cleanup(); }
+  });
+});
