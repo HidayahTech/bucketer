@@ -132,6 +132,22 @@ serve.mjs               # Dev server (builds then serves on localhost:3000)
 dist/index.html         # Build output (committed for auditability)
 ```
 
+### Cross-engine e2e
+
+The browser e2e suite runs across engines and mobile profiles, selected by env vars:
+
+```bash
+npm run test:e2e                              # chromium desktop (also the pre-push gate)
+E2E_ENGINE=firefox npm run test:e2e browser   # firefox
+E2E_ENGINE=webkit  npm run test:e2e browser   # webkit (needs system deps; see below)
+E2E_ENGINE=chromium E2E_DEVICE="Pixel 5" npm run test:e2e browser   # mobile profile
+```
+
+`E2E_ENGINE` ∈ `chromium|firefox|webkit`; `E2E_DEVICE` is a Playwright device name (empty =
+desktop). GitLab CI runs the full 3×3 matrix on the official Playwright image. WebKit needs
+system libraries that a stock host lacks — run the full matrix locally in a container instead
+(GitLab #47). On-failure screenshots + console logs land in `test/e2e/artifacts/`.
+
 ---
 
 ## Deployment
