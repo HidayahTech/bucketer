@@ -914,6 +914,7 @@ details[open] .sv-summary::before { transform: rotate(90deg); }
   gap: .4rem;
 }
 .copy-link-popover--up { top: auto; bottom: calc(100% + 4px); }
+.share-link-menu .btn { width: 100%; justify-content: flex-start; text-align: left; }
 .copy-link-presets { display: flex; gap: .3rem; flex-wrap: wrap; }
 .copy-link-custom { display: flex; gap: .3rem; align-items: center; }
 .copy-link-num {
