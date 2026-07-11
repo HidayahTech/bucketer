@@ -25,8 +25,8 @@ test:
 # node-integration layer and a cross-engine + mobile browser matrix. The Playwright image
 # ships chromium+firefox+webkit with their deps, so all three run in CI (WebKit cannot run on
 # a stock host — see GitLab #47). allow_failure keeps the matrix advisory while it stabilizes;
-# flip to required once it has a green track record. JUnit -> MR test summary; screenshots +
-# console logs are uploaded on failure.
+# flip to required once it has a green track record. JUnit -> MR test summary; the browser
+# jobs also upload on-failure screenshots + console logs (artifacts, when: always).
 .e2e-base:
   stage: test
   image: mcr.microsoft.com/playwright:v1.60.0-jammy

@@ -27,8 +27,8 @@ export function e2eEngineName() { return process.env.E2E_ENGINE || 'chromium'; }
 
 export function e2eDeviceName() { return process.env.E2E_DEVICE || null; }
 
-// Launch the selected engine. Throws if the engine binary/deps are missing — the runner
-// pre-flights and skips such engines, so this only throws when a spec is run directly.
+// Launch the selected engine. Throws if the engine's binary/deps are missing (e.g. WebKit on
+// a stock host — see GitLab #47); in CI the Playwright image ships all three engines + deps.
 export function launchBrowser(opts = {}) {
   const name = e2eEngineName();
   const engine = ENGINES[name];

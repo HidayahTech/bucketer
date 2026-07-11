@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, existsSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, existsSync, readFileSync, rmSync, writeFileSync as writeFileSyncStub } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { applyEngineQuirks } from './e2e/engine-quirks.mjs';
@@ -48,5 +48,3 @@ describe('captureFailure', () => {
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });
-
-import { writeFileSync as writeFileSyncStub } from 'node:fs';
