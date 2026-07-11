@@ -46,7 +46,13 @@ try {
   // Serialize test files (--test-concurrency=1): the browser specs each launch Chromium, and
   // running them concurrently overloads the machine and causes timeout flakes. Serial is slower
   // but deterministic — the right trade for browser e2e.
-  run(['--test', '--test-concurrency=1', ...files]);
+  // In CI (E2E_JUNIT=1) emit a JUnit report for the MR test-summary widget, while keeping the
+  // human-readable spec output on stdout. node:test supports multiple reporters (Node >=20).
+  const reporters = process.env.E2E_JUNIT === '1'
+    ? ['--test-reporter=spec', '--test-reporter-destination=stdout',
+       '--test-reporter=junit', '--test-reporter-destination=junit-e2e.xml']
+    : [];
+  run(['--test', '--test-concurrency=1', ...reporters, ...files]);
 } catch (err) {
   process.exit(err.status ?? 1);
 }
