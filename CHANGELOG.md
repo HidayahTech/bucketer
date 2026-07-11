@@ -7,6 +7,20 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.37.0] — 2026-07-11 — Folder rename
+
+- **New:** rename a folder in place — a ✎ affordance on folder rows opens an inline editor
+  (like file rename). Because a folder can hold many objects, the rename runs as a
+  cancelable **"Rename"** task in the operations panel (per-object copy-then-delete through
+  the move pipeline) rather than blocking the row.
+- **Safe by default:** the rename is blocked if a folder with the new name already exists at
+  the same parent — inline if the sibling is visible, and authoritatively by the engine
+  (which refuses and copies nothing if the target prefix is occupied). No merging.
+- **Hardening:** object-name validation (shared by rename and folder creation) now rejects a
+  name that is exactly `.` or `..`. Names that merely contain `..` (e.g. `report..final.pdf`)
+  stay valid.
+- Closes #18.
+
 ## [1.36.1] — 2026-07-11 — Resilient bucket listing (transient-error retry)
 
 - **Fixed (reliability):** bucket listing — the initial load and "Load more" pagination —

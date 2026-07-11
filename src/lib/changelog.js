@@ -1,9 +1,20 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.36.1';
+export const CURRENT_VERSION = '1.37.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.37.0",
+    "date": "2026-07-11",
+    "title": "Folder rename",
+    "changes": [
+      "**New:** rename a folder in place — a ✎ affordance on folder rows opens an inline editor",
+      "**Safe by default:** the rename is blocked if a folder with the new name already exists at",
+      "**Hardening:** object-name validation (shared by rename and folder creation) now rejects a",
+      "Closes #18."
+    ]
+  },
   {
     "version": "1.36.1",
     "date": "2026-07-11",
