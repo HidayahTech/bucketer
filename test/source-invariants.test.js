@@ -1380,8 +1380,8 @@ describe('Browser.jsx — drag-and-drop move wiring (v1.26.0)', () => {
   });
 
   test('file and folder rows are draggable and wired to handleRowDragStart', () => {
-    assert.ok(/draggable=\{canMove\}/.test(source), 'folder rows must be draggable when moves are permitted');
-    assert.ok(/draggable=\{canMove && renamingKey/.test(source), 'file rows must be draggable (except while renaming)');
+    const draggableGated = source.match(/draggable=\{canMove && renamingKey/g) || [];
+    assert.equal(draggableGated.length, 2, 'both folder and file rows must be draggable, gated off while renaming that row');
     assert.ok(/onDragStart=\{e => handleRowDragStart/.test(source), 'rows must wire onDragStart to handleRowDragStart');
   });
 

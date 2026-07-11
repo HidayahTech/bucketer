@@ -503,6 +503,28 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     }
   }
 
+  function startFolderRename(cp) {
+    setRenamingKey(cp);
+    setRenameValue(leafName(cp.slice(0, -1)));
+    setRenameError(null);
+  }
+
+  // Folder rename dispatches to the move queue (a folder can hold many objects) rather
+  // than blocking inline. The queued task shows progress; the row is removed on success
+  // via the existing movedPrefixes handling.
+  function commitFolderRename(oldPrefix) {
+    const newName = renameValue.trim();
+    const nameErr = validateObjectName(newName);
+    if (nameErr) { setRenameError(nameErr); return; }
+    if (newName === leafName(oldPrefix.slice(0, -1))) { setRenamingKey(null); return; }
+    if (commonPrefixes.includes(prefix + newName + '/')) {
+      setRenameError('A folder with that name already exists.');
+      return;
+    }
+    setRenamingKey(null);
+    onMoveRequest?.({ prefixes: [oldPrefix], renameTo: newName, mode: 'rename', capturedPrefix: prefix });
+  }
+
   function handleTableCopyLinkCopied(key) {
     setTableCopied(key);
     setTimeout(() => setTableCopied(k => k === key ? null : k), 2000);
@@ -1132,7 +1154,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                     data-testid={`folder-row:${cp.slice(prefix.length).replace(/\/$/, '')}`}
                     onClick={() => navigateTo(cp)}
                     style={{ cursor: 'pointer' }}
-                    draggable={canMove}
+                    draggable={canMove && renamingKey !== cp}
                     onDragStart={e => handleRowDragStart({ prefix: cp }, e)}
                     onDragEnd={handleRowDragEnd}
                     onDragOver={e => handleTargetDragOver(cp, e)}
@@ -1144,12 +1166,38 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                     </td>
                     <td class="col-name">
                       <span class="file-icon">📁</span>
-                      <span class="file-dir">{cp.slice(prefix.length).replace(/\/$/, '')}</span>
+                      {renamingKey === cp ? (
+                        <span class="rename-inline">
+                          <input
+                            class="rename-input"
+                            value={renameValue}
+                            onInput={e => { setRenameValue(e.target.value); setRenameError(null); }}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') commitFolderRename(cp);
+                              if (e.key === 'Escape') setRenamingKey(null);
+                            }}
+                            autoFocus
+                            onClick={e => e.stopPropagation()}
+                          />
+                          {renameError && <span class="rename-error">{renameError}</span>}
+                          <button class="btn btn-ghost btn-sm" onClick={e => { e.stopPropagation(); commitFolderRename(cp); }}>✓</button>
+                          <button class="btn btn-ghost btn-sm" onClick={e => { e.stopPropagation(); setRenamingKey(null); }}>✕</button>
+                        </span>
+                      ) : (
+                        <span class="file-dir">{cp.slice(prefix.length).replace(/\/$/, '')}</span>
+                      )}
                     </td>
                     <td class="col-size">—</td>
                     <td class="col-modified"></td>
                     <td class="col-file-modified"></td>
                     <td class="col-actions">
+                      <button
+                        class="btn btn-ghost btn-sm"
+                        style={{ marginRight: '.25rem' }}
+                        onClick={e => { e.stopPropagation(); startFolderRename(cp); }}
+                        disabled={!canMove}
+                        title={!canMove ? 'Rename not permitted with current credentials' : 'Rename folder'}
+                      >✎</button>
                       <button
                         class="btn btn-ghost btn-sm"
                         style={{ marginRight: '.25rem' }}
