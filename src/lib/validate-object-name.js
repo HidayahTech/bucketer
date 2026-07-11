@@ -16,5 +16,10 @@
 export function validateObjectName(name) {
   if (!name || !String(name).trim()) return 'Name cannot be empty.';
   if (String(name).includes('/')) return 'Name cannot contain slashes.';
+  // Reject a degenerate path-segment name. S3 keys are opaque (not a filesystem), so this
+  // is defense-in-depth against confusing keys, not a traversal fix — and only the EXACT
+  // '.'/'..' are rejected: names that merely contain '..' (e.g. 'report..final.pdf') stay valid.
+  const trimmed = String(name).trim();
+  if (trimmed === '.' || trimmed === '..') return 'Name cannot be "." or "..".';
   return null;
 }

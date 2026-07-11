@@ -40,4 +40,21 @@ describe('validateObjectName', () => {
       assert.equal(validateObjectName(name), null, `'${name}' should be valid`);
     }
   });
+
+  // Security hardening: reject a name that is exactly '.' or '..' (a degenerate path
+  // segment). S3 keys are opaque strings so this is NOT a filesystem traversal, but a
+  // folder/file literally named '.' or '..' produces confusing keys. Names that merely
+  // CONTAIN '..' (e.g. 'report..final.pdf') are legitimate and MUST stay valid.
+  test('rejects a name that is exactly "." or ".."', () => {
+    assert.ok(validateObjectName('.'), '"." must be rejected');
+    assert.ok(validateObjectName('..'), '".." must be rejected');
+    assert.ok(validateObjectName('  ..  '), 'trimmed ".." must be rejected');
+  });
+
+  test('allows legitimate names that merely contain ".." or dots', () => {
+    assert.equal(validateObjectName('report..final.pdf'), null);
+    assert.equal(validateObjectName('v1..2.txt'), null);
+    assert.equal(validateObjectName('file.txt'), null);
+    assert.equal(validateObjectName('...leading'), null);
+  });
 });
