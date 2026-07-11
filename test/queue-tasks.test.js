@@ -45,6 +45,20 @@ describe('createTransferTask', () => {
   });
 });
 
+describe('createTransferTask — rename', () => {
+  test('builds a rename task with a "old → new" subject', () => {
+    const t = createTransferTask({ files: [], prefixes: ['photos/2024/'], renameTo: 'memories', capturedPrefix: 'photos/', bucket: 'b', mode: 'rename' });
+    assert.equal(t.kind, 'rename');
+    assert.equal(t.subject, '2024 → memories');
+    assert.equal(t.renameTo, 'memories');
+    assert.deepEqual(t.prefixes, ['photos/2024/']);
+  });
+  test('move/copy tasks are unchanged', () => {
+    assert.equal(createTransferTask({ files: ['a'], prefixes: [], dest: 'd/', capturedPrefix: '', bucket: 'b', mode: 'move' }).kind, 'move');
+    assert.equal(createTransferTask({ files: ['a'], prefixes: [], dest: 'd/', capturedPrefix: '', bucket: 'b', mode: 'copy' }).kind, 'copy');
+  });
+});
+
 describe('engineUpdateToPatch', () => {
   test('phase transition maps to subPhase', () => {
     assert.deepEqual(engineUpdateToPatch({ phase: 'discovering' }, 'deleted'), { subPhase: 'discovering' });

@@ -176,3 +176,22 @@ describe('MasterQueue — interactions', () => {
     cleanup();
   });
 });
+
+describe('MasterQueue — rename', () => {
+  test('a running rename task shows "Renaming <old> → <new>"', () => {
+    const store = makeStore();
+    const id = store.add(createTransferTask({ files: [], prefixes: ['photos/2024/'], renameTo: 'memories', capturedPrefix: 'photos/', bucket: 'b', mode: 'rename' }));
+    store.update(id, { subPhase: 'moving', total: 3, current: 1 }, true);
+    const { text, cleanup } = mount(h(MasterQueue, { store }));
+    assert.ok(text().includes('Renaming 2024 → memories'), text());
+    cleanup();
+  });
+  test('a done rename task shows "Renamed <old> → <new>"', () => {
+    const store = makeStore();
+    const id = store.add(createTransferTask({ files: [], prefixes: ['photos/2024/'], renameTo: 'memories', capturedPrefix: 'photos/', bucket: 'b', mode: 'rename' }));
+    store.update(id, { status: 'done', subPhase: null }, true);
+    const { text, cleanup } = mount(h(MasterQueue, { store }));
+    assert.ok(text().includes('Renamed 2024 → memories'), text());
+    cleanup();
+  });
+});

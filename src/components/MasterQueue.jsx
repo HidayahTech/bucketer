@@ -15,6 +15,7 @@ const VERBS = {
   delete: { active: 'Deleting', done: 'Deleted' },
   move:   { active: 'Moving',   done: 'Moved' },
   copy:   { active: 'Copying',  done: 'Copied' },
+  rename: { active: 'Renaming', done: 'Renamed' },
 };
 
 function taskSummary(t) {

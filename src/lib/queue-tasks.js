@@ -5,6 +5,7 @@
 // vocabulary (deleted/moved counters, phase names); these pure functions
 // translate engine updates into task patches so the engines stay untouched
 // and independently testable.
+import { leafName } from './format.js';
 
 export function subjectLabel(fileCount, prefixCount) {
   return [
@@ -27,7 +28,21 @@ export function createDeleteTask({ files, prefixes, capturedPrefix, bucket }) {
   };
 }
 
-export function createTransferTask({ files, prefixes, dest, capturedPrefix, bucket, mode }) {
+export function createTransferTask({ files, prefixes, dest, capturedPrefix, bucket, mode, renameTo }) {
+  if (mode === 'rename') {
+    const oldLeaf = leafName(prefixes[0].slice(0, -1));
+    return {
+      kind: 'rename',
+      status: 'running',
+      subPhase: 'checking',
+      subject: `${oldLeaf} → ${renameTo}`,
+      files: [], prefixes, dest: capturedPrefix, renameTo, capturedPrefix, bucket,
+      current: 0, total: null,
+      errors: [],
+      collapsed: false,
+      cancelRequested: false,
+    };
+  }
   return {
     kind: mode === 'copy' ? 'copy' : 'move',
     status: 'running',
