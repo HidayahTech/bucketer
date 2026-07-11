@@ -50,8 +50,21 @@ describe('PreviewMedia — video', () => {
   });
 });
 
-// PDF renders an <iframe sandbox=""> — jsdom cannot render iframes without a stack overflow,
-// so that kind is exercised via manual/build testing rather than a unit test.
+describe('PreviewMedia — pdf (BUG #46: Firefox pdf.js needs scripts)', () => {
+  test('the PDF iframe sandbox permits scripts so Firefox pdf.js can render', () => {
+    const { query } = mount(<PreviewMedia kind="pdf" url={URL} alt="doc.pdf" />);
+    const iframe = query('iframe');
+    assert.ok(iframe, 'expected an iframe for PDF preview');
+    const sandbox = iframe.getAttribute('sandbox');
+    // Regression 039599b (v1.11.1, "Sandbox PDF preview iframe"): sandbox="" disables scripts,
+    // so Firefox's script-based pdf.js viewer cannot run and the preview is blank. The sandbox
+    // must be either absent or include allow-scripts.
+    assert.ok(
+      sandbox === null || sandbox.split(/\s+/).filter(Boolean).includes('allow-scripts'),
+      `PDF iframe sandbox must permit scripts for Firefox pdf.js; got sandbox="${sandbox}"`,
+    );
+  });
+});
 
 describe('PreviewMedia — text', () => {
   test('renders pre element containing the text', () => {

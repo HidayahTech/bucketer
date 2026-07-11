@@ -28,7 +28,15 @@ export function PreviewMedia({ kind, url, text, truncated, alt, pixelated, onLoa
     return <video controls src={url} class="preview-media" />;
   }
   if (kind === 'pdf' && url) {
-    return <iframe src={url} class="preview-pdf" title={alt ?? ''} sandbox="" />;
+    // sandbox="allow-scripts" (not "") so Firefox's script-based pdf.js viewer can render the
+    // PDF (BUG #46). Safe here despite allow-scripts because:
+    //   (1) the preview URL is presigned with ResponseContentType: 'application/pdf'
+    //       (usePreview.js), so the frame is always served AS a PDF — the browser hands it to
+    //       its PDF viewer and never interprets the bytes as executable HTML; and
+    //   (2) there is NO allow-same-origin, so any script runs in an opaque origin with no
+    //       access to our credentials (sessionStorage), cookies, DOM, or storage.
+    // allow-scripts also still blocks forms, top-navigation, popups, and plugins.
+    return <iframe src={url} class="preview-pdf" title={alt ?? ''} sandbox="allow-scripts" />;
   }
   if (kind === 'text' && text !== null && text !== undefined) {
     return (
