@@ -41,7 +41,7 @@ import { UploadQueue } from './UploadQueue.jsx';
 import { DeleteConfirmModal } from './DeleteConfirmModal.jsx';
 import { MasterQueue } from './MasterQueue.jsx';
 import { runDeleteOperation } from '../lib/delete-queue.js';
-import { runMoveOperation, runCopyOperation } from '../lib/move-queue.js';
+import { runMoveOperation, runCopyOperation, runRenameOperation } from '../lib/move-queue.js';
 import { taskStore } from '../lib/task-store.js';
 import { createDeleteTask, createTransferTask, engineUpdateToPatch } from '../lib/queue-tasks.js';
 import { CapabilityPanel } from './CapabilityPanel.jsx';
@@ -251,10 +251,10 @@ export function App() {
 
   // The MovePickerModal is the confirmation step, so a move/copy request starts
   // its task directly.
-  async function handleMoveRequest({ files, prefixes, dest, capturedPrefix, mode = 'move' }) {
-    const task = createTransferTask({ files, prefixes, dest, capturedPrefix, bucket: credentials.bucket, mode });
+  async function handleMoveRequest({ files, prefixes, dest, capturedPrefix, mode = 'move', renameTo }) {
+    const task = createTransferTask({ files, prefixes, dest, capturedPrefix, bucket: credentials.bucket, mode, renameTo });
     const id = taskStore.add(task);
-    const runOperation = mode === 'copy' ? runCopyOperation : runMoveOperation;
+    const runOperation = mode === 'rename' ? runRenameOperation : mode === 'copy' ? runCopyOperation : runMoveOperation;
     try {
       await runOperation(client, task.bucket, task, (update) => {
         // Remove moved source rows incrementally (copy+delete confirmed for those keys).
@@ -270,10 +270,10 @@ export function App() {
           browserActionsRef.current?.invalidateCache(task.dest);
           if (update.moved > 0) {
             handleCapabilityChange('upload', 'permitted');
-            if (mode === 'move') handleCapabilityChange('delete', 'permitted');
+            if (mode !== 'copy') handleCapabilityChange('delete', 'permitted');
           }
           if (update.errors.length === 0 && !update.cancelled) {
-            const verb = mode === 'copy' ? 'Copied' : 'Moved';
+            const verb = mode === 'copy' ? 'Copied' : mode === 'rename' ? 'Renamed' : 'Moved';
             showToast(`${verb} ${update.moved} item${update.moved === 1 ? '' : 's'}`);
           }
         }
