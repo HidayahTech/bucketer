@@ -66,3 +66,17 @@ export function freeFolderPrefix(folderTop, isTakenPrefix) {
     if (!isTakenPrefix(candidate)) return candidate;
   }
 }
+
+// Folder rename (#18): a folder relabeled at the same parent. renamedFolderPrefix computes
+// the target prefix; renameFolderKey prefix-swaps every key (including the 0-byte marker)
+// from the old prefix onto the new one.
+//   renamedFolderPrefix('photos/2024/', 'memories') -> 'photos/memories/'
+export function renamedFolderPrefix(oldPrefix, newName) {
+  return parentPrefix(oldPrefix.slice(0, -1)) + newName + '/';
+}
+
+//   renameFolderKey('photos/2024/', 'photos/2024/jan/a.jpg', 'photos/memories/')
+//     -> 'photos/memories/jan/a.jpg'
+export function renameFolderKey(oldPrefix, objectKey, newPrefix) {
+  return newPrefix + objectKey.slice(oldPrefix.length);
+}

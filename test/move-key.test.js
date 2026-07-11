@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { destKeyForFile, folderBase, destKeyForFolderObject, suffixName, freeFileKey, freeFolderPrefix } from '../src/lib/move-key.js';
+import { destKeyForFile, folderBase, destKeyForFolderObject, suffixName, freeFileKey, freeFolderPrefix, renamedFolderPrefix, renameFolderKey } from '../src/lib/move-key.js';
 
 // S3 has no move/rename — a move recomputes each object's key under a new prefix.
 // These pure functions are the heart of that remapping. Getting them wrong silently
@@ -108,5 +108,29 @@ describe('freeFolderPrefix (#17)', () => {
   test('suffixes a root-level folder', () => {
     const taken = new Set(['docs/']);
     assert.equal(freeFolderPrefix('docs/', p => taken.has(p)), 'docs (1)/');
+  });
+});
+
+describe('renamedFolderPrefix', () => {
+  test('nested folder keeps its parent, swaps the leaf', () => {
+    assert.equal(renamedFolderPrefix('photos/2024/', 'memories'), 'photos/memories/');
+  });
+  test('top-level folder has no parent', () => {
+    assert.equal(renamedFolderPrefix('docs/', 'archive'), 'archive/');
+  });
+});
+
+describe('renameFolderKey', () => {
+  test('swaps the old prefix for the new on a nested key', () => {
+    assert.equal(
+      renameFolderKey('photos/2024/', 'photos/2024/jan/a.jpg', 'photos/memories/'),
+      'photos/memories/jan/a.jpg',
+    );
+  });
+  test('the folder marker itself is remapped', () => {
+    assert.equal(
+      renameFolderKey('photos/2024/', 'photos/2024/', 'photos/memories/'),
+      'photos/memories/',
+    );
   });
 });
