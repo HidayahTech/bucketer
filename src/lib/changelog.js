@@ -1,9 +1,18 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.37.0';
+export const CURRENT_VERSION = '1.37.1';
 
 export const CHANGELOG = [
+  {
+    "version": "1.37.1",
+    "date": "2026-07-11",
+    "title": "Fix: PDF preview blank in Firefox",
+    "changes": [
+      "**Fixed:** previewing a PDF rendered blank in **Firefox** — a regression since v1.11.1. The",
+      "Internal (testing): cross-engine e2e groundwork — an engine/device selector in the e2e"
+    ]
+  },
   {
     "version": "1.37.0",
     "date": "2026-07-11",

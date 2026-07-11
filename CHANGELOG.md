@@ -7,6 +7,19 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.37.1] — 2026-07-11 — Fix: PDF preview blank in Firefox
+
+- **Fixed:** previewing a PDF rendered blank in **Firefox** — a regression since v1.11.1. The
+  preview iframe used `sandbox=""`, which disables scripts, and Firefox renders PDFs with its
+  script-based pdf.js viewer, so nothing showed (Chromium uses a native viewer and was
+  unaffected, which is why it slipped through). The iframe now uses `sandbox="allow-scripts"`,
+  which lets pdf.js run while still blocking same-origin access, forms, top-navigation,
+  popups, and plugins; the preview is served as `application/pdf` and the frame has no
+  `allow-same-origin`, so it cannot execute as HTML or reach the app's origin. Closes #46.
+- Internal (testing): cross-engine e2e groundwork — an engine/device selector in the e2e
+  harness (`E2E_ENGINE`/`E2E_DEVICE`) and a PDF-preview e2e that runs under Firefox as well as
+  Chromium.
+
 ## [1.37.0] — 2026-07-11 — Folder rename
 
 - **New:** rename a folder in place — a ✎ affordance on folder rows opens an inline editor

@@ -4,6 +4,27 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-038 — PDF preview renders blank in Firefox (sandboxed iframe blocks pdf.js)
+
+**Date:** 2026-07-11
+
+**Symptom:**
+Previewing a PDF showed a blank preview in Firefox (desktop). It rendered fine in Chromium-based browsers. A user was confident it used to work — a regression.
+
+**Root cause:**
+PDFs preview in an `<iframe class="preview-pdf" sandbox="">` (`PreviewMedia.jsx`). An empty `sandbox=""` disables scripts in the frame. Firefox renders PDFs with its script-based **pdf.js** viewer, so with scripts blocked it cannot run and nothing renders. Chromium uses a native (non-JS) PDF viewer, so it was unaffected — which is why it went unnoticed. Introduced in v1.11.1 (commit `039599b`, "Sandbox PDF preview iframe"), which added `sandbox=""` as a security hardening; PDF preview originally shipped with no sandbox (`a6195e7`) and worked in Firefox.
+
+**Fix:**
+Change the PDF iframe to `sandbox="allow-scripts"` — enough for Firefox pdf.js to run, while still blocking same-origin access, forms, top-navigation, popups, and plugins. Safe because (1) the preview URL is presigned with `ResponseContentType: 'application/pdf'` (`usePreview.js`), so the frame is served as a PDF and never interpreted as executable HTML, and (2) there is no `allow-same-origin`, so any script runs in an opaque origin with no access to our credentials, cookies, DOM, or storage.
+
+**Why it wasn't caught earlier:**
+The v1.11.1 hardening was validated in Chromium (which renders PDFs natively regardless of the sandbox), and the existing `preview-media` component test explicitly skipped the PDF case citing a jsdom iframe concern — so no test guarded the PDF iframe. The regression was Firefox-only and there was no cross-engine e2e.
+
+**Test case:**
+`test/components/preview-media.test.jsx` — "the PDF iframe sandbox permits scripts so Firefox pdf.js can render": mounts `PreviewMedia kind="pdf"` and asserts the iframe sandbox is absent or includes `allow-scripts` (red on `sandbox=""`, green on `allow-scripts`). Plus `test/e2e/browser/pdf-preview.test.mjs` verifies the full connect→preview pipeline produces a script-permitting iframe fed a presigned PDF URL, running under Firefox as well as Chromium. (Pixel-level PDF rendering is not automatable in Playwright's bundled browsers; the definitive visual confirmation is a manual open in real Firefox.)
+
+---
+
 ## BUG-037 — Cancelling a delete/move during its final batch group falsely reports "Cancelled"
 
 **Date:** 2026-07-08
