@@ -764,6 +764,9 @@ At the top of `CHANGELOG.md`, directly under the `---` on line 8, insert:
 - **Safe by default:** the rename is blocked if a folder with the new name already exists at
   the same parent — inline if the sibling is visible, and authoritatively by the engine
   (which refuses and copies nothing if the target prefix is occupied). No merging.
+- **Hardening:** object-name validation (shared by rename and folder creation) now rejects a
+  name that is exactly `.` or `..`. Names that merely contain `..` (e.g. `report..final.pdf`)
+  stay valid.
 - Closes #18.
 ```
 
