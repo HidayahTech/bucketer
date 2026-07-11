@@ -409,6 +409,18 @@ git commit -m "ci: cross-engine + mobile e2e matrix (e2e-node + matrixed e2e-bro
 
 **Interfaces:** none.
 
+- [ ] **Step 0: Complete failure-capture coverage (smoke + pdf-preview + issue-3-mobile cleanup)**
+
+`smoke.test.mjs` and `pdf-preview.test.mjs` already use `launchBrowser()`/`newE2EContext()` but predate the failure-capture wrapper, so they lack screenshot-on-failure. Convert both:
+- Add `newE2EPage, e2eTest` to their harness import.
+- `await context.newPage();` → `await newE2EPage(context);`
+- Each `test('...', ...)` → `e2eTest('...', ...)`; drop `test` from their `node:test` import.
+- Remove any now-redundant inline `page.on('console'/'pageerror', ...)` (newE2EPage attaches these).
+
+Also remove the now-unused `newE2EContext` import from `issue-3-mobile.test.mjs` (it pins its own Pixel-5 context and does not call `newE2EContext`).
+
+Run `node build.mjs --mode=perf && node test/e2e/run.mjs browser` — must stay green under Chromium (all specs, including the two just converted).
+
 - [ ] **Step 1: Verify a deliberate failure produces artifacts**
 
 Create a throwaway `test/e2e/browser/_scratch-fail.test.mjs`:
