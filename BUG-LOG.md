@@ -4,6 +4,27 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-039 — Mobile: header controls and modal buttons unreachable (no responsive layout)
+
+**Date:** 2026-07-11
+
+**Symptom:**
+On a narrow (phone) viewport, a user could not disconnect, delete, or move: the header's Disconnect / Copy link / Find duplicates buttons ran off the right edge, and the Delete / "Move here" confirmation buttons in modals could not be tapped.
+
+**Root cause:**
+Bucketer had no responsive CSS at all (only a dark-mode media query). `.app-header` is a no-wrap flex row; on a narrow viewport its controls overflowed horizontally off-screen. That header overflow also forced the whole document wider than the viewport, which displaced the `position:fixed` centered modals so their action buttons fell outside the visual viewport — unreachable by tap (and by Playwright).
+
+**Fix:**
+Added the app's first responsive breakpoint (`@media (max-width: 640px)`): `.app-header` wraps its controls (dropping the flex spacer that would otherwise break wrapping), and `.modal-dialog` is capped to the viewport (`max-width: min(94vw, 480px)`, `max-height: 88vh`, `overflow-y: auto`) so a modal always fits and its footer stays reachable.
+
+**Why it wasn't caught earlier:**
+The app was only ever tested and used on desktop; there was no mobile/responsive e2e until the cross-engine matrix added Pixel-5 / iPhone-13 device profiles, which immediately surfaced these as 6 failing specs.
+
+**Test case:**
+The browser e2e suite under `E2E_DEVICE="Pixel 5"` / `"iPhone 13"` — batch delete/move, move-via-picker, delete, versioning delete-marker/undelete, and post-disconnect form all failed before the shell fix and pass after. Run: `E2E_ENGINE=chromium E2E_DEVICE="Pixel 5" node test/e2e/run.mjs browser` (35/35).
+
+---
+
 ## BUG-038 — PDF preview renders blank in Firefox (sandboxed iframe blocks pdf.js)
 
 **Date:** 2026-07-11

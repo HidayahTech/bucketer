@@ -1,9 +1,18 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.37.1';
+export const CURRENT_VERSION = '1.37.2';
 
 export const CHANGELOG = [
+  {
+    "version": "1.37.2",
+    "date": "2026-07-11",
+    "title": "Mobile: responsive shell (header wraps, modals fit)",
+    "changes": [
+      "**Fixed:** on narrow (phone) viewports the header controls ran off the right edge —",
+      "Internal: the app's first responsive breakpoint (@media (max-width: 640px)); the mobile e2e"
+    ]
+  },
   {
     "version": "1.37.1",
     "date": "2026-07-11",

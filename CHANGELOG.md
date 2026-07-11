@@ -7,6 +7,18 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.37.2] — 2026-07-11 — Mobile: responsive shell (header wraps, modals fit)
+
+- **Fixed:** on narrow (phone) viewports the header controls ran off the right edge —
+  **Disconnect**, Copy link, and Find duplicates were unreachable — and the resulting page
+  overflow displaced the centered modals so their action buttons (Delete, Move here) could not
+  be tapped. In practice a mobile user could not disconnect, delete, or move. The header now
+  **wraps** its controls onto additional rows, and modals are sized to the viewport (scrolling
+  if tall), so everything is reachable on mobile.
+- Internal: the app's first responsive breakpoint (`@media (max-width: 640px)`); the mobile e2e
+  matrix (Pixel 5 / iPhone 13) now passes. The file-table actions-column reflow on mobile is a
+  follow-up.
+
 ## [1.37.1] — 2026-07-11 — Fix: PDF preview blank in Firefox
 
 - **Fixed:** previewing a PDF rendered blank in **Firefox** — a regression since v1.11.1. The
