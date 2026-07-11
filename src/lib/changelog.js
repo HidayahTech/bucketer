@@ -1,9 +1,21 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.35.0';
+export const CURRENT_VERSION = '1.36.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.36.0",
+    "date": "2026-07-10",
+    "title": "Copy link: include access key ID",
+    "changes": [
+      "**New:** the header **Copy link** button is now a small menu with two share-link variants:",
+      "**Connection only (no credentials)** — the existing link (endpoint, bucket, provider,",
+      "**Include access key ID** — also embeds the access key ID, so a recipient only needs to",
+      "**New (recipient):** opening an \"include access key ID\" link pre-fills everything except",
+      "Security: all share params remain in the URL hash fragment (never sent to servers); the"
+    ]
+  },
   {
     "version": "1.35.0",
     "date": "2026-07-08",

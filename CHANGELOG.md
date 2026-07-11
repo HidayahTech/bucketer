@@ -7,6 +7,19 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.36.0] — 2026-07-10 — Copy link: include access key ID
+
+- **New:** the header **Copy link** button is now a small menu with two share-link variants:
+  - **Connection only (no credentials)** — the existing link (endpoint, bucket, provider,
+    region); safe to share publicly.
+  - **Include access key ID** — also embeds the access key ID, so a recipient only needs to
+    enter the **secret key** to connect. The secret key is never included in either link.
+- **New (recipient):** opening an "include access key ID" link pre-fills everything except
+  the secret key, auto-focuses the Secret Key field, and adapts the pre-fill banner to
+  prompt for only the secret key.
+- Security: all share params remain in the URL hash fragment (never sent to servers); the
+  key ID param is validated on read (no whitespace, ≤ 128 chars).
+
 ## [1.35.0] — 2026-07-08 — Master queue: unified operations panel with cancellation
 
 Phase 1 of the master-queue unification (`docs/intent/master-queue.md`): delete and
