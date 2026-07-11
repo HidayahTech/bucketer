@@ -18,7 +18,7 @@
 // shouldCancel() is polled between objects; in-flight copies complete.
 import { ListObjectsV2Command, CopyObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { COPY_MULTIPART_THRESHOLD } from './constants.js';
-import { destKeyForFile, destKeyForFolderObject, freeFileKey, freeFolderPrefix } from './move-key.js';
+import { destKeyForFile, destKeyForFolderObject, freeFileKey, freeFolderPrefix, renamedFolderPrefix, renameFolderKey } from './move-key.js';
 import { copyObjectMultipart } from './move-multipart.js';
 import { sendWithRetry } from './s3-retry.js';
 
@@ -58,6 +58,12 @@ export async function runCopyOperation(client, bucket, op, onProgress, shouldCan
   return runTransfer(client, bucket, op, onProgress, 'copy', shouldCancel);
 }
 
+// Folder rename: a single folder relabeled at the same parent. Reuses the transfer core
+// (copy-then-delete, like move), with a prefix-swap remap and block-on-collision.
+export async function runRenameOperation(client, bucket, op, onProgress, shouldCancel = () => false) {
+  return runTransfer(client, bucket, op, onProgress, 'rename', shouldCancel);
+}
+
 // Shared core for move ('move') and copy-and-keep ('copy'). Copy renames on collision
 // (never overwrites) and skips the source delete; move skips colliding objects and
 // deletes each source only after its copy is confirmed.
@@ -65,6 +71,9 @@ async function runTransfer(client, bucket, op, onProgress, mode, shouldCancel) {
   const dest = op.dest ?? '';
   const looseFiles = (op.files || []).map(f => (typeof f === 'string' ? { key: f, size: 0 } : f));
   const prefixes = op.prefixes || [];
+
+  // Rename: compute the single target prefix once; every key is prefix-swapped onto it.
+  const renameTarget = mode === 'rename' ? renamedFolderPrefix(prefixes[0], op.renameTo) : null;
 
   // Build the work list: { sourceKey, size, destKey, prefix }.
   const work = looseFiles.map(f => ({
@@ -86,14 +95,17 @@ async function runTransfer(client, bucket, op, onProgress, mode, shouldCancel) {
     }
     for (const pfx of prefixes) {
       for (const o of (prefixObjects.get(pfx) || [])) {
-        work.push({ sourceKey: o.key, size: o.size, destKey: destKeyForFolderObject(pfx, o.key, dest), prefix: pfx });
+        const destKey = mode === 'rename'
+          ? renameFolderKey(pfx, o.key, renameTarget)
+          : destKeyForFolderObject(pfx, o.key, dest);
+        work.push({ sourceKey: o.key, size: o.size, destKey, prefix: pfx });
       }
     }
   }
 
   // Nothing to move (e.g. empty op, or only empty folders): finish without a dest crawl.
   if (work.length === 0) {
-    onProgress({ phase: 'done', moved: 0, errors: [], movedPrefixes: mode === 'move' ? [...prefixes] : [], cancelled: false });
+    onProgress({ phase: 'done', moved: 0, errors: [], movedPrefixes: mode !== 'copy' ? [...prefixes] : [], cancelled: false });
     return;
   }
 
@@ -101,7 +113,8 @@ async function runTransfer(client, bucket, op, onProgress, mode, shouldCancel) {
   onProgress({ phase: 'checking' });
   let existing;
   try {
-    const destObjs = await listAllObjectsForPrefix(client, bucket, dest);
+    const scanPrefix = mode === 'rename' ? renameTarget : dest;
+    const destObjs = await listAllObjectsForPrefix(client, bucket, scanPrefix);
     existing = new Set(destObjs.map(o => o.key));
   } catch (err) {
     onProgress({ phase: 'done', moved: 0, errors: [{ key: '(listing)', message: err.message }], movedPrefixes: [], cancelled: false });
@@ -114,7 +127,16 @@ async function runTransfer(client, bucket, op, onProgress, mode, shouldCancel) {
 
   const errors = [];
   const movable = [];
-  if (mode === 'copy') {
+  if (mode === 'rename') {
+    // Block wholesale if the target folder already exists — never merge.
+    if (existing.size > 0) {
+      onProgress({ phase: 'done', moved: 0,
+        errors: [{ key: prefixes[0], message: `A folder named "${op.renameTo}" already exists.`, skipped: true }],
+        movedPrefixes: [], cancelled: false });
+      return;
+    }
+    movable.push(...work);
+  } else if (mode === 'copy') {
     // Rename on collision so a copy never overwrites. Folders are remapped coherently
     // under one free folder prefix; loose files get a " (n)" suffix. `taken` grows as
     // destinations are claimed so intra-batch collisions are also avoided.
@@ -182,7 +204,7 @@ async function runTransfer(client, bucket, op, onProgress, mode, shouldCancel) {
       }
       // Move only: copy confirmed — delete the source. A failure here means the object
       // now exists in both places (a duplicate, not a move): report it and leave both.
-      if (mode === 'move') {
+      if (mode !== 'copy') {
         try {
           await sendWithRetry(client, () => new DeleteObjectCommand({ Bucket: bucket, Key: item.sourceKey }));
         } catch (err) {
@@ -196,7 +218,7 @@ async function runTransfer(client, bucket, op, onProgress, mode, shouldCancel) {
         movedKeySet.add(item.sourceKey);
       }
       moved++;
-      onProgress({ moved, errors: [...errors], movedKeys: mode === 'move' ? [item.sourceKey] : [] });
+      onProgress({ moved, errors: [...errors], movedKeys: mode !== 'copy' ? [item.sourceKey] : [] });
     }
   }
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, movable.length) }, worker));
@@ -204,7 +226,7 @@ async function runTransfer(client, bucket, op, onProgress, mode, shouldCancel) {
   // A source folder is complete only when every object in it was confirmed
   // moved (copy + delete). Equivalent to the old "no errors" rule when the run
   // wasn't cancelled; strictly safer when it was.
-  const movedPrefixes = mode === 'move'
+  const movedPrefixes = mode !== 'copy'
     ? prefixes.filter(pfx => (prefixObjects.get(pfx) || []).every(o => movedKeySet.has(o.key)))
     : [];
 

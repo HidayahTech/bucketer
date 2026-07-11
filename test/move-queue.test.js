@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { runMoveOperation, runCopyOperation } from '../src/lib/move-queue.js';
+import { runMoveOperation, runCopyOperation, runRenameOperation } from '../src/lib/move-queue.js';
 
 // A move is per-object: server-side copy, then — only after that copy is confirmed —
 // delete the source. These tests pin the safety-critical behavior: ordering, collisions
@@ -423,5 +423,50 @@ describe('runMoveOperation — cooperative cancel', () => {
     const done = updates.find(u => u.phase === 'done');
     assert.equal(done.cancelled, false);
     assert.equal(done.moved, 1);
+  });
+});
+
+// ── Folder rename (#18) ─────────────────────────────────────────────────────────
+
+describe('runRenameOperation — folder rename', () => {
+  function runRename(client, bucket, op) {
+    const updates = [];
+    return runRenameOperation(client, bucket, op, u => updates.push({ ...u })).then(() => updates);
+  }
+
+  test('remaps every key onto the new prefix and deletes the sources', async () => {
+    const client = mockClient({ listPages: new Map([
+      ['photos/2024/', [{ objects: [
+        { Key: 'photos/2024/', Size: 0 },
+        { Key: 'photos/2024/a.jpg', Size: 10 },
+        { Key: 'photos/2024/jan/b.jpg', Size: 20 },
+      ], isTruncated: false }]],
+      ['photos/memories/', [{ objects: [], isTruncated: false }]], // target empty → no collision
+    ]) });
+    const updates = await runRename(client, 'b', { prefixes: ['photos/2024/'], renameTo: 'memories', capturedPrefix: 'photos/' });
+
+    const copied = client.calls.filter(c => c.name === 'CopyObjectCommand').map(c => c.input.Key).sort();
+    assert.deepEqual(copied, ['photos/memories/', 'photos/memories/a.jpg', 'photos/memories/jan/b.jpg']);
+    const deleted = client.calls.filter(c => c.name === 'DeleteObjectCommand').map(c => c.input.Key).sort();
+    assert.deepEqual(deleted, ['photos/2024/', 'photos/2024/a.jpg', 'photos/2024/jan/b.jpg']);
+    const done = updates.at(-1);
+    assert.equal(done.phase, 'done');
+    assert.equal(done.moved, 3);
+    assert.deepEqual(done.movedPrefixes, ['photos/2024/']);
+  });
+
+  test('blocks wholesale when the target folder already exists — copies nothing', async () => {
+    const client = mockClient({ listPages: new Map([
+      ['photos/2024/', [{ objects: [{ Key: 'photos/2024/a.jpg', Size: 10 }], isTruncated: false }]],
+      ['photos/archive/', [{ objects: [{ Key: 'photos/archive/old.txt', Size: 5 }], isTruncated: false }]],
+    ]) });
+    const updates = await runRename(client, 'b', { prefixes: ['photos/2024/'], renameTo: 'archive', capturedPrefix: 'photos/' });
+
+    assert.equal(client.calls.some(c => c.name === 'CopyObjectCommand'), false, 'no copies');
+    assert.equal(client.calls.some(c => c.name === 'DeleteObjectCommand'), false, 'no deletes');
+    const done = updates.at(-1);
+    assert.equal(done.moved, 0);
+    assert.equal(done.errors.length, 1);
+    assert.match(done.errors[0].message, /already exists/i);
   });
 });
