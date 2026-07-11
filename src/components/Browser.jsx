@@ -6,7 +6,8 @@
 // Notifies App when the initial listing probe fails via onInitialListFailed (§4.14).
 // Coordinates with UploadQueue via onUploadTargetChange (upload destination = current prefix).
 import { useState, useEffect, useRef } from 'preact/hooks';
-import { ListObjectsV2Command, GetObjectCommand, HeadObjectCommand, PutObjectCommand, CopyObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, CopyObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { listObjectsPage } from '../lib/list-objects.js';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { formatBytes, leafName, isPermissionError } from '../lib/format.js';
 import { usePreview } from '../lib/usePreview.js';
@@ -296,14 +297,13 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     const isInitial = isInitialProbeRef.current;
 
     try {
-      const cmd = new ListObjectsV2Command({
-        Bucket: bucket,
-        Prefix: targetPrefix || undefined,
-        Delimiter: '/',
-        MaxKeys: maxKeys,
-        ContinuationToken: token || undefined,
+      const resp = await listObjectsPage(client, {
+        bucket,
+        prefix: targetPrefix,
+        token,
+        maxKeys,
+        signal: controller.signal,
       });
-      const resp = await client.send(cmd, { abortSignal: controller.signal });
 
       isInitialProbeRef.current = false;
 

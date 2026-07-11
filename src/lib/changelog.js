@@ -1,9 +1,18 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.36.0';
+export const CURRENT_VERSION = '1.36.1';
 
 export const CHANGELOG = [
+  {
+    "version": "1.36.1",
+    "date": "2026-07-11",
+    "title": "Resilient bucket listing (transient-error retry)",
+    "changes": [
+      "**Fixed (reliability):** bucket listing — the initial load and \"Load more\" pagination —",
+      "Internal: extracted src/lib/list-objects.js (listObjectsPage) — the retry-wrapped"
+    ]
+  },
   {
     "version": "1.36.0",
     "date": "2026-07-10",

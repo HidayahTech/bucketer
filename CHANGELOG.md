@@ -7,6 +7,16 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.36.1] — 2026-07-11 — Resilient bucket listing (transient-error retry)
+
+- **Fixed (reliability):** bucket listing — the initial load and "Load more" pagination —
+  now retries transient throttling (`SlowDown`/503/429) and network blips with
+  backoff+jitter, the same treatment upload, move, and delete already had. Listing was the
+  one S3 read issued with no retry, so a momentary blip surfaced as an opaque connect or
+  "Load more" failure (#23).
+- Internal: extracted `src/lib/list-objects.js` (`listObjectsPage`) — the retry-wrapped
+  single-page fetch — out of `Browser.jsx`.
+
 ## [1.36.0] — 2026-07-10 — Copy link: include access key ID
 
 - **New:** the header **Copy link** button is now a small menu with two share-link variants:
