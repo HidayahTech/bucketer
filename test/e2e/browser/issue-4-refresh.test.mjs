@@ -5,25 +5,23 @@
 //  it OR under it.
 //  Part 1 (cross-client, by design — backendless): another device's upload isn't pushed; the Refresh
 //  button pulls it on demand. This proves the Refresh control re-lists.
-import { test, describe, before, after } from 'node:test';
+import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { chromium } from 'playwright';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET } from '../harness.mjs';
+import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest } from '../harness.mjs';
 
 let ctx, app, browser;
 before(async () => {
   ctx = await startMock();
   app = await startAppServer();
-  browser = await chromium.launch({ headless: true });
+  browser = await launchBrowser();
 });
 after(async () => { await browser?.close(); await app?.close(); await ctx?.mock.close(); });
 
 async function freshSession() {
   ctx.mock.reset();
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  page.on('pageerror', (e) => process.stderr.write(`[page error] ${e.message}\n`));
+  const context = await newE2EContext(browser);
+  const page = await newE2EPage(context);
   await page.goto(app.url, { waitUntil: 'domcontentloaded' });
   await connectApp(page, ctx.browserEndpoint);
   return { context, page };
@@ -39,7 +37,7 @@ async function dropFile(page, name, content = 'x') {
 }
 
 describe('issue #4 part 2 — a sub-folder created by an upload appears without a manual refresh', () => {
-  test('dropping a file that creates a sub-folder in the current view shows it immediately', async () => {
+  e2eTest('dropping a file that creates a sub-folder in the current view shows it immediately', async () => {
     const { context, page } = await freshSession();
     try {
       // At root, drop a file whose relativePath creates a new sub-folder "newdir".
@@ -53,7 +51,7 @@ describe('issue #4 part 2 — a sub-folder created by an upload appears without 
 });
 
 describe('issue #4 part 1 — the Refresh button pulls changes made by another client', () => {
-  test('an object added out-of-band appears after clicking Refresh', async () => {
+  e2eTest('an object added out-of-band appears after clicking Refresh', async () => {
     const { context, page } = await freshSession();
     try {
       // Simulate "another device" writing directly to the bucket (no UI involved).

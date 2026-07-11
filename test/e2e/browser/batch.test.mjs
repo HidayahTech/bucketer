@@ -1,16 +1,15 @@
 // Browser e2e — The Power User's batch + listing-control journeys: multi-select batch delete and
 // batch move, select-all, filter, sort, and the copy-link popover. Asserts DOM and real bucket state.
-import { test, describe, before, after } from 'node:test';
+import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { chromium } from 'playwright';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET } from '../harness.mjs';
+import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest } from '../harness.mjs';
 
 let ctx, app, browser;
 before(async () => {
   ctx = await startMock();
   app = await startAppServer();
-  browser = await chromium.launch({ headless: true });
+  browser = await launchBrowser();
 });
 after(async () => { await browser?.close(); await app?.close(); await ctx?.mock.close(); });
 
@@ -20,9 +19,8 @@ async function bucketKeys() {
 }
 async function freshSession() {
   ctx.mock.reset();
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  page.on('pageerror', (e) => process.stderr.write(`[page error] ${e.message}\n`));
+  const context = await newE2EContext(browser);
+  const page = await newE2EPage(context);
   await page.goto(app.url, { waitUntil: 'domcontentloaded' });
   await connectApp(page, ctx.browserEndpoint);
   return { context, page };
@@ -43,7 +41,7 @@ async function waitForKeys(expected, timeout = 10000) {
 }
 
 describe('batch delete', () => {
-  test('selecting two of three files and batch-deleting removes only those two', async () => {
+  e2eTest('selecting two of three files and batch-deleting removes only those two', async () => {
     const { context, page } = await freshSession();
     try {
       await uploadFiles(page, ['a.txt', 'b.txt', 'c.txt']);
@@ -61,7 +59,7 @@ describe('batch delete', () => {
 });
 
 describe('batch move', () => {
-  test('selecting two files and moving them relocates both under the destination', async () => {
+  e2eTest('selecting two files and moving them relocates both under the destination', async () => {
     const { context, page } = await freshSession();
     try {
       // Make a destination folder, then three files.
@@ -87,7 +85,7 @@ describe('batch move', () => {
 });
 
 describe('select-all, filter, sort', () => {
-  test('select-all checkbox selects every visible file', async () => {
+  e2eTest('select-all checkbox selects every visible file', async () => {
     const { context, page } = await freshSession();
     try {
       await uploadFiles(page, ['one.txt', 'two.txt', 'three.txt']);
@@ -97,7 +95,7 @@ describe('select-all, filter, sort', () => {
     } finally { await context.close(); }
   });
 
-  test('the filter box narrows the listing by name', async () => {
+  e2eTest('the filter box narrows the listing by name', async () => {
     const { context, page } = await freshSession();
     try {
       await uploadFiles(page, ['apple.txt', 'banana.txt', 'apricot.txt']);
@@ -111,7 +109,7 @@ describe('select-all, filter, sort', () => {
     } finally { await context.close(); }
   });
 
-  test('clicking the Name header sorts; descending reverses row order', async () => {
+  e2eTest('clicking the Name header sorts; descending reverses row order', async () => {
     const { context, page } = await freshSession();
     try {
       await uploadFiles(page, ['a.txt', 'b.txt', 'c.txt']);
@@ -125,7 +123,7 @@ describe('select-all, filter, sort', () => {
 });
 
 describe('copy-link popover', () => {
-  test('opening Copy link on a row generates a presigned URL that fetches the object', async () => {
+  e2eTest('opening Copy link on a row generates a presigned URL that fetches the object', async () => {
     const { context, page } = await freshSession();
     try {
       await uploadFiles(page, ['link.txt']);

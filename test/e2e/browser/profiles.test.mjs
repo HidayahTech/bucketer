@@ -1,23 +1,21 @@
 // Browser e2e — credential/profile screen regressions. These are all BUG-LOG entries that shipped
 // with "No automated test — DOM-dependent": BUG-018, BUG-020, BUG-026, BUG-027. Mostly disconnected
 // screen, so the mock S3 server is only needed for the connect→disconnect flow (BUG-027).
-import { test, describe, before, after } from 'node:test';
+import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { chromium } from 'playwright';
-import { startMock, startAppServer, connectApp } from '../harness.mjs';
+import { startMock, startAppServer, connectApp, launchBrowser, newE2EContext, newE2EPage, e2eTest } from '../harness.mjs';
 
 let ctx, app, browser;
 before(async () => {
   ctx = await startMock();
   app = await startAppServer();
-  browser = await chromium.launch({ headless: true });
+  browser = await launchBrowser();
 });
 after(async () => { await browser?.close(); await app?.close(); await ctx?.mock.close(); });
 
 async function freshPage() {
-  const context = await browser.newContext(); // empty localStorage → no saved profiles/creds
-  const page = await context.newPage();
-  page.on('pageerror', (e) => process.stderr.write(`[page error] ${e.message}\n`));
+  const context = await newE2EContext(browser); // empty localStorage → no saved profiles/creds
+  const page = await newE2EPage(context);
   await page.goto(app.url, { waitUntil: 'domcontentloaded' });
   return { context, page };
 }
@@ -30,7 +28,7 @@ async function fillCreds(page, { endpoint, bucket, keyId, secret }) {
 
 // ── BUG-018: "Save as profile…" stays disabled until the form has valid required fields ──
 describe('BUG-018 — Save-as-profile enablement', () => {
-  test('disabled on an empty form, enabled once endpoint/bucket/keyId are valid', async () => {
+  e2eTest('disabled on an empty form, enabled once endpoint/bucket/keyId are valid', async () => {
     const { context, page } = await freshPage();
     try {
       const trigger = page.locator('.profile-save-trigger');
@@ -48,7 +46,7 @@ describe('BUG-018 — Save-as-profile enablement', () => {
 
 // ── BUG-020: saving a profile before connecting stores the values and does NOT clear the form ──
 describe('BUG-020 — save profile pre-connect', () => {
-  test('the saved profile holds the typed values and the form keeps them', async () => {
+  e2eTest('the saved profile holds the typed values and the form keeps them', async () => {
     const { context, page } = await freshPage();
     try {
       await fillCreds(page, { endpoint: 'https://s3.example.com', bucket: 'realbucket', keyId: 'AKIAREAL', secret: 'sekret' });
@@ -72,7 +70,7 @@ describe('BUG-020 — save profile pre-connect', () => {
 
 // ── BUG-027: after disconnect the form is pre-filled from the selected profile (not blank) ──
 describe('BUG-027 — post-disconnect form is populated', () => {
-  test('disconnecting leaves the endpoint/bucket/keyId visible for reconnection', async () => {
+  e2eTest('disconnecting leaves the endpoint/bucket/keyId visible for reconnection', async () => {
     ctx.mock.reset();
     const { context, page } = await freshPage();
     try {
@@ -104,7 +102,7 @@ describe('BUG-027 — post-disconnect form is populated', () => {
 
 // ── BUG-026: changing the endpoint after loading a profile re-infers the region ──
 describe('BUG-026 — region re-inference after profile load', () => {
-  test('a saved B2 profile, reloaded, updates its region when the endpoint changes', async () => {
+  e2eTest('a saved B2 profile, reloaded, updates its region when the endpoint changes', async () => {
     const { context, page } = await freshPage();
     try {
       // Save a B2 profile (region auto-inferred from the endpoint).

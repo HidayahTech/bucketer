@@ -1,26 +1,24 @@
 // Browser e2e — BUG-009: a permission error during a multipart upload must abort the session and
 // clear its resume record, so a denied upload never leaves an orphaned multipart session behind
 // (which would accrue storage and, on re-add, falsely offer to "resume" an upload that can't succeed).
-import { test, describe, before, after } from 'node:test';
+import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { chromium } from 'playwright';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET } from '../harness.mjs';
+import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest } from '../harness.mjs';
 
 let ctx, app, browser;
 before(async () => {
   ctx = await startMock();
   app = await startAppServer();
-  browser = await chromium.launch({ headless: true });
+  browser = await launchBrowser();
 });
 after(async () => { await browser?.close(); await app?.close(); await ctx?.mock.close(); });
 
 describe('BUG-009 — multipart permission failure aborts the session', () => {
-  test('a 403 on UploadPart aborts the multipart upload (no orphaned session, nothing stored)', async () => {
+  e2eTest('a 403 on UploadPart aborts the multipart upload (no orphaned session, nothing stored)', async () => {
     ctx.mock.reset();
-    const context = await browser.newContext();
-    const page = await context.newPage();
-    page.on('pageerror', (e) => process.stderr.write(`[page error] ${e.message}\n`));
+    const context = await newE2EContext(browser);
+    const page = await newE2EPage(context);
     try {
       await page.goto(app.url, { waitUntil: 'domcontentloaded' });
       await connectApp(page, ctx.browserEndpoint);

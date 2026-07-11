@@ -1,17 +1,16 @@
 // Browser e2e — the versioning journey: on a versioned bucket, deleting a file creates a delete
 // marker (the object is hidden but retained), the Hidden Versions panel surfaces it, and removing
 // the marker via the panel undeletes the file. Asserts real ListObjectVersions / ListObjectsV2 state.
-import { test, describe, before, after } from 'node:test';
+import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { chromium } from 'playwright';
 import { ListObjectsV2Command, ListObjectVersionsCommand } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET } from '../harness.mjs';
+import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest } from '../harness.mjs';
 
 let ctx, app, browser;
 before(async () => {
   ctx = await startMock();
   app = await startAppServer();
-  browser = await chromium.launch({ headless: true });
+  browser = await launchBrowser();
 });
 after(async () => { await browser?.close(); await app?.close(); await ctx?.mock.close(); });
 
@@ -25,12 +24,11 @@ async function markerCount() {
 }
 
 describe('versioning — delete marker then undelete', () => {
-  test('deleting hides the file via a marker; undeleting from Hidden Versions brings it back', async () => {
+  e2eTest('deleting hides the file via a marker; undeleting from Hidden Versions brings it back', async () => {
     ctx.mock.reset();
     ctx.mock.configure({ bucket: BUCKET, versioning: true });
-    const context = await browser.newContext();
-    const page = await context.newPage();
-    page.on('pageerror', (e) => process.stderr.write(`[page error] ${e.message}\n`));
+    const context = await newE2EContext(browser);
+    const page = await newE2EPage(context);
     try {
       await page.goto(app.url, { waitUntil: 'domcontentloaded' });
       await connectApp(page, ctx.browserEndpoint);

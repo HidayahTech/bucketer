@@ -6,17 +6,16 @@
 // This test drives the table drop handler with a synthetic DataTransfer (the e.dataTransfer.files
 // fallback path, which the real OS drag uses when FileSystemEntry isn't available) while viewing a
 // nested folder, and asserts the object lands UNDER that folder — not at root.
-import { test, describe, before, after } from 'node:test';
+import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { chromium } from 'playwright';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET } from '../harness.mjs';
+import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest } from '../harness.mjs';
 
 let ctx, app, browser;
 before(async () => {
   ctx = await startMock();
   app = await startAppServer();
-  browser = await chromium.launch({ headless: true });
+  browser = await launchBrowser();
 });
 after(async () => { await browser?.close(); await app?.close(); await ctx?.mock.close(); });
 
@@ -36,11 +35,10 @@ async function dropFile(page, name, content = 'x') {
 }
 
 describe('issue #2 — drag-dropped uploads target the current folder, not root', () => {
-  test('dropping a file while viewing a nested folder uploads it INTO that folder', async () => {
+  e2eTest('dropping a file while viewing a nested folder uploads it INTO that folder', async () => {
     ctx.mock.reset();
-    const context = await browser.newContext();
-    const page = await context.newPage();
-    page.on('pageerror', (e) => process.stderr.write(`[page error] ${e.message}\n`));
+    const context = await newE2EContext(browser);
+    const page = await newE2EPage(context);
     try {
       await page.goto(app.url, { waitUntil: 'domcontentloaded' });
       await connectApp(page, ctx.browserEndpoint);

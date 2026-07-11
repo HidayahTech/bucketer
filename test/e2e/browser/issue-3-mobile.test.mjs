@@ -9,27 +9,26 @@
 // for the reporter's residual mobile teleport. So a PASS here does not disprove the report — it
 // proves no regression in the emulable layer and pins the boundary to native mobile behavior, which
 // the issue comment asks the reporter to characterize (exact browser, repro steps).
-import { test, describe, before, after } from 'node:test';
+import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { chromium, devices } from 'playwright';
+import { devices } from 'playwright';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET } from '../harness.mjs';
+import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest, applyEngineQuirks, e2eEngineName } from '../harness.mjs';
 
 let ctx, app, browser;
 before(async () => {
   ctx = await startMock();
   app = await startAppServer();
-  browser = await chromium.launch({ headless: true });
+  browser = await launchBrowser();
 });
 after(async () => { await browser?.close(); await app?.close(); await ctx?.mock.close(); });
 
 describe('issue #3 — mobile (Android-emulated): upload does not teleport to root', () => {
-  test('uploading into a nested folder on an emulated Android device keeps the user in that folder', async () => {
+  e2eTest('uploading into a nested folder on an emulated Android device keeps the user in that folder', async () => {
     ctx.mock.reset();
     // Pixel 5 = Android viewport + touch + mobile Chrome UA.
-    const context = await browser.newContext({ ...devices['Pixel 5'] });
-    const page = await context.newPage();
-    page.on('pageerror', (e) => process.stderr.write(`[page error] ${e.message}\n`));
+    const context = await browser.newContext(applyEngineQuirks(e2eEngineName(), devices['Pixel 5']));
+    const page = await newE2EPage(context);
     try {
       await page.goto(app.url, { waitUntil: 'domcontentloaded' });
       await connectApp(page, ctx.browserEndpoint);

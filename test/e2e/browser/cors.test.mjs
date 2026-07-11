@@ -3,24 +3,22 @@
 // BUG-028 shipped — they were "never tested in a real browser against a cross-origin bucket").
 // Each test narrows the mock's CORS contract and proves the operation breaks, then restores it and
 // proves the operation works — so the test has teeth, not a tautology.
-import { test, describe, before, after, beforeEach, afterEach } from 'node:test';
+import { describe, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { chromium } from 'playwright';
 import { ListObjectsV2Command, HeadObjectCommand } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET } from '../harness.mjs';
+import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest } from '../harness.mjs';
 
 let ctx, app, browser;
 before(async () => {
   ctx = await startMock();
   app = await startAppServer();
-  browser = await chromium.launch({ headless: true });
+  browser = await launchBrowser();
 });
 after(async () => { await browser?.close(); await app?.close(); await ctx?.mock.close(); });
 
 async function freshPage() {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  page.on('pageerror', (e) => process.stderr.write(`[page error] ${e.message}\n`));
+  const context = await newE2EContext(browser);
+  const page = await newE2EPage(context);
   await page.goto(app.url, { waitUntil: 'domcontentloaded' });
   return { context, page };
 }
@@ -41,7 +39,7 @@ describe('B1 — BUG-028: custom metadata visibility depends on CORS ExposeHeade
     await page.locator('[data-testid="properties-modal"]').waitFor({ timeout: 5000 });
   }
 
-  test('NEGATIVE — narrowed ExposeHeaders (no x-amz-meta-*) hides File Modified', async () => {
+  e2eTest('NEGATIVE — narrowed ExposeHeaders (no x-amz-meta-*) hides File Modified', async () => {
     ctx.mock.reset();
     ctx.mock.configure({ cors: { exposeHeaders: ['ETag', 'Content-Length', 'Content-Type'] } });
     const { context, page } = await freshPage();
@@ -58,7 +56,7 @@ describe('B1 — BUG-028: custom metadata visibility depends on CORS ExposeHeade
     } finally { await context.close(); }
   });
 
-  test('POSITIVE — correct ExposeHeaders reveals File Modified', async () => {
+  e2eTest('POSITIVE — correct ExposeHeaders reveals File Modified', async () => {
     ctx.mock.reset(); // default CORS exposes x-amz-meta-*
     const { context, page } = await freshPage();
     try {
@@ -74,7 +72,7 @@ describe('B1 — BUG-028: custom metadata visibility depends on CORS ExposeHeade
 
 // ── B2 — BUG-012: an operation that issues HTTP DELETE (rename) breaks if DELETE not in CORS ──
 describe('B2 — BUG-012: HTTP DELETE must be in CORS AllowedMethods', () => {
-  test('rename (Copy+Delete) leaves the source when DELETE is absent; completes when present', async () => {
+  e2eTest('rename (Copy+Delete) leaves the source when DELETE is absent; completes when present', async () => {
     // Negative: AllowedMethods without DELETE. Rename copies (PUT, allowed) then deletes the source
     // (HTTP DELETE, blocked by preflight) → the original survives.
     ctx.mock.reset();

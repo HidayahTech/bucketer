@@ -1,18 +1,17 @@
 // Browser e2e: rename a folder through the real UI against the mock S3, asserting BOTH
 // the DOM (old row gone) and the mock bucket state (keys moved to the new prefix).
-import { test, describe, before, after } from 'node:test';
+import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { chromium } from 'playwright';
 import { PutObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET } from '../harness.mjs';
+import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest } from '../harness.mjs';
 
 let ctx, app, browser, context, page;
 before(async () => {
   ctx = await startMock();
   app = await startAppServer();
-  browser = await chromium.launch({ headless: true });
-  context = await browser.newContext();
-  page = await context.newPage();
+  browser = await launchBrowser();
+  context = await newE2EContext(browser);
+  page = await newE2EPage(context);
 });
 after(async () => { await browser?.close(); await app?.close(); await ctx?.mock.close(); });
 
@@ -22,7 +21,7 @@ async function keys() {
 }
 
 describe('browser e2e — folder rename', () => {
-  test('renames a folder: keys move to the new prefix, old prefix is gone', async () => {
+  e2eTest('renames a folder: keys move to the new prefix, old prefix is gone', async () => {
     // Seed two objects under docs/.
     await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'docs/a.txt', Body: 'a' }));
     await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'docs/sub/b.txt', Body: 'b' }));

@@ -1,17 +1,16 @@
 // Browser e2e — The Power User's journeys: realistic multi-step sessions through the built UI,
 // asserting BOTH the DOM and the real mock bucket state. Each test connects fresh against a reset
 // bucket. node --test + the playwright library (no @playwright/test framework).
-import { test, describe, before, after } from 'node:test';
+import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { chromium } from 'playwright';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET } from '../harness.mjs';
+import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest } from '../harness.mjs';
 
 let ctx, app, browser;
 before(async () => {
   ctx = await startMock();
   app = await startAppServer();
-  browser = await chromium.launch({ headless: true });
+  browser = await launchBrowser();
 });
 after(async () => { await browser?.close(); await app?.close(); await ctx?.mock.close(); });
 
@@ -21,9 +20,8 @@ async function bucketKeys() {
 }
 async function freshSession() {
   ctx.mock.reset();
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  page.on('pageerror', (e) => process.stderr.write(`[page error] ${e.message}\n`));
+  const context = await newE2EContext(browser);
+  const page = await newE2EPage(context);
   await page.goto(app.url, { waitUntil: 'domcontentloaded' });
   await connectApp(page, ctx.browserEndpoint);
   return { context, page };
@@ -40,7 +38,7 @@ async function waitForUploadTarget(page, prefix) {
 
 // ── B3 — batch upload lands all files and refreshes the listing once (BUG-010/011) ──
 describe('B3 — batch upload', () => {
-  test('three files upload, all land in the bucket and appear in the listing', async () => {
+  e2eTest('three files upload, all land in the bucket and appear in the listing', async () => {
     const { context, page } = await freshSession();
     try {
       await fileInput(page).setInputFiles([
@@ -57,7 +55,7 @@ describe('B3 — batch upload', () => {
 
 // ── B4 — new folder → upload into it → stay in the folder (BUG-029) ──────────────
 describe('B4 — folder journey + stay-put', () => {
-  test('upload into a subfolder keeps the user in that folder (no teleport to root)', async () => {
+  e2eTest('upload into a subfolder keeps the user in that folder (no teleport to root)', async () => {
     const { context, page } = await freshSession();
     try {
       // Create folder via the New folder dialog.
@@ -85,7 +83,7 @@ describe('B4 — folder journey + stay-put', () => {
 
 // ── B6 — move via the picker, and one drag-and-drop move ─────────────────────────
 describe('B6 — move (picker + drag-and-drop)', () => {
-  test('moving a file into a folder via the picker relocates it', async () => {
+  e2eTest('moving a file into a folder via the picker relocates it', async () => {
     const { context, page } = await freshSession();
     try {
       // Seed a folder and a file at root.
@@ -110,7 +108,7 @@ describe('B6 — move (picker + drag-and-drop)', () => {
     } finally { await context.close(); }
   });
 
-  test('drag-and-drop a file row onto a folder row moves it (one HTML5 DnD path)', async () => {
+  e2eTest('drag-and-drop a file row onto a folder row moves it (one HTML5 DnD path)', async () => {
     const { context, page } = await freshSession();
     try {
       await page.locator('button[title="Create a new folder"]').click();
@@ -143,7 +141,7 @@ describe('B6 — move (picker + drag-and-drop)', () => {
 
 // ── B7 — presigned download fetches the bytes through the mock (Auditor) ──────────
 describe('B7 — presigned download', () => {
-  test('clicking Download fetches the presigned URL and returns the file bytes', async () => {
+  e2eTest('clicking Download fetches the presigned URL and returns the file bytes', async () => {
     const { context, page } = await freshSession();
     try {
       await fileInput(page).setInputFiles({ name: 'dl.txt', mimeType: 'text/plain', buffer: Buffer.from('download-me') });
@@ -164,7 +162,7 @@ describe('B7 — presigned download', () => {
 
 // ── B8 — a denied write flips capability state and surfaces an error (Auditor) ────
 describe('B8 — capability denied', () => {
-  test('a 403 on PutObject surfaces an error and marks upload denied', async () => {
+  e2eTest('a 403 on PutObject surfaces an error and marks upload denied', async () => {
     const { context, page } = await freshSession();
     try {
       ctx.mock.configure({ faults: [{ op: 'PutObject', method: 'PUT', status: 403, code: 'AccessDenied', message: 'no write' }] });

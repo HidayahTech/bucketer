@@ -1,17 +1,16 @@
 // Browser e2e — P2 interaction edges: the full drag-and-drop move matrix (beyond the single P0
 // path) and BUG-004 (the folder picker must request directory mode). Real-browser only: HTML5 DnD
 // and the webkitdirectory DOM property cannot be exercised under jsdom.
-import { test, describe, before, after } from 'node:test';
+import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { chromium } from 'playwright';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET } from '../harness.mjs';
+import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest } from '../harness.mjs';
 
 let ctx, app, browser;
 before(async () => {
   ctx = await startMock();
   app = await startAppServer();
-  browser = await chromium.launch({ headless: true });
+  browser = await launchBrowser();
 });
 after(async () => { await browser?.close(); await app?.close(); await ctx?.mock.close(); });
 
@@ -21,9 +20,8 @@ async function bucketKeys() {
 }
 async function freshSession() {
   ctx.mock.reset();
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  page.on('pageerror', (e) => process.stderr.write(`[page error] ${e.message}\n`));
+  const context = await newE2EContext(browser);
+  const page = await newE2EPage(context);
   await page.goto(app.url, { waitUntil: 'domcontentloaded' });
   await connectApp(page, ctx.browserEndpoint);
   return { context, page };
@@ -60,7 +58,7 @@ async function waitUntil(pred, timeout = 10000) {
 }
 
 describe('drag-and-drop matrix', () => {
-  test('dragging a file onto the root breadcrumb crumb moves it up a level', async () => {
+  e2eTest('dragging a file onto the root breadcrumb crumb moves it up a level', async () => {
     const { context, page } = await freshSession();
     try {
       await newFolder(page, 'sub');
@@ -81,7 +79,7 @@ describe('drag-and-drop matrix', () => {
     } finally { await context.close(); }
   });
 
-  test('dropping a folder onto itself is rejected — nothing moves', async () => {
+  e2eTest('dropping a folder onto itself is rejected — nothing moves', async () => {
     const { context, page } = await freshSession();
     try {
       await newFolder(page, 'box');
@@ -92,7 +90,7 @@ describe('drag-and-drop matrix', () => {
     } finally { await context.close(); }
   });
 
-  test('dragging one of several selected files moves the whole selection', async () => {
+  e2eTest('dragging one of several selected files moves the whole selection', async () => {
     const { context, page } = await freshSession();
     try {
       await newFolder(page, 'dest');
@@ -119,7 +117,7 @@ describe('drag-and-drop matrix', () => {
 });
 
 describe('BUG-004 — folder picker requests directory mode', () => {
-  test('the folder-picker input has webkitdirectory=true; the file input does not', async () => {
+  e2eTest('the folder-picker input has webkitdirectory=true; the file input does not', async () => {
     const { context, page } = await freshSession();
     try {
       // Two hidden file inputs: [0] = Choose files (multiple), [1] = Choose folder (webkitdirectory).

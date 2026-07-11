@@ -1,25 +1,23 @@
 // Browser e2e — the properties modal's full metadata matrix. Proves the cross-origin HeadObject
 // round-trip surfaces Content-Type, Size, ETag, the original File Modified time, and the custom
 // content-hash stamp — all of which depend on the correct CORS ExposeHeaders (the BUG-028 surface).
-import { test, describe, before, after } from 'node:test';
+import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { chromium } from 'playwright';
-import { startMock, startAppServer, connectApp } from '../harness.mjs';
+import { startMock, startAppServer, connectApp, launchBrowser, newE2EContext, newE2EPage, e2eTest } from '../harness.mjs';
 
 let ctx, app, browser;
 before(async () => {
   ctx = await startMock();
   app = await startAppServer();
-  browser = await chromium.launch({ headless: true });
+  browser = await launchBrowser();
 });
 after(async () => { await browser?.close(); await app?.close(); await ctx?.mock.close(); });
 
 describe('properties modal — full metadata matrix', () => {
-  test('shows Content-Type, Size, ETag, File Modified, and the bucketer content-hash', async () => {
+  e2eTest('shows Content-Type, Size, ETag, File Modified, and the bucketer content-hash', async () => {
     ctx.mock.reset();
-    const context = await browser.newContext();
-    const page = await context.newPage();
-    page.on('pageerror', (e) => process.stderr.write(`[page error] ${e.message}\n`));
+    const context = await newE2EContext(browser);
+    const page = await newE2EPage(context);
     try {
       await page.goto(app.url, { waitUntil: 'domcontentloaded' });
       await connectApp(page, ctx.browserEndpoint);
