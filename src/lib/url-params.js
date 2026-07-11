@@ -5,9 +5,10 @@
 // are never transmitted to the server in HTTP request URLs (REQ-5). The hash is
 // purely client-side; the browser strips it before sending requests.
 //
-// Shareable URLs include only endpoint, bucket, provider, and region — never key ID
-// or secret key. This lets a user share a pre-configured connection URL with a
-// colleague who still authenticates separately.
+// Shareable URLs include endpoint, bucket, provider, and region. The access key ID
+// is included only when explicitly requested (buildShareUrl(creds, { includeKeyId: true })).
+// The secret key is never included, so a recipient always authenticates by entering
+// at least their secret key.
 
 function hashParams() {
   return new URLSearchParams(window.location.hash.slice(1));
@@ -47,15 +48,18 @@ export function hasUrlParams() {
   return ['endpoint', 'bucket', 'provider', 'region'].some(k => p.has(k));
 }
 
-// Build a shareable URL with the connection config in the hash (no credentials).
+// Build a shareable URL with the connection config in the hash. The secret key is
+// never included. The access key ID is included only when includeKeyId is set — this
+// is the "everything but the secret" variant, so a recipient only enters the secret.
 // Returns null when running from file:// (no meaningful origin to share).
-export function buildShareUrl(credentials) {
+export function buildShareUrl(credentials, { includeKeyId = false } = {}) {
   if (window.location.protocol === 'file:') return null;
   const p = new URLSearchParams();
-  if (credentials.endpoint)       p.set('endpoint', credentials.endpoint);
-  if (credentials.bucket)         p.set('bucket',   credentials.bucket);
-  if (credentials.provider)       p.set('provider', credentials.provider);
-  if (credentials.regionOverride) p.set('region',   credentials.regionOverride);
+  if (credentials.endpoint)               p.set('endpoint', credentials.endpoint);
+  if (credentials.bucket)                 p.set('bucket',   credentials.bucket);
+  if (credentials.provider)               p.set('provider', credentials.provider);
+  if (credentials.regionOverride)         p.set('region',   credentials.regionOverride);
+  if (includeKeyId && credentials.keyId)  p.set('keyId',    credentials.keyId);
   const hash = p.toString();
   const base = window.location.origin + window.location.pathname;
   return hash ? `${base}#${hash}` : base;

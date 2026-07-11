@@ -52,6 +52,32 @@ describe('buildShareUrl', () => {
     assert.equal(url, 'https://app.example.com/');
     assert.ok(!url.includes('#'));
   });
+
+  test('includeKeyId:true embeds the key ID in the hash', () => {
+    const url = buildShareUrl(
+      { endpoint: 'https://s3.example.com', bucket: 'my-bucket', keyId: 'AKID123' },
+      { includeKeyId: true },
+    );
+    const p = new URLSearchParams(url.split('#')[1]);
+    assert.equal(p.get('keyId'), 'AKID123');
+  });
+
+  test('includeKeyId:true still never includes the secret key', () => {
+    const url = buildShareUrl(
+      { endpoint: 'https://s3.example.com', bucket: 'my-bucket', keyId: 'AKID123', secretKey: 'supersecret' },
+      { includeKeyId: true },
+    );
+    assert.ok(!url.includes('supersecret'), 'secret key must never appear');
+    assert.ok(!url.includes('secretKey'), 'secretKey param must never appear');
+  });
+
+  test('includeKeyId:true with an empty keyId omits the param', () => {
+    const url = buildShareUrl(
+      { endpoint: 'https://s3.example.com', bucket: 'my-bucket', keyId: '' },
+      { includeKeyId: true },
+    );
+    assert.ok(!url.includes('keyId'), 'empty keyId must not add the param');
+  });
 });
 
 describe('readUrlParams', () => {
