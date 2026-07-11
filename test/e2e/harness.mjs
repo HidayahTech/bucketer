@@ -8,6 +8,9 @@ import { dirname, join } from 'node:path';
 import { createMockS3 } from './mock-s3/server.mjs';
 import { createS3Client } from '../../src/lib/s3-client.js';
 import { chromium, firefox, webkit, devices } from 'playwright';
+import { test } from 'node:test';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { applyEngineQuirks } from './engine-quirks.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const BUCKET = 'test-bucket';
@@ -38,8 +41,11 @@ export function newE2EContext(browser, extra = {}) {
   const dev = e2eDeviceName();
   const profile = dev ? devices[dev] : null;
   if (dev && !profile) throw new Error(`Unknown E2E_DEVICE "${dev}"`);
-  return browser.newContext({ ...(profile || {}), ...extra });
+  return browser.newContext(applyEngineQuirks(e2eEngineName(), profile, extra));
 }
+
+// Re-export so specs that pin their own device (e.g. issue-3-mobile) get the firefox fix too.
+export { applyEngineQuirks };
 
 // Boot a mock S3 server on an ephemeral port and return it plus a real S3 client (built via
 // the app's own createS3Client) pointed at it. provider 'minio' forces path-style addressing.
@@ -92,4 +98,50 @@ export function waitForHttp(url, timeoutMs = 15000) {
     }
     throw new Error(`Timed out waiting for ${url}`);
   })();
+}
+
+// ── Failure capture + e2eTest wrapper ───────────────────────────────────────
+// node:test has no per-test "on failure" hook (unlike @playwright/test), so specs run each
+// test through e2eTest(): on a thrown assertion it writes the active page's screenshot +
+// buffered console log to test/e2e/artifacts/ (git-ignored; CI collects it), then re-throws.
+export const ARTIFACTS_DIR = join(ROOT, 'test', 'e2e', 'artifacts');
+
+let _activePage = null;
+let _activeLogs = [];
+
+// Create the page, register it as active for failure capture, and buffer console/page errors.
+export async function newE2EPage(context) {
+  const page = await context.newPage();
+  const logs = [];
+  page.on('console', (m) => logs.push(`[console:${m.type()}] ${m.text()}`));
+  page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));
+  _activePage = page;
+  _activeLogs = logs;
+  return page;
+}
+
+function slug(name) {
+  const dev = e2eDeviceName();
+  const suffix = `${e2eEngineName()}${dev ? '-' + dev : ''}`;
+  return `${name}-${suffix}`.replace(/[^a-z0-9._-]+/gi, '_').slice(0, 120);
+}
+
+// Write the console log (always) + a best-effort screenshot (the page may be closed already
+// if a spec closes its context in a finally before the throw propagates here).
+export async function captureFailure(basename, page, logs, dir = ARTIFACTS_DIR) {
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(join(dir, `${basename}.log`), (logs || []).join('\n') + '\n');
+  try { if (page) await page.screenshot({ path: join(dir, `${basename}.png`), fullPage: true }); }
+  catch { /* page closed / screenshot unavailable — the log is enough */ }
+}
+
+export function e2eTest(name, fn) {
+  test(name, async (t) => {
+    try {
+      await fn(t);
+    } catch (err) {
+      await captureFailure(slug(name), _activePage, _activeLogs);
+      throw err;
+    }
+  });
 }

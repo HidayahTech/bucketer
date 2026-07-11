@@ -11,3 +11,6 @@ perf/index.html
 
 # aider tool artifacts
 .aider*
+
+# e2e failure artifacts (screenshots + console logs)
+test/e2e/artifacts/
