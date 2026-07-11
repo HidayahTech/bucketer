@@ -35,6 +35,7 @@ import {
 import { readUrlParams, hasUrlParams, buildShareUrl } from '../lib/url-params.js';
 import { FileBanner } from './FileBanner.jsx';
 import { CredentialForm } from './CredentialForm.jsx';
+import { ShareLinkMenu } from './ShareLinkMenu.jsx';
 import { Browser } from './Browser.jsx';
 import { UploadQueue } from './UploadQueue.jsx';
 import { DeleteConfirmModal } from './DeleteConfirmModal.jsx';
@@ -283,15 +284,6 @@ export function App() {
     }
   }
 
-  async function handleCopyLink() {
-    const url = buildShareUrl(credentials);
-    if (!url) return;
-    try {
-      await navigator.clipboard.writeText(url);
-      showToast('Share link copied to clipboard');
-    } catch { /* clipboard API unavailable */ }
-  }
-
   function handleSelectProfile(id) {
     const profile = profiles.find(p => p.id === id);
     if (!profile) return;
@@ -391,16 +383,7 @@ export function App() {
         )}
         <StatusBadge session={session} />
         {session === 'connected' && buildShareUrl(credentials) && (
-          <>
-            <button
-              class="btn btn-ghost btn-sm"
-              style={{ color: '#fff', borderColor: 'rgba(255,255,255,.4)' }}
-              onClick={handleCopyLink}
-              title="Copy a shareable link with endpoint and bucket pre-filled (no credentials)"
-            >
-              Copy link
-            </button>
-          </>
+          <ShareLinkMenu credentials={credentials} />
         )}
         {session === 'connected' && capabilities.list !== 'denied' && (
           <button
