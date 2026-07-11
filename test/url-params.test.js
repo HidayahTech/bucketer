@@ -175,6 +175,12 @@ describe('readUrlParams', () => {
     loc.hash = '#keyId=' + 'A'.repeat(129);
     assert.equal(readUrlParams().keyId, undefined);
   });
+
+  test('accepts a keyId of exactly 128 chars', () => {
+    const k = 'A'.repeat(128);
+    loc.hash = '#keyId=' + k;
+    assert.equal(readUrlParams().keyId, k);
+  });
 });
 
 describe('hasUrlParams', () => {

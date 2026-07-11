@@ -14,7 +14,7 @@ function hashParams() {
   return new URLSearchParams(window.location.hash.slice(1));
 }
 
-// Read config fields from the hash (endpoint, bucket, provider, region).
+// Read config fields from the hash (endpoint, bucket, provider, region, keyId).
 // Returned object is merged over stored credentials so the form is pre-filled.
 export function readUrlParams() {
   const p = hashParams();
