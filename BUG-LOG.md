@@ -4,6 +4,27 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-040 — Mobile: file-table per-row action buttons unreachable (actions column overflow)
+
+**Date:** 2026-07-11
+
+**Symptom:**
+On a phone viewport, the file-table actions column ran past the right edge, so the per-row buttons (properties, rename, download, copy link, move, delete) could not be tapped. Only batch selection + the toolbar worked on mobile (BUG-039 fixed those). Opening the copy-link popover from a row would also have overflowed both screen edges (~445px wide, anchored).
+
+**Root cause:**
+The table had no mobile layout: every non-name column is `white-space: nowrap`, and the six action buttons cannot wrap because JSX emits them with no whitespace between elements — inline-blocks with no text between them have no soft-wrap opportunities, so the actions cell has a fixed ~230px min width that pushed rows past a 393px viewport. The anchored popover (`right: 0`, content up to ~445px wide) is simply wider than a phone.
+
+**Fix (v1.37.3):**
+At ≤640px: hide the two Modified date columns; wrap the row's buttons in an inline `.row-actions` span that becomes a `flex-wrap` container on mobile (with `min-width: 9.5rem` on the cell) so buttons wrap 3–4 per line; enlarge tap targets; re-position the copy-link/share popover as a `position: fixed` lower-viewport sheet. `SortTh` gained a `colClass` passthrough so the Modified header is hideable by class. Desktop rendering unchanged.
+
+**Why it wasn't caught earlier:**
+Two reasons. (1) Same as BUG-039: no mobile testing existed until the cross-engine e2e matrix. (2) More subtle: the existing e2e specs click per-row buttons with `{ force: true }`, which bypasses Playwright's actionability checks — so the mobile matrix stayed green while the buttons were off-screen. Force-clicks silently mask reachability regressions.
+
+**Test case:**
+`test/e2e/browser/issue-49-mobile-actions.test.mjs` (Pixel 5 emulation): asserts no horizontal page overflow, that every file-row and folder-row action button's bounding box sits inside the viewport, per-row delete end-to-end against the mock bucket, and the copy-link popover opening within viewport bounds — all **without** `{ force: true }`. Failed before the fix (button at x=419 on a 393px viewport; popover at x=−128, w=444.75); passes after.
+
+---
+
 ## BUG-039 — Mobile: header controls and modal buttons unreachable (no responsive layout)
 
 **Date:** 2026-07-11
