@@ -1,9 +1,18 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.37.3';
+export const CURRENT_VERSION = '1.37.4';
 
 export const CHANGELOG = [
+  {
+    "version": "1.37.4",
+    "date": "2026-07-12",
+    "title": "Drag-drop uploads no longer die silently on entry failures (BUG-041)",
+    "changes": [
+      "**Fixed:** when FileSystemEntry resolution failed during a drag-drop upload, the drop did",
+      "Internal: the three WebKit e2e skips are removed — the WebKit lane now runs **skip-free**"
+    ]
+  },
   {
     "version": "1.37.3",
     "date": "2026-07-11",

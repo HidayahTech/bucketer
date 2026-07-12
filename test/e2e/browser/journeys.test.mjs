@@ -140,6 +140,13 @@ describe('B6 — move (picker + drag-and-drop)', () => {
 });
 
 // ── B7 — presigned download fetches the bytes through the mock (Auditor) ──────────
+// Asserted at the NETWORK level (the presigned GET and its response), not via Playwright's
+// "download" event: whether the browser chrome converts the <a download> navigation into a
+// download is engine- and state-dependent (WebKit ignores the cross-origin download
+// attribute and, right after an upload, navigates instead of converting the
+// Content-Disposition: attachment response — no event fires). The app's contract is the
+// correctly signed GET with an attachment disposition returning the stored bytes; that is
+// identical on all engines.
 describe('B7 — presigned download', () => {
   e2eTest('clicking Download fetches the presigned URL and returns the file bytes', async () => {
     const { context, page } = await freshSession();
@@ -148,16 +155,20 @@ describe('B7 — presigned download', () => {
       await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: 20000 });
       const row = page.locator('[data-testid="file-row:dl.txt"]');
       await row.waitFor({ timeout: 10000 });
-      const [download] = await Promise.all([
-        page.waitForEvent('download', { timeout: 10000 }),
-        row.locator('button[title="Download"]').click({ force: true }),
+      const [response] = await Promise.all([
+        page.waitForResponse((r) => r.url().includes('X-Amz-Signature') && r.url().includes('dl.txt'), { timeout: 10000 }),
+        row.locator('button[title="Download"]').click(),
       ]);
-      assert.equal(download.suggestedFilename(), 'dl.txt');
-      const stream = await download.createReadStream();
-      const chunks = []; for await (const c of stream) chunks.push(c);
-      assert.equal(Buffer.concat(chunks).toString('utf8'), 'download-me', 'the presigned GET returned the stored bytes');
+      assert.equal(response.status(), 200, 'the presigned GET is accepted (SigV4 verified by the mock)');
+      assert.match(response.headers()['content-disposition'] || '', /attachment/, 'response carries the attachment disposition');
+      // response.body() is unreadable when the engine converts the response into a download
+      // (chromium/firefox), so verify the bytes by re-fetching the same presigned URL —
+      // presigned URLs are reusable until expiry, and this path is identical on all engines.
+      const refetch = await page.request.get(response.url());
+      assert.equal(refetch.status(), 200);
+      assert.equal((await refetch.body()).toString('utf8'), 'download-me', 'the presigned URL returns the stored bytes');
     } finally { await context.close(); }
-  }, { skipOn: { webkit: 'no "download" event is emitted for the cross-origin <a download> presigned navigation in Playwright WebKit (deterministic on all 3 CI device profiles); real Safari still gets Content-Disposition: attachment from the presigned URL. chromium+firefox cover this path. GitLab #48.' } });
+  });
 });
 
 // ── B8 — a denied write flips capability state and surfaces an error (Auditor) ────

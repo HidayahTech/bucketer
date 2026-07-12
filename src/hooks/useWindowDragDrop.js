@@ -12,7 +12,7 @@
 // enqueuing), session state, S3 operations, or credential logic.
 
 import { useState, useEffect, useRef } from 'preact/hooks';
-import { collectFileEntries } from '../lib/file-entries.js';
+import { resolveDroppedFiles } from '../lib/file-entries.js';
 
 // enabled:     true when the drop zone should be active (i.e. session is connected and upload is permitted)
 // addFilesRef: ref to the UploadQueue's addFiles function — called when files are dropped
@@ -65,23 +65,9 @@ export function useWindowDragDrop({ enabled, addFilesRef }) {
     e.stopPropagation();
     counterRef.current = 0;
     setWindowDragOver(false);
-    const fsEntries = [];
-    const items = e.dataTransfer?.items;
-    if (items) {
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        const entry = item.kind === 'file' && (item.getAsEntry?.() ?? item.webkitGetAsEntry?.());
-        if (entry) fsEntries.push(entry);
-      }
-    }
-    if (fsEntries.length) {
-      collectFileEntries(fsEntries).then(fileEntries => {
-        if (fileEntries.length) addFilesRef.current?.(fileEntries);
-      }).catch(() => {});
-    } else {
-      const files = e.dataTransfer?.files;
-      if (files?.length) addFilesRef.current?.(Array.from(files).map(f => ({ file: f, relativePath: f.name })));
-    }
+    resolveDroppedFiles(e.dataTransfer).then(fileEntries => {
+      if (fileEntries.length) addFilesRef.current?.(fileEntries);
+    }).catch(() => {});
   }
 
   return { windowDragOver, handleWindowDrop };

@@ -748,14 +748,28 @@ describe('UploadQueue.jsx — handleDrop is not async (drop-sync)', () => {
 // Modal suppression: dragenter checks document.querySelector('.modal-overlay'); if a modal
 // is open, the overlay is not activated.
 
-describe('useWindowDragDrop.js — imports collectFileEntries (window-drop)', () => {
+describe('useWindowDragDrop.js — uses the shared drop resolver (window-drop, BUG-041)', () => {
   const source = src('hooks/useWindowDragDrop.js');
 
-  test('useWindowDragDrop imports collectFileEntries from file-entries', () => {
+  test('useWindowDragDrop imports resolveDroppedFiles from file-entries', () => {
     assert.ok(
-      /collectFileEntries/.test(source),
-      'useWindowDragDrop.js must import collectFileEntries — the window-drop handler uses it to ' +
-      'traverse FileSystemEntry trees just like the zone-specific drop handlers do'
+      /resolveDroppedFiles/.test(source),
+      'useWindowDragDrop.js must resolve drops via resolveDroppedFiles — the shared resolver ' +
+      'traverses FileSystemEntry trees AND falls back to dataTransfer.files when the entries ' +
+      'yield nothing (BUG-041: WebKit returns truthy entries whose .file() errors NotFoundError; ' +
+      'without the fallback such drops die silently)'
+    );
+  });
+});
+
+describe('Browser.jsx — uses the shared drop resolver (table-drop, BUG-041)', () => {
+  const source = src('components/Browser.jsx');
+
+  test('Browser imports resolveDroppedFiles from file-entries', () => {
+    assert.ok(
+      /resolveDroppedFiles/.test(source),
+      'Browser.jsx handleTableDrop must resolve drops via resolveDroppedFiles (see the ' +
+      'useWindowDragDrop invariant above for the BUG-041 fallback rationale)'
     );
   });
 });

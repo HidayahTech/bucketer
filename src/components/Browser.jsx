@@ -18,7 +18,7 @@ import { defaultMaxKeys } from '../lib/provider.js';
 import { loadMaxKeys, loadListingCacheTTL, loadFileMtimeAutoLoad } from '../lib/storage.js';
 import { pushPrefixHistory } from '../lib/url-params.js';
 import { mediaKind, mimeType, mimeKind } from '../lib/media.js';
-import { collectFileEntries } from '../lib/file-entries.js';
+import { resolveDroppedFiles } from '../lib/file-entries.js';
 import { PRESIGN_EXPIRES, TEXT_PREVIEW_LIMIT, FILE_MTIME_KEY } from '../lib/constants.js';
 import { nameComparator, numericComparator } from '../lib/sort.js';
 import { validateObjectName } from '../lib/validate-object-name.js';
@@ -434,23 +434,9 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     dragCounterRef.current = 0;
     setTableDragOver(false);
     if (!onExternalDrop) return;
-    const fsEntries = [];
-    const items = e.dataTransfer?.items;
-    if (items) {
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        const entry = item.kind === 'file' && (item.getAsEntry?.() ?? item.webkitGetAsEntry?.());
-        if (entry) fsEntries.push(entry);
-      }
-    }
-    if (fsEntries.length) {
-      collectFileEntries(fsEntries).then(fileEntries => {
-        if (fileEntries.length) onExternalDrop(fileEntries);
-      }).catch(() => {});
-    } else {
-      const files = e.dataTransfer?.files;
-      if (files?.length) onExternalDrop(Array.from(files).map(f => ({ file: f, relativePath: f.name })));
-    }
+    resolveDroppedFiles(e.dataTransfer).then(fileEntries => {
+      if (fileEntries.length) onExternalDrop(fileEntries);
+    }).catch(() => {});
   }
 
   async function handleShowMeta(obj) {

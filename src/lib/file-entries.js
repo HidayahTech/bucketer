@@ -31,3 +31,29 @@ export async function collectFileEntries(entries) {
   await Promise.all(entries.map(entry => traverse(entry, '')));
   return result;
 }
+
+// Resolve a drop's DataTransfer into { file, relativePath } pairs. Prefers the
+// FileSystemEntry path (preserves folder structure), but falls back to the flat
+// dataTransfer.files list when the entries yield nothing or fail (BUG-041: WebKit
+// returns truthy entries for synthetic DataTransfers whose .file() then errors
+// NotFoundError — without the fallback such a drop dies silently).
+export async function resolveDroppedFiles(dataTransfer) {
+  if (!dataTransfer) return [];
+  const fsEntries = [];
+  const items = dataTransfer.items;
+  if (items) {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const entry = item.kind === 'file' && (item.getAsEntry?.() ?? item.webkitGetAsEntry?.());
+      if (entry) fsEntries.push(entry);
+    }
+  }
+  // Snapshot the flat list synchronously — a DataTransfer is not reliably readable
+  // after an await.
+  const flat = dataTransfer.files ? Array.from(dataTransfer.files) : [];
+  if (fsEntries.length) {
+    const fileEntries = await collectFileEntries(fsEntries).catch(() => []);
+    if (fileEntries.length) return fileEntries;
+  }
+  return flat.map(f => ({ file: f, relativePath: f.name }));
+}

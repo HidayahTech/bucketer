@@ -4,6 +4,27 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-041 — Drag-drop upload dies silently when FileSystemEntry resolution fails (WebKit)
+
+**Date:** 2026-07-12
+
+**Symptom:**
+In WebKit, drag-dropping files onto the app did nothing — no upload, no error. Surfaced as the two deterministic WebKit e2e failures (`issue-2-drop-destination`, `issue-4-refresh` part 2) that were initially skipped as "harness emulation gaps"; the containerized WebKit loop (#47) allowed a proper diagnosis, which proved the app itself was at fault.
+
+**Root cause:**
+Both drop handlers (`Browser.jsx handleTableDrop`, `useWindowDragDrop.js handleWindowDrop`) prefer the `webkitGetAsEntry()` path and fall back to `dataTransfer.files` only when **no** item yields an entry. Probed per engine: Chromium returns `null` entries for synthetic DataTransfers (→ fallback works), but WebKit returns **truthy** entries (`isFile=true`, correct name) whose `.file()` callback then errors `NotFoundError`. `collectFileEntries` skips unreadable files, resolving `[]`, and `if (fileEntries.length)` + `.catch(() => {})` swallowed the drop with no user feedback — a silent-failure path for ANY entry-resolution failure, not just synthetic drops.
+
+**Fix (v1.37.4):**
+Extracted the duplicated resolution logic into `resolveDroppedFiles(dataTransfer)` in `src/lib/file-entries.js`: entries path first (preserves folder structure), but when it yields nothing or rejects, fall back to the synchronously-snapshotted flat `dataTransfer.files` list. Both handlers now share it. Also removed the three WebKit e2e skips; B7 (presigned download) was separately rewritten to assert the app's network-level contract (presigned GET status/disposition/bytes) instead of Playwright's engine- and state-dependent `download` event — instrumentation showed WebKit ignores the cross-origin `download` attribute and, right after an upload, navigates instead of converting the `attachment` response, so the event never fires there.
+
+**Why it wasn't caught earlier:**
+The failure needed WebKit + an entries-path failure, and every failure mode was silenced (`() => resolve()` skip, `.catch(() => {})`, `if (length)`). WebKit could not run locally until #47, and once CI showed the failures they pattern-matched to "synthetic-event emulation gap" — the initial skip reasons were plausible but wrong. Only a per-engine probe of each link in the chain (constructor → items.add → DragEvent init → getAsEntry → entry.file()) isolated the real break.
+
+**Test case:**
+Unit: `test/file-entries.test.js` — `resolveDroppedFiles` falls back to `files` when a truthy entry's `.file()` errors (the exact WebKit shape), when entries are null (Chromium shape), and on degenerate inputs. Structural: `source-invariants.test.js` requires both drop handlers to use `resolveDroppedFiles`. E2E: the previously-skipped specs now run and pass on WebKit (container + CI), skip-free.
+
+---
+
 ## BUG-040 — Mobile: file-table per-row action buttons unreachable (actions column overflow)
 
 **Date:** 2026-07-11

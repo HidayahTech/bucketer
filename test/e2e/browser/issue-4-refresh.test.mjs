@@ -47,7 +47,7 @@ describe('issue #4 part 2 — a sub-folder created by an upload appears without 
       await page.locator('[data-testid="folder-row:newdir"]').waitFor({ timeout: 15000 });
       assert.equal(await page.locator('[data-testid="folder-row:newdir"]').count(), 1);
     } finally { await context.close(); }
-  }, { skipOn: { webkit: 'synthetic file-bearing DataTransfer drops never reach the app in Playwright WebKit (deterministic on all 3 CI device profiles) — harness emulation gap, not an app bug; chromium+firefox cover this path. GitLab #48.' } });
+  });
 });
 
 describe('issue #4 part 1 — the Refresh button pulls changes made by another client', () => {

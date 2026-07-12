@@ -7,6 +7,19 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.37.4] — 2026-07-12 — Drag-drop uploads no longer die silently on entry failures (BUG-041)
+
+- **Fixed:** when FileSystemEntry resolution failed during a drag-drop upload, the drop did
+  nothing — no upload, no error. WebKit hit this deterministically (its `webkitGetAsEntry()`
+  returns entries whose `.file()` errors for synthetic DataTransfers), but the silent-failure
+  path existed for any entry-resolution failure on any engine. Both drop handlers now share
+  `resolveDroppedFiles()`, which falls back to the flat `dataTransfer.files` list when the
+  entries path yields nothing (BUG-041).
+- Internal: the three WebKit e2e skips are removed — the WebKit lane now runs **skip-free**
+  (the two drop specs pass via the fix; the presigned-download spec now asserts the app's
+  network-level contract instead of Playwright's engine-dependent `download` event). Diagnosed
+  with per-engine probes in the #47 e2e container.
+
 ## [1.37.3] — 2026-07-11 — Mobile: per-row file-table actions reachable (reflow)
 
 - **Fixed:** on phone viewports the file-table actions column ran past the right edge, so the

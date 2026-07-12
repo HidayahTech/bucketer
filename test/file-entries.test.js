@@ -6,7 +6,7 @@
 // after the first call would silently drop files in large directories.
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { collectFileEntries } from '../src/lib/file-entries.js';
+import { collectFileEntries, resolveDroppedFiles } from '../src/lib/file-entries.js';
 
 // ── Mock FileSystemEntry helpers ──────────────────────────────────────────────
 
@@ -183,5 +183,64 @@ describe('collectFileEntries — error resilience', () => {
     const result = await collectFileEntries([unreadable, fileEntry('good.txt')]);
     assert.equal(result.length, 1);
     assert.equal(result[0].relativePath, 'good.txt');
+  });
+});
+
+// ── resolveDroppedFiles — DataTransfer resolution with WebKit fallback (BUG-041) ──
+// WebKit returns truthy webkitGetAsEntry() results for synthetic DataTransfers whose
+// .file() then errors NotFoundError; the entries path yields nothing and the drop must
+// fall back to the flat dataTransfer.files list instead of dying silently.
+
+function mockDataTransfer({ items = [], files = [] } = {}) {
+  return { items, files };
+}
+function itemWithEntry(entry) {
+  return { kind: 'file', webkitGetAsEntry: () => entry };
+}
+
+describe('resolveDroppedFiles — entries path', () => {
+  test('working entries win and preserve relative paths', async () => {
+    const dt = mockDataTransfer({
+      items: [itemWithEntry(directoryEntry('dir', [fileEntry('in.txt')]))],
+      files: [makeFile('ignored.txt')],
+    });
+    const result = await resolveDroppedFiles(dt);
+    assert.equal(result.length, 1);
+    assert.equal(result[0].relativePath, 'dir/in.txt');
+  });
+
+  test('null entries (chromium synthetic drops) fall back to files', async () => {
+    const dt = mockDataTransfer({
+      items: [{ kind: 'file', webkitGetAsEntry: () => null }],
+      files: [makeFile('flat.txt')],
+    });
+    const result = await resolveDroppedFiles(dt);
+    assert.equal(result.length, 1);
+    assert.equal(result[0].relativePath, 'flat.txt');
+  });
+
+  test('BUG-041: truthy entries whose file() errors fall back to files', async () => {
+    const broken = { isFile: true, isDirectory: false, name: 'a.txt', file: (_ok, err) => err(new Error('NotFoundError')) };
+    const dt = mockDataTransfer({ items: [itemWithEntry(broken)], files: [makeFile('a.txt')] });
+    const result = await resolveDroppedFiles(dt);
+    assert.equal(result.length, 1, 'the drop must not die silently');
+    assert.equal(result[0].relativePath, 'a.txt');
+  });
+});
+
+describe('resolveDroppedFiles — degenerate inputs', () => {
+  test('no dataTransfer → empty list', async () => {
+    assert.deepEqual(await resolveDroppedFiles(null), []);
+    assert.deepEqual(await resolveDroppedFiles(undefined), []);
+  });
+
+  test('no items and no files → empty list', async () => {
+    assert.deepEqual(await resolveDroppedFiles(mockDataTransfer()), []);
+  });
+
+  test('files only (no items API) → flat entries', async () => {
+    const result = await resolveDroppedFiles({ files: [makeFile('x.bin')] });
+    assert.equal(result[0].relativePath, 'x.bin');
+    assert.ok(result[0].file);
   });
 });
