@@ -24,9 +24,12 @@ test:
 # End-to-end tests against the in-repo stateful mock S3. Split into the engine-agnostic
 # node-integration layer and a cross-engine + mobile browser matrix. The Playwright image
 # ships chromium+firefox+webkit with their deps, so all three run in CI (WebKit cannot run on
-# a stock host — see GitLab #47). allow_failure keeps the matrix advisory while it stabilizes;
-# flip to required once it has a green track record. JUnit -> MR test summary; the browser
-# jobs also upload on-failure screenshots + console logs (artifacts, when: always).
+# a stock host — see GitLab #47). Chromium + Firefox are BLOCKING (#48 Part 2: green track
+# record across all device profiles). WebKit runs as a separate advisory job: its three
+# engine-specific emulation gaps are skipped in-suite with documented reasons (e2eTest skipOn,
+# see engine-quirks.mjs); flip it to blocking once it has its own green track record.
+# JUnit -> MR test summary; the browser jobs also upload on-failure screenshots + console
+# logs (artifacts, when: always).
 .e2e-base:
   stage: test
   image: mcr.microsoft.com/playwright:v1.60.0-jammy
@@ -55,12 +58,8 @@ e2e-node:
   script:
     - npm run test:e2e node
 
-e2e-browser:
+.e2e-browser-base:
   extends: .e2e-base
-  parallel:
-    matrix:
-      - E2E_ENGINE: [chromium, firefox, webkit]
-        E2E_DEVICE: ["", "Pixel 5", "iPhone 13"]
   script:
     - npm run test:e2e browser
   artifacts:
@@ -70,6 +69,21 @@ e2e-browser:
     paths:
       - test/e2e/artifacts/
     expire_in: 1 week
+
+e2e-browser:
+  extends: .e2e-browser-base
+  allow_failure: false
+  parallel:
+    matrix:
+      - E2E_ENGINE: [chromium, firefox]
+        E2E_DEVICE: ["", "Pixel 5", "iPhone 13"]
+
+e2e-browser-webkit:
+  extends: .e2e-browser-base
+  parallel:
+    matrix:
+      - E2E_ENGINE: [webkit]
+        E2E_DEVICE: ["", "Pixel 5", "iPhone 13"]
 
 # Re-applies the GitHub mirror's `collaborators_only` interaction limit, which GitHub auto-expires
 # after 6 months (there is no permanent setting on a public, non-archived repo). Runs ONLY from a

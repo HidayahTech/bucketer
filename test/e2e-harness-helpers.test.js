@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, existsSync, readFileSync, rmSync, writeFileSync as writeFileSyncStub } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { applyEngineQuirks } from './e2e/engine-quirks.mjs';
+import { applyEngineQuirks, skipReasonFor } from './e2e/engine-quirks.mjs';
 import { captureFailure } from './e2e/harness.mjs';
 
 describe('applyEngineQuirks', () => {
@@ -23,6 +23,24 @@ describe('applyEngineQuirks', () => {
   });
   test('extra overrides win', () => {
     assert.equal(applyEngineQuirks('chromium', mobile, { isMobile: false }).isMobile, false);
+  });
+});
+
+describe('skipReasonFor', () => {
+  test('returns the reason when the engine is listed', () => {
+    assert.equal(skipReasonFor('webkit', { webkit: 'DataTransfer gap' }), 'DataTransfer gap');
+  });
+  test('returns null when the engine is not listed', () => {
+    assert.equal(skipReasonFor('chromium', { webkit: 'DataTransfer gap' }), null);
+    assert.equal(skipReasonFor('firefox', { webkit: 'DataTransfer gap' }), null);
+  });
+  test('returns null without a skipOn map', () => {
+    assert.equal(skipReasonFor('webkit', undefined), null);
+    assert.equal(skipReasonFor('webkit', null), null);
+  });
+  test('throws on a listed engine with a missing/empty reason (skips must be documented)', () => {
+    assert.throws(() => skipReasonFor('webkit', { webkit: '' }), /non-empty reason/);
+    assert.throws(() => skipReasonFor('webkit', { webkit: true }), /non-empty reason/);
   });
 });
 

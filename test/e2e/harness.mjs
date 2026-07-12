@@ -10,7 +10,7 @@ import { createS3Client } from '../../src/lib/s3-client.js';
 import { chromium, firefox, webkit, devices } from 'playwright';
 import { test } from 'node:test';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { applyEngineQuirks } from './engine-quirks.mjs';
+import { applyEngineQuirks, skipReasonFor } from './engine-quirks.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const BUCKET = 'test-bucket';
@@ -135,7 +135,15 @@ export async function captureFailure(basename, page, logs, dir = ARTIFACTS_DIR) 
   catch { /* page closed / screenshot unavailable — the log is enough */ }
 }
 
-export function e2eTest(name, fn) {
+// opts.skipOn = { engineName: 'documented reason' } skips the test on that engine
+// (surfaced as a skip with its reason in TAP/JUnit, not a silent pass). Use for
+// engine-specific emulation gaps — see GitLab #48.
+export function e2eTest(name, fn, opts = {}) {
+  const skipReason = skipReasonFor(e2eEngineName(), opts.skipOn);
+  if (skipReason) {
+    test(name, { skip: skipReason }, () => {});
+    return;
+  }
   test(name, async (t) => {
     try {
       await fn(t);

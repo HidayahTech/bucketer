@@ -157,7 +157,7 @@ describe('B7 — presigned download', () => {
       const chunks = []; for await (const c of stream) chunks.push(c);
       assert.equal(Buffer.concat(chunks).toString('utf8'), 'download-me', 'the presigned GET returned the stored bytes');
     } finally { await context.close(); }
-  });
+  }, { skipOn: { webkit: 'no "download" event is emitted for the cross-origin <a download> presigned navigation in Playwright WebKit (deterministic on all 3 CI device profiles); real Safari still gets Content-Disposition: attachment from the presigned URL. chromium+firefox cover this path. GitLab #48.' } });
 });
 
 // ── B8 — a denied write flips capability state and surfaces an error (Auditor) ────
