@@ -144,9 +144,32 @@ E2E_ENGINE=chromium E2E_DEVICE="Pixel 5" npm run test:e2e browser   # mobile pro
 ```
 
 `E2E_ENGINE` ∈ `chromium|firefox|webkit`; `E2E_DEVICE` is a Playwright device name (empty =
-desktop). GitLab CI runs the full 3×3 matrix on the official Playwright image. WebKit needs
-system libraries that a stock host lacks — run the full matrix locally in a container instead
-(GitLab #47). On-failure screenshots + console logs land in `test/e2e/artifacts/`.
+desktop). GitLab CI runs the full 3×3 matrix on the official Playwright image. On-failure
+screenshots + console logs land in `test/e2e/artifacts/`.
+
+To run several combos in one invocation, use the matrix runner (node layer once, then the
+browser layer per engine × device):
+
+```bash
+npm run test:e2e:matrix                                    # full 3×3 matrix (needs all engines)
+E2E_ENGINES=chromium,firefox npm run test:e2e:matrix       # host-safe subset
+E2E_DEVICES="desktop,Pixel 5" npm run test:e2e:matrix      # chosen devices ("desktop" = no profile)
+```
+
+WebKit needs system libraries a stock host lacks (`playwright install-deps` does not support
+Fedora), so the **full** matrix runs locally in a container (GitLab #47):
+
+```bash
+npm run test:e2e:container                     # full 3×3 matrix in the Playwright image
+E2E_ENGINES=webkit npm run test:e2e:container  # containerized WebKit-only lane
+```
+
+The wrapper prefers rootless Podman (Fedora default) and falls back to Docker. It uses the
+same `mcr.microsoft.com/playwright` image as CI, pinned to the *locked* playwright version
+(a unit test keeps `.gitlab-ci.yml` in lockstep). The repo bind-mounts with `:Z` (SELinux
+relabel); `node_modules` inside the container lives on a named volume
+(`bucketer-e2e-node_modules`) with its own `npm ci`, so host `node_modules` is never touched.
+First run downloads the ~2 GB image and installs dependencies; later runs skip both.
 
 ---
 

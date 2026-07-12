@@ -10,6 +10,8 @@
     "test:e2e": "node test/e2e/run.mjs",
     "test:e2e:node": "node test/e2e/run.mjs node",
     "test:e2e:browser": "node test/e2e/run.mjs browser",
+    "test:e2e:matrix": "node test/e2e/run-matrix.mjs",
+    "test:e2e:container": "node scripts/e2e-container.mjs",
     "bench": "node perf/bench-algorithms.mjs",
     "perftest": "node perf/run.mjs",
     "prepare": "git config core.hooksPath .githooks 2>/dev/null; git config push.followTags true 2>/dev/null; true"

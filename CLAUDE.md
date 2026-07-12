@@ -109,7 +109,14 @@ npm run build   # → dist/index.html
 npm run serve   # dev build + localhost:3000
 npm test        # unit + structural + build tests (no browser required)
 npm run test:ui # component rendering tests (jsdom — no real browser required)
+npm run test:e2e:matrix    # e2e across E2E_ENGINES × E2E_DEVICES ("desktop" = no profile)
+npm run test:e2e:container # full 3×3 e2e matrix incl. WebKit, in the Playwright image (Podman/Docker)
 ```
+
+WebKit cannot run natively on a stock Fedora host — use `test:e2e:container` for anything
+WebKit. The container image tag derives from the locked playwright version in
+`package-lock.json`; a unit test (`test/e2e-matrix-helpers.test.js`) fails if
+`.gitlab-ci.yml` pins a different image, so bump the dependency and the CI image together.
 
 ## Claude Code Setup
 
