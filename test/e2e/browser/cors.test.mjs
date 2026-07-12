@@ -102,9 +102,16 @@ describe('B2 — BUG-012: HTTP DELETE must be in CORS AllowedMethods', () => {
 
 async function renameRow(page, name, newName) {
   const row = page.locator(`[data-testid="file-row:${name}"]`);
-  await row.locator('button[title="Rename"]').click();
   const input = row.locator('input.rename-input');
-  await input.waitFor({ timeout: 5000 });
+  // The post-upload listing refetch re-renders rows and can replace the node between
+  // click resolution and dispatch, silently losing the click (same instability batch.test's
+  // selectRow documents; flaked on firefox desktop, pipeline #185). Retry until the rename
+  // input actually opens.
+  for (let attempt = 0; ; attempt++) {
+    await row.locator('button[title="Rename"]').click();
+    try { await input.waitFor({ timeout: 2500 }); break; }
+    catch (err) { if (attempt >= 2) throw err; }
+  }
   await input.fill(newName);
   await input.press('Enter');
   // Let the copy+delete round-trip settle (success or blocked).
