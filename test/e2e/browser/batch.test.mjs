@@ -113,7 +113,6 @@ describe('select-all, filter, sort', () => {
     const { context, page } = await freshSession();
     try {
       await uploadFiles(page, ['a.txt', 'b.txt', 'c.txt']);
-      const names = async () => (await page.locator('tbody tr.file-row [data-testid^="file-row:"], tbody tr.file-row').allTextContents());
       // Default is name ascending. Click Name once → toggles to descending.
       await page.locator('th:has-text("Name")').click();
       // Scope to the listing table — the UploadLog also renders tr.file-row rows (no
