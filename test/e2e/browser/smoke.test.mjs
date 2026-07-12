@@ -56,7 +56,10 @@ describe('browser e2e — connect, upload, list, delete', () => {
   });
 
   e2eTest('deleting the file removes it from the bucket and the listing', async () => {
-    const row = page.locator('tr.file-row', { hasText: 'e2e-upload.txt' });
+    // data-testid, NOT `tr.file-row hasText` — the UploadLog also renders tr.file-row rows
+    // containing the just-uploaded filename, and matching one (hidden) makes the detach
+    // wait below time out (flaked on firefox desktop, pipeline #181).
+    const row = page.locator('[data-testid="file-row:e2e-upload.txt"]');
     await row.locator('button[title="Delete"]').click({ force: true });
     // DeleteConfirmModal → confirm, then wait for the modal to close (confirm fired).
     const modal = page.locator('.modal-overlay');
@@ -65,7 +68,7 @@ describe('browser e2e — connect, upload, list, delete', () => {
     await modal.waitFor({ state: 'detached', timeout: 5000 });
 
     // DOM: the row is removed (auto-retries until the optimistic re-render flushes).
-    await page.locator('tr.file-row', { hasText: 'e2e-upload.txt' }).waitFor({ state: 'detached', timeout: 10000 });
+    await page.locator('[data-testid="file-row:e2e-upload.txt"]').waitFor({ state: 'detached', timeout: 10000 });
     // Real bucket state: poll until the delete lands server-side.
     await waitForKeys([]);
   });

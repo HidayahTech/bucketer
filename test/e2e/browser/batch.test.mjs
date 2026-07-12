@@ -116,7 +116,9 @@ describe('select-all, filter, sort', () => {
       const names = async () => (await page.locator('tbody tr.file-row [data-testid^="file-row:"], tbody tr.file-row').allTextContents());
       // Default is name ascending. Click Name once → toggles to descending.
       await page.locator('th:has-text("Name")').click();
-      const order = await page.locator('tbody tr.file-row').evaluateAll((rows) => rows.map((r) => r.getAttribute('data-testid')));
+      // Scope to the listing table — the UploadLog also renders tr.file-row rows (no
+      // data-testid), which would inject nulls into the order assertion.
+      const order = await page.locator('.file-table tbody tr.file-row').evaluateAll((rows) => rows.map((r) => r.getAttribute('data-testid')));
       assert.deepEqual(order, ['file-row:c.txt', 'file-row:b.txt', 'file-row:a.txt'], 'descending name order');
     } finally { await context.close(); }
   });
