@@ -187,6 +187,22 @@ describe('SortTh — active column', () => {
   });
 });
 
+describe('SortTh — colClass passthrough (#49 mobile column hiding)', () => {
+  test('appends colClass to the th class list', () => {
+    const { query, cleanup } = mount(h(SortTh, { col: 'modified', sortCol: 'name', sortDir: 'asc', onSort: () => {}, colClass: 'col-modified', children: 'Modified' }));
+    const th = query('th');
+    assert.ok(th.className.includes('col-modified'), 'colClass must appear on the th');
+    assert.ok(th.className.includes('col-sortable'), 'base col-sortable class must be preserved');
+    cleanup();
+  });
+
+  test('omitting colClass leaves the class list unchanged', () => {
+    const { query, cleanup } = mount(h(SortTh, { col: 'name', sortCol: 'name', sortDir: 'asc', onSort: () => {}, children: 'Name' }));
+    assert.equal(query('th').className, 'col-sortable col-sort-active', 'class list without colClass must be exactly the base classes');
+    cleanup();
+  });
+});
+
 // ─── CopyLinkPopover ─────────────────────────────────────────────────────────
 
 // Mock S3 client that never resolves (we only test the UI, not the URL generation)

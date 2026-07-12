@@ -1130,7 +1130,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                 </th>
                 <SortTh col="name" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort}>Name</SortTh>
                 <SortTh col="size" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort}>Size</SortTh>
-                <SortTh col="modified" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort}>Modified</SortTh>
+                <SortTh col="modified" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort} colClass="col-modified">Modified</SortTh>
                 <th
                   class="col-file-modified"
                   onClick={!mtimeLoadEnabled ? () => setMtimeLoadEnabled(true) : undefined}
@@ -1191,6 +1191,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                     <td class="col-modified"></td>
                     <td class="col-file-modified"></td>
                     <td class="col-actions">
+                      <span class="row-actions">
                       <button
                         class="btn btn-ghost btn-sm"
                         style={{ marginRight: '.25rem' }}
@@ -1212,6 +1213,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                         disabled={!canDelete}
                         title={!canDelete ? 'Delete not permitted with current credentials' : 'Delete folder and all contents'}
                       >✕</button>
+                      </span>
                     </td>
                   </tr>
                 );
@@ -1277,6 +1279,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                       })()}
                     </td>
                     <td class="col-actions">
+                      <span class="row-actions">
                       <button
                         class="btn btn-ghost btn-sm"
                         onClick={e => { e.stopPropagation(); handleShowMeta(obj); }}
@@ -1340,6 +1343,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                       >
                         ✕
                       </button>
+                      </span>
                     </td>
                   </tr>
                 );

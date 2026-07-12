@@ -1081,4 +1081,27 @@ details[open] .sv-summary::before { transform: rotate(90deg); }
 
   /* Any modal fits the viewport; a tall one scrolls so its footer stays reachable. */
   .modal-dialog { max-width: min(94vw, 480px); max-height: 88vh; overflow-y: auto; }
+
+  /* Slice 2 (#49): file-table actions reachable on a phone. Drop the two date
+     columns (least useful at this width), let the action buttons wrap inside
+     their cell instead of forcing the row past the right edge, and enlarge
+     the tap targets. Flex is required for the wrap: JSX emits the buttons with
+     no whitespace between them, so inline-blocks have no soft-wrap points. */
+  .file-table .col-modified,
+  .file-table .col-file-modified { display: none; }
+  .file-table .col-actions { min-width: 9.5rem; }
+  .file-table .col-actions .row-actions {
+    display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center;
+  }
+  .file-table .btn-sm { padding: .5rem .55rem; }
+
+  /* The copy-link/share popover is right-anchored inside the row and wider than
+     a phone; anchored, it runs off both edges. Pin it to the lower viewport as
+     a sheet instead (its click-outside close behavior is unaffected). */
+  .copy-link-popover,
+  .copy-link-popover--up {
+    position: fixed;
+    left: 3vw; right: 3vw; top: auto; bottom: 8vh;
+    min-width: 0;
+  }
 }

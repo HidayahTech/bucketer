@@ -1,9 +1,19 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.37.2';
+export const CURRENT_VERSION = '1.37.3';
 
 export const CHANGELOG = [
+  {
+    "version": "1.37.3",
+    "date": "2026-07-11",
+    "title": "Mobile: per-row file-table actions reachable (reflow)",
+    "changes": [
+      "**Fixed:** on phone viewports the file-table actions column ran past the right edge, so the",
+      "Desktop layout is unchanged (all rules live in the mobile media query; the buttons gained an",
+      "Internal: new mobile e2e (issue-49-mobile-actions) asserts no horizontal overflow, that every"
+    ]
+  },
   {
     "version": "1.37.2",
     "date": "2026-07-11",

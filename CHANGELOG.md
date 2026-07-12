@@ -7,6 +7,22 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.37.3] — 2026-07-11 — Mobile: per-row file-table actions reachable (reflow)
+
+- **Fixed:** on phone viewports the file-table actions column ran past the right edge, so the
+  per-row buttons (properties, rename, download, copy link, move, delete) were unreachable —
+  only batch selection + the toolbar worked on mobile (#49, slice 2 of the mobile-responsive
+  work). At ≤640px the two Modified date columns are now hidden and the action buttons wrap
+  onto additional lines inside the row, with slightly larger tap targets, so every per-row
+  action is reachable. The copy-link/share popover — wider than a phone screen — now opens as
+  a lower-viewport sheet on mobile instead of an anchored popover.
+- Desktop layout is unchanged (all rules live in the mobile media query; the buttons gained an
+  inline wrapper that does not affect desktop rendering).
+- Internal: new mobile e2e (`issue-49-mobile-actions`) asserts no horizontal overflow, that every
+  per-row button's bounding box sits inside the viewport, and exercises per-row delete plus the
+  copy-link sheet on a Pixel 5 profile **without force-clicks** (force-clicks are how the earlier
+  matrix stayed green while the buttons were off-screen).
+
 ## [1.37.2] — 2026-07-11 — Mobile: responsive shell (header wraps, modals fit)
 
 - **Fixed:** on narrow (phone) viewports the header controls ran off the right edge —
