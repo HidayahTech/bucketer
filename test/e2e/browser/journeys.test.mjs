@@ -18,6 +18,15 @@ async function bucketKeys() {
   const r = await ctx.client.send(new ListObjectsV2Command({ Bucket: BUCKET }));
   return (r.Contents || []).map((o) => o.Key).sort();
 }
+// Poll for the COMPLETE final bucket state. Move = copy-then-delete (per file, pool of
+// workers) — waiting for a single relocated key and then asserting the rest races a slow
+// runner that observes the copy before the delete (or a sibling file mid-move).
+async function waitForKeys(expected, timeout = 10000) {
+  const want = JSON.stringify(expected); const deadline = Date.now() + timeout;
+  let keys = await bucketKeys();
+  while (JSON.stringify(keys) !== want && Date.now() < deadline) { await new Promise((r) => setTimeout(r, 150)); keys = await bucketKeys(); }
+  assert.deepEqual(keys, expected);
+}
 async function freshSession() {
   ctx.mock.reset();
   const context = await newE2EContext(browser);
@@ -101,10 +110,7 @@ describe('B6 — move (picker + drag-and-drop)', () => {
       await page.locator('.move-here').click();
 
       // Relocated in the bucket (alongside the dest/ folder-marker) and out of the root listing.
-      const deadline = Date.now() + 10000; let keys = await bucketKeys();
-      while (!keys.includes('dest/m.txt') && Date.now() < deadline) { await page.waitForTimeout(150); keys = await bucketKeys(); }
-      assert.ok(keys.includes('dest/m.txt'), 'object moved under dest/');
-      assert.ok(!keys.includes('m.txt'), 'original removed from root');
+      await waitForKeys(['dest/', 'dest/m.txt']);
     } finally { await context.close(); }
   });
 
@@ -131,10 +137,7 @@ describe('B6 — move (picker + drag-and-drop)', () => {
         src.dispatchEvent(new DragEvent('dragend', { bubbles: true, cancelable: true, dataTransfer: dt }));
       });
 
-      const deadline = Date.now() + 10000; let keys = await bucketKeys();
-      while (!keys.includes('box/drag.txt') && Date.now() < deadline) { await page.waitForTimeout(150); keys = await bucketKeys(); }
-      assert.ok(keys.includes('box/drag.txt'), 'the dragged file moved into the folder');
-      assert.ok(!keys.includes('drag.txt'), 'the original is gone from root');
+      await waitForKeys(['box/', 'box/drag.txt']);
     } finally { await context.close(); }
   });
 });
@@ -163,10 +166,21 @@ describe('B7 — presigned download', () => {
       assert.match(response.headers()['content-disposition'] || '', /attachment/, 'response carries the attachment disposition');
       // response.body() is unreadable when the engine converts the response into a download
       // (chromium/firefox), so verify the bytes by re-fetching the same presigned URL —
-      // presigned URLs are reusable until expiry, and this path is identical on all engines.
-      const refetch = await page.request.get(response.url());
-      assert.equal(refetch.status(), 200);
-      assert.equal((await refetch.body()).toString('utf8'), 'download-me', 'the presigned URL returns the stored bytes');
+      // reusable until expiry. Constraints: the fetch must run IN A PAGE (browsers resolve
+      // the virtual-hosted *.localhost endpoint themselves; node-side page.request uses the
+      // OS resolver, which lacks *.localhost on CI runners → ENOTFOUND), and in a page that
+      // will not navigate (WebKit navigates the clicked page to the presigned URL,
+      // destroying its execution context). A fresh page on the app origin satisfies both;
+      // the mock serves CORS headers.
+      const fetcher = await context.newPage();
+      await fetcher.goto(app.url, { waitUntil: 'domcontentloaded' });
+      const refetch = await fetcher.evaluate(async (u) => {
+        const r = await fetch(u);
+        return { status: r.status, text: await r.text() };
+      }, response.url());
+      await fetcher.close();
+      assert.equal(refetch.status, 200);
+      assert.equal(refetch.text, 'download-me', 'the presigned URL returns the stored bytes');
     } finally { await context.close(); }
   });
 });

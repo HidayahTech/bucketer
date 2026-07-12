@@ -76,10 +76,10 @@ describe('batch move', () => {
       await page.locator('.move-picker-folder', { hasText: 'dest' }).click();
       await page.locator('.move-here').click();
 
-      const deadline = Date.now() + 10000; let keys = await bucketKeys();
-      while (!keys.includes('dest/x.txt') && Date.now() < deadline) { await page.waitForTimeout(150); keys = await bucketKeys(); }
-      assert.ok(keys.includes('dest/x.txt') && keys.includes('dest/y.txt'), 'both selected files moved');
-      assert.ok(keys.includes('z.txt') && !keys.includes('x.txt') && !keys.includes('y.txt'), 'unselected file stays, originals gone');
+      // Move = copy-then-delete per file, and the pool finishes files independently —
+      // poll for the COMPLETE final state, not just the first relocated key (a slow
+      // runner otherwise observes x.txt done while y.txt is still mid-move).
+      await waitForKeys(['dest/', 'dest/x.txt', 'dest/y.txt', 'z.txt']);
     } finally { await context.close(); }
   });
 });
