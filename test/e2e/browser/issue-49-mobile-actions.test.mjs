@@ -39,10 +39,18 @@ async function assertButtonsInViewport(page, rowLocator, label) {
   }
 }
 
+// Long enough that its nowrap width alone exceeds a phone viewport — BUG-042: the name
+// column cannot shrink below a nowrap name's width (max-width:100% is circular during
+// table intrinsic sizing), so without mobile name-wrapping this pushes the actions
+// column off-screen. NOTE: only the bounding-box assertions catch this — the page
+// scrollWidth stays put because an inner wrapper scrolls, not the document.
+const LONG_NAME = 'vacation-photos-2026-family-reunion-beach-day-final-edit-v3.jpg';
+
 describe('issue #49 — mobile (Pixel-5-emulated): per-row actions are reachable', () => {
   e2eTest('no horizontal overflow, and file + folder action buttons sit inside the viewport', async () => {
     ctx.mock.reset();
     await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'reflow.txt', Body: 'x' }));
+    await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: LONG_NAME, Body: 'l' }));
     await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'docs/inner.txt', Body: 'y' }));
     const { context, page } = await newMobilePage();
     try {
@@ -55,6 +63,7 @@ describe('issue #49 — mobile (Pixel-5-emulated): per-row actions are reachable
       assert.ok(overflow <= 0, `page must not overflow horizontally (scrollWidth exceeds viewport by ${overflow}px)`);
 
       await assertButtonsInViewport(page, page.locator('[data-testid="file-row:reflow.txt"]'), 'file row');
+      await assertButtonsInViewport(page, page.locator(`[data-testid="file-row:${LONG_NAME}"]`), 'long-name file row (BUG-042)');
       await assertButtonsInViewport(page, page.locator('[data-testid="folder-row:docs"]'), 'folder row');
     } finally { await context.close(); }
   });

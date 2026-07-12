@@ -4,6 +4,27 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-042 — Mobile: long filenames push the actions column off-screen (name column cannot shrink)
+
+**Date:** 2026-07-12
+
+**Symptom:**
+Reported from a real device (Firefox Android) reviewing v1.37.3: in the file listing, part of the rename button was cut off and the remaining per-row actions were only reachable by scrolling the table sideways — the exact symptom #49 was meant to fix, but only for rows with long filenames.
+
+**Root cause:**
+The desktop name-truncation treatment (`.file-name` = inline-block + `white-space: nowrap` + `max-width: 100%`) cannot shrink inside an auto-layout table: a percentage max-width is circular during table intrinsic sizing, so the name column's min-content width is the **full nowrap filename width**. One long filename (e.g. 64 chars ≈ 437px) forces the whole table to ~690px on a 393px viewport, pushing the actions column off-screen. Probe-verified **identical on Chromium and Firefox** (689 vs 690px) — an engine-neutral CSS-table property, not the suspected Gecko quirk.
+
+**Fix (v1.37.5):**
+At ≤640px, filenames wrap instead of truncating: `.col-name { overflow-wrap: anywhere; }` + `.file-name { white-space: normal; }`. `overflow-wrap: anywhere` reduces the name cell's min-content contribution to ~one character, so the table always fits; long names break (preferring hyphen/word boundaries) across lines.
+
+**Why it wasn't caught earlier:**
+Two test blind spots. (1) All #49 e2e fixtures and manual screenshots used short filenames (`reflow.txt`, `notes.txt`) — the failure needs a single filename whose nowrap width exceeds the viewport. (2) The spec's page-level guard (`document.documentElement.scrollWidth <= innerWidth`) cannot see it: an inner wrapper scrolls, not the document, so only per-button bounding-box assertions catch this class of overflow.
+
+**Test case:**
+`issue-49-mobile-actions` now seeds a 64-char filename and asserts every action button in that row has a bounding box inside the Pixel-5 viewport. Verified red on pre-fix CSS (button at x=576 on a 393px viewport) → green with the fix, on Firefox (reported engine) and Chromium.
+
+---
+
 ## BUG-041 — Drag-drop upload dies silently when FileSystemEntry resolution fails (WebKit)
 
 **Date:** 2026-07-12

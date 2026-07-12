@@ -1,9 +1,18 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.37.4';
+export const CURRENT_VERSION = '1.37.5';
 
 export const CHANGELOG = [
+  {
+    "version": "1.37.5",
+    "date": "2026-07-12",
+    "title": "Mobile: long filenames no longer push actions off-screen (BUG-042)",
+    "changes": [
+      "**Fixed:** on phone viewports, a row with a long filename forced the whole file table wider",
+      "Internal: the mobile e2e now seeds a 64-character filename and asserts every action button"
+    ]
+  },
   {
     "version": "1.37.4",
     "date": "2026-07-12",

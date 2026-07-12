@@ -7,6 +7,18 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.37.5] — 2026-07-12 — Mobile: long filenames no longer push actions off-screen (BUG-042)
+
+- **Fixed:** on phone viewports, a row with a long filename forced the whole file table wider
+  than the screen — part of the rename button was cut off and the remaining per-row actions
+  were only reachable by scrolling sideways (reported from Firefox Android reviewing v1.37.3;
+  probe-verified identical on Chromium — the desktop nowrap+ellipsis name treatment cannot
+  shrink inside a table, so one long name set the column's minimum width). At ≤640px filenames
+  now wrap across lines instead of truncating, so the table always fits the viewport.
+- Internal: the mobile e2e now seeds a 64-character filename and asserts every action button
+  in that row sits inside the viewport (bounding-box checks — page `scrollWidth` cannot see
+  this overflow class because an inner wrapper scrolls, not the document).
+
 ## [1.37.4] — 2026-07-12 — Drag-drop uploads no longer die silently on entry failures (BUG-041)
 
 - **Fixed:** when FileSystemEntry resolution failed during a drag-drop upload, the drop did

@@ -1089,6 +1089,12 @@ details[open] .sv-summary::before { transform: rotate(90deg); }
      no whitespace between them, so inline-blocks have no soft-wrap points. */
   .file-table .col-modified,
   .file-table .col-file-modified { display: none; }
+  /* Long names must WRAP on mobile (BUG-042): the desktop nowrap+ellipsis treatment
+     cannot shrink — max-width:100% on an inline-block is circular during table
+     intrinsic sizing, so the name column's min-content is the full name width and a
+     long filename pushes the actions column past the screen edge on every engine. */
+  .file-table .col-name { overflow-wrap: anywhere; }
+  .file-table .col-name .file-name { white-space: normal; }
   .file-table .col-actions { min-width: 9.5rem; }
   .file-table .col-actions .row-actions {
     display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center;
