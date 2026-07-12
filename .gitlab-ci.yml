@@ -24,10 +24,10 @@ test:
 # End-to-end tests against the in-repo stateful mock S3. Split into the engine-agnostic
 # node-integration layer and a cross-engine + mobile browser matrix. The Playwright image
 # ships chromium+firefox+webkit with their deps, so all three run in CI (WebKit cannot run on
-# a stock host — see GitLab #47). Chromium + Firefox are BLOCKING (#48 Part 2: green track
-# record across all device profiles). WebKit runs as a separate advisory job: its three
-# engine-specific emulation gaps are skipped in-suite with documented reasons (e2eTest skipOn,
-# see engine-quirks.mjs); flip it to blocking once it has its own green track record.
+# a stock host — see GitLab #47). ALL browser jobs are BLOCKING (#48): chromium + firefox
+# flipped first (green track record across all profiles), webkit after its own skip-free
+# streak (pipelines #177–#179; its former failures were BUG-041 + a wrong B7 assertion, both
+# fixed — no skipOn entries remain).
 # JUnit -> MR test summary; the browser jobs also upload on-failure screenshots + console
 # logs (artifacts, when: always).
 .e2e-base:
@@ -80,6 +80,7 @@ e2e-browser:
 
 e2e-browser-webkit:
   extends: .e2e-browser-base
+  allow_failure: false
   parallel:
     matrix:
       - E2E_ENGINE: [webkit]
