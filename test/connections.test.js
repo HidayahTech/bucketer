@@ -333,4 +333,29 @@ describe('migrateProfilesToConnections', () => {
     assert.equal(loadConnectionRecords().connections.length, 1);
     assert.equal(loadConnectionRecords().connections[0].id, 99);
   });
+
+  test('a null profile does not stop the profiles after it from migrating', () => {
+    writeProfiles([
+      { id: 1, name: 'A', endpoint: 'e', bucket: 'b1', keyId: 'k1', provider: 'b2', regionOverride: '' },
+      null,
+      { id: 3, name: 'C', endpoint: 'e', bucket: 'b3', keyId: 'k1', provider: 'b2', regionOverride: '' },
+    ]);
+    migrateProfilesToConnections();
+    assert.deepEqual(loadConnectionRecords().connections.map(c => c.id), [1, 3]);
+  });
+
+  test('a profile with a non-string endpoint is skipped, not fatal', () => {
+    writeProfiles([
+      { id: 1, name: 'A', endpoint: 42, bucket: 'b1', keyId: 'k1', provider: 'b2', regionOverride: '' },
+      { id: 2, name: 'B', endpoint: 'e', bucket: 'b2', keyId: 'k1', provider: 'b2', regionOverride: '' },
+    ]);
+    migrateProfilesToConnections();
+    assert.deepEqual(loadConnectionRecords().connections.map(c => c.id), [2]);
+  });
+
+  test('falls back to a generated name when the profile has none', () => {
+    writeProfiles([{ id: 1, endpoint: 'e', bucket: 'photos', keyId: 'k1', provider: 'b2', regionOverride: '' }]);
+    migrateProfilesToConnections();
+    assert.equal(loadConnectionRecords().connections[0].name, 'Backblaze B2 — photos');
+  });
 });

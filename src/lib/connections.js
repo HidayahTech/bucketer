@@ -244,23 +244,30 @@ export function migrateProfilesToConnections() {
   }
 
   for (const profile of profiles) {
-    // A profile without a bucket cannot become a usable connection. Skipping is
-    // preferable to creating a row that fails the moment it is clicked.
-    if (!profile.bucket) continue;
+    try {
+      // A profile without a bucket cannot become a usable connection. Skipping is
+      // preferable to creating a row that fails the moment it is clicked.
+      if (!profile || !profile.bucket) continue;
 
-    const cred = findOrCreateCredential({
-      endpoint:       profile.endpoint,
-      keyId:          profile.keyId,
-      provider:       profile.provider,
-      regionOverride: profile.regionOverride,
-    });
+      const cred = findOrCreateCredential({
+        endpoint:       profile.endpoint,
+        keyId:          profile.keyId,
+        provider:       profile.provider,
+        regionOverride: profile.regionOverride,
+      });
 
-    saveConnectionRecord({
-      id:           profile.id,
-      name:         profile.name || defaultConnectionName({ provider: profile.provider, bucket: profile.bucket }),
-      credentialId: cred.id,
-      bucket:       profile.bucket,
-      capabilities: null,
-    });
+      saveConnectionRecord({
+        id:           profile.id,
+        name:         profile.name || defaultConnectionName({ provider: profile.provider, bucket: profile.bucket }),
+        credentialId: cred.id,
+        bucket:       profile.bucket,
+        capabilities: null,
+      });
+    } catch {
+      // One malformed record must not strand the profiles after it. The guard at
+      // the top of this function only checks whether ANY connection exists, so a
+      // throw mid-loop would make every later profile permanently unreachable.
+      continue;
+    }
   }
 }
