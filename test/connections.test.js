@@ -22,6 +22,8 @@ import {
   newId,
   loadCredentialRecords, saveCredentialRecord, deleteCredentialRecord,
   loadConnectionRecords, saveConnectionRecord, deleteConnectionRecord,
+  credentialFingerprint, findOrCreateCredential, defaultCredentialLabel,
+  defaultConnectionName, resolveConnection, listResolvedConnections,
 } from '../src/lib/connections.js';
 
 beforeEach(() => { for (const k of Object.keys(ls)) delete ls[k]; });
@@ -111,5 +113,133 @@ describe('connection records', () => {
   test('never persists a secretKey even when one is passed in', () => {
     saveConnectionRecord({ id: 1, name: 'A', credentialId: 'c1', bucket: 'b', capabilities: null, secretKey: 'leaked' });
     assert.equal(ls['s3b_connections'].includes('leaked'), false);
+  });
+});
+
+describe('credentialFingerprint', () => {
+  test('is stable across trailing slashes and surrounding whitespace on endpoint', () => {
+    const a = credentialFingerprint({ endpoint: 'https://s3.example.com/', keyId: 'k', provider: 'b2', regionOverride: 'us-west-004' });
+    const b = credentialFingerprint({ endpoint: '  https://s3.example.com  ', keyId: 'k', provider: 'b2', regionOverride: 'us-west-004' });
+    assert.equal(a, b);
+  });
+
+  test('treats null, undefined, and empty-string provider as the same', () => {
+    const a = credentialFingerprint({ endpoint: 'e', keyId: 'k', provider: null, regionOverride: '' });
+    const b = credentialFingerprint({ endpoint: 'e', keyId: 'k', provider: '', regionOverride: '' });
+    const c = credentialFingerprint({ endpoint: 'e', keyId: 'k', regionOverride: '' });
+    assert.equal(a, b);
+    assert.equal(a, c);
+  });
+
+  test('is case-sensitive on keyId — key IDs are case-significant', () => {
+    const a = credentialFingerprint({ endpoint: 'e', keyId: 'abc', provider: null, regionOverride: '' });
+    const b = credentialFingerprint({ endpoint: 'e', keyId: 'ABC', provider: null, regionOverride: '' });
+    assert.notEqual(a, b);
+  });
+
+  test('differs when the region differs', () => {
+    const a = credentialFingerprint({ endpoint: 'e', keyId: 'k', provider: 'b2', regionOverride: 'us-west-004' });
+    const b = credentialFingerprint({ endpoint: 'e', keyId: 'k', provider: 'b2', regionOverride: 'eu-central-003' });
+    assert.notEqual(a, b);
+  });
+});
+
+describe('findOrCreateCredential', () => {
+  const fields = { endpoint: 'https://s3.example.com', keyId: 'k1', provider: 'b2', regionOverride: 'us-west-004' };
+
+  test('creates a credential when none matches', () => {
+    const cred = findOrCreateCredential(fields);
+    assert.ok(cred.id);
+    assert.equal(loadCredentialRecords().credentials.length, 1);
+  });
+
+  test('returns the existing credential instead of creating a second', () => {
+    const first  = findOrCreateCredential(fields);
+    const second = findOrCreateCredential({ ...fields, endpoint: 'https://s3.example.com/' });
+    assert.equal(first.id, second.id);
+    assert.equal(loadCredentialRecords().credentials.length, 1);
+  });
+
+  test('creates a separate credential for a different key on the same endpoint', () => {
+    findOrCreateCredential(fields);
+    findOrCreateCredential({ ...fields, keyId: 'k2' });
+    assert.equal(loadCredentialRecords().credentials.length, 2);
+  });
+
+  test('generates a default label when none is given', () => {
+    const cred = findOrCreateCredential(fields);
+    assert.equal(cred.label, 'Backblaze B2 — k1');
+  });
+
+  test('respects an explicit label', () => {
+    const cred = findOrCreateCredential({ ...fields, label: 'Work account' });
+    assert.equal(cred.label, 'Work account');
+  });
+});
+
+describe('defaultCredentialLabel', () => {
+  test('truncates long key IDs to six characters', () => {
+    assert.equal(defaultCredentialLabel({ provider: 'b2', keyId: '0057abcdef0123456789' }), 'Backblaze B2 — 0057ab…');
+  });
+
+  test('keeps short key IDs whole', () => {
+    assert.equal(defaultCredentialLabel({ provider: 'b2', keyId: 'k1' }), 'Backblaze B2 — k1');
+  });
+
+  test('falls back to the key ID alone when the provider is unknown', () => {
+    assert.equal(defaultCredentialLabel({ provider: null, keyId: 'k1' }), 'k1');
+  });
+});
+
+describe('defaultConnectionName', () => {
+  test('combines provider and bucket', () => {
+    assert.equal(defaultConnectionName({ provider: 'b2', bucket: 'photos' }), 'Backblaze B2 — photos');
+  });
+
+  test('falls back to the bucket alone when the provider is unknown', () => {
+    assert.equal(defaultConnectionName({ provider: null, bucket: 'photos' }), 'photos');
+  });
+});
+
+describe('resolveConnection / listResolvedConnections', () => {
+  test('joins a connection to its credential in profile-compatible shape', () => {
+    const cred = findOrCreateCredential({ endpoint: 'https://s3.example.com', keyId: 'k1', provider: 'b2', regionOverride: 'us-west-004' });
+    saveConnectionRecord({ id: 1, name: 'Photos', credentialId: cred.id, bucket: 'photos', capabilities: null });
+    const resolved = resolveConnection(1);
+    assert.equal(resolved.id, 1);
+    assert.equal(resolved.name, 'Photos');
+    assert.equal(resolved.endpoint, 'https://s3.example.com');
+    assert.equal(resolved.bucket, 'photos');
+    assert.equal(resolved.keyId, 'k1');
+    assert.equal(resolved.provider, 'b2');
+    assert.equal(resolved.regionOverride, 'us-west-004');
+    assert.equal(resolved.credentialId, cred.id);
+  });
+
+  test('returns null for an unknown connection id', () => {
+    assert.equal(resolveConnection(999), null);
+  });
+
+  test('returns null when the credential is orphaned', () => {
+    saveConnectionRecord({ id: 1, name: 'Orphan', credentialId: 'missing', bucket: 'b', capabilities: null });
+    assert.equal(resolveConnection(1), null);
+  });
+
+  test('listResolvedConnections omits orphaned connections rather than throwing', () => {
+    const cred = findOrCreateCredential({ endpoint: 'e', keyId: 'k', provider: null, regionOverride: '' });
+    saveConnectionRecord({ id: 1, name: 'Good',   credentialId: cred.id,  bucket: 'b1', capabilities: null });
+    saveConnectionRecord({ id: 2, name: 'Orphan', credentialId: 'gone',   bucket: 'b2', capabilities: null });
+    const list = listResolvedConnections();
+    assert.deepEqual(list.map(c => c.id), [1]);
+  });
+
+  test('two connections can share one credential', () => {
+    const cred = findOrCreateCredential({ endpoint: 'e', keyId: 'k', provider: 'b2', regionOverride: '' });
+    saveConnectionRecord({ id: 1, name: 'Photos (R/O)', credentialId: cred.id, bucket: 'photos', capabilities: null });
+    saveConnectionRecord({ id: 2, name: 'Photos (admin)', credentialId: cred.id, bucket: 'photos', capabilities: null });
+    const list = listResolvedConnections();
+    assert.equal(list.length, 2);
+    assert.equal(list[0].credentialId, list[1].credentialId);
+    assert.equal(loadCredentialRecords().credentials.length, 1);
   });
 });
