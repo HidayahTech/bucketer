@@ -30,7 +30,7 @@ function shortVersionId(id) {
 }
 
 
-export function HiddenVersions({ client, bucket, prefix, provider }) {
+export function HiddenVersions({ client, bucket, prefix, provider, diagnostics }) {
   const [rows, setRows] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -218,6 +218,7 @@ export function HiddenVersions({ client, bucket, prefix, provider }) {
               error={error}
               title="Failed to list versions"
               guidance="Check that your credentials have s3:ListObjectVersions permission and that versioning is supported by this provider."
+              diagnostics={diagnostics}
             />
           )}
 

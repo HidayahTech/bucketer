@@ -23,6 +23,7 @@ import { ThemeToggle } from './ThemeToggle.jsx';
 import { ToastHost } from './ToastHost.jsx';
 import { showToast } from '../lib/toast.js';
 import { createS3Client } from '../lib/s3-client.js';
+import { diagnosticsProps } from '../lib/connection-diagnostics.js';
 import { detectProvider, PROVIDER_LABELS } from '../lib/provider.js';
 import {
   loadCredentials, saveCredentials, clearCredentials,
@@ -448,6 +449,7 @@ export function App() {
                   error={connectionError}
                   title="Connection failed"
                   guidance="Check your endpoint URL, bucket name, and credentials. If this looks like a CORS error, ensure CORS is configured on your bucket."
+                  diagnostics={diagnosticsProps(credentials)}
                 />
               </div>
             )}
