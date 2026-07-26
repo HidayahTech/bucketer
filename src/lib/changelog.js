@@ -1,9 +1,17 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.38.0';
+export const CURRENT_VERSION = '1.38.1';
 
 export const CHANGELOG = [
+  {
+    "version": "1.38.1",
+    "date": "2026-07-26",
+    "title": "B2 Setup Guide CORS command fixed (BUG-043)",
+    "changes": [
+      "The B2 Setup Guide's put-bucket-cors command no longer fails with \"illegal '*' in an exposeHeaders value\"."
+    ]
+  },
   {
     "version": "1.38.0",
     "date": "2026-07-26",

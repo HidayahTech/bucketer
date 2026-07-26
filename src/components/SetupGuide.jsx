@@ -71,7 +71,7 @@ function Step({ n, title, children }) {
   );
 }
 
-function corsCmd({ endpoint, bucket, origin, profile = 'bucketer' }) {
+function corsCmd({ endpoint, bucket, origin, profile = 'bucketer', provider }) {
   const ep  = shellQuote(endpoint || 'https://s3.<region>.backblazeb2.com');
   const bkt = shellQuote(bucket || '<your-bucket>');
   const prof = shellQuote(profile);
@@ -79,7 +79,7 @@ function corsCmd({ endpoint, bucket, origin, profile = 'bucketer' }) {
   --profile ${prof} \\
   --endpoint-url ${ep} \\
   --bucket ${bkt} \\
-  --cors-configuration '${corsJson(origin)}'`;
+  --cors-configuration '${corsJson(origin, provider)}'`;
 }
 
 // ── Provider-specific guides ───────────────────────────────────────────────
@@ -141,7 +141,7 @@ b2 bucket update ${bkt} --cors-rules '[]'`}</Code>
             If you later deploy to a domain, re-run this with that specific origin instead.
           </p>
         )}
-        <Code>{corsCmd({ endpoint: ep, bucket: bkt, origin, profile: 'bucketer' })}</Code>
+        <Code>{corsCmd({ endpoint: ep, bucket: bkt, origin, profile: 'bucketer', provider: PROVIDERS.B2 })}</Code>
       </Step>
 
       <Step n="5" title="Verify">

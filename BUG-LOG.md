@@ -4,6 +4,27 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-043 — Setup Guide CORS command rejected by B2: wildcard in ExposeHeaders
+
+**Date:** 2026-07-26
+
+**Symptom:**
+Copy-pasting the B2 Setup Guide's `aws s3api put-bucket-cors` command verbatim failed with `An error occurred (InvalidRequest) when calling the PutBucketCors operation: illegal '*' in an exposeHeaders value.` Reported live by the operator while configuring a newly created B2 bucket — the guide's command was unusable on the provider Bucketer targets most.
+
+**Root cause:**
+`corsJson()` in `src/lib/cors-config.js` emitted `x-amz-meta-*` in `ExposeHeaders` unconditionally (added by BUG-028 so stored object metadata is readable from the browser). B2 permits wildcards in `allowedHeaders` but rejects them in `exposeHeaders`; AWS S3 accepts both, which is why the config validated there. Confirmed by the live PutBucketCors error against `s3.us-west-000.backblazeb2.com`.
+
+**Fix (v1.38.1):**
+`corsJson(origin, provider)` is now provider-aware: for `PROVIDERS.B2` it replaces the `x-amz-meta-*` wildcard with the explicit meta headers the app reads — `x-amz-meta-${CONTENT_HASH_KEY}` and `x-amz-meta-${FILE_MTIME_KEY}` (derived from constants so they cannot drift). All other providers keep the wildcard, since Browser's metadata panel displays arbitrary `x-amz-meta-*` keys and the move pipeline preserves `head.Metadata`, both of which need the wildcard where it is legal. Known trade-off: on B2, third-party metadata beyond those two headers stays invisible to the browser (it already was — the guide's config had never applied successfully on B2).
+
+**Why it wasn't caught earlier:**
+BUG-028's fix was validated against providers that accept the wildcard; no test executed the generated config against a real B2 `PutBucketCors`, and the unit tests asserted the wildcard's *presence* (the BUG-028 regression test) but nothing about per-provider legality. The e2e mock S3 server does not model provider-specific CORS-rule validation.
+
+**Test case:**
+`test/cors-config.test.js` (BUG-043 describe): for provider `'b2'`, no `ExposeHeaders` value may contain `*`, and both explicit meta headers must be present; non-B2 providers must retain `x-amz-meta-*` (BUG-028 preserved). `test/components/setup-guide.test.jsx`: the rendered B2 guide command contains no `x-amz-meta-*` and includes both explicit headers.
+
+---
+
 ## BUG-042 — Mobile: long filenames push the actions column off-screen (name column cannot shrink)
 
 **Date:** 2026-07-12

@@ -7,6 +7,13 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.38.1] — 2026-07-26 — B2 Setup Guide CORS command fixed (BUG-043)
+
+- The B2 Setup Guide's `put-bucket-cors` command no longer fails with "illegal '*' in an exposeHeaders value".
+  B2 rejects wildcards in `ExposeHeaders` (unlike AWS), so the generated config now lists the app's meta
+  headers explicitly (`x-amz-meta-bucketer-content-hash`, `x-amz-meta-file-mtime`) for B2 while other
+  providers keep the `x-amz-meta-*` wildcard that keeps arbitrary object metadata readable.
+
 ## [1.38.0] — 2026-07-26 — Connection diagnostics
 
 - New **Run diagnostics** button turns masked network errors into one precise verdict.

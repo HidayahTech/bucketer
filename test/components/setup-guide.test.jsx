@@ -57,6 +57,20 @@ describe('SetupGuide — B2', () => {
     assert.ok(text().includes('my-test-bucket'), 'bucket name should appear in the guide');
     cleanup();
   });
+
+  // BUG-043: B2 rejects PutBucketCors when ExposeHeaders contains a wildcard
+  // ("illegal '*' in an exposeHeaders value"), so the copy-paste command must
+  // expose the app's meta headers explicitly instead of x-amz-meta-*.
+  test('CORS command has no ExposeHeaders wildcard (BUG-043)', () => {
+    const { text, cleanup } = mount(h(SetupGuide, props));
+    assert.ok(!text().includes('x-amz-meta-*'),
+      'B2 guide must not emit x-amz-meta-* — B2 rejects wildcards in ExposeHeaders');
+    assert.ok(text().includes('x-amz-meta-bucketer-content-hash'),
+      'B2 guide must expose the content-hash meta header explicitly');
+    assert.ok(text().includes('x-amz-meta-file-mtime'),
+      'B2 guide must expose the file-mtime meta header explicitly');
+    cleanup();
+  });
 });
 
 describe('SetupGuide — R2', () => {

@@ -96,6 +96,51 @@ describe('corsJson — ExposeHeaders', () => {
   });
 });
 
+describe('corsJson — B2 ExposeHeaders (BUG-043)', () => {
+  // BUG-043: B2 rejects PutBucketCors with "illegal '*' in an exposeHeaders value" —
+  // wildcards are legal in AllowedHeaders but NOT ExposeHeaders on B2. The Setup
+  // Guide's generated command therefore failed verbatim on the provider that needs
+  // it most. For B2, corsJson must emit the explicit meta headers the app reads
+  // (x-amz-meta-bucketer-content-hash, x-amz-meta-file-mtime) instead of x-amz-meta-*.
+  function b2Rule() {
+    return JSON.parse(corsJson('https://app.example.com', 'b2')).CORSRules[0];
+  }
+
+  test('no ExposeHeaders value contains a wildcard for B2', () => {
+    for (const h of b2Rule().ExposeHeaders) {
+      assert.ok(!h.includes('*'), `ExposeHeaders value "${h}" must not contain '*' — B2 rejects it`);
+    }
+  });
+
+  test('exposes the app content-hash and mtime meta headers explicitly for B2', () => {
+    const expose = b2Rule().ExposeHeaders;
+    for (const h of ['x-amz-meta-bucketer-content-hash', 'x-amz-meta-file-mtime']) {
+      assert.ok(expose.includes(h), `${h} must be in B2 ExposeHeaders`);
+    }
+  });
+
+  test('still exposes ETag, Content-Length, Content-Type for B2', () => {
+    const expose = b2Rule().ExposeHeaders;
+    for (const h of ['ETag', 'Content-Length', 'Content-Type']) {
+      assert.ok(expose.includes(h), `${h} must be in B2 ExposeHeaders`);
+    }
+  });
+
+  test('keeps the x-amz-* wildcard in AllowedHeaders for B2 (legal there)', () => {
+    assert.ok(b2Rule().AllowedHeaders.includes('x-amz-*'));
+  });
+
+  test('non-B2 providers keep the x-amz-meta-* ExposeHeaders wildcard (BUG-028)', () => {
+    for (const provider of [undefined, 'aws', 'r2']) {
+      const rule = JSON.parse(corsJson('https://app.example.com', provider)).CORSRules[0];
+      assert.ok(
+        rule.ExposeHeaders.includes('x-amz-meta-*'),
+        `provider ${provider} must retain x-amz-meta-* so arbitrary object metadata stays readable`
+      );
+    }
+  });
+});
+
 // ── T5-3: corsCmd must shell-quote bucket/endpoint to prevent injection ───────────────
 // corsCmd() interpolates bucket and endpoint directly into a shell command string.
 // A bucket name containing a single quote (e.g. "my'bucket") breaks the shell quoting
