@@ -271,3 +271,42 @@ export function migrateProfilesToConnections() {
     }
   }
 }
+
+const CAPABILITY_OPS = ['list', 'download', 'upload', 'delete'];
+
+export function defaultCapabilities() {
+  return { list: 'unknown', download: 'unknown', upload: 'unknown', delete: 'unknown' };
+}
+
+function isValidCapabilities(caps) {
+  if (!caps || typeof caps !== 'object') return false;
+  return CAPABILITY_OPS.every(op => typeof caps[op] === 'string');
+}
+
+// Capabilities live on the connection record rather than in one global key, so
+// that state learned against one bucket is never applied to another.
+//
+// An unknown connection id returns defaults rather than throwing: ad-hoc
+// credentials with no saved connection are a supported case, and the caller
+// holds their capabilities in memory for the session only.
+export function loadConnectionCapabilities(id) {
+  const { connections } = loadConnectionRecords();
+  const conn = connections.find(c => c.id === id);
+  if (!conn || !isValidCapabilities(conn.capabilities)) return defaultCapabilities();
+  return { ...defaultCapabilities(), ...conn.capabilities };
+}
+
+export function saveConnectionCapabilities(id, caps) {
+  const data = loadConnectionRecords();
+  const idx = data.connections.findIndex(c => c.id === id);
+  if (idx < 0) return; // ad-hoc connection — nothing to persist against
+  data.connections[idx] = { ...data.connections[idx], capabilities: { ...caps } };
+  saveConnectionData(data);
+}
+
+export function clearAllConnectionCapabilities() {
+  const data = loadConnectionRecords();
+  if (!data.connections.length) return;
+  data.connections = data.connections.map(c => ({ ...c, capabilities: null }));
+  saveConnectionData(data);
+}

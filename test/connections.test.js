@@ -25,6 +25,7 @@ import {
   credentialFingerprint, findOrCreateCredential, defaultCredentialLabel,
   defaultConnectionName, resolveConnection, listResolvedConnections,
   migrateProfilesToConnections,
+  defaultCapabilities, loadConnectionCapabilities, saveConnectionCapabilities, clearAllConnectionCapabilities,
 } from '../src/lib/connections.js';
 
 beforeEach(() => { for (const k of Object.keys(ls)) delete ls[k]; });
@@ -357,5 +358,61 @@ describe('migrateProfilesToConnections', () => {
     writeProfiles([{ id: 1, endpoint: 'e', bucket: 'photos', keyId: 'k1', provider: 'b2', regionOverride: '' }]);
     migrateProfilesToConnections();
     assert.equal(loadConnectionRecords().connections[0].name, 'Backblaze B2 — photos');
+  });
+});
+
+describe('per-connection capabilities', () => {
+  function makeConnection(id) {
+    const cred = findOrCreateCredential({ endpoint: 'e', keyId: `k${id}`, provider: 'b2', regionOverride: '' });
+    saveConnectionRecord({ id, name: `C${id}`, credentialId: cred.id, bucket: `b${id}`, capabilities: null });
+  }
+
+  test('defaultCapabilities are all unknown', () => {
+    assert.deepEqual(defaultCapabilities(), { list: 'unknown', download: 'unknown', upload: 'unknown', delete: 'unknown' });
+  });
+
+  test('an unsaved connection reads back defaults', () => {
+    makeConnection(1);
+    assert.deepEqual(loadConnectionCapabilities(1), defaultCapabilities());
+  });
+
+  test('an unknown connection id reads back defaults rather than throwing', () => {
+    assert.deepEqual(loadConnectionCapabilities(999), defaultCapabilities());
+  });
+
+  test('saves and reads back capabilities for one connection', () => {
+    makeConnection(1);
+    saveConnectionCapabilities(1, { ...defaultCapabilities(), delete: 'denied' });
+    assert.equal(loadConnectionCapabilities(1).delete, 'denied');
+  });
+
+  test('capabilities learned on one connection do not leak to another', () => {
+    makeConnection(1);
+    makeConnection(2);
+    saveConnectionCapabilities(1, { ...defaultCapabilities(), delete: 'denied' });
+    assert.equal(loadConnectionCapabilities(2).delete, 'unknown');
+  });
+
+  test('saving capabilities for an unknown connection is a no-op, not a crash', () => {
+    saveConnectionCapabilities(999, { ...defaultCapabilities(), delete: 'denied' });
+    assert.deepEqual(loadConnectionRecords().connections, []);
+  });
+
+  test('a corrupt capabilities value falls back to defaults', () => {
+    makeConnection(1);
+    const data = loadConnectionRecords();
+    data.connections[0].capabilities = 'nonsense';
+    ls['s3b_connections'] = JSON.stringify(data);
+    assert.deepEqual(loadConnectionCapabilities(1), defaultCapabilities());
+  });
+
+  test('clearAllConnectionCapabilities resets every connection', () => {
+    makeConnection(1);
+    makeConnection(2);
+    saveConnectionCapabilities(1, { ...defaultCapabilities(), delete: 'denied' });
+    saveConnectionCapabilities(2, { ...defaultCapabilities(), upload: 'denied' });
+    clearAllConnectionCapabilities();
+    assert.deepEqual(loadConnectionCapabilities(1), defaultCapabilities());
+    assert.deepEqual(loadConnectionCapabilities(2), defaultCapabilities());
   });
 });
