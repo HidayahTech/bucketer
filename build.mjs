@@ -64,10 +64,10 @@ function parseChangelog(src) {
     // Two-level parse: **Bold lines** become group labels; following bullet lines
     // are nested under them. Bullet lines before any group remain plain strings.
     // Older entries with no bold headers produce a flat string array (unchanged).
-    const changes = [];
+    const rawChanges = [];
     let currentGroup = null;
     const appendToLast = (text) => {
-      const list = currentGroup ? currentGroup.items : changes;
+      const list = currentGroup ? currentGroup.items : rawChanges;
       const last = list.length - 1;
       if (last >= 0 && typeof list[last] === 'string') list[last] += ' ' + text;
     };
@@ -76,15 +76,21 @@ function parseChangelog(src) {
       const groupMatch = t.match(/^\*\*(.+)\*\*$/);
       if (groupMatch) {
         currentGroup = { group: groupMatch[1], items: [] };
-        changes.push(currentGroup);
+        rawChanges.push(currentGroup);
       } else if (t.startsWith('- ')) {
-        const text = t.slice(2).trim().replace(/`([^`]+)`/g, '$1');
+        const text = t.slice(2).trim();
         if (currentGroup) currentGroup.items.push(text);
-        else changes.push(text);
+        else rawChanges.push(text);
       } else if (t && !/^-+$/.test(t)) {
-        appendToLast(t.replace(/`([^`]+)`/g, '$1'));
+        appendToLast(t);
       }
     }
+    // Plain-text cleanup for modal display: strip backtick and inline **bold**
+    // markers. Runs AFTER continuation-line joining, because a marker pair can
+    // span physical lines in the wrapped source (e.g. the v1.33.0 entry).
+    const clean = (t) => t.replace(/`([^`]+)`/g, '$1').replace(/\*\*([^*]+)\*\*/g, '$1');
+    const changes = rawChanges.map(c =>
+      typeof c === 'string' ? clean(c) : { group: c.group, items: c.items.map(clean) });
     entries.push({ version, date, ...(title ? { title: title.trim() } : {}), changes });
   }
   return entries;

@@ -7,6 +7,12 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.38.4] — 2026-07-26 — Changelog modal strips inline bold markers
+
+- Bullets no longer show literal asterisks (e.g. "New **Run diagnostics** button").
+  The modal renders plain text, so inline bold markers are now stripped the same
+  way backticks already were.
+
 ## [1.38.3] — 2026-07-26 — Connection-diagnostics polish (#51, #52)
 
 - Diagnostics results now reset when a different error appears in the same error block,

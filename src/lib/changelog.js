@@ -1,9 +1,17 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.38.3';
+export const CURRENT_VERSION = '1.38.4';
 
 export const CHANGELOG = [
+  {
+    "version": "1.38.4",
+    "date": "2026-07-26",
+    "title": "Changelog modal strips inline bold markers",
+    "changes": [
+      "Bullets no longer show literal asterisks (e.g. \"New Run diagnostics button\"). The modal renders plain text, so inline bold markers are now stripped the same way backticks already were."
+    ]
+  },
   {
     "version": "1.38.3",
     "date": "2026-07-26",
@@ -35,7 +43,7 @@ export const CHANGELOG = [
     "date": "2026-07-26",
     "title": "Connection diagnostics",
     "changes": [
-      "New **Run diagnostics** button turns masked network errors into one precise verdict. Available on connect-screen, listing, download, and hidden-versions errors. Runs static checks (offline, mixed content, URL validity) plus unauthenticated no-cors reachability probes of the endpoint and bucket hostname — e.g. \"endpoint unreachable\" vs. \"almost certainly missing CORS configuration\" — instead of the generic three-way guess. Nothing runs until clicked; credentials are never attached to probes."
+      "New Run diagnostics button turns masked network errors into one precise verdict. Available on connect-screen, listing, download, and hidden-versions errors. Runs static checks (offline, mixed content, URL validity) plus unauthenticated no-cors reachability probes of the endpoint and bucket hostname — e.g. \"endpoint unreachable\" vs. \"almost certainly missing CORS configuration\" — instead of the generic three-way guess. Nothing runs until clicked; credentials are never attached to probes."
     ]
   },
   {
@@ -43,7 +51,7 @@ export const CHANGELOG = [
     "date": "2026-07-12",
     "title": "Mobile: long filenames no longer push actions off-screen (BUG-042)",
     "changes": [
-      "**Fixed:** on phone viewports, a row with a long filename forced the whole file table wider than the screen — part of the rename button was cut off and the remaining per-row actions were only reachable by scrolling sideways (reported from Firefox Android reviewing v1.37.3; probe-verified identical on Chromium — the desktop nowrap+ellipsis name treatment cannot shrink inside a table, so one long name set the column's minimum width). At ≤640px filenames now wrap across lines instead of truncating, so the table always fits the viewport.",
+      "Fixed: on phone viewports, a row with a long filename forced the whole file table wider than the screen — part of the rename button was cut off and the remaining per-row actions were only reachable by scrolling sideways (reported from Firefox Android reviewing v1.37.3; probe-verified identical on Chromium — the desktop nowrap+ellipsis name treatment cannot shrink inside a table, so one long name set the column's minimum width). At ≤640px filenames now wrap across lines instead of truncating, so the table always fits the viewport.",
       "Internal: the mobile e2e now seeds a 64-character filename and asserts every action button in that row sits inside the viewport (bounding-box checks — page scrollWidth cannot see this overflow class because an inner wrapper scrolls, not the document)."
     ]
   },
@@ -52,8 +60,8 @@ export const CHANGELOG = [
     "date": "2026-07-12",
     "title": "Drag-drop uploads no longer die silently on entry failures (BUG-041)",
     "changes": [
-      "**Fixed:** when FileSystemEntry resolution failed during a drag-drop upload, the drop did nothing — no upload, no error. WebKit hit this deterministically (its webkitGetAsEntry() returns entries whose .file() errors for synthetic DataTransfers), but the silent-failure path existed for any entry-resolution failure on any engine. Both drop handlers now share resolveDroppedFiles(), which falls back to the flat dataTransfer.files list when the entries path yields nothing (BUG-041).",
-      "Internal: the three WebKit e2e skips are removed — the WebKit lane now runs **skip-free** (the two drop specs pass via the fix; the presigned-download spec now asserts the app's network-level contract instead of Playwright's engine-dependent download event). Diagnosed with per-engine probes in the #47 e2e container."
+      "Fixed: when FileSystemEntry resolution failed during a drag-drop upload, the drop did nothing — no upload, no error. WebKit hit this deterministically (its webkitGetAsEntry() returns entries whose .file() errors for synthetic DataTransfers), but the silent-failure path existed for any entry-resolution failure on any engine. Both drop handlers now share resolveDroppedFiles(), which falls back to the flat dataTransfer.files list when the entries path yields nothing (BUG-041).",
+      "Internal: the three WebKit e2e skips are removed — the WebKit lane now runs skip-free (the two drop specs pass via the fix; the presigned-download spec now asserts the app's network-level contract instead of Playwright's engine-dependent download event). Diagnosed with per-engine probes in the #47 e2e container."
     ]
   },
   {
@@ -61,9 +69,9 @@ export const CHANGELOG = [
     "date": "2026-07-11",
     "title": "Mobile: per-row file-table actions reachable (reflow)",
     "changes": [
-      "**Fixed:** on phone viewports the file-table actions column ran past the right edge, so the per-row buttons (properties, rename, download, copy link, move, delete) were unreachable — only batch selection + the toolbar worked on mobile (#49, slice 2 of the mobile-responsive work). At ≤640px the two Modified date columns are now hidden and the action buttons wrap onto additional lines inside the row, with slightly larger tap targets, so every per-row action is reachable. The copy-link/share popover — wider than a phone screen — now opens as a lower-viewport sheet on mobile instead of an anchored popover.",
+      "Fixed: on phone viewports the file-table actions column ran past the right edge, so the per-row buttons (properties, rename, download, copy link, move, delete) were unreachable — only batch selection + the toolbar worked on mobile (#49, slice 2 of the mobile-responsive work). At ≤640px the two Modified date columns are now hidden and the action buttons wrap onto additional lines inside the row, with slightly larger tap targets, so every per-row action is reachable. The copy-link/share popover — wider than a phone screen — now opens as a lower-viewport sheet on mobile instead of an anchored popover.",
       "Desktop layout is unchanged (all rules live in the mobile media query; the buttons gained an inline wrapper that does not affect desktop rendering).",
-      "Internal: new mobile e2e (issue-49-mobile-actions) asserts no horizontal overflow, that every per-row button's bounding box sits inside the viewport, and exercises per-row delete plus the copy-link sheet on a Pixel 5 profile **without force-clicks** (force-clicks are how the earlier matrix stayed green while the buttons were off-screen)."
+      "Internal: new mobile e2e (issue-49-mobile-actions) asserts no horizontal overflow, that every per-row button's bounding box sits inside the viewport, and exercises per-row delete plus the copy-link sheet on a Pixel 5 profile without force-clicks (force-clicks are how the earlier matrix stayed green while the buttons were off-screen)."
     ]
   },
   {
@@ -71,7 +79,7 @@ export const CHANGELOG = [
     "date": "2026-07-11",
     "title": "Mobile: responsive shell (header wraps, modals fit)",
     "changes": [
-      "**Fixed:** on narrow (phone) viewports the header controls ran off the right edge — **Disconnect**, Copy link, and Find duplicates were unreachable — and the resulting page overflow displaced the centered modals so their action buttons (Delete, Move here) could not be tapped. In practice a mobile user could not disconnect, delete, or move. The header now **wraps** its controls onto additional rows, and modals are sized to the viewport (scrolling if tall), so everything is reachable on mobile.",
+      "Fixed: on narrow (phone) viewports the header controls ran off the right edge — Disconnect, Copy link, and Find duplicates were unreachable — and the resulting page overflow displaced the centered modals so their action buttons (Delete, Move here) could not be tapped. In practice a mobile user could not disconnect, delete, or move. The header now wraps its controls onto additional rows, and modals are sized to the viewport (scrolling if tall), so everything is reachable on mobile.",
       "Internal: the app's first responsive breakpoint (@media (max-width: 640px)); the mobile e2e matrix (Pixel 5 / iPhone 13) now passes. The file-table actions-column reflow on mobile is a follow-up."
     ]
   },
@@ -80,7 +88,7 @@ export const CHANGELOG = [
     "date": "2026-07-11",
     "title": "Fix: PDF preview blank in Firefox",
     "changes": [
-      "**Fixed:** previewing a PDF rendered blank in **Firefox** — a regression since v1.11.1. The preview iframe used sandbox=\"\", which disables scripts, and Firefox renders PDFs with its script-based pdf.js viewer, so nothing showed (Chromium uses a native viewer and was unaffected, which is why it slipped through). The iframe now uses sandbox=\"allow-scripts\", which lets pdf.js run while still blocking same-origin access, forms, top-navigation, popups, and plugins; the preview is served as application/pdf and the frame has no allow-same-origin, so it cannot execute as HTML or reach the app's origin. Closes #46.",
+      "Fixed: previewing a PDF rendered blank in Firefox — a regression since v1.11.1. The preview iframe used sandbox=\"\", which disables scripts, and Firefox renders PDFs with its script-based pdf.js viewer, so nothing showed (Chromium uses a native viewer and was unaffected, which is why it slipped through). The iframe now uses sandbox=\"allow-scripts\", which lets pdf.js run while still blocking same-origin access, forms, top-navigation, popups, and plugins; the preview is served as application/pdf and the frame has no allow-same-origin, so it cannot execute as HTML or reach the app's origin. Closes #46.",
       "Internal (testing): cross-engine e2e groundwork — an engine/device selector in the e2e harness (E2E_ENGINE/E2E_DEVICE) and a PDF-preview e2e that runs under Firefox as well as Chromium."
     ]
   },
@@ -89,9 +97,9 @@ export const CHANGELOG = [
     "date": "2026-07-11",
     "title": "Folder rename",
     "changes": [
-      "**New:** rename a folder in place — a ✎ affordance on folder rows opens an inline editor (like file rename). Because a folder can hold many objects, the rename runs as a cancelable **\"Rename\"** task in the operations panel (per-object copy-then-delete through the move pipeline) rather than blocking the row.",
-      "**Safe by default:** the rename is blocked if a folder with the new name already exists at the same parent — inline if the sibling is visible, and authoritatively by the engine (which refuses and copies nothing if the target prefix is occupied). No merging.",
-      "**Hardening:** object-name validation (shared by rename and folder creation) now rejects a name that is exactly . or ... Names that merely contain .. (e.g. report..final.pdf) stay valid.",
+      "New: rename a folder in place — a ✎ affordance on folder rows opens an inline editor (like file rename). Because a folder can hold many objects, the rename runs as a cancelable \"Rename\" task in the operations panel (per-object copy-then-delete through the move pipeline) rather than blocking the row.",
+      "Safe by default: the rename is blocked if a folder with the new name already exists at the same parent — inline if the sibling is visible, and authoritatively by the engine (which refuses and copies nothing if the target prefix is occupied). No merging.",
+      "Hardening: object-name validation (shared by rename and folder creation) now rejects a name that is exactly . or ... Names that merely contain .. (e.g. report..final.pdf) stay valid.",
       "Closes #18."
     ]
   },
@@ -100,7 +108,7 @@ export const CHANGELOG = [
     "date": "2026-07-11",
     "title": "Resilient bucket listing (transient-error retry)",
     "changes": [
-      "**Fixed (reliability):** bucket listing — the initial load and \"Load more\" pagination — now retries transient throttling (SlowDown/503/429) and network blips with backoff+jitter, the same treatment upload, move, and delete already had. Listing was the one S3 read issued with no retry, so a momentary blip surfaced as an opaque connect or \"Load more\" failure (#23).",
+      "Fixed (reliability): bucket listing — the initial load and \"Load more\" pagination — now retries transient throttling (SlowDown/503/429) and network blips with backoff+jitter, the same treatment upload, move, and delete already had. Listing was the one S3 read issued with no retry, so a momentary blip surfaced as an opaque connect or \"Load more\" failure (#23).",
       "Internal: extracted src/lib/list-objects.js (listObjectsPage) — the retry-wrapped single-page fetch — out of Browser.jsx."
     ]
   },
@@ -109,10 +117,10 @@ export const CHANGELOG = [
     "date": "2026-07-10",
     "title": "Copy link: include access key ID",
     "changes": [
-      "**New:** the header **Copy link** button is now a small menu with two share-link variants:",
-      "**Connection only (no credentials)** — the existing link (endpoint, bucket, provider, region); safe to share publicly.",
-      "**Include access key ID** — also embeds the access key ID, so a recipient only needs to enter the **secret key** to connect. The secret key is never included in either link.",
-      "**New (recipient):** opening an \"include access key ID\" link pre-fills everything except the secret key, auto-focuses the Secret Key field, and adapts the pre-fill banner to prompt for only the secret key.",
+      "New: the header Copy link button is now a small menu with two share-link variants:",
+      "Connection only (no credentials) — the existing link (endpoint, bucket, provider, region); safe to share publicly.",
+      "Include access key ID — also embeds the access key ID, so a recipient only needs to enter the secret key to connect. The secret key is never included in either link.",
+      "New (recipient): opening an \"include access key ID\" link pre-fills everything except the secret key, auto-focuses the Secret Key field, and adapts the pre-fill banner to prompt for only the secret key.",
       "Security: all share params remain in the URL hash fragment (never sent to servers); the key ID param is validated on read (no whitespace, ≤ 128 chars)."
     ]
   },
@@ -121,11 +129,11 @@ export const CHANGELOG = [
     "date": "2026-07-08",
     "title": "Master queue: unified operations panel with cancellation",
     "changes": [
-      "**New:** a unified operations panel replaces the separate delete and move panels — one row per operation with progress, expandable per-item error details, and controls.",
-      "**New:** delete, move, and copy operations can now be **cancelled mid-run**. Cancellation is cooperative: work already in flight completes (Cancel stops at the next batch), and the row reports exactly how much was done, e.g. \"Cancelled — deleted 3,000 of 18,400\".",
-      "**New:** \"Dismiss all finished\" bulk action once two or more operations have settled.",
-      "**Changed:** finished operation rows now **persist until dismissed** instead of disappearing after 3 seconds — a delete result is evidence, not a fleeting notification. Success toasts are unchanged.",
-      "**Fixed (hardening):** a cancelled folder delete/move can no longer report the folder as fully completed — completion now requires every object confirmed deleted/moved, not merely the absence of errors.",
+      "New: a unified operations panel replaces the separate delete and move panels — one row per operation with progress, expandable per-item error details, and controls.",
+      "New: delete, move, and copy operations can now be cancelled mid-run. Cancellation is cooperative: work already in flight completes (Cancel stops at the next batch), and the row reports exactly how much was done, e.g. \"Cancelled — deleted 3,000 of 18,400\".",
+      "New: \"Dismiss all finished\" bulk action once two or more operations have settled.",
+      "Changed: finished operation rows now persist until dismissed instead of disappearing after 3 seconds — a delete result is evidence, not a fleeting notification. Success toasts are unchanged.",
+      "Fixed (hardening): a cancelled folder delete/move can no longer report the folder as fully completed — completion now requires every object confirmed deleted/moved, not merely the absence of errors.",
       "Internal: new module-level task store with animation-frame-batched progress updates (delete/move progress no longer re-renders per object); delete confirmation extracted to a pre-queue modal; the duplicated delete/move panel CSS and JSX were consolidated."
     ]
   },
@@ -134,7 +142,7 @@ export const CHANGELOG = [
     "date": "2026-07-01",
     "title": "Multi-origin sharding: add Wasabi",
     "changes": [
-      "**Wasabi now supports parallel upload connections** (on by default), joining Backblaze B2 and AWS S3. Verified Wasabi is HTTP/1.1 across regions (s3.<region>.wasabisys.com) with *.s3.<region>.wasabisys.com cert coverage. It reuses the default-origin-aware model — Wasabi defaults to virtual-hosted addressing, so the added second origin is path-style, probed on part 1 with graceful fallback to single-origin.",
+      "Wasabi now supports parallel upload connections (on by default), joining Backblaze B2 and AWS S3. Verified Wasabi is HTTP/1.1 across regions (s3.<region>.wasabisys.com) with *.s3.<region>.wasabisys.com cert coverage. It reuses the default-origin-aware model — Wasabi defaults to virtual-hosted addressing, so the added second origin is path-style, probed on part 1 with graceful fallback to single-origin.",
       "Provider support is now: B2, AWS, Wasabi (all HTTP/1.1). Still excluded: Cloudflare R2 (HTTP/2 — no benefit) and MinIO/generic (virtual-hosting is deployment-specific)."
     ]
   },
@@ -143,8 +151,8 @@ export const CHANGELOG = [
     "date": "2026-07-01",
     "title": "Multi-origin sharding extended to AWS S3",
     "changes": [
-      "**AWS S3 now supports parallel upload connections** (Settings → \"Parallel upload connections\", on by default), joining Backblaze B2. Verified AWS is HTTP/1.1 with *.s3.<region>.amazonaws.com cert coverage, so a bucket is reachable via two distinct origins — path-style (s3.<region>.…/bucket) and virtual-hosted (bucket.s3.<region>.…) — for two ~6-connection pools.",
-      "**Sharding is now default-origin aware.** Each provider has a guaranteed default addressing style (path-style for B2, virtual-hosted for AWS); the second origin uses the opposite style, and part 1 probes that added origin, silently falling back to the default if it's rejected. So on any provider the worst case is single-origin (unchanged behaviour), never a failure. This also **fixes a latent issue where AWS would have placed both lanes on the same virtual-hosted origin** (no speedup), since the connected client already uses virtual-hosting for AWS.",
+      "AWS S3 now supports parallel upload connections (Settings → \"Parallel upload connections\", on by default), joining Backblaze B2. Verified AWS is HTTP/1.1 with *.s3.<region>.amazonaws.com cert coverage, so a bucket is reachable via two distinct origins — path-style (s3.<region>.…/bucket) and virtual-hosted (bucket.s3.<region>.…) — for two ~6-connection pools.",
+      "Sharding is now default-origin aware. Each provider has a guaranteed default addressing style (path-style for B2, virtual-hosted for AWS); the second origin uses the opposite style, and part 1 probes that added origin, silently falling back to the default if it's rejected. So on any provider the worst case is single-origin (unchanged behaviour), never a failure. This also fixes a latent issue where AWS would have placed both lanes on the same virtual-hosted origin (no speedup), since the connected client already uses virtual-hosting for AWS.",
       "Still excluded: HTTP/2 providers (Cloudflare R2), where sharding gives no benefit, and MinIO/generic, where virtual-hosting is deployment-specific."
     ]
   },
@@ -153,8 +161,8 @@ export const CHANGELOG = [
     "date": "2026-07-01",
     "title": "Upload history: richer diagnostics + expandable per-row detail",
     "changes": [
-      "**The upload history now records full per-upload diagnostics** — part size, part count, transient retry count, provider, endpoint, and bucket — on top of the existing mode / concurrency / sharding / speed. The IndexedDB log store is schema-flexible, so older entries are unaffected (absent fields are simply omitted).",
-      "**Compact default line, expand for the rest.** The Strategy column stays a concise one-liner — e.g. manual · 32 MiB · 32 conns · sharded ×2 (now disambiguating part **size** from **concurrency**, which the old \"N parts\" conflated) — and **clicking any row reveals a full diagnostic breakdown**: part size, part count, peak concurrency, transient retries, avg speed, duration, provider/bucket/endpoint, probe result, and the error message for failed uploads. Useful for problem-solving without cluttering the everyday view.",
+      "The upload history now records full per-upload diagnostics — part size, part count, transient retry count, provider, endpoint, and bucket — on top of the existing mode / concurrency / sharding / speed. The IndexedDB log store is schema-flexible, so older entries are unaffected (absent fields are simply omitted).",
+      "Compact default line, expand for the rest. The Strategy column stays a concise one-liner — e.g. manual · 32 MiB · 32 conns · sharded ×2 (now disambiguating part size from concurrency, which the old \"N parts\" conflated) — and clicking any row reveals a full diagnostic breakdown: part size, part count, peak concurrency, transient retries, avg speed, duration, provider/bucket/endpoint, probe result, and the error message for failed uploads. Useful for problem-solving without cluttering the everyday view.",
       "withUploadRetry gained an onRetry hook so the transient-retry count — a flaky-network signal — is captured for the log."
     ]
   },
@@ -163,10 +171,10 @@ export const CHANGELOG = [
     "date": "2026-06-30",
     "title": "Multi-origin sharding on by default (B2) with graceful fallback; fix BUG-035",
     "changes": [
-      "**On by default for Backblaze B2** (Settings → \"Parallel upload connections\", still toggleable). Splits each large file's parts across two origins — path-style (s3.<region>.…/bucket) and virtual-hosted (bucket.s3.<region>.…) — for two ~6-connection pools, roughly doubling per-file throughput toward link speed with **no browser configuration required**.",
-      "**Probe-based graceful fallback:** each sharded upload probes the virtual-hosted origin with part 1; if the provider rejects it, the file silently continues single-origin. Sharding can only help, never fail.",
+      "On by default for Backblaze B2 (Settings → \"Parallel upload connections\", still toggleable). Splits each large file's parts across two origins — path-style (s3.<region>.…/bucket) and virtual-hosted (bucket.s3.<region>.…) — for two ~6-connection pools, roughly doubling per-file throughput toward link speed with no browser configuration required.",
+      "Probe-based graceful fallback: each sharded upload probes the virtual-hosted origin with part 1; if the provider rejects it, the file silently continues single-origin. Sharding can only help, never fail.",
       "Gated to DNS-safe bucket names; the upload log's strategy column now shows \"sharded ×2\" when it engaged. (The resume path remains single-origin for now.) ### Fixes",
-      "**BUG-035:** a non-probe multipart upload (manual mode, small multipart, or sharded) threw ReferenceError: probeResolved is not defined at completion — the object uploaded but the item showed as failed. Introduced by the BUG-033 refactor in v1.29.0; restored the variable to function scope. The browser e2e suite is the only layer that exercises this path, so the **pre-push hook now runs the component and e2e suites** (not just unit tests) — an upload-completion regression can no longer ship.",
+      "BUG-035: a non-probe multipart upload (manual mode, small multipart, or sharded) threw ReferenceError: probeResolved is not defined at completion — the object uploaded but the item showed as failed. Introduced by the BUG-033 refactor in v1.29.0; restored the variable to function scope. The browser e2e suite is the only layer that exercises this path, so the pre-push hook now runs the component and e2e suites (not just unit tests) — an upload-completion regression can no longer ship.",
       "Fixed a stale browser-e2e selector (the filter-box placeholder gained a \"( / )\" shortcut hint); the browser e2e suite is green again."
     ]
   },
@@ -175,10 +183,10 @@ export const CHANGELOG = [
     "date": "2026-06-30",
     "title": "Upload reliability: transient-error retry + resume-on-failure; experimental multi-origin sharding",
     "changes": [
-      "**A transient network error no longer fails an entire large upload.** Every UploadPart and the final CompleteMultipartUpload now retry on transient fetch/connection errors (Firefox \"NetworkError when attempting to fetch resource.\", Chromium \"Failed to fetch\", timeouts, connection resets) with exponential backoff + jitter — abort-aware, in both the fresh and resume paths. Previously a single blip on any of thousands of parts (or on the one completion call) killed the whole upload, because the AWS SDK does not classify a bare fetch TypeError as retryable.",
-      "**Failed uploads can now Resume, not just Restart.** A multipart upload that fails on a transient (non-permission) error keeps its server-side session and uploaded parts; the failed item now offers **Resume** (uploads only the missing parts) alongside **Restart** (re-uploads from zero). Recovering a near-complete 235 GiB upload becomes seconds instead of a full re-transfer. ### Experimental",
-      "**Multi-origin upload sharding** (Settings → \"Parallel upload connections\", **B2 only, default off**). Splits a large file's parts across two origins — path-style (s3.<region>.…/bucket) and virtual-hosted (bucket.s3.<region>.…) — so the browser opens two ~6-connection pools instead of one, roughly doubling per-file concurrency toward link speed. B2's cert and routing accept both addressing styles; **this path is not yet validated end-to-end against a live signed upload — enable for testing only.** Gated to DNS-safe bucket names; silently stays single-origin otherwise.",
-      "**createS3Client gains an optional { forcePathStyle } override**, used to build the virtual-hosted client for sharding."
+      "A transient network error no longer fails an entire large upload. Every UploadPart and the final CompleteMultipartUpload now retry on transient fetch/connection errors (Firefox \"NetworkError when attempting to fetch resource.\", Chromium \"Failed to fetch\", timeouts, connection resets) with exponential backoff + jitter — abort-aware, in both the fresh and resume paths. Previously a single blip on any of thousands of parts (or on the one completion call) killed the whole upload, because the AWS SDK does not classify a bare fetch TypeError as retryable.",
+      "Failed uploads can now Resume, not just Restart. A multipart upload that fails on a transient (non-permission) error keeps its server-side session and uploaded parts; the failed item now offers Resume (uploads only the missing parts) alongside Restart (re-uploads from zero). Recovering a near-complete 235 GiB upload becomes seconds instead of a full re-transfer. ### Experimental",
+      "Multi-origin upload sharding (Settings → \"Parallel upload connections\", B2 only, default off). Splits a large file's parts across two origins — path-style (s3.<region>.…/bucket) and virtual-hosted (bucket.s3.<region>.…) — so the browser opens two ~6-connection pools instead of one, roughly doubling per-file concurrency toward link speed. B2's cert and routing accept both addressing styles; this path is not yet validated end-to-end against a live signed upload — enable for testing only. Gated to DNS-safe bucket names; silently stays single-origin otherwise.",
+      "createS3Client gains an optional { forcePathStyle } override, used to build the virtual-hosted client for sharding."
     ]
   },
   {
@@ -186,9 +194,9 @@ export const CHANGELOG = [
     "date": "2026-06-30",
     "title": "Fix: large part sizes collapsed upload concurrency to 1; configurable memory budget",
     "changes": [
-      "**BUG-033: a large part size silently forced fully sequential uploads.** Part concurrency is bounded by a memory budget (concurrency × partSize must fit within it), and that budget defaulted to 200 MiB. With a user-chosen 128 MiB part size, floor(200 MiB / 128 MiB) = 1 clamped concurrency to a single stream regardless of the configured value — so a 20 GB file uploaded **one part at a time**, and choosing a *larger* part size made it slower, not faster. The default budget is now **1 GiB**, which keeps large parts parallel (128 MiB parts → 8 concurrent). Ordinary 5 MiB uploads are unaffected (peak ~80 MiB either way). The fix applies to both fresh and resumed multipart uploads.",
-      "**New \"Upload memory budget (MiB)\" setting** (range 64–8192, default 1024) exposes the ceiling on total RAM held by in-flight upload parts, making the part-size / concurrency / memory tradeoff tunable instead of a silent cap. Settings → Upload memory budget.",
-      "**Tests:** a regression assertion in concurrency-strategy.test.js (fails at the old 200 MiB default, passes at 1 GiB), a storage.test.js accessor round-trip, and a settings-panel.test.jsx field render."
+      "BUG-033: a large part size silently forced fully sequential uploads. Part concurrency is bounded by a memory budget (concurrency × partSize must fit within it), and that budget defaulted to 200 MiB. With a user-chosen 128 MiB part size, floor(200 MiB / 128 MiB) = 1 clamped concurrency to a single stream regardless of the configured value — so a 20 GB file uploaded one part at a time, and choosing a *larger* part size made it slower, not faster. The default budget is now 1 GiB, which keeps large parts parallel (128 MiB parts → 8 concurrent). Ordinary 5 MiB uploads are unaffected (peak ~80 MiB either way). The fix applies to both fresh and resumed multipart uploads.",
+      "New \"Upload memory budget (MiB)\" setting (range 64–8192, default 1024) exposes the ceiling on total RAM held by in-flight upload parts, making the part-size / concurrency / memory tradeoff tunable instead of a silent cap. Settings → Upload memory budget.",
+      "Tests: a regression assertion in concurrency-strategy.test.js (fails at the old 200 MiB default, passes at 1 GiB), a storage.test.js accessor round-trip, and a settings-panel.test.jsx field render."
     ]
   },
   {
@@ -196,8 +204,8 @@ export const CHANGELOG = [
     "date": "2026-06-30",
     "title": "Upload throughput: drop the redundant per-part CRC32",
     "changes": [
-      "**requestChecksumCalculation: 'WHEN_REQUIRED' set on the S3 client** (src/lib/s3-client.js). Since AWS SDK for JavaScript v3.729.0 the flexible-checksums middleware defaults to WHEN_SUPPORTED, which attaches an automatic CRC32 checksum to every PutObject and UploadPart. Bucketer never requests an upload checksum, so that CRC32 was pure overhead — a second full traversal of each part's bytes on the main thread, on top of the SigV4 x-amz-content-sha256 SHA-256 — and the unsolicited x-amz-checksum-crc32 header has been rejected by some S3-compatible providers (Cloudflare R2, Backblaze B2). WHEN_REQUIRED keeps checksums only for operations that mandate them; multipart object integrity remains ETag-based. Backward-compatible.",
-      "**Test** (test/s3-client.test.js): asserts the client resolves requestChecksumCalculation to WHEN_REQUIRED."
+      "requestChecksumCalculation: 'WHEN_REQUIRED' set on the S3 client (src/lib/s3-client.js). Since AWS SDK for JavaScript v3.729.0 the flexible-checksums middleware defaults to WHEN_SUPPORTED, which attaches an automatic CRC32 checksum to every PutObject and UploadPart. Bucketer never requests an upload checksum, so that CRC32 was pure overhead — a second full traversal of each part's bytes on the main thread, on top of the SigV4 x-amz-content-sha256 SHA-256 — and the unsolicited x-amz-checksum-crc32 header has been rejected by some S3-compatible providers (Cloudflare R2, Backblaze B2). WHEN_REQUIRED keeps checksums only for operations that mandate them; multipart object integrity remains ETag-based. Backward-compatible.",
+      "Test (test/s3-client.test.js): asserts the client resolves requestChecksumCalculation to WHEN_REQUIRED."
     ]
   },
   {
@@ -205,8 +213,8 @@ export const CHANGELOG = [
     "date": "2026-06-21",
     "title": "Privacy: Referrer-Policy `no-referrer`",
     "changes": [
-      "**<meta name=\"referrer\" content=\"no-referrer\"> added to the document head.** Presigned S3 URLs and bucket/prefix names — which live in the URL and hash fragment — no longer leak via the Referer header on any outbound navigation, including the sandboxed PDF preview iframe. Static hosting (S3/R2/B2) cannot set a Referrer-Policy response header, so the meta tag delivers the guarantee with no server configuration. Placed immediately after the app-version tag so the update-check byte-512 invariant is unaffected (build-id and app-version still end at bytes 179/224).",
-      "**Build invariant** added to build.test.js: asserts the tag is present and set to no-referrer."
+      "<meta name=\"referrer\" content=\"no-referrer\"> added to the document head. Presigned S3 URLs and bucket/prefix names — which live in the URL and hash fragment — no longer leak via the Referer header on any outbound navigation, including the sandboxed PDF preview iframe. Static hosting (S3/R2/B2) cannot set a Referrer-Policy response header, so the meta tag delivers the guarantee with no server configuration. Placed immediately after the app-version tag so the update-check byte-512 invariant is unaffected (build-id and app-version still end at bytes 179/224).",
+      "Build invariant added to build.test.js: asserts the tag is present and set to no-referrer."
     ]
   },
   {
@@ -214,10 +222,10 @@ export const CHANGELOG = [
     "date": "2026-06-20",
     "title": "Fix: drag-dropped uploads landed at root; sub-folder not shown until reload",
     "changes": [
-      "**Drag-dropped uploads now target the current folder, not the bucket root (#2, BUG-031).** UploadQueue exposed addFiles once via onMount ([] deps), so the reference the drag-drop handlers call captured a stale closure over the mount-time destination prefix (root). Every dragged file/folder uploaded to the root regardless of the folder being viewed; the \"Choose files\" picker (which used a fresh closure) worked. Fixed by reading the destination through a live ref (destinationPrefixRef) — the same pattern Browser.jsx already uses for its onMount-exposed actions.",
-      "**A sub-folder created by an upload into the current view now appears without a manual reload (#4, BUG-032).** onUploadsDrained refetched the listing only on an exact prefix match, so uploading a folder *into* the current view (which drains the new sub-prefix, not the current prefix) left the new folder invisible until reload. It now refetches when any drained prefix is the current prefix or a descendant of it.",
-      "**Refresh control is now labelled \"↺ Refresh\"** (was an unlabelled ↺ icon) and its tooltip notes it pulls changes uploaded from other devices — Bucketer is backendless, so cross-client changes (#4, part 1) surface on demand via Refresh rather than live.",
-      "**e2e regression coverage** for all of the above, plus an Android-emulated check that uploading into a nested folder does not teleport the view to root (the desktop BUG-029 fix holds under mobile emulation; the reporter's residual mobile teleport (#3) needs native-device repro details)."
+      "Drag-dropped uploads now target the current folder, not the bucket root (#2, BUG-031). UploadQueue exposed addFiles once via onMount ([] deps), so the reference the drag-drop handlers call captured a stale closure over the mount-time destination prefix (root). Every dragged file/folder uploaded to the root regardless of the folder being viewed; the \"Choose files\" picker (which used a fresh closure) worked. Fixed by reading the destination through a live ref (destinationPrefixRef) — the same pattern Browser.jsx already uses for its onMount-exposed actions.",
+      "A sub-folder created by an upload into the current view now appears without a manual reload (#4, BUG-032). onUploadsDrained refetched the listing only on an exact prefix match, so uploading a folder *into* the current view (which drains the new sub-prefix, not the current prefix) left the new folder invisible until reload. It now refetches when any drained prefix is the current prefix or a descendant of it.",
+      "Refresh control is now labelled \"↺ Refresh\" (was an unlabelled ↺ icon) and its tooltip notes it pulls changes uploaded from other devices — Bucketer is backendless, so cross-client changes (#4, part 1) surface on demand via Refresh rather than live.",
+      "e2e regression coverage for all of the above, plus an Android-emulated check that uploading into a nested folder does not teleport the view to root (the desktop BUG-029 fix holds under mobile emulation; the reporter's residual mobile teleport (#3) needs native-device repro details)."
     ]
   },
   {
@@ -235,11 +243,11 @@ export const CHANGELOG = [
     "date": "2026-06-20",
     "title": "End-to-end test coverage on the stateful mock S3 server",
     "changes": [
-      "**Mock server extensions** (test/e2e/mock-s3/server.mjs): ListParts pagination (the BUG-007 substrate), fault hooks on the multipart/copy/get paths, presigned response-header overrides (response-content-disposition), a request-level vs per-key delete fault distinction, and a CORS fix so a narrowed ExposeHeaders genuinely hides x-amz-meta-* from the browser (the BUG-028 substrate).",
-      "**Node-integration layer** (test/e2e/node/): the destructive failure modes asserted against real bucket state — delete-denied-after-copy duplicate, multipart-copy abort-on-failure, partial batch delete, transient-throttle recovery, the dedup byte-for-byte gate over real GetObject streams, and a >1000-part ListParts resume (BUG-007).",
-      "**Browser layer** (test/e2e/browser/): real-browser proofs that unit tests can't give — BUG-028 (metadata hidden vs visible by CORS ExposeHeaders) and BUG-012 (an HTTP-DELETE operation blocked when DELETE is absent from CORS), batch upload, stay-in-folder after upload (BUG-029), move via the picker and via HTML5 drag-and-drop, presigned download, and capability-denied handling.",
-      "**Source data-testid hooks** (inert): app-connected, file-row:<name>, folder-row:<name>, properties-modal, meta-file-modified, delete-confirm.",
-      "**Scripts/CI**: npm run test:e2e (+ :node/:browser); a non-blocking GitLab e2e job. The e2e build targets the gitignored perf/ directory so the committed dist/index.html stays pristine."
+      "Mock server extensions (test/e2e/mock-s3/server.mjs): ListParts pagination (the BUG-007 substrate), fault hooks on the multipart/copy/get paths, presigned response-header overrides (response-content-disposition), a request-level vs per-key delete fault distinction, and a CORS fix so a narrowed ExposeHeaders genuinely hides x-amz-meta-* from the browser (the BUG-028 substrate).",
+      "Node-integration layer (test/e2e/node/): the destructive failure modes asserted against real bucket state — delete-denied-after-copy duplicate, multipart-copy abort-on-failure, partial batch delete, transient-throttle recovery, the dedup byte-for-byte gate over real GetObject streams, and a >1000-part ListParts resume (BUG-007).",
+      "Browser layer (test/e2e/browser/): real-browser proofs that unit tests can't give — BUG-028 (metadata hidden vs visible by CORS ExposeHeaders) and BUG-012 (an HTTP-DELETE operation blocked when DELETE is absent from CORS), batch upload, stay-in-folder after upload (BUG-029), move via the picker and via HTML5 drag-and-drop, presigned download, and capability-denied handling.",
+      "Source data-testid hooks (inert): app-connected, file-row:<name>, folder-row:<name>, properties-modal, meta-file-modified, delete-confirm.",
+      "Scripts/CI: npm run test:e2e (+ :node/:browser); a non-blocking GitLab e2e job. The e2e build targets the gitignored perf/ directory so the committed dist/index.html stays pristine."
     ]
   },
   {
@@ -247,10 +255,10 @@ export const CHANGELOG = [
     "date": "2026-06-19",
     "title": "Drag-and-drop moving",
     "changes": [
-      "**Drop targets you can already see** — folder rows in the listing (move *into* a subfolder) and breadcrumb crumbs for the current folder's parent and any ancestor up to root (move *up*). A target highlights only while it is a valid destination; dropping a folder into itself/a descendant, or onto its current location, is rejected with a no-drop cursor.",
-      "**Selection-aware** — dragging a row that is part of the current selection moves the whole selection; dragging an unselected row moves just that row, leaving any selection intact.",
-      "**Internal vs. external drags** — object moves are distinguished from OS file drags by the Files DataTransfer type, so dragging an object no longer raises the \"Drop files to upload\" overlay (handleTableDragEnter and the table's onDragOver now gate on it).",
-      "**Pure decision logic** in new src/lib/move-drag.js (dragPayload, dropAccepted) — unit-tested in isolation since DragEvent/DataTransfer don't exist under the test runner; the Browser/Breadcrumb wiring is a thin shell over it. Breadcrumb.jsx gained opt-in move-drop props (the picker's use is unchanged)."
+      "Drop targets you can already see — folder rows in the listing (move *into* a subfolder) and breadcrumb crumbs for the current folder's parent and any ancestor up to root (move *up*). A target highlights only while it is a valid destination; dropping a folder into itself/a descendant, or onto its current location, is rejected with a no-drop cursor.",
+      "Selection-aware — dragging a row that is part of the current selection moves the whole selection; dragging an unselected row moves just that row, leaving any selection intact.",
+      "Internal vs. external drags — object moves are distinguished from OS file drags by the Files DataTransfer type, so dragging an object no longer raises the \"Drop files to upload\" overlay (handleTableDragEnter and the table's onDragOver now gate on it).",
+      "Pure decision logic in new src/lib/move-drag.js (dragPayload, dropAccepted) — unit-tested in isolation since DragEvent/DataTransfer don't exist under the test runner; the Browser/Breadcrumb wiring is a thin shell over it. Breadcrumb.jsx gained opt-in move-drop props (the picker's use is unchanged)."
     ]
   },
   {
@@ -258,12 +266,12 @@ export const CHANGELOG = [
     "date": "2026-06-19",
     "title": "Move files & folders into another folder",
     "changes": [
-      "**Folder-tree destination picker** (src/components/MovePickerModal.jsx) — drill into prefixes (ListObjectsV2 with Delimiter:'/') and click **Move here**. The picker is the confirmation step; a structural guard (src/lib/move-guards.js) disables \"Move here\" with an inline reason for invalid destinations (a folder into itself or a descendant, or a no-op move).",
-      "**Copy-before-delete, per object** (src/lib/move-queue.js, runMoveOperation) — each object's source is deleted only after its copy is confirmed, so an object is always in a clean state (source-only / both / destination-only). Source rows are removed incrementally as they complete; a worker pool (8) with throttling backoff (src/lib/s3-retry.js) handles large folder moves.",
-      "**Any size, from day one** — objects ≤ 5 GiB use a single CopyObject (MetadataDirective:'COPY'); objects > 5 GiB use multipart UploadPartCopy (src/lib/move-multipart.js), carrying Content-Type and custom metadata forward via a source HeadObject (UploadPartCopy copies bytes only) and aborting any orphaned multipart session on failure. New constant COPY_MULTIPART_THRESHOLD (5 GiB), distinct from the 5 MiB upload MULTIPART_THRESHOLD.",
-      "**Never overwrites** — a single destination-prefix scan pre-detects collisions (and intra-batch duplicate target keys); a colliding object is skipped with both source and destination left untouched. Skips are surfaced in the move panel (src/components/MoveQueue.jsx) distinctly from genuine failures. If a copy succeeds but the source delete is denied, the object now exists in both places — this is reported as a distinct error and the source is left in place (never auto-deleted).",
-      "**Cross-provider** — server-side copy is permitted by the existing CORS template (PUT + x-amz-copy-source via the x-amz-* rule) on all supported providers; no CORS change is needed. Move is gated on both write (upload) and delete capabilities.",
-      "**Key remapping** (src/lib/move-key.js) preserves a moved folder's own name and nested sub-prefix structure under the destination, including the 0-byte folder-marker object."
+      "Folder-tree destination picker (src/components/MovePickerModal.jsx) — drill into prefixes (ListObjectsV2 with Delimiter:'/') and click Move here. The picker is the confirmation step; a structural guard (src/lib/move-guards.js) disables \"Move here\" with an inline reason for invalid destinations (a folder into itself or a descendant, or a no-op move).",
+      "Copy-before-delete, per object (src/lib/move-queue.js, runMoveOperation) — each object's source is deleted only after its copy is confirmed, so an object is always in a clean state (source-only / both / destination-only). Source rows are removed incrementally as they complete; a worker pool (8) with throttling backoff (src/lib/s3-retry.js) handles large folder moves.",
+      "Any size, from day one — objects ≤ 5 GiB use a single CopyObject (MetadataDirective:'COPY'); objects > 5 GiB use multipart UploadPartCopy (src/lib/move-multipart.js), carrying Content-Type and custom metadata forward via a source HeadObject (UploadPartCopy copies bytes only) and aborting any orphaned multipart session on failure. New constant COPY_MULTIPART_THRESHOLD (5 GiB), distinct from the 5 MiB upload MULTIPART_THRESHOLD.",
+      "Never overwrites — a single destination-prefix scan pre-detects collisions (and intra-batch duplicate target keys); a colliding object is skipped with both source and destination left untouched. Skips are surfaced in the move panel (src/components/MoveQueue.jsx) distinctly from genuine failures. If a copy succeeds but the source delete is denied, the object now exists in both places — this is reported as a distinct error and the source is left in place (never auto-deleted).",
+      "Cross-provider — server-side copy is permitted by the existing CORS template (PUT + x-amz-copy-source via the x-amz-* rule) on all supported providers; no CORS change is needed. Move is gated on both write (upload) and delete capabilities.",
+      "Key remapping (src/lib/move-key.js) preserves a moved folder's own name and nested sub-prefix structure under the destination, including the 0-byte folder-marker object."
     ]
   },
   {
@@ -271,9 +279,9 @@ export const CHANGELOG = [
     "date": "2026-06-18",
     "title": "Duplicate detection: durable results + scrollable report",
     "changes": [
-      "**Durable scan results** — a scan is no longer discarded when the report closes. Results are persisted per (endpoint, bucket) in a new IndexedDB store (bucketer_dedup_scans; DB schema bumped v2 → v3) and **restored on reopen**, so a large scan never has to be repeated. Keeper choices and byte-for-byte verifications are saved as they are made (transient progress flags are stripped, so a reload never shows a stuck spinner). The report shows a \"Last scan: … · N objects · timestamp · restored from cache\" line with **Re-scan** and **Clear saved** controls. Persistence is best-effort: when IndexedDB is unavailable it degrades to a no-op rather than failing the scan. New module src/lib/dedup-scan-store.js.",
-      "**Scrollable, wider report** — the duplicates dialog is now min(94vw, 920px) wide and height-capped at 88vh, with the match list scrolling inside the dialog instead of overflowing the viewport. Long keys/paths wrap rather than truncating.",
-      "**Test infrastructure** — test/helpers/with-dom.js now installs a non-recursive performance.now(). jsdom's own performance.now() recurses into itself once installed as the global performance, overflowing the stack under an async component re-render; this removes that long-standing hazard and unblocks async component tests."
+      "Durable scan results — a scan is no longer discarded when the report closes. Results are persisted per (endpoint, bucket) in a new IndexedDB store (bucketer_dedup_scans; DB schema bumped v2 → v3) and restored on reopen, so a large scan never has to be repeated. Keeper choices and byte-for-byte verifications are saved as they are made (transient progress flags are stripped, so a reload never shows a stuck spinner). The report shows a \"Last scan: … · N objects · timestamp · restored from cache\" line with Re-scan and Clear saved controls. Persistence is best-effort: when IndexedDB is unavailable it degrades to a no-op rather than failing the scan. New module src/lib/dedup-scan-store.js.",
+      "Scrollable, wider report — the duplicates dialog is now min(94vw, 920px) wide and height-capped at 88vh, with the match list scrolling inside the dialog instead of overflowing the viewport. Long keys/paths wrap rather than truncating.",
+      "Test infrastructure — test/helpers/with-dom.js now installs a non-recursive performance.now(). jsdom's own performance.now() recurses into itself once installed as the global performance, overflowing the stack under an async component re-render; this removes that long-standing hazard and unblocks async component tests."
     ]
   },
   {
@@ -281,11 +289,11 @@ export const CHANGELOG = [
     "date": "2026-06-17",
     "title": "Duplicate detection (iteration 1: scan + verify, read-only)",
     "changes": [
-      "**Tiered, provider-agnostic detection** (src/lib/dedup-scan.js) — narrows candidates cheaply: free size grouping → one HeadObject per same-size object (deriving a trusted single-part ETag-MD5, our content-hash stamp, and the multipart/encryption flags) → an opportunistic, **AWS-only** GetObjectAttributes checksum adapter. The engine only ever lists and HEADs; it never mutates an object.",
-      "**Byte-for-byte verification is the only deletion gate** (src/lib/verify-bytes.js). No hash decides identity: MD5 and SHA-1 are broken for collision resistance and even SHA-256 is a hash, so matches are shown as **candidates** and a streaming byte-for-byte comparison (immune to any hash collision, low memory, early-abort) is what promotes a group to **verified**.",
-      "**Content-hash stamp on upload** — every upload now records x-amz-meta-bucketer-content-hash with a self-describing value (sha256-ht64k:<hex>, the existing head/tail sample) as a cheap candidate filter for future scans. The hash is computed once and reused for the multipart resume record. Works on every provider, including those that expose no usable server-side checksum.",
-      "**Strict, fail-loud provider adapter** (src/lib/provider-checksum.js) — accepts a provider checksum only in an exact full-object shape, falls back to the universal tiers otherwise, and console.warns genuinely unexpected shapes so they can be reported and the adapter refined from real data. Other providers get an adapter only once probe output confirms one.",
-      "**Report UI** (src/components/DuplicatesModal.jsx) — candidate/verified badges, per-group keep-selection (default: oldest copy), and read-only per-object download/preview/copy-link. **Delete others** and **Move others** render as disabled stubs in this iteration. No existing object is ever rewritten (no checksum backfill) and the CORS template is unchanged."
+      "Tiered, provider-agnostic detection (src/lib/dedup-scan.js) — narrows candidates cheaply: free size grouping → one HeadObject per same-size object (deriving a trusted single-part ETag-MD5, our content-hash stamp, and the multipart/encryption flags) → an opportunistic, AWS-only GetObjectAttributes checksum adapter. The engine only ever lists and HEADs; it never mutates an object.",
+      "Byte-for-byte verification is the only deletion gate (src/lib/verify-bytes.js). No hash decides identity: MD5 and SHA-1 are broken for collision resistance and even SHA-256 is a hash, so matches are shown as candidates and a streaming byte-for-byte comparison (immune to any hash collision, low memory, early-abort) is what promotes a group to verified.",
+      "Content-hash stamp on upload — every upload now records x-amz-meta-bucketer-content-hash with a self-describing value (sha256-ht64k:<hex>, the existing head/tail sample) as a cheap candidate filter for future scans. The hash is computed once and reused for the multipart resume record. Works on every provider, including those that expose no usable server-side checksum.",
+      "Strict, fail-loud provider adapter (src/lib/provider-checksum.js) — accepts a provider checksum only in an exact full-object shape, falls back to the universal tiers otherwise, and console.warns genuinely unexpected shapes so they can be reported and the adapter refined from real data. Other providers get an adapter only once probe output confirms one.",
+      "Report UI (src/components/DuplicatesModal.jsx) — candidate/verified badges, per-group keep-selection (default: oldest copy), and read-only per-object download/preview/copy-link. Delete others and Move others render as disabled stubs in this iteration. No existing object is ever rewritten (no checksum backfill) and the CORS template is unchanged."
     ]
   },
   {
@@ -317,11 +325,11 @@ export const CHANGELOG = [
     "date": "2026-06-13",
     "title": "Build integrity check (honest-host)",
     "changes": [
-      "**Honest framing** — the match/mismatch UI explicitly states that this proves the host is serving the canonical artifact, not that the running JavaScript was not modified. A malicious host could rewrite both.",
-      "**Build pipeline** — build.mjs now emits dist/integrity.json alongside dist/index.html (sha256 in an extensible hashes object — sha512/blake3 can be added later without a schema migration).",
-      "**Release pipeline** — scripts/release.mjs uploads the manifest to the same GitLab Generic Package Registry path as the HTML and lists it among the Release assets.",
-      "**CI reproducibility guard** — .gitlab-ci.yml gains a reproducibility stage that builds twice and diffs both index.html and integrity.json. The release job now depends on this stage. Catches any future regression that leaks nondeterminism into the build.",
-      "**Result states** — match (green), mismatch (red with both hashes), no-manifest (yellow, for versions predating this feature), unknown-algorithm (yellow), network error (yellow).",
+      "Honest framing — the match/mismatch UI explicitly states that this proves the host is serving the canonical artifact, not that the running JavaScript was not modified. A malicious host could rewrite both.",
+      "Build pipeline — build.mjs now emits dist/integrity.json alongside dist/index.html (sha256 in an extensible hashes object — sha512/blake3 can be added later without a schema migration).",
+      "Release pipeline — scripts/release.mjs uploads the manifest to the same GitLab Generic Package Registry path as the HTML and lists it among the Release assets.",
+      "CI reproducibility guard — .gitlab-ci.yml gains a reproducibility stage that builds twice and diffs both index.html and integrity.json. The release job now depends on this stage. Catches any future regression that leaks nondeterminism into the build.",
+      "Result states — match (green), mismatch (red with both hashes), no-manifest (yellow, for versions predating this feature), unknown-algorithm (yellow), network error (yellow).",
       "Default off — enabling the toggle is the only thing that triggers any network call to GitLab."
     ]
   },
@@ -342,9 +350,9 @@ export const CHANGELOG = [
     "date": "2026-06-11",
     "title": "In-page preview on download links",
     "changes": [
-      "**PreviewMedia component** (src/components/PreviewMedia.jsx) — shared renderer for image, audio, video, PDF, and text kinds; replaces the equivalent inline JSX in Browser.",
-      "**DownloadPage preview** — detects the file type from the extension and renders the appropriate preview element using the presigned URL as the source directly. Text files are fetched in a useEffect (range-limited to 100 KB, same as the browser preview).",
-      "**Browser refactor** — preview rendering in Browser.jsx now delegates to PreviewMedia with no behaviour change."
+      "PreviewMedia component (src/components/PreviewMedia.jsx) — shared renderer for image, audio, video, PDF, and text kinds; replaces the equivalent inline JSX in Browser.",
+      "DownloadPage preview — detects the file type from the extension and renders the appropriate preview element using the presigned URL as the source directly. Text files are fetched in a useEffect (range-limited to 100 KB, same as the browser preview).",
+      "Browser refactor — preview rendering in Browser.jsx now delegates to PreviewMedia with no behaviour change."
     ]
   },
   {
@@ -352,10 +360,10 @@ export const CHANGELOG = [
     "date": "2026-06-11",
     "title": "Presigned URL sharing",
     "changes": [
-      "**Share via Bucketer** button in the file copy-link popover (single-file only; preset durations: 1 h, 24 h, 7 d).",
-      "**DownloadPage** — recipients open the link in Bucketer and see a clean download card showing the file name, expiry countdown, and a Download button. No S3 credentials required.",
-      "**Expired link handling** — if the presigned URL has passed its expiry, the download button is replaced with an \"This link has expired\" notice.",
-      "**base64url encoding** — synchronous, universally supported (including Safari), no compression API required."
+      "Share via Bucketer button in the file copy-link popover (single-file only; preset durations: 1 h, 24 h, 7 d).",
+      "DownloadPage — recipients open the link in Bucketer and see a clean download card showing the file name, expiry countdown, and a Download button. No S3 credentials required.",
+      "Expired link handling — if the presigned URL has passed its expiry, the download button is replaced with an \"This link has expired\" notice.",
+      "base64url encoding — synchronous, universally supported (including Safari), no compression API required."
     ]
   },
   {
@@ -363,13 +371,13 @@ export const CHANGELOG = [
     "date": "2026-06-11",
     "title": "Adaptive upload concurrency",
     "changes": [
-      "**Adaptive/Manual toggle** in Settings (adaptive is the default). In adaptive mode the part and file concurrency sliders are hidden.",
-      "**Sort-by-size**: files in a batch are enqueued smallest-first so small files complete quickly and part concurrency scales up sooner for large files.",
-      "**Budget rebalancer**: as active uploads drop, partsPerFile scales up automatically (4 files → 4 parts/file, 2 files → 8 parts/file, 1 file → 16 parts/file), keeping total in-flight streams near 16.",
-      "**Per-file probe** (files ≥ 100 MB): uploads one warm-up part then times a baseline and candidate (+4) concurrency phase; holds the faster result for the rest of the file. Inconclusive probes (measurement < 10 ms) fall back to baseline.",
-      "**Memory cap**: part concurrency is clamped so total ArrayBuffer usage across all concurrent files stays within 200 MiB, preventing tab crashes on very large files where calcPartSize raises the part size beyond 5 MiB.",
-      "**Strategy column** in Upload history showing mode, peak part concurrency, and probe outcome per file.",
-      "**Console debug output** via localStorage.setItem('s3b_debug_concurrency', '1'): logs rebalance events (only when partsPerFile changes) and per-file file-complete summaries with speed and probe results.",
+      "Adaptive/Manual toggle in Settings (adaptive is the default). In adaptive mode the part and file concurrency sliders are hidden.",
+      "Sort-by-size: files in a batch are enqueued smallest-first so small files complete quickly and part concurrency scales up sooner for large files.",
+      "Budget rebalancer: as active uploads drop, partsPerFile scales up automatically (4 files → 4 parts/file, 2 files → 8 parts/file, 1 file → 16 parts/file), keeping total in-flight streams near 16.",
+      "Per-file probe (files ≥ 100 MB): uploads one warm-up part then times a baseline and candidate (+4) concurrency phase; holds the faster result for the rest of the file. Inconclusive probes (measurement < 10 ms) fall back to baseline.",
+      "Memory cap: part concurrency is clamped so total ArrayBuffer usage across all concurrent files stays within 200 MiB, preventing tab crashes on very large files where calcPartSize raises the part size beyond 5 MiB.",
+      "Strategy column in Upload history showing mode, peak part concurrency, and probe outcome per file.",
+      "Console debug output via localStorage.setItem('s3b_debug_concurrency', '1'): logs rebalance events (only when partsPerFile changes) and per-file file-complete summaries with speed and probe results.",
       "New pure module src/lib/concurrency-strategy.js (calcAdaptiveConcurrency, createProbeState, resolveProbe, capConcurrencyByMemory) — fully unit-tested."
     ]
   },
@@ -387,23 +395,23 @@ export const CHANGELOG = [
     "date": "2026-06-08",
     "title": "Code simplification: shared utilities, deduplication, indexeddb split",
     "changes": [
-      "**lib/constants.js**: centralises MULTIPART_THRESHOLD, LARGE_FILE_WARN, PRESIGN_EXPIRES, TEXT_PREVIEW_LIMIT, COPY_LINK_PRESETS, and concurrency defaults previously scattered across UploadQueue.jsx and Browser.jsx. One place to change a threshold.",
-      "**lib/upload-status.js**: isActive / isFailed / isSettled / isPaused / isDone / isAborted predicate functions, replacing inline i.status === 'uploading' || i.status === 'resuming' || ... chains duplicated 4+ times in UploadQueue.jsx.",
-      "**lib/upload-cleanup.js**: abortMultipartSession(client, params) — abort + deleteResumeRecord were copy-pasted in three best-effort cleanup paths; now a single tested helper with a doc comment explaining which callers must stay inline (those that surface errors to the UI).",
-      "**lib/sort.js**: nameComparator / numericComparator factories extracted from Browser.jsx. Locale-comparison options (sensitivity: 'base') defined in one place.",
-      "**lib/validate-object-name.js**: shared validation (non-empty, no slashes) for both rename and folder-create; rules cannot silently diverge between the two callers.",
-      "**lib/purge-versions.js**: purgeAllVersions() and collectHiddenVersions() extracted from HiddenVersions.jsx. The 57-line async pagination + batched DeleteObjectsCommand loop is now independently testable with a mock S3 client (6 new tests).",
-      "**lib/indexeddb.js → barrel over four focused modules**: indexeddb-core.js (shared openDB, schema constants), resume-records.js, file-identity.js, active-uploads.js, upload-log.js. Each module owns one concern; the barrel preserves all existing import paths.",
-      "**lib/storage.js factory refactor**: 8 near-identical load<Setting> / save<Setting> function pairs collapsed into a makeSettingAccessors() factory. All exported function names are identical — callers are unchanged.",
-      "**hooks/useDoubleClickSafety.js**: the \"prime for 3 s, confirm on second click\" timer pattern was duplicated between the main UploadQueue cancel-all button and BatchSummary's per-batch cancel button. Extracted as a hook + pure applyClickSafety() function (tested with injected timer stubs).",
-      "**hooks/useInterpolatedProgress.js**: rAF byte-counter animation extracted from UploadItem. Pure interpolateBytes() function tested separately from the Preact hook.",
-      "**hooks/useWindowDragDrop.js**: ~60 lines of dragenter / dragleave / dragover event listener setup, counter management, and the handleWindowDrop file-entry resolver extracted from App.jsx.",
-      "**hooks/useModalStates.js**: App-level changelog / about / storage modal open-state grouped so new modals have a canonical home. **Component refactoring (Phase 2):** each component is shortened using Phase 1 utilities; tests run before and after each change.",
-      "**UploadQueue.jsx** (−75 lines): uses useDoubleClickSafety, useInterpolatedProgress, status predicates, abortMultipartSession, and constants. ErrorDetailsPanel extracted as a named sub-component. MultipartFailureConsequence moved to its own file (components/MultipartFailureConsequence.jsx) since it has no dependency on UploadQueue state.",
-      "**Browser.jsx** (−71 lines): CopyLinkPopover and BatchCopyLinkPopover merged into one parameterised component — fileKey for single, fileKeys for batch. Uses nameComparator / numericComparator, validateObjectName, and constants.",
-      "**App.jsx** (−67 lines): dead statusLabel variable removed (declared but never read). Drag-drop logic extracted to useWindowDragDrop; modal open-state extracted to useModalStates.",
-      "**HiddenVersions.jsx** (−41 lines): delegates purge to purgeAllVersions(); uses collectHiddenVersions.",
-      "**StorageModal.jsx**: internal Confirm sub-component renamed ConfirmDialog for clarity. **Tests:** 76 new tests added across 8 new test files (584 total). Source-invariants updated to assert the new structure — e.g. that BatchCopyLinkPopover cannot be re-introduced as a separate function, that UploadQueue imports its hook and predicate dependencies, and that indexeddb.js is a barrel (no openDB definition)."
+      "lib/constants.js: centralises MULTIPART_THRESHOLD, LARGE_FILE_WARN, PRESIGN_EXPIRES, TEXT_PREVIEW_LIMIT, COPY_LINK_PRESETS, and concurrency defaults previously scattered across UploadQueue.jsx and Browser.jsx. One place to change a threshold.",
+      "lib/upload-status.js: isActive / isFailed / isSettled / isPaused / isDone / isAborted predicate functions, replacing inline i.status === 'uploading' || i.status === 'resuming' || ... chains duplicated 4+ times in UploadQueue.jsx.",
+      "lib/upload-cleanup.js: abortMultipartSession(client, params) — abort + deleteResumeRecord were copy-pasted in three best-effort cleanup paths; now a single tested helper with a doc comment explaining which callers must stay inline (those that surface errors to the UI).",
+      "lib/sort.js: nameComparator / numericComparator factories extracted from Browser.jsx. Locale-comparison options (sensitivity: 'base') defined in one place.",
+      "lib/validate-object-name.js: shared validation (non-empty, no slashes) for both rename and folder-create; rules cannot silently diverge between the two callers.",
+      "lib/purge-versions.js: purgeAllVersions() and collectHiddenVersions() extracted from HiddenVersions.jsx. The 57-line async pagination + batched DeleteObjectsCommand loop is now independently testable with a mock S3 client (6 new tests).",
+      "lib/indexeddb.js → barrel over four focused modules: indexeddb-core.js (shared openDB, schema constants), resume-records.js, file-identity.js, active-uploads.js, upload-log.js. Each module owns one concern; the barrel preserves all existing import paths.",
+      "lib/storage.js factory refactor: 8 near-identical load<Setting> / save<Setting> function pairs collapsed into a makeSettingAccessors() factory. All exported function names are identical — callers are unchanged.",
+      "hooks/useDoubleClickSafety.js: the \"prime for 3 s, confirm on second click\" timer pattern was duplicated between the main UploadQueue cancel-all button and BatchSummary's per-batch cancel button. Extracted as a hook + pure applyClickSafety() function (tested with injected timer stubs).",
+      "hooks/useInterpolatedProgress.js: rAF byte-counter animation extracted from UploadItem. Pure interpolateBytes() function tested separately from the Preact hook.",
+      "hooks/useWindowDragDrop.js: ~60 lines of dragenter / dragleave / dragover event listener setup, counter management, and the handleWindowDrop file-entry resolver extracted from App.jsx.",
+      "hooks/useModalStates.js: App-level changelog / about / storage modal open-state grouped so new modals have a canonical home. Component refactoring (Phase 2): each component is shortened using Phase 1 utilities; tests run before and after each change.",
+      "UploadQueue.jsx (−75 lines): uses useDoubleClickSafety, useInterpolatedProgress, status predicates, abortMultipartSession, and constants. ErrorDetailsPanel extracted as a named sub-component. MultipartFailureConsequence moved to its own file (components/MultipartFailureConsequence.jsx) since it has no dependency on UploadQueue state.",
+      "Browser.jsx (−71 lines): CopyLinkPopover and BatchCopyLinkPopover merged into one parameterised component — fileKey for single, fileKeys for batch. Uses nameComparator / numericComparator, validateObjectName, and constants.",
+      "App.jsx (−67 lines): dead statusLabel variable removed (declared but never read). Drag-drop logic extracted to useWindowDragDrop; modal open-state extracted to useModalStates.",
+      "HiddenVersions.jsx (−41 lines): delegates purge to purgeAllVersions(); uses collectHiddenVersions.",
+      "StorageModal.jsx: internal Confirm sub-component renamed ConfirmDialog for clarity. Tests: 76 new tests added across 8 new test files (584 total). Source-invariants updated to assert the new structure — e.g. that BatchCopyLinkPopover cannot be re-introduced as a separate function, that UploadQueue imports its hook and predicate dependencies, and that indexeddb.js is a barrel (no openDB definition)."
     ]
   },
   {
@@ -411,10 +419,10 @@ export const CHANGELOG = [
     "date": "2026-06-07",
     "title": "Credential form and profile management bug fixes",
     "changes": [
-      "**Region inference restored for loaded profiles (BUG-026)**: loading a saved profile silently marked the region as \"user-edited\" regardless of whether its stored value matched what the endpoint would give. The _initExtractedRegion IIFE bailed out early when initial.regionOverride was set, making the comparison against the extracted value impossible. Removed the early bail; now the stored region is compared to the extracted one and treated as inferred (allowing endpoint changes to update it) when they match. The \"Auto-filled from endpoint URL\" hint also reappears for profile-loaded regions that are endpoint-derived.",
-      "**Post-disconnect form repopulated from selected profile (BUG-027)**: disconnecting cleared credentials to all-empty but left selectedProfileId pointing to the last profile, leaving the splash screen with a highlighted profile row and a blank form. Clicking the row was a no-op (same key, no CredentialForm remount). handleDisconnect now repopulates credentials and liveFormData from the selected profile minus the secret key, so the user only needs to re-enter the secret key to reconnect.",
-      "**Default profile name now includes provider (Issue 3)**: defaultName in ProfilePicker read formData.provider, which is absent when liveFormData comes from live form edits (those carry providerOverride instead). Now resolves providerOverride || provider || detectProvider(endpoint) so the suggested name reflects what the form shows — \"B2 — my-bucket\" instead of just \"my-bucket\".",
-      "**Profile delete requires confirmation (Issue 4)**: clicking ✕ on a profile row previously deleted it immediately with no undo. Now shows an inline \"Delete? [Confirm] [Cancel]\" confirmation in the row; the Confirm button is styled in danger-red. Clicking the row itself also dismisses the confirmation without selecting the profile."
+      "Region inference restored for loaded profiles (BUG-026): loading a saved profile silently marked the region as \"user-edited\" regardless of whether its stored value matched what the endpoint would give. The _initExtractedRegion IIFE bailed out early when initial.regionOverride was set, making the comparison against the extracted value impossible. Removed the early bail; now the stored region is compared to the extracted one and treated as inferred (allowing endpoint changes to update it) when they match. The \"Auto-filled from endpoint URL\" hint also reappears for profile-loaded regions that are endpoint-derived.",
+      "Post-disconnect form repopulated from selected profile (BUG-027): disconnecting cleared credentials to all-empty but left selectedProfileId pointing to the last profile, leaving the splash screen with a highlighted profile row and a blank form. Clicking the row was a no-op (same key, no CredentialForm remount). handleDisconnect now repopulates credentials and liveFormData from the selected profile minus the secret key, so the user only needs to re-enter the secret key to reconnect.",
+      "Default profile name now includes provider (Issue 3): defaultName in ProfilePicker read formData.provider, which is absent when liveFormData comes from live form edits (those carry providerOverride instead). Now resolves providerOverride || provider || detectProvider(endpoint) so the suggested name reflects what the form shows — \"B2 — my-bucket\" instead of just \"my-bucket\".",
+      "Profile delete requires confirmation (Issue 4): clicking ✕ on a profile row previously deleted it immediately with no undo. Now shows an inline \"Delete? [Confirm] [Cancel]\" confirmation in the row; the Confirm button is styled in danger-red. Clicking the row itself also dismisses the confirmation without selecting the profile."
     ]
   },
   {
@@ -422,10 +430,10 @@ export const CHANGELOG = [
     "date": "2026-06-07",
     "title": "Bidirectional endpoint↔region inference in credential form",
     "changes": [
-      "**Region auto-filled from endpoint**: the region field is now always visible and is automatically populated when the endpoint URL embeds a region (B2, Wasabi, AWS, DO Spaces). Previously the extracted region was only shown as a sidebar hint; now it appears as an editable value with an \"Auto-filled from endpoint URL\" indicator.",
-      "**Endpoint auto-filled from provider + region**: selecting a provider from the override dropdown and typing a region constructs and auto-fills the canonical endpoint URL (\"Auto-filled from provider and region\"). Provider-specific exceptions are handled: Wasabi's us-east-1 produces https://s3.wasabisys.com (bare legacy hostname) rather than the naïve template. R2 auto-fills the region with 'auto' (endpoint requires account ID and cannot be constructed). MinIO and Generic providers do not infer endpoints.",
-      "**Endpoint patterns verified against official docs** (all fetched 2026-06-04/07): B2 via backblaze.com/docs, Wasabi via docs.wasabi.com, AWS via docs.aws.amazon.com/general, DO Spaces via docs.digitalocean.com, R2 via developers.cloudflare.com.",
-      "**Circular update prevention**: a userEditedRef ensures inference only flows from user-typed fields into fields the user has not yet touched. Editing an auto-filled field marks it as user-owned and stops inference from overwriting it."
+      "Region auto-filled from endpoint: the region field is now always visible and is automatically populated when the endpoint URL embeds a region (B2, Wasabi, AWS, DO Spaces). Previously the extracted region was only shown as a sidebar hint; now it appears as an editable value with an \"Auto-filled from endpoint URL\" indicator.",
+      "Endpoint auto-filled from provider + region: selecting a provider from the override dropdown and typing a region constructs and auto-fills the canonical endpoint URL (\"Auto-filled from provider and region\"). Provider-specific exceptions are handled: Wasabi's us-east-1 produces https://s3.wasabisys.com (bare legacy hostname) rather than the naïve template. R2 auto-fills the region with 'auto' (endpoint requires account ID and cannot be constructed). MinIO and Generic providers do not infer endpoints.",
+      "Endpoint patterns verified against official docs (all fetched 2026-06-04/07): B2 via backblaze.com/docs, Wasabi via docs.wasabi.com, AWS via docs.aws.amazon.com/general, DO Spaces via docs.digitalocean.com, R2 via developers.cloudflare.com.",
+      "Circular update prevention: a userEditedRef ensures inference only flows from user-typed fields into fields the user has not yet touched. Editing an auto-filled field marks it as user-owned and stops inference from overwriting it."
     ]
   },
   {
@@ -433,10 +441,10 @@ export const CHANGELOG = [
     "date": "2026-06-06",
     "title": "Profile reliability: provider inference, update-in-place, reload consistency, hint labels",
     "changes": [
-      "**Provider override no longer carries over from auto-detection**: CredentialForm previously initialized the provider-override dropdown from the stored/detected provider, so switching a form pre-filled with B2 credentials to a Wasabi endpoint would silently submit provider: 'b2'. The dropdown now only pre-selects a value when it genuinely differs from what detectProvider would return for the current endpoint — i.e., only for real overrides (MinIO on a generic URL, a reverse proxy, etc.). Auto-detected providers always start at \"Auto-detect from endpoint\".",
-      "**Profile save updates in place**: \"Save current as profile…\" previously always created a new profile (id: Date.now()), making it impossible to update an existing one. When a profile is currently selected, the button now reads \"Update profile…\" and saves with the existing profile's id, replacing it rather than duplicating it. The name input pre-fills with the profile's current name.",
-      "**Reload prefers flat credentials over profile data**: on page load, the app previously always loaded the last-selected profile's data, which overwrote credentials saved by a manually-entered connection that was never saved as a profile. Flat credentials (written on every handleConnect) are now used when present; the profile is used only as a fallback when flat credentials are absent (i.e. after a disconnect or first load).",
-      "**Profile list hint shows full provider names**: the hint line under each profile name now uses PROVIDER_LABELS (\"Backblaze B2 · bucket\") instead of the raw key uppercased (\"B2 · bucket\")."
+      "Provider override no longer carries over from auto-detection: CredentialForm previously initialized the provider-override dropdown from the stored/detected provider, so switching a form pre-filled with B2 credentials to a Wasabi endpoint would silently submit provider: 'b2'. The dropdown now only pre-selects a value when it genuinely differs from what detectProvider would return for the current endpoint — i.e., only for real overrides (MinIO on a generic URL, a reverse proxy, etc.). Auto-detected providers always start at \"Auto-detect from endpoint\".",
+      "Profile save updates in place: \"Save current as profile…\" previously always created a new profile (id: Date.now()), making it impossible to update an existing one. When a profile is currently selected, the button now reads \"Update profile…\" and saves with the existing profile's id, replacing it rather than duplicating it. The name input pre-fills with the profile's current name.",
+      "Reload prefers flat credentials over profile data: on page load, the app previously always loaded the last-selected profile's data, which overwrote credentials saved by a manually-entered connection that was never saved as a profile. Flat credentials (written on every handleConnect) are now used when present; the profile is used only as a fallback when flat credentials are absent (i.e. after a disconnect or first load).",
+      "Profile list hint shows full provider names: the hint line under each profile name now uses PROVIDER_LABELS (\"Backblaze B2 · bucket\") instead of the raw key uppercased (\"B2 · bucket\")."
     ]
   },
   {
@@ -444,11 +452,11 @@ export const CHANGELOG = [
     "date": "2026-06-06",
     "title": "Upload UI cleanup: hide when denied, drop zone removed, empty-state hint",
     "changes": [
-      "**Upload UI hidden when denied**: entire upload section (destination folder, file/folder picker buttons) is now hidden when capabilities.upload === 'denied' rather than shown in a disabled/greyed state. When unknown or permitted, everything shows as before.",
-      "**Dedicated drop zone removed**: the \"Drop files or folders here\" element in UploadQueue is gone. The window-wide overlay (v1.15.2) covers the same surface area; the zone was redundant. handleDrop and dragOver state removed from UploadQueue.",
-      "**Empty-state hint**: when the queue is empty and upload is available, a line reads \"Drag files or folders anywhere in this window to upload, or use the buttons above.\" — the first-use teaching moment.",
-      "**Window overlay respects upload capability**: the document dragenter listener and the overlay render are both gated on capabilities.upload !== 'denied'.",
-      "**Error handling on detached drops**: .catch(() => {}) added to the collectFileEntries().then() chains in handleWindowDrop (App.jsx) and handleTableDrop (Browser.jsx) to prevent silent promise rejections."
+      "Upload UI hidden when denied: entire upload section (destination folder, file/folder picker buttons) is now hidden when capabilities.upload === 'denied' rather than shown in a disabled/greyed state. When unknown or permitted, everything shows as before.",
+      "Dedicated drop zone removed: the \"Drop files or folders here\" element in UploadQueue is gone. The window-wide overlay (v1.15.2) covers the same surface area; the zone was redundant. handleDrop and dragOver state removed from UploadQueue.",
+      "Empty-state hint: when the queue is empty and upload is available, a line reads \"Drag files or folders anywhere in this window to upload, or use the buttons above.\" — the first-use teaching moment.",
+      "Window overlay respects upload capability: the document dragenter listener and the overlay render are both gated on capabilities.upload !== 'denied'.",
+      "Error handling on detached drops: .catch(() => {}) added to the collectFileEntries().then() chains in handleWindowDrop (App.jsx) and handleTableDrop (Browser.jsx) to prevent silent promise rejections."
     ]
   },
   {
@@ -456,10 +464,10 @@ export const CHANGELOG = [
     "date": "2026-06-05",
     "title": "Window-wide drag-and-drop overlay",
     "changes": [
-      "**Drop anywhere on the window to upload**: document-level dragenter/dragleave/dragover listeners in App.jsx activate a full-screen fixed overlay (z-index 500, below modals at 1000) whenever files are dragged over the viewport while connected.",
-      "**Modal suppression**: dragenter checks document.querySelector('.modal-overlay') — the overlay is not activated while any modal is open.",
-      "**Overlay captures the drop**: ondrop on the overlay fires collectFileEntries as a detached .then(), routing files to the same addFilesRef destination as all other drop paths.",
-      "**Existing zone-specific handlers unchanged**: Browser table drop and UploadQueue upload-zone drop continue to work as before; the window overlay is the primary path when connected."
+      "Drop anywhere on the window to upload: document-level dragenter/dragleave/dragover listeners in App.jsx activate a full-screen fixed overlay (z-index 500, below modals at 1000) whenever files are dragged over the viewport while connected.",
+      "Modal suppression: dragenter checks document.querySelector('.modal-overlay') — the overlay is not activated while any modal is open.",
+      "Overlay captures the drop: ondrop on the overlay fires collectFileEntries as a detached .then(), routing files to the same addFilesRef destination as all other drop paths.",
+      "Existing zone-specific handlers unchanged: Browser table drop and UploadQueue upload-zone drop continue to work as before; the window overlay is the primary path when connected."
     ]
   },
   {
@@ -467,9 +475,9 @@ export const CHANGELOG = [
     "date": "2026-06-05",
     "title": "Synchronous drop capture, parallel folder traversal, pending-drop indicator",
     "changes": [
-      "**Drop handlers are now synchronous** (handleTableDrop in Browser.jsx, handleDrop in UploadQueue.jsx): FileSystemEntry objects are captured synchronously before any await, then collectFileEntries fires as a detached .then(). The handler returns immediately so rapid consecutive drops are captured right away rather than waiting for the previous traversal to complete.",
-      "**Parallel top-level traversal in collectFileEntries**: changed for…await over root entries to Promise.all, so independent folder subtrees are walked concurrently rather than one at a time.",
-      "**Pending-drop indicator in UploadQueue**: while folder traversal is running a pendingDrops counter drives a \"Counting files in N folders…\" message beneath the drop zone, giving the user immediate feedback that the drop was accepted."
+      "Drop handlers are now synchronous (handleTableDrop in Browser.jsx, handleDrop in UploadQueue.jsx): FileSystemEntry objects are captured synchronously before any await, then collectFileEntries fires as a detached .then(). The handler returns immediately so rapid consecutive drops are captured right away rather than waiting for the previous traversal to complete.",
+      "Parallel top-level traversal in collectFileEntries: changed for…await over root entries to Promise.all, so independent folder subtrees are walked concurrently rather than one at a time.",
+      "Pending-drop indicator in UploadQueue: while folder traversal is running a pendingDrops counter drives a \"Counting files in N folders…\" message beneath the drop zone, giving the user immediate feedback that the drop was accepted."
     ]
   },
   {
@@ -477,10 +485,10 @@ export const CHANGELOG = [
     "date": "2026-06-05",
     "title": "Refactor + accessibility: usePreview hook, cancellation guard, htmlFor labels, progress ARIA",
     "changes": [
-      "**T4-1** Extract all preview state, handlePreview, and closePreview into src/lib/usePreview.js; Browser.jsx now consumes the hook",
-      "**T4-2** Add gen-ref cancellation guard to handlePreview — every await is followed by if (gen !== genRef.current) return to drop stale async callbacks when the user opens a new preview",
-      "**T4-6** Add htmlFor + id to all standalone <label> elements in CredentialForm.jsx (6) and SettingsPanel.jsx (7) — screen readers and click-to-focus now work correctly",
-      "**T5-9** Add role=\"progressbar\" + aria-valuenow/min/max + aria-label to progress bar elements in UploadQueue.jsx — upload progress is now exposed to the accessibility tree"
+      "T4-1 Extract all preview state, handlePreview, and closePreview into src/lib/usePreview.js; Browser.jsx now consumes the hook",
+      "T4-2 Add gen-ref cancellation guard to handlePreview — every await is followed by if (gen !== genRef.current) return to drop stale async callbacks when the user opens a new preview",
+      "T4-6 Add htmlFor + id to all standalone <label> elements in CredentialForm.jsx (6) and SettingsPanel.jsx (7) — screen readers and click-to-focus now work correctly",
+      "T5-9 Add role=\"progressbar\" + aria-valuenow/min/max + aria-label to progress bar elements in UploadQueue.jsx — upload progress is now exposed to the accessibility tree"
     ]
   },
   {
@@ -488,21 +496,21 @@ export const CHANGELOG = [
     "date": "2026-06-04",
     "title": "Quality batch: concurrency cap, format guards, build invariants, provider accuracy, UI polish",
     "changes": [
-      "**T4-3** Cap discoverPrefixKeys concurrency at 8 with worker-pool; removes bare Promise.all(prefixes.map) that could throttle on large folder-delete operations",
-      "**T4-4** Guard formatBytes against null/undefined/NaN/negative/Infinity — all return '—' instead of crashing",
-      "**T4-5** Remove stale \"No delete, rename, copy\" and \"N=2 concurrency\" claims from docs/QUESTIONS.md",
-      "**T5-1** Add build test: production bundle must have no source map comments (regression guard)",
-      "**T5-2** Add build invariant: dist/index.html must not exceed 600 KB ceiling",
-      "**T5-3** Export shellQuote from cors-config.js; use in corsCmd() to prevent shell injection from bucket/endpoint names",
-      "**T5-4** Add <meta http-equiv=\"Content-Security-Policy\"> to src/index.html for S3/R2/B2 static-hosting deployments",
-      "**T5-5** Replace module-level let _sessionFirstMount in Browser.jsx with isFirstMount prop derived from browserKey === 0 in App.jsx",
-      "**T5-6** Distinguish empty-bucket copy (\"This bucket is empty. Upload files to get started.\") from empty-prefix copy",
-      "**T5-7** Show filename in delete confirmation modal for single-file deletes",
-      "**T5-8** Add inline hint to CapabilityPanel explaining permissions are detected automatically",
-      "**T5-11** Add dotted-bucket SSL caveat to Wasabi SetupGuide step",
-      "**T5-12** Correct requiresPathStyle comment — B2 supports both styles; we use path-style because users supply a plain endpoint",
-      "**T5-13** Correct defaultMaxKeys comment — B2 Class C is not billed per call; 200 is a UX latency choice",
-      "**T5-14** Map Wasabi legacy alias region slugs (nl-1→eu-central-1, de-1→eu-central-2, uk-1→eu-west-1, fr-1→eu-west-2, uk-2→eu-west-3, it-1→eu-south-1) to canonical SigV4 names to prevent signing failures"
+      "T4-3 Cap discoverPrefixKeys concurrency at 8 with worker-pool; removes bare Promise.all(prefixes.map) that could throttle on large folder-delete operations",
+      "T4-4 Guard formatBytes against null/undefined/NaN/negative/Infinity — all return '—' instead of crashing",
+      "T4-5 Remove stale \"No delete, rename, copy\" and \"N=2 concurrency\" claims from docs/QUESTIONS.md",
+      "T5-1 Add build test: production bundle must have no source map comments (regression guard)",
+      "T5-2 Add build invariant: dist/index.html must not exceed 600 KB ceiling",
+      "T5-3 Export shellQuote from cors-config.js; use in corsCmd() to prevent shell injection from bucket/endpoint names",
+      "T5-4 Add <meta http-equiv=\"Content-Security-Policy\"> to src/index.html for S3/R2/B2 static-hosting deployments",
+      "T5-5 Replace module-level let _sessionFirstMount in Browser.jsx with isFirstMount prop derived from browserKey === 0 in App.jsx",
+      "T5-6 Distinguish empty-bucket copy (\"This bucket is empty. Upload files to get started.\") from empty-prefix copy",
+      "T5-7 Show filename in delete confirmation modal for single-file deletes",
+      "T5-8 Add inline hint to CapabilityPanel explaining permissions are detected automatically",
+      "T5-11 Add dotted-bucket SSL caveat to Wasabi SetupGuide step",
+      "T5-12 Correct requiresPathStyle comment — B2 supports both styles; we use path-style because users supply a plain endpoint",
+      "T5-13 Correct defaultMaxKeys comment — B2 Class C is not billed per call; 200 is a UX latency choice",
+      "T5-14 Map Wasabi legacy alias region slugs (nl-1→eu-central-1, de-1→eu-central-2, uk-1→eu-west-1, fr-1→eu-west-2, uk-2→eu-west-3, it-1→eu-south-1) to canonical SigV4 names to prevent signing failures"
     ]
   },
   {
@@ -510,12 +518,12 @@ export const CHANGELOG = [
     "date": "2026-06-04",
     "title": "Provider-specific fixes: Wasabi billing warnings, R2 versioning gate, AWS region patterns, SetupGuide improvements",
     "changes": [
-      "**T3-1:** Delete confirmation dialogs now show a Wasabi-specific 90-day minimum retention warning when provider === 'wasabi' — both DeleteQueue (file/folder delete) and HiddenVersions purge-all confirmation. Prevents silent billing surprises for deleted test data.",
-      "**T3-2:** HiddenVersions now accepts a provider prop (threaded from Browser). Cloudflare R2 buckets render a \"versioning not supported\" message instead of a confusing empty panel, because R2 does not implement ListObjectVersions.",
-      "**T3-3:** extractRegion() for AWS S3 now handles virtual-hosted bucket URLs (bucket.s3.region.amazonaws.com), dualstack endpoints (s3.dualstack.region.amazonaws.com), FIPS endpoints (s3-fips.region.amazonaws.com), and legacy dash-style endpoints (s3-region.amazonaws.com). Pasting a URL from the AWS Console no longer silently falls back to us-east-1.",
-      "**T3-4:** GuideMinIO in SetupGuide now includes an explicit mixed-content warning: browsers block HTTP requests from an HTTPS-served Bucketer to an HTTP MinIO server, and the error only appears in DevTools.",
-      "**T3-5:** GuideB2 now mentions that application keys must have the listAllBucketNames capability — a single-bucket key without it causes AWS SDK v3 initialisation to fail entirely.",
-      "**T3-6:** GuideR2 now tells users where to find their Account ID (dashboard sidebar), that a payment method is required even on the free tier, and the difference between account-scoped and bucket-scoped token scope."
+      "T3-1: Delete confirmation dialogs now show a Wasabi-specific 90-day minimum retention warning when provider === 'wasabi' — both DeleteQueue (file/folder delete) and HiddenVersions purge-all confirmation. Prevents silent billing surprises for deleted test data.",
+      "T3-2: HiddenVersions now accepts a provider prop (threaded from Browser). Cloudflare R2 buckets render a \"versioning not supported\" message instead of a confusing empty panel, because R2 does not implement ListObjectVersions.",
+      "T3-3: extractRegion() for AWS S3 now handles virtual-hosted bucket URLs (bucket.s3.region.amazonaws.com), dualstack endpoints (s3.dualstack.region.amazonaws.com), FIPS endpoints (s3-fips.region.amazonaws.com), and legacy dash-style endpoints (s3-region.amazonaws.com). Pasting a URL from the AWS Console no longer silently falls back to us-east-1.",
+      "T3-4: GuideMinIO in SetupGuide now includes an explicit mixed-content warning: browsers block HTTP requests from an HTTPS-served Bucketer to an HTTP MinIO server, and the error only appears in DevTools.",
+      "T3-5: GuideB2 now mentions that application keys must have the listAllBucketNames capability — a single-bucket key without it causes AWS SDK v3 initialisation to fail entirely.",
+      "T3-6: GuideR2 now tells users where to find their Account ID (dashboard sidebar), that a payment method is required even on the free tier, and the difference between account-scoped and bucket-scoped token scope."
     ]
   },
   {
@@ -523,12 +531,12 @@ export const CHANGELOG = [
     "date": "2026-06-04",
     "title": "Correctness and security fixes: settings preservation, resume parallelism, purge-all error recovery, endpoint URL guard, CSP docs",
     "changes": [
-      "**T2-1:** clearCredentials() now only removes credential fields (endpoint, bucket, keyId, provider, regionOverride). Settings keys (partSize, concurrency, etc.) survive disconnect — split LS_KEYS into CREDENTIAL_KEYS and SETTINGS_KEYS; resetSettings() now uses the canonical SETTINGS_KEYS set.",
-      "**T2-2:** Multipart resume path now uses the same uploadPartsWithPool worker pool as fresh uploads, matching the configured PART_CONCURRENCY. Extracted helper exported from src/lib/upload-queue.js with unit tests asserting concurrency.",
-      "**T2-3:** HiddenVersions.handlePurgeAllConfirm now continues through all batches on S3 Errors entries instead of throwing on the first — reports aggregate failure count in the dialog rather than abandoning remaining batches silently.",
-      "**T2-4:** readUrlParams() now validates the endpoint parameter (must be a parseable http: or https: URL) and the bucket parameter (no slashes or .. traversal sequences). Prevents crafted share links from pre-filling the credential form with attacker-controlled values.",
-      "**T2-5:** Fixed README.md nginx and Caddy CSP examples to include img-src data: https:; media-src https:; frame-src https:;. Previous img-src data: only directive silently blocked all presigned S3 preview URLs. Added note about unsafe-inline being structurally required and a future hash-based alternative.",
-      "**T2-6:** handleDeleteConfirm in App.jsx now wraps runDeleteOperation in try/catch. An uncaught throw previously left the delete panel stuck in discovering or deleting phase indefinitely with no dismiss path."
+      "T2-1: clearCredentials() now only removes credential fields (endpoint, bucket, keyId, provider, regionOverride). Settings keys (partSize, concurrency, etc.) survive disconnect — split LS_KEYS into CREDENTIAL_KEYS and SETTINGS_KEYS; resetSettings() now uses the canonical SETTINGS_KEYS set.",
+      "T2-2: Multipart resume path now uses the same uploadPartsWithPool worker pool as fresh uploads, matching the configured PART_CONCURRENCY. Extracted helper exported from src/lib/upload-queue.js with unit tests asserting concurrency.",
+      "T2-3: HiddenVersions.handlePurgeAllConfirm now continues through all batches on S3 Errors entries instead of throwing on the first — reports aggregate failure count in the dialog rather than abandoning remaining batches silently.",
+      "T2-4: readUrlParams() now validates the endpoint parameter (must be a parseable http: or https: URL) and the bucket parameter (no slashes or .. traversal sequences). Prevents crafted share links from pre-filling the credential form with attacker-controlled values.",
+      "T2-5: Fixed README.md nginx and Caddy CSP examples to include img-src data: https:; media-src https:; frame-src https:;. Previous img-src data: only directive silently blocked all presigned S3 preview URLs. Added note about unsafe-inline being structurally required and a future hash-based alternative.",
+      "T2-6: handleDeleteConfirm in App.jsx now wraps runDeleteOperation in try/catch. An uncaught throw previously left the delete panel stuck in discovering or deleting phase indefinitely with no dismiss path."
     ]
   },
   {
@@ -536,8 +544,8 @@ export const CHANGELOG = [
     "date": "2026-06-04",
     "title": "Fix rename: add missing DeleteObjectCommand import; add Command import invariant",
     "changes": [
-      "**Bug fix (T1-1):** Browser.jsx was missing DeleteObjectCommand from its @aws-sdk/client-s3 import. Every rename threw ReferenceError after the copy step succeeded, leaving a duplicate file. Lost during the v1.14.0 unified-delete refactor.",
-      "**Test invariant (T1-2):** Added source-level assertion to test/source-invariants.test.js that scans every src/ file importing from @aws-sdk/client-s3 and asserts every new XCommand() usage has a matching named import. Prevents this class of bug from silently shipping again."
+      "Bug fix (T1-1): Browser.jsx was missing DeleteObjectCommand from its @aws-sdk/client-s3 import. Every rename threw ReferenceError after the copy step succeeded, leaving a duplicate file. Lost during the v1.14.0 unified-delete refactor.",
+      "Test invariant (T1-2): Added source-level assertion to test/source-invariants.test.js that scans every src/ file importing from @aws-sdk/client-s3 and asserts every new XCommand() usage has a matching named import. Prevents this class of bug from silently shipping again."
     ]
   },
   {
@@ -631,7 +639,7 @@ export const CHANGELOG = [
       {
         "group": "In-app changelog grouping",
         "items": [
-          "The changelog modal now renders a second level of hierarchy: **Bold section headers** in CHANGELOG.md become labelled groups with their items nested beneath them; entries without headers render as a flat list as before (no change to older releases)"
+          "The changelog modal now renders a second level of hierarchy: Bold section headers in CHANGELOG.md become labelled groups with their items nested beneath them; entries without headers render as a flat list as before (no change to older releases)"
         ]
       },
       {
@@ -1037,7 +1045,7 @@ export const CHANGELOG = [
       "Extracted preparePutBody(file) from UploadQueue.jsx into src/lib/upload-queue.js (exported)",
       "uploadSmall now calls preparePutBody(file) instead of inlining the conversion",
       "BUG-003 regression tests added to test/calc-part-size.test.js: returns Uint8Array, never Blob, content preserved, empty file produces empty array",
-      "Added **Coverage:** line for BUG-003 in BUG-LOG.md",
+      "Added Coverage: line for BUG-003 in BUG-LOG.md",
       "Test count: 272 → 276"
     ]
   },
@@ -1047,7 +1055,7 @@ export const CHANGELOG = [
     "title": "Document test suite in CLAUDE.md and update BUG-LOG",
     "changes": [
       "Added \"Test Suite\" section to CLAUDE.md: lists all 14 test files with their scope, explains the two-layer structure (unit vs build-output), and documents how to add new tests",
-      "Updated BUG-LOG.md: added **Coverage:** lines to BUG-001, BUG-002, BUG-007, BUG-008, BUG-012, BUG-013, BUG-015 linking each to its implementing test file and suite"
+      "Updated BUG-LOG.md: added Coverage: lines to BUG-001, BUG-002, BUG-007, BUG-008, BUG-012, BUG-013, BUG-015 linking each to its implementing test file and suite"
     ]
   },
   {

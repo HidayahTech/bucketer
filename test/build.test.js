@@ -228,4 +228,31 @@ describe('Build output — changelog wrapped bullets (#50)', () => {
       'the bullet must not end at its first physical line'
     );
   });
+
+  // Follow-up to #50: the modal renders plain text, so inline **bold** markers
+  // must be stripped like backticks — otherwise bullets show literal asterisks
+  // (e.g. "New **Run diagnostics** button" in the v1.38.0 entry). Glob patterns
+  // like src/**/*.js are NOT bold pairs and must survive untouched (v1.12.9).
+  test('no change string retains a strippable **bold** pair', async () => {
+    const { CHANGELOG } = await import('../src/lib/changelog.js');
+    for (const entry of CHANGELOG) {
+      for (const c of entry.changes) {
+        const texts = typeof c === 'string' ? [c] : [c.group, ...c.items];
+        for (const t of texts) {
+          assert.ok(!/\*\*[^*]+\*\*/.test(t),
+            `v${entry.version} change retains a bold pair: "${t.slice(0, 80)}"`);
+        }
+      }
+    }
+    const flat = (v) => CHANGELOG.find(e => e.version === v).changes
+      .map(c => typeof c === 'string' ? c : [c.group, ...c.items].join(' ')).join(' ');
+    assert.ok(flat('1.38.0').includes('New Run diagnostics button'),
+      'v1.38.0 inline bold must render as plain text');
+    // v1.33.0 has a bold span wrapped across physical lines — strippable only
+    // after continuation joining, which is why cleanup runs post-join.
+    assert.ok(flat('1.33.0').includes('fixes a latent issue where'),
+      'v1.33.0 line-spanning bold must be stripped after joining');
+    assert.ok(flat('1.12.9').includes('src/**/*.js'),
+      'glob patterns must survive the bold strip');
+  });
 });
