@@ -1,9 +1,17 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.37.5';
+export const CURRENT_VERSION = '1.38.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.38.0",
+    "date": "2026-07-26",
+    "title": "Connection diagnostics",
+    "changes": [
+      "New **Run diagnostics** button on CORS-masked network errors (connect screen,"
+    ]
+  },
   {
     "version": "1.37.5",
     "date": "2026-07-12",
