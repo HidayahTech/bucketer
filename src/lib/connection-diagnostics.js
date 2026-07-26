@@ -20,15 +20,23 @@ export const VERDICT_MESSAGES = {
   'bad-endpoint-url': 'The endpoint is not a valid URL. Check it for typos.',
   'endpoint-unreachable': 'The endpoint host did not respond — check the URL for typos. A blocking browser extension can also cause this.',
   'bucket-host-unreachable': 'The endpoint responds, but the bucket\'s hostname does not — check the bucket name. For a brand-new bucket, DNS may still be propagating.',
-  'cors-blocked': 'Your storage responded, but the browser blocked the request. This is almost certainly missing or incorrect CORS configuration on the bucket — see the Setup Guide for your provider\'s exact command.',
+  'cors-blocked': 'Your storage responded, but the browser blocked the request. This is almost certainly missing or incorrect CORS configuration on the bucket — see the Setup Guide for your provider\'s exact command. If CORS is already configured, double-check the bucket name: some providers respond even for buckets that do not exist.',
+  // #52: the all-probes-pass inference is only sound for request-time blocks.
+  // On an already-working connection, a mid-transfer network reset produces the
+  // same masked TypeError — so connected sessions get this softer verdict.
+  'cors-blocked-transient': 'Your storage responded, but this request was blocked or interrupted. Since this connection was already working, a transient network interruption is more likely than a CORS problem — retry the operation. If it keeps happening, re-check the bucket\'s CORS configuration.',
 };
 
 // Builds the ErrorBlock `diagnostics` prop from a stored credentials object.
-export function diagnosticsProps(credentials) {
+// connected: pass true from error blocks that only render inside a working
+// session (Browser, HiddenVersions) — it selects the transient variant of the
+// cors-blocked verdict (#52). The connect screen leaves it false.
+export function diagnosticsProps(credentials, connected = false) {
   return {
     endpoint: credentials.endpoint,
     bucket: credentials.bucket,
     forcePathStyle: requiresPathStyle(credentials.provider),
+    connected,
   };
 }
 
@@ -46,7 +54,7 @@ async function probe(url, fetchFn, timeoutMs) {
   }
 }
 
-export async function runDiagnostics({ endpoint, bucket, forcePathStyle, fetchFn, pageProtocol, onLine, timeoutMs } = {}) {
+export async function runDiagnostics({ endpoint, bucket, forcePathStyle, connected, fetchFn, pageProtocol, onLine, timeoutMs } = {}) {
   fetchFn = fetchFn || globalThis.fetch;
   pageProtocol = pageProtocol ?? globalThis.location?.protocol;
   onLine = onLine ?? (globalThis.navigator ? globalThis.navigator.onLine : true);
@@ -114,7 +122,9 @@ export async function runDiagnostics({ endpoint, bucket, forcePathStyle, fetchFn
     }
   }
 
-  // 6 (implicit). Reachable everywhere yet the SDK saw a masked TypeError → CORS layer.
-  if (!verdict) verdict = 'cors-blocked';
+  // 6 (implicit). Reachable everywhere yet the SDK saw a masked TypeError → CORS
+  // layer for request-time blocks; on an already-working connection a transient
+  // mid-transfer interruption is the likelier cause (#52).
+  if (!verdict) verdict = connected ? 'cors-blocked-transient' : 'cors-blocked';
   return { checks, verdict };
 }

@@ -93,23 +93,56 @@ describe('runDiagnostics verdicts', () => {
   });
 
   test('every verdict has a user-facing message', async () => {
-    for (const v of ['offline', 'mixed-content', 'bad-endpoint-url', 'endpoint-unreachable', 'bucket-host-unreachable', 'cors-blocked']) {
+    for (const v of ['offline', 'mixed-content', 'bad-endpoint-url', 'endpoint-unreachable', 'bucket-host-unreachable', 'cors-blocked', 'cors-blocked-transient']) {
       assert.equal(typeof VERDICT_MESSAGES[v], 'string');
       assert.ok(VERDICT_MESSAGES[v].length > 20, `message for ${v} should be a real sentence`);
     }
     assert.ok(VERDICT_MESSAGES['cors-blocked'].includes('almost certainly'));
     assert.ok(!VERDICT_MESSAGES['cors-blocked'].toLowerCase().includes('definitely'));
   });
+
+  // #52.1: wildcard-DNS providers (AWS, R2) answer probes for nonexistent buckets,
+  // so a bucket-name typo lands on cors-blocked — the message must hint at that.
+  test('cors-blocked message hints at bucket-name typos (#52)', () => {
+    assert.ok(VERDICT_MESSAGES['cors-blocked'].toLowerCase().includes('bucket name'),
+      'cors-blocked must suggest double-checking the bucket name');
+  });
+
+  // #52.2: on an already-working connection a mid-transfer network reset also
+  // reaches "all probes pass" — the CORS inference is only sound for
+  // request-time blocks, so connected sessions get a softer transient verdict.
+  test('connected sessions get the transient verdict instead of cors-blocked (#52)', async () => {
+    const { verdict } = await runDiagnostics({ ...BASE, fetchFn: fetchOk, connected: true });
+    assert.equal(verdict, 'cors-blocked-transient');
+  });
+
+  test('transient message suggests retry, not CORS misconfiguration (#52)', () => {
+    const msg = VERDICT_MESSAGES['cors-blocked-transient'];
+    assert.ok(msg.toLowerCase().includes('transient') || msg.toLowerCase().includes('retry'),
+      'transient verdict should frame the failure as retryable');
+    assert.ok(!msg.includes('almost certainly'),
+      'transient verdict must not confidently blame CORS configuration');
+  });
+
+  test('connected does not change failure verdicts (#52)', async () => {
+    const { verdict } = await runDiagnostics({ ...BASE, fetchFn: fetchFail, connected: true });
+    assert.equal(verdict, 'endpoint-unreachable');
+  });
 });
 
 describe('diagnosticsProps', () => {
   test('derives forcePathStyle from provider', () => {
     const p = diagnosticsProps({ endpoint: 'https://x.example.com', bucket: 'b', provider: 'minio' });
-    assert.deepEqual(p, { endpoint: 'https://x.example.com', bucket: 'b', forcePathStyle: true });
+    assert.deepEqual(p, { endpoint: 'https://x.example.com', bucket: 'b', forcePathStyle: true, connected: false });
   });
 
   test('virtual-host provider yields forcePathStyle false', () => {
     const p = diagnosticsProps({ endpoint: 'https://s3.amazonaws.com', bucket: 'b', provider: 'aws' });
     assert.equal(p.forcePathStyle, false);
+  });
+
+  test('passes connected through for in-session error blocks (#52)', () => {
+    const p = diagnosticsProps({ endpoint: 'https://x.example.com', bucket: 'b', provider: 'aws' }, true);
+    assert.equal(p.connected, true);
   });
 });

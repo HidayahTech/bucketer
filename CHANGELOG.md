@@ -7,6 +7,16 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.38.3] — 2026-07-26 — Connection-diagnostics polish (#51, #52)
+
+- Diagnostics results now reset when a different error appears in the same error block,
+  restoring the Run-diagnostics button instead of showing stale results (#51).
+- The cors-blocked verdict now suggests double-checking the bucket name, since wildcard-DNS
+  providers (AWS, R2) answer probes even for buckets that don't exist (#52).
+- Error blocks inside a working session (listing, download, hidden versions) get a softer
+  verdict when all probes pass: a transient network interruption is more likely than a CORS
+  problem on a connection that was already working — retry first (#52).
+
 ## [1.38.2] — 2026-07-26 — In-app changelog no longer truncates wrapped bullets (#50, BUG-044)
 
 - The changelog modal now shows each bullet's full text.

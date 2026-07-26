@@ -828,7 +828,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
           error={listError}
           title="Cannot list bucket contents"
           guidance="Check that your key has ListObjects permission on this bucket."
-          diagnostics={diagnosticsProps(credentials)}
+          diagnostics={diagnosticsProps(credentials, true)}
         />
       </div>
     );
@@ -1090,7 +1090,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
           error={downloadError}
           title="Download failed"
           guidance="Check that your key has GetObject permission on this bucket."
-          diagnostics={diagnosticsProps(credentials)}
+          diagnostics={diagnosticsProps(credentials, true)}
         />
       )}
 
@@ -1099,7 +1099,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
           error={listError}
           title="Listing failed"
           guidance="If this looks like a CORS error, check your bucket's CORS configuration."
-          diagnostics={diagnosticsProps(credentials)}
+          diagnostics={diagnosticsProps(credentials, true)}
         />
       )}
 
@@ -1355,7 +1355,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
         </div>
       )}
 
-      <HiddenVersions key={prefix} client={client} bucket={bucket} prefix={prefix} provider={provider} diagnostics={diagnosticsProps(credentials)} />
+      <HiddenVersions key={prefix} client={client} bucket={bucket} prefix={prefix} provider={provider} diagnostics={diagnosticsProps(credentials, true)} />
     </div>
   );
 }

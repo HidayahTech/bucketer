@@ -3,7 +3,8 @@
 import '../helpers/with-dom.js';       // must be first — installs DOM globals
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { h } from 'preact';
+import { h, render } from 'preact';
+import { act } from 'preact/test-utils';
 import { mount, fire } from '../helpers/render.js';
 import { ErrorBlock } from '../../src/components/ErrorBlock.jsx';
 
@@ -139,6 +140,37 @@ describe('ErrorBlock', () => {
     assert.ok(text().includes('almost certainly missing or incorrect CORS'),
       'cors-blocked verdict should be shown');
     assert.ok(text().includes('Endpoint host responds'), 'check list should be shown');
+    cleanup();
+  });
+
+  // #51: diag state must reset when a different error lands in the same mounted
+  // block — otherwise stale results render with no way to re-run diagnostics.
+  test('diagnostics results reset when the error changes (#51)', async () => {
+    const diagnostics = {
+      endpoint: 'https://s3.example.com',
+      bucket: 'b',
+      forcePathStyle: false,
+      pageProtocol: 'https:',
+      onLine: true,
+      fetchFn: async () => ({ type: 'opaque' }),
+    };
+    const { queryAll, text, container, cleanup } = mount(h(ErrorBlock, {
+      error: new Error('Failed to fetch'),
+      diagnostics,
+    }));
+    fire(queryAll('button').find(b => b.textContent.includes('Run diagnostics')), 'click');
+    await new Promise(r => setTimeout(r, 0));
+    await new Promise(r => setTimeout(r, 0));
+    assert.ok(text().includes('Browser is online'), 'precondition: results are showing');
+
+    act(() => render(h(ErrorBlock, {
+      error: new Error('NetworkError when attempting to fetch resource.'),
+      diagnostics,
+    }), container));
+
+    assert.ok(!text().includes('Browser is online'), 'old check list must be cleared for the new error');
+    assert.ok(queryAll('button').some(b => b.textContent.includes('Run diagnostics')),
+      'Run diagnostics button must return for the new error');
     cleanup();
   });
 });

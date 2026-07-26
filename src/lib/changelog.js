@@ -1,9 +1,19 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.38.2';
+export const CURRENT_VERSION = '1.38.3';
 
 export const CHANGELOG = [
+  {
+    "version": "1.38.3",
+    "date": "2026-07-26",
+    "title": "Connection-diagnostics polish (#51, #52)",
+    "changes": [
+      "Diagnostics results now reset when a different error appears in the same error block, restoring the Run-diagnostics button instead of showing stale results (#51).",
+      "The cors-blocked verdict now suggests double-checking the bucket name, since wildcard-DNS providers (AWS, R2) answer probes even for buckets that don't exist (#52).",
+      "Error blocks inside a working session (listing, download, hidden versions) get a softer verdict when all probes pass: a transient network interruption is more likely than a CORS problem on a connection that was already working — retry first (#52)."
+    ]
+  },
   {
     "version": "1.38.2",
     "date": "2026-07-26",

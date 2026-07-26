@@ -12,7 +12,7 @@
 // When the `diagnostics` prop ({ endpoint, bucket, forcePathStyle }) is provided and the
 // error is CORS-like, a "Run diagnostics" button offers an in-browser differential
 // diagnosis (see lib/connection-diagnostics.js). Nothing runs until the user clicks.
-import { useState } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import { parseS3Error } from '../lib/format.js';
 import { runDiagnostics, VERDICT_MESSAGES } from '../lib/connection-diagnostics.js';
 
@@ -20,6 +20,9 @@ const STATUS_ICONS = { pass: '✓', fail: '✗', skip: '–' };
 
 export function ErrorBlock({ error, title, consequence, guidance, diagnostics }) {
   const [diag, setDiag] = useState(null); // null | 'running' | { checks, verdict }
+  // #51: results belong to the error they diagnosed — when a different error
+  // lands in the same mounted block, clear them and restore the button.
+  useEffect(() => { setDiag(null); }, [error]);
   if (!error) return null;
   const parsed = typeof error === 'string' ? { message: error } : parseS3Error(error);
   const isCorsLike = parsed.message?.toLowerCase().includes('fetch') ||
