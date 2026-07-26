@@ -24,6 +24,7 @@ import {
   loadConnectionRecords, saveConnectionRecord, deleteConnectionRecord,
   credentialFingerprint, findOrCreateCredential, defaultCredentialLabel,
   defaultConnectionName, resolveConnection, listResolvedConnections,
+  migrateProfilesToConnections,
 } from '../src/lib/connections.js';
 
 beforeEach(() => { for (const k of Object.keys(ls)) delete ls[k]; });
@@ -247,5 +248,89 @@ describe('resolveConnection / listResolvedConnections', () => {
     assert.equal(list.length, 2);
     assert.equal(list[0].credentialId, list[1].credentialId);
     assert.equal(loadCredentialRecords().credentials.length, 1);
+  });
+});
+
+describe('migrateProfilesToConnections', () => {
+  function writeProfiles(profiles) {
+    ls['s3b_profiles'] = JSON.stringify({ version: 1, profiles });
+  }
+
+  test('does nothing when there are no profiles', () => {
+    migrateProfilesToConnections();
+    assert.deepEqual(loadConnectionRecords().connections, []);
+    assert.deepEqual(loadCredentialRecords().credentials, []);
+  });
+
+  test('converts one profile into one credential and one connection', () => {
+    writeProfiles([{ id: 1, name: 'Photos', endpoint: 'https://s3.example.com', bucket: 'photos', keyId: 'k1', provider: 'b2', regionOverride: 'us-west-004' }]);
+    migrateProfilesToConnections();
+    assert.equal(loadCredentialRecords().credentials.length, 1);
+    const { connections } = loadConnectionRecords();
+    assert.equal(connections.length, 1);
+    assert.equal(connections[0].name, 'Photos');
+    assert.equal(connections[0].bucket, 'photos');
+  });
+
+  test('preserves the profile id as the connection id so s3b_last_profile_id stays valid', () => {
+    writeProfiles([{ id: 12345, name: 'Photos', endpoint: 'e', bucket: 'photos', keyId: 'k1', provider: 'b2', regionOverride: '' }]);
+    migrateProfilesToConnections();
+    assert.equal(loadConnectionRecords().connections[0].id, 12345);
+  });
+
+  test('dedupes credentials across profiles sharing one key', () => {
+    writeProfiles([
+      { id: 1, name: 'A', endpoint: 'https://s3.example.com', bucket: 'b1', keyId: 'k1', provider: 'b2', regionOverride: 'us-west-004' },
+      { id: 2, name: 'B', endpoint: 'https://s3.example.com', bucket: 'b2', keyId: 'k1', provider: 'b2', regionOverride: 'us-west-004' },
+      { id: 3, name: 'C', endpoint: 'https://s3.example.com/', bucket: 'b3', keyId: 'k1', provider: 'b2', regionOverride: 'us-west-004' },
+    ]);
+    migrateProfilesToConnections();
+    assert.equal(loadCredentialRecords().credentials.length, 1);
+    assert.equal(loadConnectionRecords().connections.length, 3);
+  });
+
+  test('keeps credentials separate when the key differs on the same bucket', () => {
+    writeProfiles([
+      { id: 1, name: 'Photos (R/O)',   endpoint: 'e', bucket: 'photos', keyId: 'ro', provider: 'b2', regionOverride: '' },
+      { id: 2, name: 'Photos (admin)', endpoint: 'e', bucket: 'photos', keyId: 'rw', provider: 'b2', regionOverride: '' },
+    ]);
+    migrateProfilesToConnections();
+    assert.equal(loadCredentialRecords().credentials.length, 2);
+    assert.equal(loadConnectionRecords().connections.length, 2);
+  });
+
+  test('is idempotent — running twice does not duplicate', () => {
+    writeProfiles([{ id: 1, name: 'Photos', endpoint: 'e', bucket: 'photos', keyId: 'k1', provider: 'b2', regionOverride: '' }]);
+    migrateProfilesToConnections();
+    migrateProfilesToConnections();
+    assert.equal(loadConnectionRecords().connections.length, 1);
+    assert.equal(loadCredentialRecords().credentials.length, 1);
+  });
+
+  test('leaves s3b_profiles in place as a rollback path', () => {
+    writeProfiles([{ id: 1, name: 'Photos', endpoint: 'e', bucket: 'photos', keyId: 'k1', provider: 'b2', regionOverride: '' }]);
+    migrateProfilesToConnections();
+    assert.ok(ls['s3b_profiles']);
+  });
+
+  test('skips a profile with no bucket rather than creating a broken connection', () => {
+    writeProfiles([{ id: 1, name: 'Broken', endpoint: 'e', bucket: '', keyId: 'k1', provider: 'b2', regionOverride: '' }]);
+    migrateProfilesToConnections();
+    assert.deepEqual(loadConnectionRecords().connections, []);
+  });
+
+  test('tolerates a corrupt s3b_profiles record', () => {
+    ls['s3b_profiles'] = '{not json';
+    migrateProfilesToConnections();
+    assert.deepEqual(loadConnectionRecords().connections, []);
+  });
+
+  test('does not run when connections already exist', () => {
+    const cred = findOrCreateCredential({ endpoint: 'e', keyId: 'k', provider: null, regionOverride: '' });
+    saveConnectionRecord({ id: 99, name: 'Existing', credentialId: cred.id, bucket: 'b', capabilities: null });
+    writeProfiles([{ id: 1, name: 'Photos', endpoint: 'e2', bucket: 'photos', keyId: 'k9', provider: 'b2', regionOverride: '' }]);
+    migrateProfilesToConnections();
+    assert.equal(loadConnectionRecords().connections.length, 1);
+    assert.equal(loadConnectionRecords().connections[0].id, 99);
   });
 });

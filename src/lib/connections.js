@@ -217,3 +217,50 @@ export function listResolvedConnections() {
     .map(c => resolveConnection(c.id))
     .filter(Boolean);
 }
+
+const LS_KEY_PROFILES = 's3b_profiles';
+
+// Idempotent — converts the legacy flat profile record into credentials +
+// connections. Safe to call on every mount; returns immediately once any
+// connection exists.
+//
+// s3b_profiles is READ but deliberately NOT deleted: it is the rollback path for
+// one release. A later release removes it.
+//
+// Profile ids become connection ids so the existing s3b_last_profile_id pointer
+// keeps resolving without a second migration.
+export function migrateProfilesToConnections() {
+  if (loadConnectionRecords().connections.length > 0) return; // already migrated
+
+  let profiles = [];
+  try {
+    const raw = safeGetRaw(LS_KEY_PROFILES);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.profiles)) return;
+    profiles = parsed.profiles;
+  } catch {
+    return; // corrupt legacy record — nothing to migrate
+  }
+
+  for (const profile of profiles) {
+    // A profile without a bucket cannot become a usable connection. Skipping is
+    // preferable to creating a row that fails the moment it is clicked.
+    if (!profile.bucket) continue;
+
+    const cred = findOrCreateCredential({
+      endpoint:       profile.endpoint,
+      keyId:          profile.keyId,
+      provider:       profile.provider,
+      regionOverride: profile.regionOverride,
+    });
+
+    saveConnectionRecord({
+      id:           profile.id,
+      name:         profile.name || defaultConnectionName({ provider: profile.provider, bucket: profile.bucket }),
+      credentialId: cred.id,
+      bucket:       profile.bucket,
+      capabilities: null,
+    });
+  }
+}
