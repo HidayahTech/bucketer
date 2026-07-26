@@ -4,7 +4,7 @@ import '../helpers/with-dom.js';       // must be first — installs DOM globals
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { h } from 'preact';
-import { mount } from '../helpers/render.js';
+import { mount, fire } from '../helpers/render.js';
 import { ErrorBlock } from '../../src/components/ErrorBlock.jsx';
 
 describe('ErrorBlock', () => {
@@ -86,6 +86,59 @@ describe('ErrorBlock', () => {
     const s3Error = Object.assign(new Error('Access Denied'), { Code: 'AccessDenied', $metadata: { httpStatusCode: 403 } });
     const { query, cleanup } = mount(h(ErrorBlock, { error: s3Error }));
     assert.ok(query('details'), 'should render a details element for S3 errors with metadata');
+    cleanup();
+  });
+
+  test('no diagnostics button without the diagnostics prop', () => {
+    const { queryAll, cleanup } = mount(h(ErrorBlock, { error: new Error('Failed to fetch') }));
+    assert.ok(!queryAll('button').some(b => b.textContent.includes('Run diagnostics')));
+    cleanup();
+  });
+
+  test('no diagnostics button for non-CORS-like errors even with the prop', () => {
+    const s3Error = Object.assign(new Error('Access Denied'), {
+      Code: 'AccessDenied',
+      $metadata: { httpStatusCode: 403 },
+    });
+    const { queryAll, cleanup } = mount(h(ErrorBlock, {
+      error: s3Error,
+      diagnostics: { endpoint: 'https://s3.example.com', bucket: 'b', forcePathStyle: false },
+    }));
+    assert.ok(!queryAll('button').some(b => b.textContent.includes('Run diagnostics')));
+    cleanup();
+  });
+
+  test('diagnostics button renders for CORS-like errors with the prop', () => {
+    const { queryAll, cleanup } = mount(h(ErrorBlock, {
+      error: new Error('Failed to fetch'),
+      diagnostics: { endpoint: 'https://s3.example.com', bucket: 'b', forcePathStyle: false },
+    }));
+    const btn = queryAll('button').find(b => b.textContent.includes('Run diagnostics'));
+    assert.ok(btn, 'button should be present');
+    assert.equal(btn.getAttribute('type'), 'button');
+    cleanup();
+  });
+
+  test('clicking the button runs diagnostics and shows the verdict', async () => {
+    const { queryAll, text, cleanup } = mount(h(ErrorBlock, {
+      error: new Error('Failed to fetch'),
+      diagnostics: {
+        endpoint: 'https://s3.example.com',
+        bucket: 'b',
+        forcePathStyle: false,
+        pageProtocol: 'https:',
+        onLine: true,
+        fetchFn: async () => ({ type: 'opaque' }),
+      },
+    }));
+    const btn = queryAll('button').find(b => b.textContent.includes('Run diagnostics'));
+    fire(btn, 'click');
+    // flush the async runDiagnostics → setState round-trips
+    await new Promise(r => setTimeout(r, 0));
+    await new Promise(r => setTimeout(r, 0));
+    assert.ok(text().includes('almost certainly missing or incorrect CORS'),
+      'cors-blocked verdict should be shown');
+    assert.ok(text().includes('Endpoint host responds'), 'check list should be shown');
     cleanup();
   });
 });
