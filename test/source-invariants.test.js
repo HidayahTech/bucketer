@@ -105,29 +105,31 @@ describe('UploadLog — MAX_DISPLAY cap is present and bounded (BUG-021)', () =>
   });
 });
 
-// ── BUG-017: selectedProfileId must be declared before credentials ─────────────
-// The credentials useState initializer pre-fills the form from the last-used
-// profile by calling loadLastProfileId() and matching it against loadProfiles().
-// If credentials is declared before selectedProfileId, JavaScript's sequential
-// useState initialization means the credentials initializer runs before
-// selectedProfileId is assigned — making the profile lookup impossible and
-// leaving the form empty even when a profile is saved and selected.
+// BUG-017: the credentials initializer reads the selected connection to pre-fill
+// the form on first load, so that state must be declared BEFORE credentials.
+// Declaring it after produces a temporal-dead-zone ReferenceError at mount.
+test('selectedConnectionId is declared before credentials in App.jsx', () => {
+  const src = readFileSync(new URL('../src/components/App.jsx', import.meta.url), 'utf8');
+  const selIdx  = src.indexOf('const [selectedConnectionId');
+  const credIdx = src.indexOf('const [credentials');
+  assert.ok(selIdx > -1, 'selectedConnectionId state not found in App.jsx');
+  assert.ok(credIdx > -1, 'credentials state not found in App.jsx');
+  assert.ok(
+    selIdx < credIdx,
+    'selectedConnectionId must be declared before credentials; its initializer calls ' +
+    'loadLastProfileId() to pre-fill from the saved connection'
+  );
+});
 
-describe('App.jsx — selectedProfileId declared before credentials (BUG-017)', () => {
-  const source = src('components/App.jsx');
-
-  test('selectedProfileId state declaration precedes credentials state declaration', () => {
-    const profileIdIdx = source.indexOf('selectedProfileId, setSelectedProfileId');
-    const credIdx      = source.indexOf('credentials, setCredentials');
-    assert.ok(profileIdIdx !== -1, 'selectedProfileId state must exist in App.jsx');
-    assert.ok(credIdx !== -1,      'credentials state must exist in App.jsx');
-    assert.ok(
-      profileIdIdx < credIdx,
-      'selectedProfileId must be declared before credentials — the credentials ' +
-      'initializer calls loadLastProfileId() to pre-fill from the saved profile; ' +
-      'if credentials is first, the profile lookup is impossible and the form loads empty'
-    );
-  });
+// The global s3b_capabilities key leaked capability state across buckets.
+// Capabilities now live on the connection record (connections.js).
+test('App.jsx does not import capability functions from storage.js', () => {
+  const src = readFileSync(new URL('../src/components/App.jsx', import.meta.url), 'utf8');
+  assert.equal(
+    /loadCapabilities|saveCapabilities|clearCapabilities/.test(src),
+    false,
+    'capability state must come from connections.js, not storage.js'
+  );
 });
 
 // ── T3-1: Wasabi billing warning must appear in delete confirmation dialogs ───────────

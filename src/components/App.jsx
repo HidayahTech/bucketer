@@ -27,12 +27,16 @@ import { diagnosticsProps } from '../lib/connection-diagnostics.js';
 import { detectProvider, PROVIDER_LABELS } from '../lib/provider.js';
 import {
   loadCredentials, saveCredentials, clearCredentials,
-  loadCapabilities, saveCapabilities, clearCapabilities, defaultCapabilities,
   loadUpdateCheckEnabled, saveUpdateCheckEnabled,
   loadPrefetchSizeLimit, savePrefetchSizeLimit,
-  loadProfiles, saveProfile, deleteProfile, loadLastProfileId, saveLastProfileId,
-  migrateProfilesFromLegacy, repairStorageInvariants,
+  loadLastProfileId, saveLastProfileId, repairStorageInvariants,
 } from '../lib/storage.js';
+import {
+  listResolvedConnections, resolveConnection, findOrCreateCredential,
+  saveConnectionRecord, deleteConnectionRecord, migrateProfilesToConnections,
+  defaultCapabilities, loadConnectionCapabilities, saveConnectionCapabilities,
+  defaultConnectionName,
+} from '../lib/connections.js';
 import { readUrlParams, hasUrlParams, buildShareUrl } from '../lib/url-params.js';
 import { FileBanner } from './FileBanner.jsx';
 import { CredentialForm } from './CredentialForm.jsx';
@@ -65,22 +69,25 @@ if (_iconLink) _iconLink.href = logoUrl;
 // Session states: disconnected | connecting | connected | failed
 export function App() {
   const [session, setSession] = useState('disconnected');
-  // selectedProfileId must be declared before credentials so the credentials
-  // initializer can pre-fill the form from the saved profile on first load.
-  const [selectedProfileId, setSelectedProfileId] = useState(() => loadLastProfileId());
+  // selectedConnectionId must be declared before credentials so the credentials
+  // initializer can pre-fill the form from the saved connection on first load.
+  const [selectedConnectionId, setSelectedConnectionId] = useState(() => loadLastProfileId());
   const [credentials, setCredentials] = useState(() => {
     const stored = loadCredentials();
     const fromUrl = readUrlParams();
     const lastId = loadLastProfileId();
     if (lastId) {
-      const profile = loadProfiles().profiles.find(p => p.id === lastId);
-      if (profile) return { ...profile, secretKey: stored.secretKey || '', ...fromUrl };
+      const conn = resolveConnection(lastId);
+      if (conn) return { ...conn, secretKey: stored.secretKey || '', ...fromUrl };
     }
     return { ...stored, ...fromUrl };
   });
   const [client, setClient] = useState(null);
   const [connectionError, setConnectionError] = useState(null);
-  const [capabilities, setCapabilities] = useState(() => loadCapabilities());
+  const [capabilities, setCapabilities] = useState(() => {
+    const lastId = loadLastProfileId();
+    return lastId ? loadConnectionCapabilities(lastId) : defaultCapabilities();
+  });
   const [currentPrefix, setCurrentPrefix] = useState('');
   const [browserKey, setBrowserKey] = useState(0); // force re-mount on reconnect
   const [logKey, setLogKey] = useState(0);         // incremented to refresh upload log
@@ -92,7 +99,7 @@ export function App() {
   // True when the incoming share link pre-filled the access key ID — used to focus the
   // Secret Key field and adapt the pre-fill banner. Computed once from the URL hash.
   const [urlHadKeyId] = useState(() => !!readUrlParams().keyId);
-  const [profiles, setProfiles] = useState(() => loadProfiles().profiles);
+  const [connections, setConnections] = useState(() => listResolvedConnections());
   // Delete requests confirm BEFORE entering the master queue (a queued task is
   // always already authorized). One pending request at a time; a new request
   // replaces an unconfirmed one.
@@ -105,22 +112,24 @@ export function App() {
   // Capability state is updated reactively as operations fail (§4.12).
   // The idempotency check (prev[op] === state) prevents unnecessary re-renders and
   // storage writes when the same operation fails multiple times in rapid succession.
+  //
+  // Persisted against the selected connection. With no connection selected the
+  // credentials are ad-hoc, and their capabilities are session-only — persisting
+  // them to a global key is what let bucket A's state apply to bucket B.
   const handleCapabilityChange = useCallback((op, state) => {
     setCapabilities(prev => {
       if (prev[op] === state) return prev;
       const next = { ...prev, [op]: state };
-      saveCapabilities(next);
+      if (selectedConnectionId) saveConnectionCapabilities(selectedConnectionId, next);
       return next;
     });
-  }, []);
+  }, [selectedConnectionId]);
 
   // Resets all capabilities to 'unknown' and re-mounts Browser to trigger a fresh probe.
-  // Called from CapabilityPanel when the user wants to re-check permissions after
-  // changing bucket policy or key permissions without disconnecting and reconnecting.
   function handleRefreshPermissions() {
     const fresh = defaultCapabilities();
     setCapabilities(fresh);
-    saveCapabilities(fresh);
+    if (selectedConnectionId) saveConnectionCapabilities(selectedConnectionId, fresh);
     setBrowserKey(k => k + 1); // re-mount browser → triggers new listing probe
   }
 
@@ -134,8 +143,9 @@ export function App() {
     const fullCreds = { ...creds, provider };
 
     saveCredentials(fullCreds);
-    clearCapabilities();
-    setCapabilities(defaultCapabilities());
+    setCapabilities(selectedConnectionId
+      ? loadConnectionCapabilities(selectedConnectionId)
+      : defaultCapabilities());
     setCredentials(fullCreds);
 
     try {
@@ -157,15 +167,12 @@ export function App() {
     setClient(null);
     setConnectionError(null);
     clearCredentials();
-    clearCapabilities();
     setCapabilities(defaultCapabilities());
-    // Repopulate form from the selected profile (minus secret key) so the user only
-    // has to re-enter their secret key to reconnect. Without this, the form is blank
-    // while the profile row still appears highlighted, and clicking it is a no-op
-    // (same selectedProfileId → same key → CredentialForm doesn't remount).
-    const profile = selectedProfileId ? profiles.find(p => p.id === selectedProfileId) : null;
-    const nextCreds = profile
-      ? { ...profile, secretKey: '' }
+    // Repopulate form from the selected connection (minus secret key) so the user
+    // only has to re-enter their secret key to reconnect.
+    const conn = selectedConnectionId ? resolveConnection(selectedConnectionId) : null;
+    const nextCreds = conn
+      ? { ...conn, secretKey: '' }
       : { endpoint: '', bucket: '', keyId: '', secretKey: '', provider: null, regionOverride: '' };
     setCredentials(nextCreds);
     setLiveFormData(nextCreds);
@@ -177,23 +184,21 @@ export function App() {
   // Migration runs first so the profile list is populated before state reads it.
   useEffect(() => {
     repairStorageInvariants();
-    migrateProfilesFromLegacy();
-    const updatedProfiles = loadProfiles().profiles;
-    setProfiles(updatedProfiles);
+    migrateProfilesToConnections();
+    const updated = listResolvedConnections();
+    setConnections(updated);
     const lastId = loadLastProfileId();
-    if (lastId) setSelectedProfileId(lastId);
+    if (lastId) setSelectedConnectionId(lastId);
 
     const stored = loadCredentials();
     const fromUrl = readUrlParams();
-    const profile = lastId ? updatedProfiles.find(p => p.id === lastId) : null;
-    // Prefer flat credentials (written by saveCredentials on every connect) over profile
-    // data. This ensures that connecting with modified credentials — without saving a new
-    // profile — is correctly restored on reload. Flat credentials are absent only after a
-    // disconnect (clearCredentials wipes them) or on first load, in which case we fall
-    // back to the saved profile so the form is pre-filled.
+    const conn = lastId ? updated.find(c => c.id === lastId) : null;
+    // Prefer flat credentials (written by saveCredentials on every connect) over
+    // connection data, so connecting with modified credentials — without saving —
+    // is restored correctly on reload.
     const base = stored.endpoint
       ? stored
-      : (profile ? { ...profile, secretKey: stored.secretKey || '' } : stored);
+      : (conn ? { ...conn, secretKey: stored.secretKey || '' } : stored);
     const merged = { ...base, ...fromUrl };
     if (merged.endpoint && merged.bucket && merged.keyId && merged.secretKey) {
       handleConnect(merged);
@@ -289,11 +294,12 @@ export function App() {
   }
 
   function handleSelectProfile(id) {
-    const profile = profiles.find(p => p.id === id);
-    if (!profile) return;
-    setSelectedProfileId(id);
+    const conn = resolveConnection(id);
+    if (!conn) return;
+    setSelectedConnectionId(id);
     saveLastProfileId(id);
-    const creds = { ...profile, secretKey: '' };
+    setCapabilities(loadConnectionCapabilities(id));
+    const creds = { ...conn, secretKey: '' };
     setCredentials(creds);
     setLiveFormData(creds);
   }
@@ -310,34 +316,40 @@ export function App() {
       : liveFormData.provider;
     const provider = providerSource || detectProvider(ep);
 
-    // If a profile is currently selected, update it in place (same id) rather than
-    // always creating a new one, so repeated saves don't accumulate duplicates.
-    const existingProfile = selectedProfileId ? profiles.find(p => p.id === selectedProfileId) : null;
-    const profile = {
-      id: existingProfile ? existingProfile.id : Date.now(),
-      name,
-      endpoint: ep,
-      bucket: (liveFormData.bucket || '').trim(),
-      keyId: (liveFormData.keyId || '').trim(),
+    const existing = selectedConnectionId ? connections.find(c => c.id === selectedConnectionId) : null;
+    const id = existing ? existing.id : Date.now();
+
+    const cred = findOrCreateCredential({
+      endpoint:       liveFormData.endpoint,
+      keyId:          liveFormData.keyId,
       provider,
-      regionOverride: (liveFormData.regionOverride || '').trim(),
-    };
-    saveProfile(profile);
-    const updated = loadProfiles().profiles;
-    setProfiles(updated);
-    setSelectedProfileId(profile.id);
-    saveLastProfileId(profile.id);
+      regionOverride: liveFormData.regionOverride,
+    });
+
+    saveConnectionRecord({
+      id,
+      name:         name || defaultConnectionName({ provider, bucket: liveFormData.bucket }),
+      credentialId: cred.id,
+      bucket:       liveFormData.bucket,
+      capabilities: existing ? existing.capabilities : null,
+    });
+
+    const updated = listResolvedConnections();
+    setConnections(updated);
+    setSelectedConnectionId(id);
+    saveLastProfileId(id);
     // Sync credentials so the form doesn't reset when it remounts on key change.
-    const creds = { ...profile, secretKey: liveFormData.secretKey || '' };
+    const saved = updated.find(c => c.id === id);
+    const creds = { ...saved, secretKey: liveFormData.secretKey || '' };
     setCredentials(creds);
     setLiveFormData(creds);
   }
 
   function handleDeleteProfile(id) {
-    deleteProfile(id);
-    setProfiles(loadProfiles().profiles);
-    if (selectedProfileId === id) {
-      setSelectedProfileId(null);
+    deleteConnectionRecord(id);
+    setConnections(listResolvedConnections());
+    if (selectedConnectionId === id) {
+      setSelectedConnectionId(null);
       saveLastProfileId(null);
     }
   }
@@ -419,8 +431,8 @@ export function App() {
           <div class="splash">
             <h2>Connect to a bucket</h2>
             <ProfilePicker
-              profiles={profiles}
-              selectedId={selectedProfileId}
+              profiles={connections}
+              selectedId={selectedConnectionId}
               onSelect={handleSelectProfile}
               onDelete={handleDeleteProfile}
               onSave={handleSaveProfile}
@@ -436,7 +448,7 @@ export function App() {
               </div>
             )}
             <CredentialForm
-              key={selectedProfileId ?? 'manual'}
+              key={selectedConnectionId ?? 'manual'}
               initial={credentials}
               onSave={handleConnect}
               onFormChange={setLiveFormData}
@@ -491,9 +503,9 @@ export function App() {
         <div class="app-body">
           {sidebarOpen && <div class="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
           <aside class={`sidebar${sidebarOpen ? ' sidebar-open' : ''}`}>
-            {selectedProfileId && profiles.find(p => p.id === selectedProfileId) && (
+            {selectedConnectionId && connections.find(p => p.id === selectedConnectionId) && (
               <div class="profile-active-name">
-                {profiles.find(p => p.id === selectedProfileId).name}
+                {connections.find(p => p.id === selectedConnectionId).name}
               </div>
             )}
             <CredentialForm
