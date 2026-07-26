@@ -4,6 +4,27 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-044 — In-app changelog truncates every wrapped bullet (#50)
+
+**Date:** 2026-07-26
+
+**Symptom:**
+The ChangelogModal showed each release's bullets cut off at their first physical line — e.g. the v1.38.0 bullet ended mid-parenthetical at "(connect screen,". All 128 entries were affected; ~20 KB of changelog text was silently missing from the bundle.
+
+**Root cause:**
+`parseChangelog()` in `build.mjs` recognized only lines starting with `- ` (bullets) or `**…**` (group headers). A bullet wrapped across multiple physical lines — the normal formatting for every long CHANGELOG.md entry — had its indented continuation lines match neither pattern, so they were dropped. `src/lib/changelog.js` is generated from this parse, and the modal renders the generated data.
+
+**Fix (v1.38.2):**
+Continuation lines (non-empty, not a bullet, not a group header, not a `---` rule) now append to the most recent bullet, joined with a space and with the same backtick stripping. Fix is in the parser, so a rebuild repairs the entire history at once.
+
+**Why it wasn't caught earlier:**
+The generated file *looked* complete — every bullet was present, just truncated — and no test compared the generated text against the source CHANGELOG.md content. Existing changelog tests asserted structure (version/date/entry presence), not fidelity. Found by code review during the v1.38.0 release, when that entry's cut was unusually visible.
+
+**Test case:**
+`test/build.test.js` (#50 describe): the generated `changelog.js` entry for v1.38.1 must contain text that only exists on a continuation line (`x-amz-meta-file-mtime`) and must not end at its first physical line.
+
+---
+
 ## BUG-043 — Setup Guide CORS command rejected by B2: wildcard in ExposeHeaders
 
 **Date:** 2026-07-26

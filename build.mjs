@@ -47,7 +47,10 @@ const appVersion = JSON.parse(readFileSync('package.json', 'utf8')).version;
 //
 // Heading format: ## [version] — date — Title
 // Bullet lines (- ...) become the changes array; backtick markers are stripped
-// for plain-text display in the modal.
+// for plain-text display in the modal. A bullet wrapped across multiple physical
+// lines is joined back into one string: continuation lines (non-empty, not a
+// bullet, not a **group** header, not a --- rule) append to the most recent
+// bullet (#50 — they were previously dropped, truncating every wrapped bullet).
 
 function parseChangelog(src) {
   const entries = [];
@@ -63,6 +66,11 @@ function parseChangelog(src) {
     // Older entries with no bold headers produce a flat string array (unchanged).
     const changes = [];
     let currentGroup = null;
+    const appendToLast = (text) => {
+      const list = currentGroup ? currentGroup.items : changes;
+      const last = list.length - 1;
+      if (last >= 0 && typeof list[last] === 'string') list[last] += ' ' + text;
+    };
     for (const line of lines.slice(1)) {
       const t = line.trim();
       const groupMatch = t.match(/^\*\*(.+)\*\*$/);
@@ -73,6 +81,8 @@ function parseChangelog(src) {
         const text = t.slice(2).trim().replace(/`([^`]+)`/g, '$1');
         if (currentGroup) currentGroup.items.push(text);
         else changes.push(text);
+      } else if (t && !/^-+$/.test(t)) {
+        appendToLast(t.replace(/`([^`]+)`/g, '$1'));
       }
     }
     entries.push({ version, date, ...(title ? { title: title.trim() } : {}), changes });

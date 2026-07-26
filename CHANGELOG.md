@@ -7,6 +7,13 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.38.2] — 2026-07-26 — In-app changelog no longer truncates wrapped bullets (#50, BUG-044)
+
+- The changelog modal now shows each bullet's full text.
+  The build-time parser dropped a wrapped bullet's continuation lines, truncating every
+  release's blurb at its first physical line; continuation lines are now joined back
+  into the bullet, restoring ~20 KB of history across all 128 entries at once.
+
 ## [1.38.1] — 2026-07-26 — B2 Setup Guide CORS command fixed (BUG-043)
 
 - The B2 Setup Guide's `put-bucket-cors` command no longer fails with "illegal '*' in an exposeHeaders value".

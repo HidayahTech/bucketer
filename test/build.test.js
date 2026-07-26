@@ -206,3 +206,26 @@ describe('Build output — Referrer-Policy for privacy (#12)', () => {
     assert.equal(match[1], 'no-referrer', 'referrer policy must be "no-referrer"');
   });
 });
+
+describe('Build output — changelog wrapped bullets (#50)', () => {
+  // #50: parseChangelog in build.mjs only captured lines starting with "- ",
+  // silently dropping a wrapped bullet's indented continuation lines. Every
+  // multi-line bullet rendered truncated at its first physical line in the
+  // in-app ChangelogModal. The generated src/lib/changelog.js must contain
+  // the FULL text of a known multi-line bullet.
+  test('v1.38.1 entry retains its continuation lines in generated changelog.js', async () => {
+    const { CHANGELOG } = await import('../src/lib/changelog.js');
+    const entry = CHANGELOG.find(e => e.version === '1.38.1');
+    assert.ok(entry, 'v1.38.1 entry must exist');
+    const flat = entry.changes.map(c => typeof c === 'string' ? c : [c.group, ...c.items].join(' ')).join(' ');
+    assert.ok(
+      flat.includes('x-amz-meta-file-mtime'),
+      'the v1.38.1 bullet text from a continuation line must survive parsing — ' +
+      'its absence means parseChangelog is still dropping wrapped lines (#50)'
+    );
+    assert.ok(
+      !flat.trim().endsWith('value".'),
+      'the bullet must not end at its first physical line'
+    );
+  });
+});
