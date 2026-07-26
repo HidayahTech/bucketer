@@ -9,13 +9,13 @@ Heading format: `## [version] — date — Title`
 
 ## [1.38.0] — 2026-07-26 — Connection diagnostics
 
-- New **Run diagnostics** button on CORS-masked network errors (connect screen,
-  listing, download, and hidden-versions errors). Runs static checks (offline,
-  mixed content, URL validity) plus unauthenticated `no-cors` reachability
-  probes of the endpoint and bucket hostname, then reports a single precise
-  verdict — e.g. "endpoint unreachable" vs. "almost certainly missing CORS
-  configuration" — instead of the generic three-way guess. Nothing runs until
-  clicked; credentials are never attached to probes.
+- New **Run diagnostics** button turns masked network errors into one precise verdict.
+  Available on connect-screen, listing, download, and hidden-versions errors. Runs
+  static checks (offline, mixed content, URL validity) plus unauthenticated `no-cors`
+  reachability probes of the endpoint and bucket hostname — e.g. "endpoint
+  unreachable" vs. "almost certainly missing CORS configuration" — instead of the
+  generic three-way guess. Nothing runs until clicked; credentials are never
+  attached to probes.
 
 ## [1.37.5] — 2026-07-12 — Mobile: long filenames no longer push actions off-screen (BUG-042)
 

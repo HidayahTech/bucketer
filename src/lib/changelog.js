@@ -9,7 +9,7 @@ export const CHANGELOG = [
     "date": "2026-07-26",
     "title": "Connection diagnostics",
     "changes": [
-      "New **Run diagnostics** button on CORS-masked network errors (connect screen,"
+      "New **Run diagnostics** button turns masked network errors into one precise verdict."
     ]
   },
   {
