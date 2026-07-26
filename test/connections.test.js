@@ -142,6 +142,12 @@ describe('credentialFingerprint', () => {
     const b = credentialFingerprint({ endpoint: 'e', keyId: 'k', provider: 'b2', regionOverride: 'eu-central-003' });
     assert.notEqual(a, b);
   });
+
+  test('does not collide when a field contains an internal space', () => {
+    const a = credentialFingerprint({ endpoint: 'a',   keyId: 'b c', provider: '', regionOverride: '' });
+    const b = credentialFingerprint({ endpoint: 'a b', keyId: 'c',   provider: '', regionOverride: '' });
+    assert.notEqual(a, b);
+  });
 });
 
 describe('findOrCreateCredential', () => {

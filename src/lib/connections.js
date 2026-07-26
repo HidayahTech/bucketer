@@ -143,8 +143,11 @@ export function credentialFingerprint({ endpoint, keyId, provider, regionOverrid
   const k = keyId || '';
   const p = provider || '';
   const r = (regionOverride || '').trim();
-  //   cannot appear in any of these fields, so it is an unambiguous separator.
-  return [e, k, p, r].join(' ');
+  // JSON.stringify of the tuple, not a join on a separator character. Any
+  // separator that can also occur inside a field lets distinct tuples collide:
+  // ['a','b c'] and ['a b','c'] join identically. Migration feeds legacy records
+  // straight in without form validation, so this cannot assume well-formed input.
+  return JSON.stringify([e, k, p, r]);
 }
 
 const LABEL_KEY_ID_MAX = 6;
