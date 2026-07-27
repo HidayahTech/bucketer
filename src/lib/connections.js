@@ -310,3 +310,18 @@ export function clearAllConnectionCapabilities() {
   data.connections = data.connections.map(c => ({ ...c, capabilities: null }));
   saveConnectionData(data);
 }
+
+// Clears provider fields that failed validation. The validity rule lives in
+// storage.js (isValidProvider) and is passed in, so the rule is encoded in
+// exactly one place rather than duplicated across both modules.
+export function repairCredentialProviders(isValidProvider) {
+  const data = loadCredentialRecords();
+  let dirty = false;
+  for (const cred of data.credentials) {
+    if (cred.provider && !isValidProvider(cred.provider)) {
+      cred.provider = null;
+      dirty = true;
+    }
+  }
+  if (dirty) saveCredentialData(data);
+}

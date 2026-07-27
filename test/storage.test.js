@@ -31,13 +31,12 @@ import {
   loadMultiOriginUpload, saveMultiOriginUpload,
   loadFileConcurrency, saveFileConcurrency,
   loadListingCacheTTL, saveListingCacheTTL,
-  loadCapabilities, saveCapabilities, clearCapabilities,
-  defaultCapabilities,
   loadProfiles, saveProfile, deleteProfile,
   loadLastProfileId, saveLastProfileId,
   migrateProfilesFromLegacy,
   loadAdaptiveMode, saveAdaptiveMode,
   loadFileMtimeAutoLoad, saveFileMtimeAutoLoad,
+  wipeAllAppData, deleteAllProfiles,
 } from '../src/lib/storage.js';
 
 // Clear both stores before each test to prevent cross-test contamination.
@@ -258,43 +257,6 @@ describe('saveListingCacheTTL / loadListingCacheTTL', () => {
   });
 });
 
-// ── Capabilities ──────────────────────────────────────────────────────────────
-
-describe('defaultCapabilities', () => {
-  test('all four operations start as unknown', () => {
-    const caps = defaultCapabilities();
-    assert.equal(caps.list,     'unknown');
-    assert.equal(caps.download, 'unknown');
-    assert.equal(caps.upload,   'unknown');
-    assert.equal(caps.delete,   'unknown');
-  });
-});
-
-describe('saveCapabilities / loadCapabilities', () => {
-  test('round-trips a capabilities object', () => {
-    const caps = { list: 'unknown', download: 'denied', upload: 'unknown', delete: 'denied' };
-    saveCapabilities(caps);
-    assert.deepEqual(loadCapabilities(), caps);
-  });
-
-  test('returns default capabilities when not set', () => {
-    assert.deepEqual(loadCapabilities(), defaultCapabilities());
-  });
-
-  test('returns default capabilities when stored value is corrupted JSON', () => {
-    ls['s3b_capabilities'] = '{bad json';
-    assert.deepEqual(loadCapabilities(), defaultCapabilities());
-  });
-});
-
-describe('clearCapabilities', () => {
-  test('resets to defaults after clear', () => {
-    saveCapabilities({ list: 'denied', download: 'denied', upload: 'denied', delete: 'denied' });
-    clearCapabilities();
-    assert.deepEqual(loadCapabilities(), defaultCapabilities());
-  });
-});
-
 // ── Profiles ──────────────────────────────────────────────────────────────────
 
 describe('repairStorageInvariants', () => {
@@ -336,6 +298,26 @@ describe('repairStorageInvariants', () => {
     repairStorageInvariants();
     repairStorageInvariants();
     assert.equal(safeGetLS('s3b_provider'), '');
+  });
+
+  // The provider field moved from profiles onto credential records
+  // (connections.js) — repairStorageInvariants must repair it there too.
+  test('repairs corrupted provider field inside a stored credential record', () => {
+    ls['s3b_credentials'] = JSON.stringify({ version: 1, credentials: [
+      { id: 'cred1', provider: 'b2Key ID: 000a8794834eb7c000000001cSecret Key: abc', endpoint: 'https://s3.example.com', keyId: 'k' },
+    ] });
+    repairStorageInvariants();
+    const { credentials } = JSON.parse(ls['s3b_credentials']);
+    assert.equal(credentials[0].provider, null);
+  });
+
+  test('leaves credential records with a valid provider untouched', () => {
+    ls['s3b_credentials'] = JSON.stringify({ version: 1, credentials: [
+      { id: 'cred1', provider: 'b2', endpoint: 'https://s3.example.com', keyId: 'k' },
+    ] });
+    repairStorageInvariants();
+    const { credentials } = JSON.parse(ls['s3b_credentials']);
+    assert.equal(credentials[0].provider, 'b2');
   });
 });
 
@@ -547,5 +529,35 @@ describe('loadThemePref / saveThemePref (#14)', () => {
   test('saving an invalid preference stores system', () => {
     saveThemePref('neon');
     assert.equal(loadThemePref(), 'system');
+  });
+});
+
+// ── Connection model housekeeping ───────────────────────────────────────────
+// wipeAllAppData/deleteAllProfiles enumerate storage keys explicitly. Left
+// unchanged after the credential/connection split, they would silently miss
+// the new records — for wipeAllAppData that means a user asks to clear
+// everything and their stored credentials stay on disk.
+
+describe('wipeAllAppData covers the connection model keys', () => {
+  test('removes s3b_credentials and s3b_connections', () => {
+    ls['s3b_credentials'] = JSON.stringify({ version: 1, credentials: [{ id: 'c1' }] });
+    ls['s3b_connections'] = JSON.stringify({ version: 2, connections: [{ id: 1 }] });
+    ls['s3b_profiles']    = JSON.stringify({ version: 1, profiles: [{ id: 1 }] });
+    wipeAllAppData();
+    assert.equal(ls['s3b_credentials'], undefined);
+    assert.equal(ls['s3b_connections'], undefined);
+    assert.equal(ls['s3b_profiles'], undefined);
+  });
+});
+
+describe('deleteAllProfiles covers the connection model keys', () => {
+  test('removes connection data alongside legacy profiles', () => {
+    ls['s3b_credentials'] = JSON.stringify({ version: 1, credentials: [{ id: 'c1' }] });
+    ls['s3b_connections'] = JSON.stringify({ version: 2, connections: [{ id: 1 }] });
+    ls['s3b_profiles']    = JSON.stringify({ version: 1, profiles: [{ id: 1 }] });
+    deleteAllProfiles();
+    assert.equal(ls['s3b_credentials'], undefined);
+    assert.equal(ls['s3b_connections'], undefined);
+    assert.equal(ls['s3b_profiles'], undefined);
   });
 });

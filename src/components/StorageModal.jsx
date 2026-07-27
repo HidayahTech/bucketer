@@ -236,7 +236,7 @@ export function StorageModal({ onClose, isConnected }) {
                   </table>
                 )}
                 <ConfirmDialog id="profiles" controller={controller} label="Delete all profiles"
-                  warning="All saved profiles will be removed. Credentials on your storage provider are unaffected."
+                  warning="All saved profiles and their stored credentials will be removed. Credentials on your storage provider are unaffected."
                   danger />
               </div>
             </details>

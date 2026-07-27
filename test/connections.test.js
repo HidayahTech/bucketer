@@ -26,6 +26,7 @@ import {
   defaultConnectionName, resolveConnection, listResolvedConnections,
   migrateProfilesToConnections,
   defaultCapabilities, loadConnectionCapabilities, saveConnectionCapabilities, clearAllConnectionCapabilities,
+  repairCredentialProviders,
 } from '../src/lib/connections.js';
 
 beforeEach(() => { for (const k of Object.keys(ls)) delete ls[k]; });
@@ -414,5 +415,29 @@ describe('per-connection capabilities', () => {
     clearAllConnectionCapabilities();
     assert.deepEqual(loadConnectionCapabilities(1), defaultCapabilities());
     assert.deepEqual(loadConnectionCapabilities(2), defaultCapabilities());
+  });
+});
+
+// repairCredentialProviders takes the validity rule as a parameter rather than
+// importing it — the rule (isValidProvider) lives in storage.js, so this keeps
+// it encoded in exactly one place. Tests here stand in a minimal equivalent.
+describe('repairCredentialProviders', () => {
+  const isValidProvider = p => typeof p === 'string' && p.length <= 20 && !/\s/.test(p);
+
+  test('clears provider fields that fail the validity check', () => {
+    saveCredentialRecord({ id: 'c1', provider: 'b2Key ID: 000a8794834eb7c000000001cSecret Key: abc', endpoint: 'e', keyId: 'k' });
+    repairCredentialProviders(isValidProvider);
+    assert.equal(loadCredentialRecords().credentials[0].provider, null);
+  });
+
+  test('leaves valid providers untouched', () => {
+    saveCredentialRecord({ id: 'c1', provider: 'b2', endpoint: 'e', keyId: 'k' });
+    repairCredentialProviders(isValidProvider);
+    assert.equal(loadCredentialRecords().credentials[0].provider, 'b2');
+  });
+
+  test('is a no-op when there are no credentials', () => {
+    repairCredentialProviders(isValidProvider); // should not throw
+    assert.deepEqual(loadCredentialRecords().credentials, []);
   });
 });
