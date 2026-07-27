@@ -341,3 +341,124 @@ describe('App — capabilities reset to unknown on every connect (Finding 2)', (
     }
   });
 });
+
+// Coordinator follow-up (2026-07-26), Finding A — CRITICAL: calling
+// migrateProfilesFromLegacy() unconditionally (the Finding 4 fix, above) backfires
+// for a user already on the connections model. migrateProfilesFromLegacy() decides
+// whether it has already run by checking s3b_profiles, but handleSaveProfile never
+// writes that record any more — it writes connections and credentials — while
+// saveCredentials() rewrites the flat s3b_endpoint/s3b_bucket/s3b_key_id keys on
+// every connect. So an established user with a real connection and no s3b_profiles
+// gets a phantom profile synthesised from those stale flat keys, and
+// saveLastProfileId() (called inside migrateProfilesFromLegacy) overwrites the real
+// s3b_last_profile_id pointer with the phantom's Date.now() id — silently
+// deselecting the real connection and making saveConnectionCapabilities a
+// permanent no-op for it (idx < 0 in connections.js).
+describe('App — legacy migration does not hijack an established connections-model user (Finding A)', () => {
+  test('a real connection and its last-selected pointer survive mount when only flat credential keys are stale', () => {
+    clearAppStorage();
+    // Established connections-model user: migration marker set, a real connection,
+    // its pointer — and, because saveCredentials() rewrites these on every connect,
+    // stale flat credential keys left over from that connect. Deliberately NO
+    // s3b_profiles: handleSaveProfile never writes it.
+    localStorage.setItem('s3b_connections_migrated', '1');
+    localStorage.setItem('s3b_credentials', JSON.stringify({
+      version: 1,
+      credentials: [{ id: 'credX', label: 'X', endpoint: 'https://s3.example-x.com', keyId: 'kX', provider: null, regionOverride: '' }],
+    }));
+    localStorage.setItem('s3b_connections', JSON.stringify({
+      version: 2,
+      connections: [{ id: 42, name: 'Real conn', credentialId: 'credX', bucket: 'bucket-x', capabilities: null }],
+    }));
+    localStorage.setItem('s3b_last_profile_id', '42');
+    localStorage.setItem('s3b_endpoint', 'https://s3.example-x.com');
+    localStorage.setItem('s3b_bucket', 'bucket-x');
+    localStorage.setItem('s3b_key_id', 'kX');
+
+    const { cleanup } = mount(h(App, {}));
+    try {
+      assert.equal(localStorage.getItem('s3b_last_profile_id'), '42',
+        'the real connection pointer must survive mount, not be clobbered by a phantom profile id');
+      const { connections } = JSON.parse(localStorage.getItem('s3b_connections'));
+      assert.ok(connections.some(c => String(c.id) === '42'),
+        'the pointer must still resolve to a real connection');
+      assert.equal(localStorage.getItem('s3b_profiles'), null,
+        'no phantom profile should be synthesised for a user who never had s3b_profiles');
+    } finally {
+      cleanup();
+      clearAppStorage();
+    }
+  });
+});
+
+// Finding A, second case — guards against over-correcting into skipping the legacy
+// chain entirely. This is the same scenario as the Finding 4 test above (a genuine
+// pre-profiles user: bare flat keys, no s3b_profiles, no connections, no migration
+// marker) restated here explicitly so this fix's two cases are verified side by
+// side: gating on the marker must not stop migrateProfilesFromLegacy() from running
+// for a user who has never migrated at all.
+describe('App — legacy migration still runs for a genuine pre-profiles user (Finding A, case 2)', () => {
+  test('a user with only flat credential keys and no migration marker still gets a connection created', () => {
+    clearAppStorage();
+    localStorage.setItem('s3b_endpoint', 'https://s3.us-west-004.backblazeb2.com');
+    localStorage.setItem('s3b_bucket', 'another-legacy-bucket');
+    localStorage.setItem('s3b_key_id', 'k2');
+    localStorage.setItem('s3b_provider', 'b2');
+
+    const { cleanup } = mount(h(App, {}));
+    try {
+      const { connections } = JSON.parse(localStorage.getItem('s3b_connections') || '{"connections":[]}');
+      assert.equal(connections.length, 1,
+        'gating migrateProfilesFromLegacy() on the marker must not prevent it from running for an un-migrated user');
+      assert.equal(connections[0].bucket, 'another-legacy-bucket');
+    } finally {
+      cleanup();
+      clearAppStorage();
+    }
+  });
+});
+
+// Coordinator follow-up (2026-07-26), Finding B — IMPORTANT: the Finding 2 fix
+// reset in-memory capabilities to 'unknown' on every connect but left the stored
+// per-connection record untouched. handleCapabilityChange merges new observations
+// against in-memory `prev`, and saveConnectionCapabilities blind-overwrites the
+// whole stored field — so Browser's initial listing probe, firing almost
+// immediately after connect, persists {list: X, download: 'unknown', upload:
+// 'unknown', delete: 'unknown'}, silently discarding whatever was accurately known
+// about the other three ops.
+describe('App — connecting resets the stored capability record, not just in-memory (Finding B)', () => {
+  test('a stale denied capability stored against the connection does not survive a reconnect', () => {
+    clearAppStorage();
+    // Loopback + closed port — see the Finding 2 test above for why this is safe
+    // and fast: createS3Client() does no I/O at construction, so session reaches
+    // 'connected' synchronously, and the async listing probe fails immediately
+    // with ECONNREFUSED with no real network dependency.
+    localStorage.setItem('s3b_connections_migrated', '1');
+    localStorage.setItem('s3b_credentials', JSON.stringify({
+      version: 1,
+      credentials: [{ id: 'credB2', label: 'B2', endpoint: 'http://127.0.0.1:1', keyId: 'AKIDEXAMPLE9999', provider: null, regionOverride: '' }],
+    }));
+    localStorage.setItem('s3b_connections', JSON.stringify({
+      version: 2,
+      connections: [{
+        id: 9, name: 'Test conn 2', credentialId: 'credB2', bucket: 'test-bucket-2',
+        capabilities: { list: 'permitted', download: 'permitted', upload: 'permitted', delete: 'denied' },
+      }],
+    }));
+    localStorage.setItem('s3b_last_profile_id', '9');
+
+    const { query, cleanup } = mount(h(App, {}));
+    try {
+      setInput(query('#cred-secretkey'), 'secret456');
+      fire(query('button[type="submit"]'), 'click');
+
+      const { connections } = JSON.parse(localStorage.getItem('s3b_connections'));
+      const stored = connections.find(c => c.id === 9).capabilities;
+      assert.deepEqual(stored, { list: 'unknown', download: 'unknown', upload: 'unknown', delete: 'unknown' },
+        'the stored capability record must reset to unknown on connect too, not just the in-memory copy');
+    } finally {
+      cleanup();
+      clearAppStorage();
+    }
+  });
+});

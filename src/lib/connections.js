@@ -237,6 +237,14 @@ export function listResolvedConnections() {
 
 const LS_KEY_PROFILES = 's3b_profiles';
 
+// Exposed so callers outside this module can decide for themselves whether
+// connection migration has already happened, rather than inferring it from a
+// record (s3b_profiles) that connections-model code paths no longer maintain.
+// App's mount effect uses this to gate the legacy flat-key migration chain.
+export function hasMigratedConnections() {
+  return !!safeGetRaw(LS_KEY_MIGRATED);
+}
+
 // Idempotent — converts the legacy flat profile record into credentials +
 // connections. Safe to call on every mount; returns immediately once the
 // migration marker (LS_KEY_MIGRATED) is set.

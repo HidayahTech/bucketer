@@ -36,7 +36,7 @@ import {
   listResolvedConnections, resolveConnection, findOrCreateCredential,
   saveConnectionRecord, deleteConnectionRecord, migrateProfilesToConnections,
   defaultCapabilities, loadConnectionCapabilities, saveConnectionCapabilities,
-  defaultConnectionName,
+  defaultConnectionName, hasMigratedConnections,
 } from '../lib/connections.js';
 import { readUrlParams, hasUrlParams, buildShareUrl } from '../lib/url-params.js';
 import { FileBanner } from './FileBanner.jsx';
@@ -155,11 +155,22 @@ export function App() {
     // so it must self-heal on the next connect rather than persist forever just
     // because the user fixed their bucket policy at the provider. Do NOT change
     // this to restore the stored per-connection value — that was tried on this
-    // branch and reverted (whole-branch review, Finding 2). The stored record
-    // itself is left untouched: handleCapabilityChange/saveConnectionCapabilities
-    // keep writing to it, because Phase 3's connection switcher needs it to switch
-    // connections without a full reconnect.
-    setCapabilities(defaultCapabilities());
+    // branch and reverted (whole-branch review, Finding 2).
+    const resetCaps = defaultCapabilities();
+    setCapabilities(resetCaps);
+    // Reset the stored record too, so it stays consistent with in-memory state:
+    // handleCapabilityChange merges new observations against in-memory `prev` and
+    // saveConnectionCapabilities overwrites the whole stored field, so a stored
+    // record that disagreed with the fresh in-memory reset would be silently
+    // truncated by the very first post-connect capability write (Browser's initial
+    // listing probe fires almost immediately). This mirrors the pre-branch
+    // reset-on-connect behaviour for the stored record too, not just in-memory.
+    // The record still accumulates normally after this point via
+    // handleCapabilityChange/saveConnectionCapabilities, and
+    // selecting a connection without reconnecting (handleSelectProfile, and
+    // eventually Phase 3's connection switcher) still reads its full history via
+    // loadConnectionCapabilities — only an actual connect resets it.
+    if (selectedConnectionId) saveConnectionCapabilities(selectedConnectionId, resetCaps);
     setCredentials(fullCreds);
 
     try {
@@ -202,8 +213,14 @@ export function App() {
     // before profiles shipped (~v1.15.0) still has only bare flat credential keys,
     // not an s3b_profiles record. migrateProfilesToConnections() reads s3b_profiles
     // only, so without this call such a user gets no connection created at all.
-    // Both calls are idempotent.
-    migrateProfilesFromLegacy();
+    //
+    // Only reach for the legacy flat-key chain when the connection migration has
+    // never run. migrateProfilesFromLegacy() decides for itself by inspecting
+    // s3b_profiles, which connections-model users never write — so calling it
+    // unconditionally makes it synthesise a phantom profile from the flat keys
+    // that saveCredentials() rewrites on every connect, and clobber
+    // s3b_last_profile_id with an id that matches no connection.
+    if (!hasMigratedConnections()) migrateProfilesFromLegacy();
     migrateProfilesToConnections();
     const updated = listResolvedConnections();
     setConnections(updated);
