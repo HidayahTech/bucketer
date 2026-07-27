@@ -25,6 +25,41 @@
 
 > **Task order note.** Tasks execute by number. Task 7 appears *before* Tasks 5 and 6 in this file — an artifact of a post-review reorder that put the `storage.js` export removal last so that every intermediate commit builds. Extract each task by its number, not by its position in the file.
 
+## ⚠️ As-built status — read before reusing any code from this plan
+
+**This document is the pre-implementation draft, not a record of what shipped.**
+It was executed on 2026-07-26/27 and released as v1.39.0 (merge `7790159`). Its
+code blocks were written before any of it ran, and **review found defects in
+seven of them**. The shipped implementation is in `src/lib/connections.js`,
+`src/lib/storage.js`, and `src/components/App.jsx` — treat those as the source of
+truth and this document as the reasoning behind them.
+
+| Plan code | Defect | Shipped fix |
+|---|---|---|
+| `migrateProfilesToConnections` guard | Used "is the connection list empty?" as the already-migrated sentinel. Deleting every connection made it look unmigrated and resurrected deleted rows from `s3b_profiles`, which is never deleted. Took four rounds to fix properly; the answer was to **record** the fact at connection creation, not derive it. | `BUG-045`, `ffa0da4` |
+| `migrateProfilesToConnections` loop | No per-profile `try/catch`. One malformed record threw mid-loop *after* earlier writes, and the guard then read the partial write as "already migrated" — permanently stranding every profile after it. | `83204ca` |
+| `handleSaveProfile` | Dropped the `.trim()` on `bucket` and `keyId` that the pre-branch code had. Nothing downstream compensated. | `fb051ff` |
+| `handleSaveProfile` | Preserved capabilities from the stale `connections` React snapshot, silently reverting what had been learned. | `fb051ff` |
+| `handleSaveProfile` | Read back what it had just written. A silently-failed storage write (private browsing, blocked site data, quota) then blanked the form. | `BUG-046`, `c9826f6` |
+| `repairStorageInvariants` | Placed the `repairCredentialProviders()` call after an early return, making it unreachable for fresh installs and already-migrated users. | `f594a4d` |
+| Storage inspector `caps` | Showed `profiles[0].capabilities` — an arbitrary connection — under a heading that read as global. | `ef45855` |
+
+One further discrepancy is **not** a plan defect: `credentialFingerprint`
+originally used a literal NUL byte as the tuple separator, which is sound. The
+NUL did not survive legibly into the extracted task brief, was transcribed as a
+space, and a space *can* occur inside these fields — so `['a','b c']` and
+`['a b','c']` collided. The code block above has been corrected to the shipped
+`JSON.stringify` form, which is unambiguous regardless of field content. Two
+literal NUL bytes were also removed from this file; they were making `grep`
+treat it as binary.
+
+**The lesson for later phases:** a plan that hands over complete code transfers
+its author's mistakes directly into commits, because implementers reasonably
+trust it. Every defect above was transcribed faithfully and caught only by
+review. Prefer stating intent, interfaces, and test cases over dictating
+implementations — and when dictating them, expect the review gate to be the only
+thing standing between a plan defect and production.
+
 ---
 
 ### Task 1: Store primitives in `connections.js`
@@ -501,8 +536,11 @@ export function credentialFingerprint({ endpoint, keyId, provider, regionOverrid
   const k = keyId || '';
   const p = provider || '';
   const r = (regionOverride || '').trim();
-  //   cannot appear in any of these fields, so it is an unambiguous separator.
-  return [e, k, p, r].join(' ');
+  // JSON.stringify of the tuple, not a join on a separator character. Any
+  // separator that can also occur inside a field lets distinct tuples collide:
+  // ['a','b c'] and ['a b','c'] join identically. Migration feeds legacy records
+  // straight in without form validation, so this cannot assume well-formed input.
+  return JSON.stringify([e, k, p, r]);
 }
 
 const LABEL_KEY_ID_MAX = 6;
