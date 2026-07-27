@@ -23,6 +23,12 @@ import { PROVIDER_LABELS } from './provider.js';
 
 const LS_KEY_CREDENTIALS = 's3b_credentials';
 const LS_KEY_CONNECTIONS = 's3b_connections';
+// Sentinel marking that migrateProfilesToConnections() has already run to
+// completion. Deliberately NOT "connections.length > 0" — that emptied out
+// whenever the user deleted their last connection, which made the next mount
+// treat storage as "not yet migrated" and rebuild every deleted connection
+// straight back out of the (never-deleted) s3b_profiles record.
+const LS_KEY_MIGRATED = 's3b_connections_migrated';
 
 const CREDENTIALS_VERSION = 1;
 const CONNECTIONS_VERSION = 2;
@@ -120,19 +126,30 @@ export function saveConnectionRecord(conn) {
   saveConnectionData(data);
 }
 
+// Also garbage-collects the connection's credential: an explicitly deleted
+// connection must not leave its endpoint/key/provider/region behind forever with
+// no UI able to remove it (this compounds in Phase 2, where the vault will key
+// encrypted secrets by credential id). deleteCredentialRecord already refuses when
+// another connection still references the credential, which is exactly the
+// shared-credential case, so no extra guard is needed here.
 export function deleteConnectionRecord(id) {
   const data = loadConnectionRecords();
+  const conn = data.connections.find(c => c.id === id);
   data.connections = data.connections.filter(c => c.id !== id);
   saveConnectionData(data);
+  if (conn) deleteCredentialRecord(conn.credentialId);
 }
 
-// Removes both records outright. Used by wipeAllAppData and the storage inspector.
+// Removes every key this module owns outright. Used by wipeAllAppData and the
+// storage inspector. Iterates CONNECTION_STORAGE_KEYS rather than naming keys
+// individually so a key added to that list (e.g. the migration marker) cannot be
+// forgotten here — leaving a marker behind after a wipe would permanently disable
+// migration for that user.
 export function deleteAllConnectionData() {
-  safeRemoveRaw(LS_KEY_CREDENTIALS);
-  safeRemoveRaw(LS_KEY_CONNECTIONS);
+  CONNECTION_STORAGE_KEYS.forEach(k => safeRemoveRaw(k));
 }
 
-export const CONNECTION_STORAGE_KEYS = [LS_KEY_CREDENTIALS, LS_KEY_CONNECTIONS];
+export const CONNECTION_STORAGE_KEYS = [LS_KEY_CREDENTIALS, LS_KEY_CONNECTIONS, LS_KEY_MIGRATED];
 
 // Normalizes the four fields that identify a credential, so that cosmetic
 // differences (a trailing slash, stray whitespace, null vs '' provider) do not
@@ -221,8 +238,8 @@ export function listResolvedConnections() {
 const LS_KEY_PROFILES = 's3b_profiles';
 
 // Idempotent — converts the legacy flat profile record into credentials +
-// connections. Safe to call on every mount; returns immediately once any
-// connection exists.
+// connections. Safe to call on every mount; returns immediately once the
+// migration marker (LS_KEY_MIGRATED) is set.
 //
 // s3b_profiles is READ but deliberately NOT deleted: it is the rollback path for
 // one release. A later release removes it.
@@ -230,7 +247,16 @@ const LS_KEY_PROFILES = 's3b_profiles';
 // Profile ids become connection ids so the existing s3b_last_profile_id pointer
 // keeps resolving without a second migration.
 export function migrateProfilesToConnections() {
-  if (loadConnectionRecords().connections.length > 0) return; // already migrated
+  if (safeGetRaw(LS_KEY_MIGRATED)) return;
+
+  // A build from before the marker existed may already have migrated. Adopt that
+  // state rather than re-running against s3b_profiles, which is never deleted —
+  // otherwise a later delete of every connection would look identical to "not yet
+  // migrated" and resurrect them all from the stale legacy record.
+  if (loadConnectionRecords().connections.length > 0) {
+    safeSetRaw(LS_KEY_MIGRATED, '1');
+    return;
+  }
 
   let profiles = [];
   try {
@@ -265,11 +291,16 @@ export function migrateProfilesToConnections() {
       });
     } catch {
       // One malformed record must not strand the profiles after it. The guard at
-      // the top of this function only checks whether ANY connection exists, so a
-      // throw mid-loop would make every later profile permanently unreachable.
+      // the top of this function only checks the migration marker, so a throw
+      // mid-loop would make every later profile permanently unreachable.
       continue;
     }
   }
+
+  // Only reached once every profile has been attempted. An early return above
+  // (missing/corrupt s3b_profiles) deliberately leaves the marker unset so a
+  // later mount can retry rather than being locked into "migrated nothing" forever.
+  safeSetRaw(LS_KEY_MIGRATED, '1');
 }
 
 const CAPABILITY_OPS = ['list', 'download', 'upload', 'delete'];

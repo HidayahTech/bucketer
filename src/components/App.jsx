@@ -30,6 +30,7 @@ import {
   loadUpdateCheckEnabled, saveUpdateCheckEnabled,
   loadPrefetchSizeLimit, savePrefetchSizeLimit,
   loadLastProfileId, saveLastProfileId, repairStorageInvariants,
+  migrateProfilesFromLegacy,
 } from '../lib/storage.js';
 import {
   listResolvedConnections, resolveConnection, findOrCreateCredential,
@@ -148,9 +149,17 @@ export function App() {
     const fullCreds = { ...creds, provider };
 
     saveCredentials(fullCreds);
-    setCapabilities(selectedConnectionId
-      ? loadConnectionCapabilities(selectedConnectionId)
-      : defaultCapabilities());
+    // Always reset to 'unknown' on connect, regardless of whether a connection is
+    // selected — matches pre-branch behaviour exactly. A stale 'denied' hides UI
+    // (upload section, drop overlay, Find duplicates, download/delete/move/copy),
+    // so it must self-heal on the next connect rather than persist forever just
+    // because the user fixed their bucket policy at the provider. Do NOT change
+    // this to restore the stored per-connection value — that was tried on this
+    // branch and reverted (whole-branch review, Finding 2). The stored record
+    // itself is left untouched: handleCapabilityChange/saveConnectionCapabilities
+    // keep writing to it, because Phase 3's connection switcher needs it to switch
+    // connections without a full reconnect.
+    setCapabilities(defaultCapabilities());
     setCredentials(fullCreds);
 
     try {
@@ -189,6 +198,12 @@ export function App() {
   // Migration runs first so the profile list is populated before state reads it.
   useEffect(() => {
     repairStorageInvariants();
+    // Restores the pre-branch migration chain: a user who last opened Bucketer
+    // before profiles shipped (~v1.15.0) still has only bare flat credential keys,
+    // not an s3b_profiles record. migrateProfilesToConnections() reads s3b_profiles
+    // only, so without this call such a user gets no connection created at all.
+    // Both calls are idempotent.
+    migrateProfilesFromLegacy();
     migrateProfilesToConnections();
     const updated = listResolvedConnections();
     setConnections(updated);
@@ -207,12 +222,16 @@ export function App() {
     const merged = { ...base, ...fromUrl };
     if (merged.endpoint && merged.bucket && merged.keyId && merged.secretKey) {
       handleConnect(merged);
-    } else if (conn) {
+    } else if (conn && !stored.endpoint) {
       // First load after migration: the `credentials` initializer above ran BEFORE
       // migrateProfilesToConnections(), so resolveConnection() found nothing and the
       // form fell back to the (empty) flat credential keys. Now that connections
       // exist, populate the form from the selected one — otherwise every upgrading
       // user gets a blank form on first load with their profile row highlighted.
+      // Gated on `!stored.endpoint`: when flat credentials DO exist, `base` above
+      // already picked them (by design — they are the last-connected values), and
+      // this branch must not override that choice with the connection's values,
+      // or the picker can highlight connection A while the form shows B's data.
       setCredentials(merged);
       setLiveFormData(merged);
       // selectedConnectionId is unchanged (it was already `lastId` before migration

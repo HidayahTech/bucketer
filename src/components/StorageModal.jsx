@@ -15,7 +15,7 @@ import {
 } from '../lib/storage.js';
 import {
   listResolvedConnections, loadCredentialRecords, deleteConnectionRecord,
-  clearAllConnectionCapabilities, defaultCapabilities,
+  clearAllConnectionCapabilities, defaultCapabilities, loadConnectionCapabilities,
 } from '../lib/connections.js';
 import {
   loadUploadLog, clearUploadLog,
@@ -91,7 +91,11 @@ export function StorageModal({ onClose, isConnected }) {
     // Fall back to the first connection only when nothing is selected, so the panel
     // still shows something on a fresh load; either way it is labelled below.
     const capsConnection = selected || profiles[0] || null;
-    const caps           = (capsConnection && capsConnection.capabilities) || defaultCapabilities();
+    // Routed through loadConnectionCapabilities() rather than reading
+    // capsConnection.capabilities raw, so this goes through the same
+    // validate-and-merge-over-defaults path as every other reader instead of being
+    // a second, divergent one.
+    const caps           = capsConnection ? loadConnectionCapabilities(capsConnection.id) : defaultCapabilities();
     const active  = loadActiveUploads();
     const settings = {
       maxKeys:            loadMaxKeys(),

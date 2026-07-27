@@ -24,7 +24,7 @@ import {
   loadConnectionRecords, saveConnectionRecord, deleteConnectionRecord,
   credentialFingerprint, findOrCreateCredential, defaultCredentialLabel,
   defaultConnectionName, resolveConnection, listResolvedConnections,
-  migrateProfilesToConnections,
+  migrateProfilesToConnections, deleteAllConnectionData,
   defaultCapabilities, loadConnectionCapabilities, saveConnectionCapabilities, clearAllConnectionCapabilities,
   repairCredentialProviders,
 } from '../src/lib/connections.js';
@@ -359,6 +359,87 @@ describe('migrateProfilesToConnections', () => {
     writeProfiles([{ id: 1, endpoint: 'e', bucket: 'photos', keyId: 'k1', provider: 'b2', regionOverride: '' }]);
     migrateProfilesToConnections();
     assert.equal(loadConnectionRecords().connections[0].name, 'Backblaze B2 — photos');
+  });
+});
+
+// Whole-branch review (2026-07-26), Finding 1 — CRITICAL: migrateProfilesToConnections()
+// used "connections.length > 0" as its already-migrated sentinel. deleteConnectionRecord
+// can empty that list, and s3b_profiles is deliberately never deleted, so the next call
+// saw an empty list, treated it as "not yet migrated," and rebuilt every deleted
+// connection with its original id and name — deletes did not stick. This is a sequence
+// bug: no single-function unit test of migrateProfilesToConnections or
+// deleteConnectionRecord alone can see it.
+describe('migrateProfilesToConnections — the sentinel survives deleting every connection (Finding 1)', () => {
+  function writeProfiles(profiles) {
+    ls['s3b_profiles'] = JSON.stringify({ version: 1, profiles });
+  }
+
+  test('migrate, delete every connection, migrate again: the deletions must stick', () => {
+    writeProfiles([
+      { id: 1, name: 'Photos',  endpoint: 'e', bucket: 'photos',  keyId: 'k1', provider: 'b2', regionOverride: '' },
+      { id: 2, name: 'Backups', endpoint: 'e', bucket: 'backups', keyId: 'k2', provider: 'b2', regionOverride: '' },
+    ]);
+
+    migrateProfilesToConnections();
+    assert.equal(loadConnectionRecords().connections.length, 2, 'sanity: migration created both connections');
+
+    for (const { id } of loadConnectionRecords().connections) deleteConnectionRecord(id);
+    assert.deepEqual(loadConnectionRecords().connections, [], 'sanity: both connections were deleted');
+
+    migrateProfilesToConnections();
+    assert.deepEqual(loadConnectionRecords().connections, [],
+      'deleted connections must stay deleted — they must not be resurrected from s3b_profiles');
+  });
+});
+
+// Finding 3 — IMPORTANT: deleteConnectionRecord only removed the connection row,
+// leaving its credential (endpoint, key ID, provider, region) in s3b_credentials
+// forever with no UI able to remove it — even though deleteCredentialRecord (built and
+// tested in Task 1) already existed and refuses to delete a still-referenced credential.
+describe('deleteConnectionRecord garbage-collects its credential (Finding 3)', () => {
+  test('a credential shared by two connections survives until the last one is deleted', () => {
+    const cred = findOrCreateCredential({ endpoint: 'e', keyId: 'k1', provider: 'b2', regionOverride: '' });
+    saveConnectionRecord({ id: 1, name: 'Photos (R/O)',   credentialId: cred.id, bucket: 'photos', capabilities: null });
+    saveConnectionRecord({ id: 2, name: 'Photos (admin)', credentialId: cred.id, bucket: 'photos', capabilities: null });
+
+    deleteConnectionRecord(1);
+    assert.ok(loadCredentialRecords().credentials.some(c => c.id === cred.id),
+      'credential must survive while connection 2 still references it');
+
+    deleteConnectionRecord(2);
+    assert.ok(!loadCredentialRecords().credentials.some(c => c.id === cred.id),
+      'credential must be removed once nothing references it any more');
+  });
+
+  test('deleting a connection with no shared reference removes its credential outright', () => {
+    const cred = findOrCreateCredential({ endpoint: 'e', keyId: 'k1', provider: 'b2', regionOverride: '' });
+    saveConnectionRecord({ id: 1, name: 'Photos', credentialId: cred.id, bucket: 'photos', capabilities: null });
+    deleteConnectionRecord(1);
+    assert.deepEqual(loadCredentialRecords().credentials, []);
+  });
+});
+
+// Finding 1, critical detail — the migration marker must be one of the keys a wipe
+// removes, or migration can never run again for that user. This does not reproduce a
+// bug in the pre-fix code (which has no marker concept at all, so this passes
+// trivially against it); it guards the specific hazard the fix introduces: forgetting
+// to register the new key wherever CONNECTION_STORAGE_KEYS is enumerated.
+describe('wiping connection data clears the migration marker', () => {
+  test('deleteAllConnectionData clears the marker so migration can run again', () => {
+    ls['s3b_profiles'] = JSON.stringify({
+      version: 1,
+      profiles: [{ id: 1, name: 'Photos', endpoint: 'e', bucket: 'photos', keyId: 'k1', provider: 'b2', regionOverride: '' }],
+    });
+    migrateProfilesToConnections();
+    assert.equal(loadConnectionRecords().connections.length, 1, 'sanity: migration ran once');
+
+    deleteAllConnectionData();
+    assert.deepEqual(loadConnectionRecords().connections, [], 'sanity: wipe cleared connections');
+    assert.deepEqual(loadCredentialRecords().credentials, [], 'sanity: wipe cleared credentials');
+
+    migrateProfilesToConnections();
+    assert.equal(loadConnectionRecords().connections.length, 1,
+      'migration must be able to run again after a wipe — the marker must not survive deleteAllConnectionData');
   });
 });
 

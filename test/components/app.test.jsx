@@ -18,6 +18,7 @@ const CRED_KEYS = [
   's3b_endpoint', 's3b_bucket', 's3b_key_id', 's3b_provider',
   's3b_region_override', 's3b_capabilities', 's3b_profiles',
   's3b_last_profile_id', 's3b_connections', 's3b_credentials',
+  's3b_connections_migrated',
 ];
 
 function clearAppStorage() {
@@ -216,6 +217,124 @@ describe('App — first load after migration pre-fills the form (regression)', (
       assert.equal(query('#cred-keyid')?.value, 'k1',
         'key ID must be pre-filled from the migrated connection on first load');
       assert.ok(text().includes('Backups'), 'the migrated profile must still show in the picker');
+    } finally {
+      cleanup();
+      clearAppStorage();
+    }
+  });
+});
+
+// Whole-branch review (2026-07-26), Finding 4 — IMPORTANT: migrateProfilesFromLegacy()
+// (converts bare flat credential keys into an s3b_profiles record) was no longer
+// called from src/ anywhere, only from its own unit test. migrateProfilesToConnections()
+// reads s3b_profiles only, so a user whose storage never reached the profiles stage
+// (last opened Bucketer before ~v1.15.0: bare flat keys, no s3b_profiles at all) got
+// no connection created on upgrade — the legacy migration chain was severed.
+describe('App — legacy flat-key migration chain is restored (Finding 4)', () => {
+  test('a user with only flat credential keys (no s3b_profiles) gets a connection created on mount', () => {
+    clearAppStorage();
+    // Exactly the pre-profiles state: bare flat keys only, no s3b_profiles and no
+    // s3b_connections/s3b_credentials yet.
+    localStorage.setItem('s3b_endpoint', 'https://s3.us-west-004.backblazeb2.com');
+    localStorage.setItem('s3b_bucket', 'legacy-bucket');
+    localStorage.setItem('s3b_key_id', 'k1');
+    localStorage.setItem('s3b_provider', 'b2');
+
+    const { cleanup } = mount(h(App, {}));
+    try {
+      const { connections } = JSON.parse(localStorage.getItem('s3b_connections') || '{"connections":[]}');
+      assert.equal(connections.length, 1,
+        'a connection must be created from the flat legacy keys via the restored migration chain');
+      assert.equal(connections[0].bucket, 'legacy-bucket');
+    } finally {
+      cleanup();
+      clearAppStorage();
+    }
+  });
+});
+
+// Whole-branch review (2026-07-26), Finding 5 — IMPORTANT: on an ordinary reload with
+// a connection selected, the `credentials` initializer prefers the resolved connection,
+// but the mount effect's `else if (conn)` branch preferred flat credentials whenever
+// stored.endpoint was set and then forced a form remount to adopt them — flipping the
+// pre-fill source away from the connection the picker highlights.
+describe("App — the selected connection's values win over stale flat credentials on reload (Finding 5)", () => {
+  test('form shows the selected connection\'s endpoint/bucket/keyId, not differing flat credentials left over from a previous connect', async () => {
+    clearAppStorage();
+    // Connections already exist — an ordinary reload, not first-load-after-migration —
+    // so mark migration done and seed connection B directly.
+    localStorage.setItem('s3b_connections_migrated', '1');
+    localStorage.setItem('s3b_credentials', JSON.stringify({
+      version: 1,
+      credentials: [{ id: 'credB', label: 'B', endpoint: 'https://s3.example-b.com', keyId: 'kB', provider: null, regionOverride: '' }],
+    }));
+    localStorage.setItem('s3b_connections', JSON.stringify({
+      version: 2,
+      connections: [{ id: 42, name: 'Conn B', credentialId: 'credB', bucket: 'bucket-b', capabilities: null }],
+    }));
+    localStorage.setItem('s3b_last_profile_id', '42');
+    // Flat credentials left over from a DIFFERENT, previously-connected profile (A) —
+    // saveCredentials() writes these on every connect, and clearCredentials() only
+    // removes them on an explicit disconnect, so they can easily outlive the switch
+    // to a different selected connection.
+    localStorage.setItem('s3b_endpoint', 'https://s3.example-a.com');
+    localStorage.setItem('s3b_bucket', 'bucket-a');
+    localStorage.setItem('s3b_key_id', 'kA');
+
+    const { query, cleanup } = mount(h(App, {}));
+    try {
+      for (let i = 0; i < 20 && query('#cred-endpoint')?.value !== 'https://s3.example-b.com'; i++) {
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+      assert.equal(query('#cred-endpoint')?.value, 'https://s3.example-b.com',
+        "the selected connection (B) must win — the mount effect must not override it with stale flat credentials (A)");
+      assert.equal(query('#cred-bucket')?.value, 'bucket-b');
+      assert.equal(query('#cred-keyid')?.value, 'kB');
+    } finally {
+      cleanup();
+      clearAppStorage();
+    }
+  });
+});
+
+// Whole-branch review (2026-07-26), Finding 2 — IMPORTANT (operator decision: restore
+// pre-branch behaviour): handleConnect used to unconditionally reset capabilities to
+// 'unknown' on every connect. The branch changed this to restore the connection's
+// stored capabilities instead, making a stale 'denied' durable across reconnects —
+// hiding upload/download/delete/move/copy UI even after the user fixed their bucket
+// policy at the provider and reloaded.
+describe('App — capabilities reset to unknown on every connect (Finding 2)', () => {
+  test('connecting resets capabilities to unknown even when the selected connection record holds denied', () => {
+    clearAppStorage();
+    // 127.0.0.1 on a closed port: createS3Client() constructs successfully (no
+    // network I/O at construction time), so the session reaches 'connected'
+    // synchronously and CapabilityPanel renders. Browser's own listing probe fires
+    // afterward, asynchronously, and fails immediately with ECONNREFUSED on the
+    // loopback interface — no real network dependency, no delay.
+    localStorage.setItem('s3b_connections_migrated', '1');
+    localStorage.setItem('s3b_credentials', JSON.stringify({
+      version: 1,
+      credentials: [{ id: 'cred1', label: 'Test', endpoint: 'http://127.0.0.1:1', keyId: 'AKIDEXAMPLE1234', provider: null, regionOverride: '' }],
+    }));
+    localStorage.setItem('s3b_connections', JSON.stringify({
+      version: 2,
+      connections: [{
+        id: 7, name: 'Test conn', credentialId: 'cred1', bucket: 'test-bucket',
+        capabilities: { list: 'permitted', download: 'permitted', upload: 'permitted', delete: 'denied' },
+      }],
+    }));
+    localStorage.setItem('s3b_last_profile_id', '7');
+
+    const { query, queryAll, cleanup } = mount(h(App, {}));
+    try {
+      setInput(query('#cred-secretkey'), 'secret123');
+      fire(query('button[type="submit"]'), 'click');
+
+      assert.ok(query('.cap-list'), 'connecting must render the sidebar CapabilityPanel');
+      assert.equal(queryAll('.cap-denied').length, 0,
+        'no capability may read as denied immediately after connecting');
+      assert.equal(queryAll('.cap-unknown').length, 4,
+        'all four capabilities must reset to unknown on connect, even though the stored connection record has delete: denied');
     } finally {
       cleanup();
       clearAppStorage();
