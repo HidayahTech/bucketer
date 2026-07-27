@@ -176,3 +176,49 @@ describe('App — saving a profile does not clobber capabilities written directl
     }
   });
 });
+
+// Regression: the `credentials` useState initializer runs BEFORE the mount effect's
+// migrateProfilesToConnections(), so on a legacy user's first post-upgrade load,
+// resolveConnection(lastId) finds nothing yet and the form falls back to empty flat
+// credential keys. setCredentials was previously only reached inside the
+// handleConnect(...) branch, gated on a secretKey that migration never has — so the
+// form stayed blank even though the profile showed selected in the picker. Unit tests
+// on storage.js/connections.js in isolation cannot catch this: it is purely about
+// App.jsx's mount-effect ordering.
+describe('App — first load after migration pre-fills the form (regression)', () => {
+  test('endpoint/bucket/keyId are populated from the migrated connection, not left blank', async () => {
+    clearAppStorage();
+    // Exactly the pre-upgrade state: a legacy s3b_profiles record and a pointer to
+    // it, but no s3b_connections/s3b_credentials yet (migration hasn't run) and no
+    // flat credential keys (no prior direct-credential session either).
+    localStorage.setItem('s3b_profiles', JSON.stringify({
+      version: 1,
+      profiles: [{
+        id: 1, name: 'Backups',
+        endpoint: 'https://s3.us-west-004.backblazeb2.com',
+        bucket: 'backups', keyId: 'k1', provider: 'b2', regionOverride: 'us-west-004',
+      }],
+    }));
+    localStorage.setItem('s3b_last_profile_id', '1');
+
+    const { query, text, cleanup } = mount(h(App, {}));
+    try {
+      // The mount effect's work is synchronous, but poll a bounded number of ticks
+      // rather than assuming — mirrors the pattern used for StorageModal's async load.
+      for (let i = 0; i < 20 && query('#cred-endpoint')?.value !== 'https://s3.us-west-004.backblazeb2.com'; i++) {
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+
+      assert.equal(query('#cred-endpoint')?.value, 'https://s3.us-west-004.backblazeb2.com',
+        'endpoint must be pre-filled from the migrated connection on first load');
+      assert.equal(query('#cred-bucket')?.value, 'backups',
+        'bucket must be pre-filled from the migrated connection on first load');
+      assert.equal(query('#cred-keyid')?.value, 'k1',
+        'key ID must be pre-filled from the migrated connection on first load');
+      assert.ok(text().includes('Backups'), 'the migrated profile must still show in the picker');
+    } finally {
+      cleanup();
+      clearAppStorage();
+    }
+  });
+});

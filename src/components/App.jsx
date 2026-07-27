@@ -90,6 +90,11 @@ export function App() {
   });
   const [currentPrefix, setCurrentPrefix] = useState('');
   const [browserKey, setBrowserKey] = useState(0); // force re-mount on reconnect
+  // Bumped once when the mount effect hydrates `credentials` from a just-migrated
+  // connection (see the `else if (conn)` branch below). CredentialForm reads
+  // `initial` only in its own useState initializer, so without a key change,
+  // setCredentials() alone is invisible to an already-mounted form.
+  const [formResetKey, setFormResetKey] = useState(0);
   const [logKey, setLogKey] = useState(0);         // incremented to refresh upload log
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { changelogOpen, setChangelogOpen, aboutOpen, setAboutOpen, storageOpen, setStorageOpen, duplicatesOpen, setDuplicatesOpen } = useModalStates();
@@ -202,6 +207,18 @@ export function App() {
     const merged = { ...base, ...fromUrl };
     if (merged.endpoint && merged.bucket && merged.keyId && merged.secretKey) {
       handleConnect(merged);
+    } else if (conn) {
+      // First load after migration: the `credentials` initializer above ran BEFORE
+      // migrateProfilesToConnections(), so resolveConnection() found nothing and the
+      // form fell back to the (empty) flat credential keys. Now that connections
+      // exist, populate the form from the selected one — otherwise every upgrading
+      // user gets a blank form on first load with their profile row highlighted.
+      setCredentials(merged);
+      setLiveFormData(merged);
+      // selectedConnectionId is unchanged (it was already `lastId` before migration
+      // ran), so CredentialForm's key does not change and it will not remount to
+      // pick up the credentials update above — force it explicitly.
+      setFormResetKey(k => k + 1);
     }
   }, []);
 
@@ -454,7 +471,7 @@ export function App() {
               </div>
             )}
             <CredentialForm
-              key={selectedConnectionId ?? 'manual'}
+              key={`${selectedConnectionId ?? 'manual'}-${formResetKey}`}
               initial={credentials}
               onSave={handleConnect}
               onFormChange={setLiveFormData}
