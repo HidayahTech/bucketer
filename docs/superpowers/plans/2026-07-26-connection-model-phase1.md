@@ -14,6 +14,7 @@
 - **`@anthropic-ai/claude-code` must never appear** in `package.json` or `package-lock.json`.
 - **Phase 1 is invisible.** No user-facing UI change except the storage inspector in `StorageModal`, which must stay truthful about which keys exist.
 - **`s3b_profiles` is read but never deleted** in this phase. It is the rollback path and is removed in a later release.
+- **The rollback is one-way once `s3b_connections_migrated` is set.** That marker (added during the whole-branch review, `src/lib/connections.js`) records "this user is on the connection model" durably — set by `migrateProfilesToConnections()` on completion and, since round 4 of the review, by `saveConnectionRecord()` the instant any connection is created. If a build is rolled back to the pre-connection-model release, the user keeps using `s3b_profiles` directly and the marker is untouched. Rolling forward again short-circuits both `migrateProfilesFromLegacy()` (gated on `hasMigratedConnections()`, which sees the marker) and `migrateProfilesToConnections()` (gated on the marker directly) — so any profile edits, additions, or deletions made *during* the rollback window are never re-synced into `s3b_connections`/`s3b_credentials`; only the state as of the last time migration actually ran is what the connection model sees. This is a deliberate consequence of fixing the resurrection bug (see `BUG-045` in `BUG-LOG.md`), not an oversight: the alternative — re-deriving "already migrated" from mutable state instead of recording it — is exactly what caused that bug through three rounds of fixes. Previously this caveat existed only as a code comment on `hasMigratedConnections()`.
 - **Connection ids reuse the old profile ids.** `s3b_last_profile_id` continues to work untouched; renaming that key is deferred to Phase 3.
 - **No `crypto.randomUUID`.** It requires a secure context and Bucketer supports `file://` usage (see `FileBanner.jsx`). Use the sequence-based `newId` helper defined in Task 1.
 - **Storage access goes through try/catch wrappers.** Private browsing throws on every read and write; the app degrades rather than crashing, matching `storage.js:52-60`.
@@ -38,7 +39,7 @@
   - `newId(prefix: string) → string`
   - `loadCredentialRecords() → { version: 1, credentials: Array<CredentialRecord> }`
   - `saveCredentialRecord(cred: CredentialRecord) → void` (upsert by `id`)
-  - `deleteCredentialRecord(id: string) → void`
+  - `deleteCredentialRecord(id: string) → boolean` — `true` when deleted, `false` when refused because a connection still references the credential
   - `loadConnectionRecords() → { version: 2, connections: Array<ConnectionRecord> }`
   - `saveConnectionRecord(conn: ConnectionRecord) → void` (upsert by `id`)
   - `deleteConnectionRecord(id: string|number) → void`

@@ -24,7 +24,7 @@ import {
   loadConnectionRecords, saveConnectionRecord, deleteConnectionRecord,
   credentialFingerprint, findOrCreateCredential, defaultCredentialLabel,
   defaultConnectionName, resolveConnection, listResolvedConnections,
-  migrateProfilesToConnections, deleteAllConnectionData,
+  migrateProfilesToConnections, deleteAllConnectionData, hasMigratedConnections,
   defaultCapabilities, loadConnectionCapabilities, saveConnectionCapabilities, clearAllConnectionCapabilities,
   repairCredentialProviders,
 } from '../src/lib/connections.js';
@@ -440,6 +440,47 @@ describe('wiping connection data clears the migration marker', () => {
     migrateProfilesToConnections();
     assert.equal(loadConnectionRecords().connections.length, 1,
       'migration must be able to run again after a wipe — the marker must not survive deleteAllConnectionData');
+  });
+});
+
+// Round 4 of the whole-branch review's Finding A: hasMigratedConnections() had no
+// direct unit test at all through three rounds of a failing predicate. Covers both
+// arms independently, plus the raw-vs-resolved distinction the reviewer asked to
+// have characterized explicitly.
+describe('hasMigratedConnections', () => {
+  test('true when the marker is set, even with zero connections', () => {
+    ls['s3b_connections_migrated'] = '1';
+    assert.equal(loadConnectionRecords().connections.length, 0, 'sanity: no connections exist');
+    assert.equal(hasMigratedConnections(), true);
+  });
+
+  test('true when a connection exists, even with the marker absent', () => {
+    const cred = findOrCreateCredential({ endpoint: 'e', keyId: 'k', provider: null, regionOverride: '' });
+    saveConnectionRecord({ id: 1, name: 'A', credentialId: cred.id, bucket: 'b', capabilities: null });
+    // saveConnectionRecord() itself now sets the marker as its primary effect (the
+    // round-4 fix) — clear it here to isolate the fallback arm being tested, i.e.
+    // to simulate a connection written by a build that predates that fix.
+    delete ls['s3b_connections_migrated'];
+    assert.equal(hasMigratedConnections(), true);
+  });
+
+  test('false when neither the marker nor any connection exists', () => {
+    assert.equal(hasMigratedConnections(), false);
+  });
+
+  // resolveConnection()/listResolvedConnections() drop a connection whose
+  // credentialId does not resolve (see "returns null when the credential is
+  // orphaned" above) — but hasMigratedConnections() reads the raw connection
+  // list, so an orphaned connection still counts here. I believe this is the
+  // correct behaviour, not an oversight: the raw record's mere presence is
+  // evidence the user was on the connection model at some point, and letting the
+  // legacy flat-key chain run because the *resolved* view is empty would layer a
+  // phantom profile on top of already-corrupt data instead of leaving it alone.
+  test('an orphaned connection (unresolvable credentialId) still counts, though the resolved view drops it', () => {
+    saveConnectionRecord({ id: 1, name: 'Orphan', credentialId: 'missing', bucket: 'b', capabilities: null });
+    delete ls['s3b_connections_migrated']; // isolate the fallback arm, as above
+    assert.equal(listResolvedConnections().length, 0, 'sanity: the resolved view filters the orphan out');
+    assert.equal(hasMigratedConnections(), true, 'the raw connection record still counts for this predicate');
   });
 });
 

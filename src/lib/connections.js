@@ -23,11 +23,26 @@ import { PROVIDER_LABELS } from './provider.js';
 
 const LS_KEY_CREDENTIALS = 's3b_credentials';
 const LS_KEY_CONNECTIONS = 's3b_connections';
-// Sentinel marking that migrateProfilesToConnections() has already run to
-// completion. Deliberately NOT "connections.length > 0" — that emptied out
-// whenever the user deleted their last connection, which made the next mount
-// treat storage as "not yet migrated" and rebuild every deleted connection
-// straight back out of the (never-deleted) s3b_profiles record.
+// Sentinel with two purposes, both keyed off the same underlying fact:
+//
+//   1. migrateProfilesToConnections() uses it to know it has already converted
+//      s3b_profiles, so it does not run the conversion loop again. Deliberately
+//      NOT "connections.length > 0" for that purpose — that emptied out whenever
+//      the user deleted their last connection, which made the next mount treat
+//      storage as "not yet migrated" and rebuild every deleted connection
+//      straight back out of the (never-deleted) s3b_profiles record.
+//
+//   2. saveConnectionRecord() also sets it, recording durably that this user is
+//      on the connection model the instant any connection is created (via
+//      migration's loop or via handleSaveProfile), so App's legacy flat-key
+//      migration gate (hasMigratedConnections()) does not have to re-derive that
+//      fact from the connection list — which deleteConnectionRecord can empty
+//      just as easily, reintroducing the same resurrection bug one level up.
+//
+// Name kept as s3b_connections_migrated even though its meaning has widened to
+// "the connection model is in use" — renaming a storage key mid-branch is a
+// migration problem of its own for no benefit. See hasMigratedConnections()
+// below for the up-to-date meaning.
 const LS_KEY_MIGRATED = 's3b_connections_migrated';
 
 const CREDENTIALS_VERSION = 1;
@@ -124,6 +139,15 @@ export function saveConnectionRecord(conn) {
   if (idx >= 0) data.connections[idx] = { ...data.connections[idx], ...safeConn };
   else data.connections.push({ ...safeConn });
   saveConnectionData(data);
+  // Record, durably, that this user is on the connection model — the moment any
+  // connection is created, however it got there (migration's loop or
+  // handleSaveProfile). This must be a recorded FACT, not derived from the
+  // connection list's current emptiness: deleteConnectionRecord can empty that
+  // list again, and re-deriving "not yet on the connection model" from an empty
+  // list is exactly what let the legacy flat-key chain resurrect a phantom
+  // connection after a user saved one and then deleted it (see
+  // hasMigratedConnections() for the full explanation).
+  safeSetRaw(LS_KEY_MIGRATED, '1');
 }
 
 // Also garbage-collects the connection's credential: an explicitly deleted
@@ -248,12 +272,20 @@ const LS_KEY_PROFILES = 's3b_profiles';
 //   and must stay marker-only — treating an empty connection list as "unmigrated"
 //   is what resurrected deleted connections from the never-deleted s3b_profiles.
 //
-//   This asks "is this user already on the connection model?", which is true as
-//   soon as any connection exists, however it got there. handleSaveProfile writes
-//   connections directly and never sets the marker, so a marker-only answer here
-//   let the legacy chain synthesise a phantom profile from the flat keys that
-//   saveCredentials() rewrites on every connect, clobbering s3b_last_profile_id
-//   even though a real, already-saved connection existed.
+//   This asks "is this user already on the connection model?" — true from the
+//   instant saveConnectionRecord() first records it (the marker check below),
+//   which is now the load-bearing answer.
+//
+// The connections.length fallback below is NOT equivalent to the marker and is
+// deliberately secondary: it is NOT monotonic — it stops being true the moment
+// the last connection is deleted, even though the user unambiguously remains on
+// the connection model. Relying on it alone (as an earlier version of this fix
+// did) let deleteConnectionRecord silently flip this predicate back to false,
+// which made the legacy chain run again and synthesise a phantom profile from
+// stale flat keys — the same resurrection bug as the original Critical,
+// relocated to this gate instead of migrateProfilesToConnections(). It is kept
+// only as a fallback for connection records written by a build that predates
+// saveConnectionRecord() setting the marker.
 export function hasMigratedConnections() {
   if (safeGetRaw(LS_KEY_MIGRATED)) return true;
   return loadConnectionRecords().connections.length > 0;
@@ -319,9 +351,16 @@ export function migrateProfilesToConnections() {
     }
   }
 
-  // Only reached once every profile has been attempted. An early return above
-  // (missing/corrupt s3b_profiles) deliberately leaves the marker unset so a
-  // later mount can retry rather than being locked into "migrated nothing" forever.
+  // Only reached once every profile has been attempted. saveConnectionRecord()
+  // now sets this marker itself the moment any connection is created, so this
+  // write is redundant whenever at least one profile actually converted — but it
+  // is still the ONLY thing that sets the marker when every profile was skipped
+  // (no bucket) or the profiles array was empty: saveConnectionRecord() is never
+  // called in that case, and without this write migration would be re-attempted
+  // (and re-produce nothing) on every future mount instead of being recorded as
+  // complete. An early return above (missing/corrupt s3b_profiles) deliberately
+  // leaves the marker unset so a later mount can retry rather than being locked
+  // into "migrated nothing" forever.
   safeSetRaw(LS_KEY_MIGRATED, '1');
 }
 

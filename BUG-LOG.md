@@ -4,6 +4,34 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-045 — Deleting a connection resurrects it as a phantom on the next reload
+
+**Date:** 2026-07-26
+
+**Symptom:**
+On the `connection-model` branch, deleting a saved connection did not stay deleted. The most ordinary sequence reproduced it: connect to a bucket, save the connection under a name (e.g. "My Bucket"), delete it, reload the page. The connection reappeared under a new, auto-generated id and a generic auto-generated name instead of the one the user had given it — the delete silently didn't stick.
+
+**Root cause:**
+Three successive attempts at the surrounding migration logic each answered the same underlying question — "is this user already on the connection model, so the legacy flat-key migration chain should not run?" — by *deriving* it from mutable evidence instead of *recording* it as a fact:
+
+1. The original form of this class of bug: `migrateProfilesToConnections()` used `connections.length > 0` as its "already migrated" sentinel. Deleting the last connection emptied the list, making the next mount look "unmigrated" and resurrect every deleted connection from the never-deleted `s3b_profiles` record. Fixed by introducing an explicit `s3b_connections_migrated` marker for *that* function's own guard.
+2. `migrateProfilesFromLegacy()` was then wired in ahead of `migrateProfilesToConnections()` to restore migration for users who never reached the `s3b_profiles` stage. Gating it on the marker alone broke for a connection created via `handleSaveProfile` (which never sets the marker) once the user reloaded before ever triggering a real migration — same resurrection, different trigger.
+3. `hasMigratedConnections()` was widened to `marker set OR connections.length > 0`, fixing case 2 — but the `connections.length > 0` arm reintroduced exactly the same conflation as the original bug, one level up: `deleteConnectionRecord` empties the connection list, so deleting the *only* connection a user had ever saved (regardless of whether the marker had ever been set) flipped this predicate back to `false`, and the legacy chain resurrected it from the flat credential keys `saveCredentials()` leaves behind on every connect.
+
+Confirmed via a reproduction script and an automated test (`test/components/app.test.jsx`, "F1 round 4"): fresh install → connect → save a connection → delete it → reload produced a new connection with a fresh id and a generated name in place of the deleted one.
+
+**Fix:**
+Stopped deriving the fact and started recording it. `saveConnectionRecord()` (`src/lib/connections.js`) now sets the `s3b_connections_migrated` marker itself, unconditionally, the instant any connection is created — whether by `migrateProfilesToConnections()`'s conversion loop or by `handleSaveProfile`. `hasMigratedConnections()` still checks the marker first and falls back to `connections.length > 0` only for records written by a build predating this fix; that fallback is documented as non-monotonic (it can flip back to `false` after a delete) precisely so a future change doesn't rely on it as authoritative. `migrateProfilesToConnections()`'s own guard is untouched and stays marker-only.
+
+**Why it wasn't caught earlier:**
+Every unit test in the suite exercised a single function or a single mount in isolation. This class of bug lives entirely in a *sequence* — connect, then save, then delete, then reload — spanning three functions across two modules and a component's mount effect. No single-function test can see a predicate that is correct at every point it's checked in isolation but wrong once the operations are composed in the order a real user performs them. Three rounds of code review each caught the case immediately in front of them (missing-case reviews) rather than the structural pattern (a derived, non-monotonic predicate standing in for a recorded fact) until an adversarial fourth-round review looked for the pattern itself instead of another missing case.
+
+**Test case:**
+`test/components/app.test.jsx` — "App — a deleted connection does not resurrect after this sequence: connect, save, delete, reload (Finding A, F1 round 4)": seeds live flat credential keys, saves a real connection via `saveConnectionRecord`, deletes it via `deleteConnectionRecord`, mounts `App` once (the actual mount-effect ordering), and asserts the connection list stays empty and no phantom `s3b_profiles` record is written. Failed against the pre-fix commit (`5797003`) with a resurrected connection; passes after.
+`test/connections.test.js` — `hasMigratedConnections` describe block: direct unit coverage of both arms of the predicate (marker-only, connections-only, neither, and an orphaned connection whose raw record counts even though the resolved view filters it out) — previously had no direct test at all, which is how the predicate passed review three times without one.
+
+---
+
 ## BUG-044 — In-app changelog truncates every wrapped bullet (#50)
 
 **Date:** 2026-07-26

@@ -12,7 +12,8 @@ import assert from 'node:assert/strict';
 import { h } from 'preact';
 import { mount, fire, setInput } from '../helpers/render.js';
 import { App } from '../../src/components/App.jsx';
-import { saveConnectionCapabilities } from '../../src/lib/connections.js';
+import { saveConnectionCapabilities, saveConnectionRecord, findOrCreateCredential, deleteConnectionRecord } from '../../src/lib/connections.js';
+import { deleteAllProfiles } from '../../src/lib/storage.js';
 
 const CRED_KEYS = [
   's3b_endpoint', 's3b_bucket', 's3b_key_id', 's3b_provider',
@@ -507,6 +508,83 @@ describe('App — connecting resets the stored capability record, not just in-me
       const stored = connections.find(c => c.id === 9).capabilities;
       assert.deepEqual(stored, { list: 'unknown', download: 'unknown', upload: 'unknown', delete: 'unknown' },
         'the stored capability record must reset to unknown on connect too, not just the in-memory copy');
+    } finally {
+      cleanup();
+      clearAppStorage();
+    }
+  });
+});
+
+// Coordinator follow-up (2026-07-26, round 4), Finding A — the round-3 predicate
+// (hasMigratedConnections() deriving "on the connection model" from
+// connections.length as its load-bearing signal) was itself the same sentinel
+// conflation as the original Critical, relocated: deleteConnectionRecord empties
+// the connection list, and re-deriving "not yet on the connection model" from
+// that empty list resurrects a phantom from stale flat keys via the legacy chain
+// — this time triggered by the most ordinary sequence of all: connect, save the
+// connection under a name, delete it, reload.
+//
+// The setup below constructs that exact storage state via the real
+// connections.js functions (mirroring what handleConnect/handleSaveProfile/
+// handleDeleteProfile actually call), then mounts the real App once — that mount
+// is "the mount order" under test: App's actual hasMigratedConnections() gate
+// ahead of migrateProfilesFromLegacy()/migrateProfilesToConnections().
+describe('App — a deleted connection does not resurrect after this sequence: connect, save, delete, reload (Finding A, F1 round 4)', () => {
+  test('the connection list stays empty and no phantom profile is synthesised', () => {
+    clearAppStorage();
+    // "Connect" — saveCredentials() would write these flat keys; write them
+    // directly since the connect UI path itself is not what is under test here.
+    localStorage.setItem('s3b_endpoint', 'https://s3.example-f1.com');
+    localStorage.setItem('s3b_bucket', 'buck-1');
+    localStorage.setItem('s3b_key_id', 'kF1');
+    // "Save the connection under a name" — the real handleSaveProfile call chain.
+    const cred = findOrCreateCredential({ endpoint: 'https://s3.example-f1.com', keyId: 'kF1', provider: null, regionOverride: '' });
+    saveConnectionRecord({ id: 501, name: 'My Bucket', credentialId: cred.id, bucket: 'buck-1', capabilities: null });
+    localStorage.setItem('s3b_last_profile_id', '501');
+    // "Delete it" — the real handleDeleteProfile call chain.
+    deleteConnectionRecord(501);
+
+    // "Reload."
+    const { cleanup } = mount(h(App, {}));
+    try {
+      const { connections } = JSON.parse(localStorage.getItem('s3b_connections') || '{"connections":[]}');
+      assert.deepEqual(connections, [],
+        'the deleted connection must not be resurrected as a phantom from stale flat keys');
+      assert.equal(localStorage.getItem('s3b_profiles'), null,
+        'no phantom profile should be synthesised — saveConnectionRecord recorded that this user is already on the connection model');
+    } finally {
+      cleanup();
+      clearAppStorage();
+    }
+  });
+});
+
+// Finding A, case 4, restated explicitly as its own assertion (previously only
+// verified manually via a standalone script) so a future change cannot silently
+// remove this pre-branch parity: a full wipe (deleteAllProfiles — clears
+// s3b_profiles, s3b_connections/s3b_credentials, and the migration marker, but
+// deliberately leaves the flat credential keys behind) followed by a reload must
+// still resurrect one connection from those surviving flat keys. This is the
+// same behaviour the pre-branch build had and the coordinator explicitly chose
+// not to change.
+describe('App — post-wipe resurrection from surviving flat keys is preserved (Finding A, case 4 — must not change)', () => {
+  test('deleteAllProfiles() followed by a reload still resurrects one connection from the flat keys it leaves behind', () => {
+    clearAppStorage();
+    const cred = findOrCreateCredential({ endpoint: 'https://s3.example-f1.com', keyId: 'kF1', provider: null, regionOverride: '' });
+    saveConnectionRecord({ id: 501, name: 'My Bucket', credentialId: cred.id, bucket: 'buck-1', capabilities: null });
+    localStorage.setItem('s3b_last_profile_id', '501');
+    localStorage.setItem('s3b_endpoint', 'https://s3.example-f1.com');
+    localStorage.setItem('s3b_bucket', 'buck-1');
+    localStorage.setItem('s3b_key_id', 'kF1');
+
+    deleteAllProfiles(); // clears profiles/connections/credentials/marker; flat keys survive
+
+    const { cleanup } = mount(h(App, {}));
+    try {
+      const { connections } = JSON.parse(localStorage.getItem('s3b_connections') || '{"connections":[]}');
+      assert.equal(connections.length, 1,
+        'this is intentional pre-branch parity — a full wipe followed by a reload resurrects a connection from surviving flat keys, and must keep doing so');
+      assert.equal(connections[0].bucket, 'buck-1');
     } finally {
       cleanup();
       clearAppStorage();
