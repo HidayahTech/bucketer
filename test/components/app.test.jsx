@@ -418,6 +418,57 @@ describe('App — legacy migration still runs for a genuine pre-profiles user (F
   });
 });
 
+// Coordinator follow-up (2026-07-26, round 3), Finding A case 5 — the marker-only
+// predicate above (`if (!hasMigratedConnections()) migrateProfilesFromLegacy();`
+// with `hasMigratedConnections()` checking only the marker) still broke the most
+// ordinary path of all: a fresh install, connect, save the connection, reload.
+// migrateProfilesToConnections()'s own no-profiles early return correctly leaves
+// the marker unset (by design — nothing to convert yet), and handleSaveProfile
+// creates a real connection via saveConnectionRecord directly without ever
+// setting the marker either. So on the next mount the marker is still unset, the
+// legacy chain runs, finds no s3b_profiles but live flat keys from
+// saveCredentials(), synthesises a phantom profile, and clobbers
+// s3b_last_profile_id — while migrateProfilesToConnections() then takes its
+// "connections already exist" adopt branch and returns without ever converting
+// the phantom, leaving the pointer resolving to nothing. Fixed by widening
+// hasMigratedConnections() to also treat any existing connection as "already on
+// the connection model," however it got there.
+describe('App — a freshly saved connection survives the very next reload (Finding A, case 5)', () => {
+  test('connect, save as a new connection, reload: the pointer must not be clobbered by a phantom legacy profile', () => {
+    clearAppStorage();
+    // No migration marker at all — this precondition is the whole bug. A real
+    // connection (as handleSaveProfile would have just created) plus live flat
+    // credential keys matching it (as saveCredentials leaves them after connect),
+    // and deliberately no s3b_profiles.
+    localStorage.setItem('s3b_credentials', JSON.stringify({
+      version: 1,
+      credentials: [{ id: 'credY', label: 'Y', endpoint: 'https://s3.example-y.com', keyId: 'kY', provider: null, regionOverride: '' }],
+    }));
+    localStorage.setItem('s3b_connections', JSON.stringify({
+      version: 2,
+      connections: [{ id: 77, name: 'Freshly saved', credentialId: 'credY', bucket: 'bucket-y', capabilities: null }],
+    }));
+    localStorage.setItem('s3b_last_profile_id', '77');
+    localStorage.setItem('s3b_endpoint', 'https://s3.example-y.com');
+    localStorage.setItem('s3b_bucket', 'bucket-y');
+    localStorage.setItem('s3b_key_id', 'kY');
+
+    const { cleanup } = mount(h(App, {}));
+    try {
+      assert.equal(localStorage.getItem('s3b_last_profile_id'), '77',
+        'the real connection pointer must survive the very next reload, not be clobbered by a phantom profile id');
+      const { connections } = JSON.parse(localStorage.getItem('s3b_connections'));
+      assert.ok(connections.some(c => String(c.id) === '77'),
+        'the pointer must still resolve to the real connection');
+      assert.equal(localStorage.getItem('s3b_profiles'), null,
+        'no phantom profile should be synthesised — the legacy chain must recognize this user is already on the connection model');
+    } finally {
+      cleanup();
+      clearAppStorage();
+    }
+  });
+});
+
 // Coordinator follow-up (2026-07-26), Finding B — IMPORTANT: the Finding 2 fix
 // reset in-memory capabilities to 'unknown' on every connect but left the stored
 // per-connection record untouched. handleCapabilityChange merges new observations

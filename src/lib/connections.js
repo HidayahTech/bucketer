@@ -241,8 +241,22 @@ const LS_KEY_PROFILES = 's3b_profiles';
 // connection migration has already happened, rather than inferring it from a
 // record (s3b_profiles) that connections-model code paths no longer maintain.
 // App's mount effect uses this to gate the legacy flat-key migration chain.
+//
+// Two different questions, deliberately not the same predicate:
+//
+//   migrateProfilesToConnections() asks "have I already converted s3b_profiles?"
+//   and must stay marker-only — treating an empty connection list as "unmigrated"
+//   is what resurrected deleted connections from the never-deleted s3b_profiles.
+//
+//   This asks "is this user already on the connection model?", which is true as
+//   soon as any connection exists, however it got there. handleSaveProfile writes
+//   connections directly and never sets the marker, so a marker-only answer here
+//   let the legacy chain synthesise a phantom profile from the flat keys that
+//   saveCredentials() rewrites on every connect, clobbering s3b_last_profile_id
+//   even though a real, already-saved connection existed.
 export function hasMigratedConnections() {
-  return !!safeGetRaw(LS_KEY_MIGRATED);
+  if (safeGetRaw(LS_KEY_MIGRATED)) return true;
+  return loadConnectionRecords().connections.length > 0;
 }
 
 // Idempotent — converts the legacy flat profile record into credentials +
