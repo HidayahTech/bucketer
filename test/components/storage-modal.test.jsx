@@ -118,3 +118,22 @@ describe('StorageModal — wipe section', () => {
     assert.doesNotThrow(() => cleanup());
   });
 });
+
+describe('connection model in the storage inspector', () => {
+  test('names s3b_connections and s3b_credentials, not the retired s3b_capabilities', async () => {
+    const { text, cleanup } = mount(h(StorageModal, defaultProps()));
+
+    // load() is async — it awaits IndexedDB reads — and `data` is null until it
+    // resolves, so the inspector sections do not exist on synchronous mount.
+    // Poll a bounded number of ticks rather than guessing a fixed delay.
+    for (let i = 0; i < 20 && text().includes('Loading'); i++) {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+
+    const rendered = text();
+    assert.ok(rendered.includes('s3b_connections'), 'inspector should name s3b_connections');
+    assert.ok(rendered.includes('s3b_credentials'), 'inspector should name s3b_credentials');
+    assert.equal(rendered.includes('s3b_capabilities'), false, 's3b_capabilities is retired');
+    cleanup();
+  });
+});

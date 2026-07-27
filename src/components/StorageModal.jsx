@@ -10,10 +10,12 @@ import {
   loadCredentials, clearCredentials,
   loadMaxKeys, loadPartConcurrency, loadPartSizeMB,
   loadFileConcurrency, loadListingCacheTTL, loadUpdateCheckEnabled,
-  loadCapabilities, clearCapabilities,
-  loadProfiles, deleteProfile,
   wipeAllAppData, resetSettings, deleteAllProfiles,
 } from '../lib/storage.js';
+import {
+  listResolvedConnections, loadCredentialRecords, deleteConnectionRecord,
+  clearAllConnectionCapabilities, defaultCapabilities,
+} from '../lib/connections.js';
 import {
   loadUploadLog, clearUploadLog,
   loadAllResumeRecords, clearAllResumeRecords,
@@ -79,10 +81,11 @@ export function StorageModal({ onClose, isConnected }) {
   async function load() {
     const creds   = loadCredentials();
     const secret  = !!sessionStorage.getItem('s3b_secret_key');
-    const { profiles } = loadProfiles();
+    const profiles = listResolvedConnections();
+    const { credentials } = loadCredentialRecords();
     const log     = await loadUploadLog().catch(() => []);
     const resume  = await loadAllResumeRecords().catch(() => []);
-    const caps    = loadCapabilities();
+    const caps    = profiles.length ? profiles[0].capabilities || defaultCapabilities() : defaultCapabilities();
     const active  = loadActiveUploads();
     const settings = {
       maxKeys:            loadMaxKeys(),
@@ -92,7 +95,7 @@ export function StorageModal({ onClose, isConnected }) {
       listingCacheTTL:    loadListingCacheTTL(),
       updateCheckEnabled: loadUpdateCheckEnabled(),
     };
-    setData({ creds, secret, profiles, log, resume, caps, active, settings });
+    setData({ creds, secret, profiles, credentials, log, resume, caps, active, settings });
   }
 
   useEffect(() => {
@@ -120,7 +123,7 @@ export function StorageModal({ onClose, isConnected }) {
     else if (action === 'log')      await clearUploadLog();
     else if (action === 'resume')   await clearAllResumeRecords();
     else if (action === 'settings') resetSettings();
-    else if (action === 'caps')     clearCapabilities();
+    else if (action === 'caps')     clearAllConnectionCapabilities();
     else if (action === 'active')   clearActiveUploads();
     setCleared(action);
     setTimeout(() => setCleared(c => c === action ? null : c), 2500);
@@ -193,7 +196,7 @@ export function StorageModal({ onClose, isConnected }) {
             <details class="sv-section" open>
               <SectionHead title="Saved Profiles" badge={data.profiles.length} />
               <div class="sv-section-body">
-                <StoreLoc>localStorage · <KeyName name="s3b_profiles" /> (JSON array) · <KeyName name="s3b_last_profile_id" /> (selected profile)</StoreLoc>
+                <StoreLoc>localStorage · <KeyName name="s3b_connections" /> (JSON array) · <KeyName name="s3b_credentials" /> ({data.credentials.length} stored) · <KeyName name="s3b_last_profile_id" /> (selected)</StoreLoc>
                 {data.profiles.length === 0 ? (
                   <Empty text="No saved profiles." />
                 ) : (
@@ -216,7 +219,7 @@ export function StorageModal({ onClose, isConnected }) {
                           <td class="sv-val sv-mono" title={p.keyId}>{truncate(p.keyId, 10)}</td>
                           <td>
                             <button type="button" class="btn btn-ghost btn-sm sv-del-btn"
-                              onClick={async () => { deleteProfile(p.id); await load(); }}
+                              onClick={async () => { deleteConnectionRecord(p.id); await load(); }}
                               title="Delete this profile">✕</button>
                           </td>
                         </tr>
@@ -357,7 +360,7 @@ export function StorageModal({ onClose, isConnected }) {
               <SectionHead title="Runtime State" />
               <div class="sv-section-body">
                 <p class="sv-sub-heading">Capabilities</p>
-                <StoreLoc><KeyName name="s3b_capabilities" /> (JSON) · localStorage · values: <KeyName name="'unknown' | 'permitted' | 'denied'" /></StoreLoc>
+                <StoreLoc>per connection in <KeyName name="s3b_connections" /> (JSON) · localStorage · values: <KeyName name="'unknown' | 'permitted' | 'denied'" /></StoreLoc>
                 <table class="sv-table">
                   <tbody>
                     {['list', 'download', 'upload', 'delete'].map(op => (
