@@ -1,9 +1,22 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.38.4';
+export const CURRENT_VERSION = '1.39.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.39.0",
+    "date": "2026-07-26",
+    "title": "Connection model",
+    "changes": [
+      "Saved profiles are now stored as s3b_credentials (endpoint, key ID, provider, region) plus s3b_connections (name, bucket, and a reference to the credential). The thing you name and click is still the pairing, exactly as before.",
+      "Migration runs once on first load. It keeps your profile names and selection, merges credentials that were identical across profiles, and skips any single malformed record rather than abandoning the ones after it. Your old s3b_profiles record is left untouched for one release as a rollback path.",
+      "Permissions (list, download, upload, delete) are now remembered per connection instead of in one global setting. Previously, a permission denial learned against one bucket was applied to every bucket. They are still learned only from operations that actually fail — nothing is probed — and still reset on each connect.",
+      "\"Clear all app data\" and \"Delete all profiles\" now clear the new records too. Previously a wipe would have left stored credentials on disk.",
+      "Deleting a connection now also removes its credential, unless another connection still uses it.",
+      "The storage inspector names the new keys and says which connection the permissions shown belong to."
+    ]
+  },
   {
     "version": "1.38.4",
     "date": "2026-07-26",
