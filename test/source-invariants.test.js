@@ -109,9 +109,9 @@ describe('UploadLog — MAX_DISPLAY cap is present and bounded (BUG-021)', () =>
 // the form on first load, so that state must be declared BEFORE credentials.
 // Declaring it after produces a temporal-dead-zone ReferenceError at mount.
 test('selectedConnectionId is declared before credentials in App.jsx', () => {
-  const src = readFileSync(new URL('../src/components/App.jsx', import.meta.url), 'utf8');
-  const selIdx  = src.indexOf('const [selectedConnectionId');
-  const credIdx = src.indexOf('const [credentials');
+  const source = readFileSync(new URL('../src/components/App.jsx', import.meta.url), 'utf8');
+  const selIdx  = source.indexOf('const [selectedConnectionId');
+  const credIdx = source.indexOf('const [credentials');
   assert.ok(selIdx > -1, 'selectedConnectionId state not found in App.jsx');
   assert.ok(credIdx > -1, 'credentials state not found in App.jsx');
   assert.ok(
@@ -124,9 +124,9 @@ test('selectedConnectionId is declared before credentials in App.jsx', () => {
 // The global s3b_capabilities key leaked capability state across buckets.
 // Capabilities now live on the connection record (connections.js).
 test('App.jsx does not import capability functions from storage.js', () => {
-  const src = readFileSync(new URL('../src/components/App.jsx', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../src/components/App.jsx', import.meta.url), 'utf8');
   assert.equal(
-    /loadCapabilities|saveCapabilities|clearCapabilities/.test(src),
+    /loadCapabilities|saveCapabilities|clearCapabilities/.test(source),
     false,
     'capability state must come from connections.js, not storage.js'
   );

@@ -318,21 +318,27 @@ export function App() {
 
     const existing = selectedConnectionId ? connections.find(c => c.id === selectedConnectionId) : null;
     const id = existing ? existing.id : Date.now();
+    const trimmedBucket = (liveFormData.bucket || '').trim();
 
     const cred = findOrCreateCredential({
-      endpoint:       liveFormData.endpoint,
-      keyId:          liveFormData.keyId,
+      endpoint:       ep,
+      keyId:          (liveFormData.keyId || '').trim(),
       provider,
-      regionOverride: liveFormData.regionOverride,
+      regionOverride: (liveFormData.regionOverride || '').trim(),
     });
 
-    saveConnectionRecord({
+    const conn = {
       id,
-      name:         name || defaultConnectionName({ provider, bucket: liveFormData.bucket }),
+      name:         name || defaultConnectionName({ provider, bucket: trimmedBucket }),
       credentialId: cred.id,
-      bucket:       liveFormData.bucket,
-      capabilities: existing ? existing.capabilities : null,
-    });
+      bucket:       trimmedBucket,
+    };
+    // Only set capabilities when creating. On update, omit the key so
+    // saveConnectionRecord's merge keeps what is in storage: capability changes are
+    // written directly to localStorage and are not reflected in the `connections`
+    // React snapshot, so reading them from state here would revert them.
+    if (!existing) conn.capabilities = null;
+    saveConnectionRecord(conn);
 
     const updated = listResolvedConnections();
     setConnections(updated);
