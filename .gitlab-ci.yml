@@ -11,9 +11,26 @@ test:
       when: never
     - when: on_success
   script:
+    # dist/index.html is tracked, and Laravel Forge deploys the repository on every
+    # push to main — so the committed bundle IS production. A commit that changes
+    # src/ without rebuilding it would silently ship stale code. Snapshot the
+    # committed bundle before the build overwrites it, then compare.
+    - cp dist/index.html /tmp/committed-index.html
     - npm ci
     - npm run build
+    - |
+      if ! diff -q /tmp/committed-index.html dist/index.html >/dev/null 2>&1; then
+        echo "ERROR: committed dist/index.html does not match a build of this source."
+        echo "Forge deploys the committed bundle, so this would ship stale code."
+        echo "Fix: run 'npm run build' and commit the result."
+        exit 1
+      fi
     - npm test
+    # Component tests (jsdom, no browser needed, ~10s). These carry much of the
+    # regression protection for storage and credential handling — the BUG-046
+    # silent-write-failure case, first-load migration pre-fill, share links against
+    # a saved connection — none of which npm test covers.
+    - npm run test:ui
   artifacts:
     paths:
       - dist/index.html
@@ -107,13 +124,20 @@ relock-github-mirror:
 
 # Guards the invariant the in-app integrity check depends on: the build must
 # be bit-identical across runs given the same source. If anything ever leaks
-# nondeterminism into the build (timestamps, RNG, unpinned tooling), this job
-# catches it on the release tag before the release artifact is uploaded.
+# nondeterminism into the build (timestamps, RNG, unpinned tooling), the integrity
+# check starts reporting tampering on untampered hosts.
+#
+# Runs on EVERY pipeline, not only release tags. It used to be tag-only to conserve
+# shared-runner minutes; on self-hosted runners the extra two builds are free, and
+# catching nondeterminism at push time is far cheaper than discovering it when a
+# release artifact is already published.
 reproducibility:
   stage: reproducibility
   image: node:20-alpine
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+    - if: '$RELOCK_MIRROR == "true"'
+      when: never
+    - when: on_success
   script:
     - npm ci
     - npm run build
