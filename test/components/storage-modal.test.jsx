@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { h } from 'preact';
 import { mount, fire } from '../helpers/render.js';
 import { StorageModal } from '../../src/components/StorageModal.jsx';
+import { findOrCreateCredential, saveConnectionRecord, loadConnectionRecords } from '../../src/lib/connections.js';
 
 function defaultProps(overrides = {}) {
   return { onClose: () => {}, isConnected: false, ...overrides };
@@ -135,5 +136,51 @@ describe('connection model in the storage inspector', () => {
     assert.ok(rendered.includes('s3b_credentials'), 'inspector should name s3b_credentials');
     assert.equal(rendered.includes('s3b_capabilities'), false, 's3b_capabilities is retired');
     cleanup();
+  });
+
+  // Regression coverage for the per-row delete repoint: the button used to call the
+  // legacy deleteProfile(p.id), which removes a row from s3b_profiles while leaving
+  // the connection in s3b_connections intact — the row would reappear on reload.
+  test('per-row delete button removes the connection from s3b_connections', async () => {
+    localStorage.removeItem('s3b_connections');
+    localStorage.removeItem('s3b_credentials');
+
+    // Seed one credential + one connection through the same connections.js
+    // primitives App.jsx's handleSaveProfile uses, so the row rendered in the
+    // Saved Profiles table is backed by a real connection record.
+    const cred = findOrCreateCredential({
+      endpoint:       'https://s3.us-east-1.amazonaws.com',
+      keyId:          'AKIDEXAMPLE1234',
+      provider:       'aws',
+      regionOverride: '',
+    });
+    saveConnectionRecord({
+      id:           'conn-test-delete-1',
+      name:         'Test connection',
+      credentialId: cred.id,
+      bucket:       'test-bucket',
+      capabilities: null,
+    });
+
+    const { text, queryAll, cleanup } = mount(h(StorageModal, defaultProps()));
+    try {
+      for (let i = 0; i < 20 && text().includes('Loading'); i++) {
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+
+      const delBtn = queryAll('.sv-del-btn')[0];
+      assert.ok(delBtn, 'per-row delete button must be present for the seeded connection');
+      fire(delBtn, 'click');
+
+      assert.equal(
+        loadConnectionRecords().connections.some(c => c.id === 'conn-test-delete-1'),
+        false,
+        'clicking the row delete button must remove the connection from s3b_connections'
+      );
+    } finally {
+      cleanup();
+      localStorage.removeItem('s3b_connections');
+      localStorage.removeItem('s3b_credentials');
+    }
   });
 });
