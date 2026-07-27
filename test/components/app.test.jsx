@@ -591,3 +591,55 @@ describe('App — post-wipe resurrection from surviving flat keys is preserved (
     }
   });
 });
+
+// Coordinator follow-up (2026-07-26, round 5), Finding (Medium) — BUG-046.
+// handleSaveProfile's post-save `credentials` sync read back from storage
+// (`updated.find(c => c.id === id)`) instead of building from the values already
+// in memory. Every write above it goes through a wrapper (safeSetRaw) that
+// swallows failure by design — private browsing, blocked site data, quota
+// exhaustion, all hazards this codebase explicitly designs for (see
+// FileBanner.jsx). When a write silently doesn't land, the read-back finds no
+// matching row, `saved` is `undefined`, and `{ ...undefined, secretKey }`
+// collapses `credentials`/`liveFormData` to just `{ secretKey }` — blanking
+// endpoint/bucket/keyId/provider in the exact form the user just filled in, made
+// visible immediately by the remount CredentialForm undergoes on the
+// selectedConnectionId key change.
+describe('App — a storage write that silently fails does not blank the form (BUG-046)', () => {
+  test('endpoint/bucket/key ID survive "Save as profile" when localStorage.setItem throws', () => {
+    clearAppStorage();
+    const { query, cleanup } = mount(h(App, {}));
+    // jsdom's Storage is a legacy platform object: instance-level assignment
+    // (`localStorage.setItem = fn`) does NOT override the method — it silently
+    // stores the function as a stringified value under a key literally named
+    // "setItem" (confirmed directly: getItem('setItem') then returns it, and the
+    // real setItem keeps working). The prototype method must be replaced instead.
+    const proto = Object.getPrototypeOf(localStorage);
+    const originalSetItem = proto.setItem;
+    try {
+      setInput(query('#cred-endpoint'), 'https://s3.us-east-1.amazonaws.com');
+      setInput(query('#cred-bucket'), 'my-bucket');
+      setInput(query('#cred-keyid'), 'AKIDEXAMPLE1234');
+
+      // Simulate Safari private browsing / blocked site data / quota exhaustion —
+      // every localStorage write handleSaveProfile makes goes through safeSetRaw,
+      // which swallows exactly this.
+      proto.setItem = function () { throw new Error('simulated storage failure'); };
+
+      fire(query('.profile-save-trigger'), 'click');
+      fire(query('.profile-save-form button[type="submit"]'), 'click');
+
+      assert.equal(query('#cred-endpoint')?.value, 'https://s3.us-east-1.amazonaws.com',
+        'endpoint must survive a save attempt that silently failed to persist');
+      assert.equal(query('#cred-bucket')?.value, 'my-bucket',
+        'bucket must survive a save attempt that silently failed to persist');
+      assert.equal(query('#cred-keyid')?.value, 'AKIDEXAMPLE1234',
+        'key ID must survive a save attempt that silently failed to persist');
+    } finally {
+      // Restore before cleanup/clearAppStorage — both call localStorage methods,
+      // and this stub is on the shared prototype every other test relies on.
+      proto.setItem = originalSetItem;
+      cleanup();
+      clearAppStorage();
+    }
+  });
+});

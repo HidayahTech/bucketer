@@ -398,8 +398,36 @@ export function App() {
     setSelectedConnectionId(id);
     saveLastProfileId(id);
     // Sync credentials so the form doesn't reset when it remounts on key change.
-    const saved = updated.find(c => c.id === id);
-    const creds = { ...saved, secretKey: liveFormData.secretKey || '' };
+    //
+    // Built from what we just wrote (`cred`, `conn`), NOT from a read-back
+    // (`updated.find(...)`). Every storage write above goes through a wrapper
+    // (safeSetRaw) that swallows failure by design — private browsing, blocked
+    // site data, quota exhaustion. If the write silently doesn't land, a
+    // read-back finds no matching row, `saved` is `undefined`, and
+    // `{ ...undefined }` collapses to `{}` — blanking endpoint/bucket/keyId/
+    // provider in the very form the user just filled in, made immediately
+    // visible by the remount the selectedConnectionId change triggers on
+    // CredentialForm's key. `cred` and `conn` are already in memory and always
+    // defined, so this shape is built to match resolveConnection()'s field set
+    // exactly (id/name/bucket/capabilities/credentialId/endpoint/keyId/provider/
+    // regionOverride), so CredentialForm receives the identical shape whether or
+    // not the write actually landed.
+    const creds = {
+      id,
+      name:           conn.name,
+      bucket:         conn.bucket,
+      // Mirrors the `if (!existing) conn.capabilities = null;` branch above: a
+      // new connection's capabilities are null; an updated one keeps whatever
+      // was already known (existing is the pre-write snapshot from React state —
+      // the same source conn.capabilities deliberately avoided overwriting).
+      capabilities:   existing ? (existing.capabilities ?? null) : null,
+      credentialId:   cred.id,
+      endpoint:       cred.endpoint,
+      keyId:          cred.keyId,
+      provider:       cred.provider,
+      regionOverride: cred.regionOverride,
+      secretKey:      liveFormData.secretKey || '',
+    };
     setCredentials(creds);
     setLiveFormData(creds);
   }

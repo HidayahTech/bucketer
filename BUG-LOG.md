@@ -4,6 +4,27 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-046 — Saving a profile blanks the credential form when the storage write silently fails
+
+**Date:** 2026-07-26
+
+**Symptom:**
+On the splash screen: type endpoint, bucket, key ID, and secret key; click "Save as profile…"; name it; click Save. In Safari private browsing, with site data blocked for the origin, or under storage quota exhaustion, the endpoint, bucket, key ID, and provider fields cleared instantly — the secret key was the only field left standing. `canSaveProfile()` then evaluated false against the now-empty fields, disabling the Save button, so the user could not even retry without retyping everything from scratch.
+
+**Root cause:**
+`handleSaveProfile` (`src/components/App.jsx`) persists a credential and a connection via `saveCredentialRecord`/`saveConnectionRecord`, both of which write through `safeSetRaw` — a wrapper that deliberately swallows `localStorage.setItem` exceptions (private browsing, blocked site data, and quota exhaustion all throw there) so the app degrades instead of crashing. After those writes, the handler re-read its own write back from storage to build the `credentials`/`liveFormData` state used to repopulate the form: `const saved = updated.find(c => c.id === id); const creds = { ...saved, secretKey: ... };`. When the write silently didn't land, `updated` (from `listResolvedConnections()`) had no matching row, `saved` was `undefined`, and `{ ...undefined }` evaluated to `{}` — collapsing `creds` to just `{ secretKey }`. `setSelectedConnectionId(id)` then changed `CredentialForm`'s `key` prop, forcing an immediate remount against that blanked `initial`. Confirmed by reading `safeSetRaw`'s try/catch (`storage.js`) and `findOrCreateCredential`/`saveConnectionRecord` (`connections.js`), which both return valid in-memory objects regardless of whether the underlying write succeeded — and by a component test that stubs the write to throw and observes the blank exactly as described.
+
+**Fix:**
+Build the post-save `credentials`/`liveFormData` object from the in-memory `cred` (returned by `findOrCreateCredential`, always defined) and `conn` (the object the handler itself constructed, always defined) instead of reading the write back from storage. The constructed shape matches `resolveConnection()`'s field set exactly (`id`, `name`, `bucket`, `capabilities`, `credentialId`, `endpoint`, `keyId`, `provider`, `regionOverride`) plus `secretKey`, so `CredentialForm` receives an identical shape whether or not the write actually landed. `capabilities` mirrors the same `existing`-based branch the handler already uses to decide whether this is a create or an update.
+
+**Why it wasn't caught earlier:**
+This handler had already been reviewed five times across the connection-model whole-branch review (the original task review, plus rounds 1–4 of the review's own fix cycle), and every pass asked "which records exist and are they consistent with each other" — never "what does this handler do when one of its own writes silently fails." The storage layer's core design (swallow write errors, degrade gracefully) is exactly what makes this module unusually prone to that class of bug: every write is a potential silent no-op, but nothing in the surrounding code is written defensively against that possibility unless someone asks the question directly. There was also zero test coverage anywhere in the suite for a throwing `localStorage` — private browsing and quota exhaustion are both hazards the codebase explicitly designs for elsewhere (`FileBanner.jsx` names private browsing directly), but no test had ever simulated the write actually failing.
+
+**Test case:**
+`test/components/app.test.jsx` — "App — a storage write that silently fails does not blank the form (BUG-046)": stubs `Object.getPrototypeOf(localStorage).setItem` (not the instance property — jsdom's `Storage` is a legacy platform object where instance-level assignment silently stores a literal key named `"setItem"` instead of overriding the method, confirmed by direct experiment) to throw, drives the splash form and the ProfilePicker "Save as profile…" flow, and asserts the endpoint/bucket/key-ID inputs still hold their typed values afterward. Fails against the pre-fix commit with the endpoint reading back as `''`; passes after. Restores the prototype method in `finally`, since the stub sits on state shared by every other test in the file.
+
+---
+
 ## BUG-045 — Deleting a connection resurrects it as a phantom on the next reload
 
 **Date:** 2026-07-26
