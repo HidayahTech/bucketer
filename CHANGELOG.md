@@ -20,7 +20,8 @@ first load, and credentials that were duplicated across profiles are merged.
 - Saved profiles are now stored as `s3b_credentials` (endpoint, key ID, provider, region) plus `s3b_connections` (name, bucket, and a reference to the credential). The thing you name and click is still the pairing, exactly as before.
 - Migration runs once on first load. It keeps your profile names and selection, merges credentials that were identical across profiles, and skips any single malformed record rather than abandoning the ones after it. Your old `s3b_profiles` record is left untouched for one release as a rollback path.
 - Permissions (list, download, upload, delete) are now remembered per connection instead of in one global setting. Previously, a permission denial learned against one bucket was applied to every bucket. They are still learned only from operations that actually fail — nothing is probed — and still reset on each connect.
-- "Clear all app data" and "Delete all profiles" now clear the new records too. Previously a wipe would have left stored credentials on disk.
+- "Clear all app data" and "Delete all profiles" clear the new records as well as the old ones, so a wipe still removes everything.
+- Upgrading also clears the old global permissions key off your device. Nothing reads it any more, and leaving it behind would mean the storage inspector no longer listed something still stored on your disk.
 - Deleting a connection now also removes its credential, unless another connection still uses it.
 - The storage inspector names the new keys and says which connection the permissions shown belong to.
 

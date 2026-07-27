@@ -62,6 +62,16 @@ function safeRemoveRaw(key) {
 // secure context, and Bucketer supports being opened from file:// (see
 // FileBanner.jsx). The sequence counter guarantees uniqueness even when several
 // ids are minted inside the same millisecond, which migration does.
+// ⚠️ CREDENTIAL IDS ONLY — do not use this for connection ids without reading this.
+//
+// Connection ids are NUMBERS: new ones are Date.now() (App.jsx handleSaveProfile) and
+// migrated ones reuse the numeric profile.id. The selected-connection pointer is read
+// through loadLastProfileId() (storage.js), which coerces with Number(). Give a
+// connection a string id from here and that coercion yields NaN, so the pointer can
+// never match it again — the connection becomes permanently unselectable, silently.
+//
+// Either keep connection ids numeric, or change loadLastProfileId() to stop coercing
+// and migrate the stored pointer. Do not mix the two.
 let _seq = 0;
 export function newId(prefix) {
   _seq += 1;

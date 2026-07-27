@@ -234,14 +234,23 @@ the remote `index.html` without downloading the full page.
 
 ### Capability State
 
-#### `s3b_capabilities`
+#### `s3b_capabilities` — **RETIRED in v1.39.0**
 
-| Property | Value |
+> Capability state moved onto each connection record. A single global key applied a
+> denial learned against one bucket to every bucket, which is wrong once more than
+> one bucket exists. Nothing reads or writes this key any more;
+> `loadCapabilities()`, `saveCapabilities()`, and `clearCapabilities()` were removed
+> from `storage.js`. `repairStorageInvariants()` deletes the key on mount so it does
+> not linger on an upgrading user's disk. The live location is the `capabilities`
+> field on each entry in `s3b_connections` — see below.
+
+| Property | Value (pre-v1.39.0) |
 |---|---|
 | **Type** | JSON string |
 | **Introduced** | Initial commit (2026-05-21); `delete` field added ~2026-05-26 |
-| **Cleared by** | `clearCapabilities()`, called inside `clearCredentials()` and `handleConnect()` |
-| **Owner** | `src/lib/storage.js` via `loadCapabilities()` / `saveCapabilities()` / `clearCapabilities()` |
+| **Retired** | v1.39.0 (2026-07-26) |
+| **Cleared by** | `repairStorageInvariants()` on mount, and `wipeAllAppData()` |
+| **Owner** | none — formerly `src/lib/storage.js` |
 
 JSON schema:
 ```json
@@ -260,7 +269,75 @@ Parse failure falls back to `defaultCapabilities()` (all `'unknown'`).
 
 ---
 
+### Connections (v1.39.0+)
+
+Since v1.39.0 a saved profile is stored as two records rather than one. A
+**credential** (endpoint, key ID, provider, region) can serve many buckets, and a
+**connection** is the named pairing of a credential with a bucket — so the same
+bucket can also be reached by two different credentials, e.g. a read-only key for
+browsing and a read-write key for changes. The connection is what the user names
+and clicks; only the credential is shared. Owned by `src/lib/connections.js`.
+
+Like the profile keys below, these are outside `LS_KEYS` so `clearCredentials()`
+does not remove them on disconnect. **Secret keys are never written to any of
+them** — the secret lives in `sessionStorage` only.
+
+#### `s3b_credentials`
+
+| Property | Value |
+|---|---|
+| **Type** | JSON string — `{ version: 1, credentials: [...] }` |
+| **Introduced** | v1.39.0 (2026-07-26) |
+| **Cleared by** | `wipeAllAppData()`, `deleteAllProfiles()`, and `deleteCredentialRecord()` when the last connection referencing it is deleted |
+| **Owner** | `src/lib/connections.js` |
+
+Each entry: `{ id, label, endpoint, keyId, provider, regionOverride }`. Deduplicated
+on `(endpoint, keyId, provider, regionOverride)` — several connections on one key
+store that key once.
+
+#### `s3b_connections`
+
+| Property | Value |
+|---|---|
+| **Type** | JSON string — `{ version: 2, connections: [...] }` |
+| **Introduced** | v1.39.0 (2026-07-26); supersedes `s3b_profiles` |
+| **Cleared by** | `wipeAllAppData()`, `deleteAllProfiles()`, `deleteConnectionRecord()` |
+| **Owner** | `src/lib/connections.js` |
+
+Each entry: `{ id, name, credentialId, bucket, capabilities }`. `capabilities` is
+`{ list, download, upload, delete }`, each `'unknown' | 'permitted' | 'denied'`, and
+is the live replacement for the retired global `s3b_capabilities` key. Ids are
+carried over from the pre-migration `s3b_profiles` entries so `s3b_last_profile_id`
+keeps resolving without a second migration.
+
+#### `s3b_connections_migrated`
+
+| Property | Value |
+|---|---|
+| **Type** | String — `'1'` when set, absent otherwise |
+| **Introduced** | v1.39.0 (2026-07-26) |
+| **Cleared by** | `wipeAllAppData()`, `deleteAllProfiles()` |
+| **Owner** | `src/lib/connections.js` |
+
+Records that this device is on the connection model. Written by
+`migrateProfilesToConnections()` on completion **and** by `saveConnectionRecord()`
+the moment any connection is created. It is a **recorded fact, not a derived one**,
+deliberately: earlier attempts inferred "already migrated" from whether any
+connection existed, so deleting the last connection made the app look unmigrated and
+resurrect deleted rows from the never-deleted `s3b_profiles`. See `BUG-045`.
+
+Consequence worth knowing: once this is set, both migrations short-circuit, so a
+lost or corrupted `s3b_connections` cannot be rebuilt from `s3b_profiles` in-app.
+That is the accepted price of recording rather than deriving.
+
+---
+
 ### Profile Management
+
+`s3b_profiles` is **legacy as of v1.39.0** — read once by migration, then never
+again. It is deliberately not deleted, as a one-release rollback path.
+`s3b_last_profile_id` is still live and now points at a connection id; it keeps its
+old name to avoid a second migration.
 
 These two keys are intentionally **outside `LS_KEYS`** so `clearCredentials()`
 does not remove them on disconnect. Profiles should survive across sessions and
@@ -510,8 +587,11 @@ and is a candidate for a future fix.
 | `s3b_file_concurrency` | localStorage | Yes | `clearCredentials()` | Settings |
 | `s3b_listing_cache_ttl` | localStorage | Yes | `clearCredentials()` | Settings |
 | `s3b_update_check_enabled` | localStorage | Yes | `clearCredentials()` | Settings |
-| `s3b_capabilities` | localStorage | Yes | `clearCapabilities()` | Runtime State |
-| `s3b_profiles` | localStorage | Yes | Explicit deletion only | Profiles |
+| `s3b_capabilities` | localStorage | — | **RETIRED v1.39.0** — cleared on mount | Runtime State |
+| `s3b_credentials` | localStorage | Yes | `wipeAllAppData()` / `deleteAllProfiles()` | Connections |
+| `s3b_connections` | localStorage | Yes | `wipeAllAppData()` / `deleteAllProfiles()` | Connections |
+| `s3b_connections_migrated` | localStorage | Yes | `wipeAllAppData()` / `deleteAllProfiles()` | Connections |
+| `s3b_profiles` | localStorage | Yes | Explicit deletion only — **legacy**, read once for migration | Profiles |
 | `s3b_last_profile_id` | localStorage | Yes | Profile deletion | Profiles |
 | `s3b_active_uploads` | localStorage | Yes | Upload complete/fail | Transient State |
 | `s3b_secret_key` | sessionStorage | **No** | Tab close / `clearCredentials()` | Credential (sensitive) |

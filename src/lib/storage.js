@@ -49,6 +49,13 @@ const SETTINGS_KEYS = {
 const LS_KEYS = { ...CREDENTIAL_KEYS, ...SETTINGS_KEYS };
 const SS_KEY_SECRET = 's3b_secret_key';
 
+// Retired in v1.39.0 — capability state moved onto each connection record
+// (connections.js). Nothing writes or reads it any more; it is named here only so
+// that repairStorageInvariants() and wipeAllAppData() can clear it off the disks of
+// users upgrading from v1.38.4 or earlier. Remove this constant once no supported
+// upgrade path can still be carrying the key.
+const LEGACY_KEY_CAPABILITIES = 's3b_capabilities';
+
 // Wrap storage access — private browsing throws on every read/write.
 // Returns empty string rather than null so falsy checks work consistently.
 function safeGet(storage, key) {
@@ -218,6 +225,14 @@ export function repairStorageInvariants() {
   // Repair credentials too — the provider field now lives there as well
   // (connections.js), and must be clean before migration runs.
   repairCredentialProviders(isValidProvider);
+
+  // Remove the retired global capability key. Capability state moved onto each
+  // connection in v1.39.0 and nothing reads this any more, but an upgrading user
+  // still has it on disk — where the storage inspector, whose whole job is to
+  // report every key the app has written, would no longer list it. It carries no
+  // rollback value either: both the old and new builds reset capabilities on
+  // every connect, so the stored blob was already discarded on first use.
+  safeRemove(localStorage, LEGACY_KEY_CAPABILITIES);
 }
 
 // Theme preference — standalone key (outside LS_KEYS) so it survives both
@@ -300,7 +315,7 @@ export function wipeAllAppData() {
     LS_KEY_PROFILES,
     LS_KEY_LAST_PROFILE_ID,
     ...CONNECTION_STORAGE_KEYS,
-    's3b_capabilities',   // legacy key — removed so an upgrade leaves nothing behind
+    LEGACY_KEY_CAPABILITIES,   // retired v1.39.0 — cleared so an upgrade leaves nothing behind
     's3b_active_uploads',
   ];
   allLSKeys.forEach(k => safeRemove(localStorage, k));

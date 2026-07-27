@@ -548,6 +548,41 @@ describe('wipeAllAppData covers the connection model keys', () => {
     assert.equal(ls['s3b_connections'], undefined);
     assert.equal(ls['s3b_profiles'], undefined);
   });
+
+  // s3b_capabilities is named explicitly in wipeAllAppData's key list, and that
+  // entry exists for exactly one reason: an upgrading user still has the retired
+  // key on disk. Without this assertion the line has no coverage at all.
+  test('removes the retired s3b_capabilities key an upgrade leaves behind', () => {
+    ls['s3b_capabilities'] = JSON.stringify({ list: 'denied' });
+    wipeAllAppData();
+    assert.equal(ls['s3b_capabilities'], undefined);
+  });
+});
+
+describe('repairStorageInvariants clears the retired capability key', () => {
+  // Capability state moved onto each connection in v1.39.0. A user upgrading from
+  // v1.38.4 still carries the global key, which nothing reads — leaving it would
+  // mean the storage inspector no longer lists a key that is still on their disk.
+  test('removes s3b_capabilities on mount', () => {
+    ls['s3b_capabilities'] = JSON.stringify({ list: 'denied', delete: 'denied' });
+    repairStorageInvariants();
+    assert.equal(ls['s3b_capabilities'], undefined);
+  });
+
+  test('is a no-op when the key was never present', () => {
+    repairStorageInvariants();
+    assert.equal(ls['s3b_capabilities'], undefined);
+  });
+
+  test('does not disturb the connection model records', () => {
+    ls['s3b_capabilities'] = JSON.stringify({ list: 'denied' });
+    ls['s3b_connections']  = JSON.stringify({ version: 2, connections: [{ id: 1, name: 'A' }] });
+    ls['s3b_credentials']  = JSON.stringify({ version: 1, credentials: [{ id: 'c1', provider: 'b2' }] });
+    repairStorageInvariants();
+    assert.equal(ls['s3b_capabilities'], undefined);
+    assert.equal(JSON.parse(ls['s3b_connections']).connections.length, 1);
+    assert.equal(JSON.parse(ls['s3b_credentials']).credentials.length, 1);
+  });
 });
 
 describe('deleteAllProfiles covers the connection model keys', () => {
