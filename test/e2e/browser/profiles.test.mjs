@@ -26,6 +26,41 @@ async function fillCreds(page, { endpoint, bucket, keyId, secret }) {
   if (secret != null) await page.locator('input[placeholder="Secret Access Key"]').fill(secret);
 }
 
+// ── BUG-047: a share link's details must survive a disconnect ──────────────────
+// Reported in production. Every deep-link parameter lives in the URL fragment by
+// design, so re-entering the link cannot recover it — a fragment-only navigation
+// never reloads the page. Disconnecting therefore had to stop blanking a form the
+// URL still describes, because the user has no way to get those values back.
+describe('BUG-047 — a share link survives disconnect', () => {
+  e2eTest('after disconnecting, the form still shows the connection details from the URL', async () => {
+    ctx.mock.reset();
+    const context = await newE2EContext(browser);
+    const page = await newE2EPage(context);
+    try {
+      const hash = '#endpoint=' + encodeURIComponent(ctx.browserEndpoint)
+                 + '&bucket=test-bucket&keyId=k';
+      await page.goto(app.url + hash, { waitUntil: 'domcontentloaded' });
+
+      // The link supplies everything but the secret, which is the whole point of it.
+      await page.locator('input[placeholder="Secret Access Key"]').fill('s');
+      const region = page.locator('input[placeholder="us-east-1"]');
+      if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
+      await page.locator('button[type="submit"]:has-text("Connect")').click();
+      await page.locator('[data-testid="file-input"]').waitFor({ state: 'attached', timeout: 15000 });
+
+      await page.locator('button:has-text("Disconnect")').click();
+      await page.locator('input[type="url"]').waitFor({ timeout: 5000 });
+
+      assert.equal(await page.locator('input[type="url"]').inputValue(), ctx.browserEndpoint,
+        'endpoint from the share link must survive disconnect (BUG-047)');
+      assert.equal(await page.locator('input[placeholder="my-bucket"]').inputValue(), 'test-bucket',
+        'bucket from the share link must survive disconnect (BUG-047)');
+      assert.equal(await page.locator('input[placeholder="Access Key ID"]').inputValue(), 'k',
+        'key ID from the share link must survive disconnect (BUG-047)');
+    } finally { await context.close(); }
+  });
+});
+
 // ── BUG-018: "Save as profile…" stays disabled until the form has valid required fields ──
 describe('BUG-018 — Save-as-profile enablement', () => {
   e2eTest('disabled on an empty form, enabled once endpoint/bucket/keyId are valid', async () => {

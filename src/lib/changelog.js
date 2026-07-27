@@ -1,9 +1,19 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.39.0';
+export const CURRENT_VERSION = '1.39.1';
 
 export const CHANGELOG = [
+  {
+    "version": "1.39.1",
+    "date": "2026-07-27",
+    "title": "Share links work when Bucketer is already open",
+    "changes": [
+      "Pasting a share link into a tab that already has Bucketer open now fills the form, instead of silently doing nothing.",
+      "Disconnecting no longer clears connection details that came from the link in your address bar. Re-entering that link could not bring them back, so they are kept.",
+      "Re-entering a link identical to the one already in the address bar still does nothing — the browser tells the page nothing at all in that case. Reload the page (F5)."
+    ]
+  },
   {
     "version": "1.39.0",
     "date": "2026-07-26",

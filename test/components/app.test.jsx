@@ -727,6 +727,50 @@ describe('App — connection share links', () => {
     }
   });
 
+  // BUG-047. Every deep-link parameter lives in the fragment by design, so opening a
+  // share link while Bucketer is already loaded is always a SAME-DOCUMENT navigation:
+  // the browser fires hashchange and never reloads, and the mount-time readUrlParams()
+  // never runs again. Before the fix the link silently did nothing.
+  test('a share link pasted while the app is already open is applied', async () => {
+    clearAppStorage();
+    window.location.hash = '';
+    const { query, cleanup } = mount(h(App, {}));
+    try {
+      await new Promise(resolve => setTimeout(resolve, 0));
+      assert.equal(query('#cred-endpoint')?.value, '', 'precondition: form starts empty');
+
+      // Exactly what the browser does for a fragment-only navigation.
+      setShareHash(SHARED, { includeKeyId: true });
+      window.dispatchEvent(new window.HashChangeEvent('hashchange'));
+      await new Promise(resolve => setTimeout(resolve, 0));
+
+      assert.equal(query('#cred-endpoint')?.value, SHARED.endpoint,
+        'endpoint must be applied without a page reload');
+      assert.equal(query('#cred-bucket')?.value, SHARED.bucket);
+      assert.equal(query('#cred-keyid')?.value, SHARED.keyId);
+      assert.equal(query('#cred-region')?.value, SHARED.regionOverride);
+    } finally {
+      cleanup(); window.location.hash = ''; clearAppStorage();
+    }
+  });
+
+  test('a hashchange carrying no connection details leaves the form alone', async () => {
+    clearAppStorage();
+    setShareHash(SHARED, { includeKeyId: true });
+    const { query, cleanup } = mount(h(App, {}));
+    try {
+      await new Promise(resolve => setTimeout(resolve, 0));
+      // Folder navigation rewrites the fragment with only a prefix param.
+      window.location.hash = '#prefix=some/folder/';
+      window.dispatchEvent(new window.HashChangeEvent('hashchange'));
+      await new Promise(resolve => setTimeout(resolve, 0));
+      assert.equal(query('#cred-endpoint')?.value, SHARED.endpoint,
+        'a prefix-only hash must not clear connection details already in the form');
+    } finally {
+      cleanup(); window.location.hash = ''; clearAppStorage();
+    }
+  });
+
   test('a link without a key ID leaves that field empty for the recipient', async () => {
     clearAppStorage();
     setShareHash(SHARED);   // no includeKeyId

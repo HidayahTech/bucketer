@@ -103,8 +103,10 @@ export function App() {
   const [updateCheckEnabled, setUpdateCheckEnabled] = useState(() => loadUpdateCheckEnabled());
   const [prefetchSizeLimit, setPrefetchSizeLimit] = useState(() => loadPrefetchSizeLimit());
   // True when the incoming share link pre-filled the access key ID — used to focus the
-  // Secret Key field and adapt the pre-fill banner. Computed once from the URL hash.
-  const [urlHadKeyId] = useState(() => !!readUrlParams().keyId);
+  // Secret Key field and adapt the pre-fill banner. Seeded from the URL hash at mount
+  // and re-derived by the hashchange effect below, so the banner cannot keep claiming
+  // the link omitted a key ID after a newer link supplied one (BUG-047).
+  const [urlHadKeyId, setUrlHadKeyId] = useState(() => !!readUrlParams().keyId);
   const [connections, setConnections] = useState(() => listResolvedConnections());
   // Delete requests confirm BEFORE entering the master queue (a queued task is
   // always already authorized). One pending request at a time; a new request
@@ -196,13 +198,51 @@ export function App() {
     // Repopulate form from the selected connection (minus secret key) so the user
     // only has to re-enter their secret key to reconnect.
     const conn = selectedConnectionId ? resolveConnection(selectedConnectionId) : null;
-    const nextCreds = conn
+    const base = conn
       ? { ...conn, secretKey: '' }
       : { endpoint: '', bucket: '', keyId: '', secretKey: '', provider: null, regionOverride: '' };
+    // Disconnecting does not change the URL, so if the address bar still carries a
+    // share link's connection details, keep them rather than blanking the form —
+    // otherwise the page contradicts its own URL, and re-entering that URL cannot
+    // fix it: a fragment-only navigation never reloads the page (BUG-047).
+    const fromUrl = readUrlParams();
+    const nextCreds = { ...base, ...fromUrl };
     setCredentials(nextCreds);
     setLiveFormData(nextCreds);
+    // CredentialForm reads `initial` only at mount, so a state update alone is
+    // invisible; force a remount only when the URL actually supplied values, to
+    // keep the ordinary disconnect path byte-for-byte as it was.
+    if (Object.keys(fromUrl).length > 0) setFormResetKey(k => k + 1);
     setBrowserKey(k => k + 1);
   }
+
+  // A share link opened while Bucketer is already loaded is a SAME-DOCUMENT
+  // navigation: the browser fires hashchange and never reloads, so the mount-time
+  // readUrlParams() never runs again and the link silently does nothing. Every
+  // deep-link parameter lives in the fragment by design — it must never reach a
+  // server — so this affects every share link, not an edge case (BUG-047).
+  //
+  // Scoped to the non-connected states on purpose: pushPrefixHistory() only runs
+  // while Browser is mounted, so there is no self-inflicted hash churn to react to
+  // here, and a pasted link must never silently swap the credentials of a live
+  // session out from under an in-flight operation.
+  //
+  // Note the limit: re-entering an IDENTICAL URL fires no event at all, so nothing
+  // can be done for that case from JavaScript. handleDisconnect above covers the
+  // common shape of it.
+  useEffect(() => {
+    if (session === 'connected' || session === 'connecting') return;
+    const onHashChange = () => {
+      const fromUrl = readUrlParams();
+      if (Object.keys(fromUrl).length === 0) return;
+      setUrlHadKeyId(!!fromUrl.keyId);
+      setCredentials(prev => ({ ...prev, ...fromUrl }));
+      setLiveFormData(prev => ({ ...prev, ...fromUrl }));
+      setFormResetKey(k => k + 1);
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, [session]);
 
   // Auto-connect if credentials are stored. Merge URL params so endpoint/bucket
   // from the URL override stored values (secret key never comes from URL).

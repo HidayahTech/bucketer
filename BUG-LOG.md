@@ -4,6 +4,74 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-047 — A share link does nothing when Bucketer is already open
+
+**Symptom.** Reported in production. Opening a connection share link
+(`#endpoint=…&bucket=…&keyId=…`) in a tab that already had Bucketer loaded left
+the connect form completely empty, while the banner above it claimed "Endpoint
+and bucket pre-filled from URL". Pressing Enter on the URL again did not help.
+Only a hard reload worked.
+
+**Root cause.** A URL differing only in its fragment — or identical to the
+current one — is a *same-document navigation*. The browser does not reload, so
+`readUrlParams()`, which `App.jsx` calls once in the `credentials` initializer
+and once for `urlHadKeyId`, never ran again. Nothing anywhere listened for
+`hashchange`; `Browser.jsx` listened for `popstate` but only to read the `prefix`
+param for folder navigation.
+
+This is sharper for Bucketer than for most apps: every deep-link parameter lives
+in the fragment deliberately, so it never reaches a server (REQ-5). The
+consequence is that *every* share link opened in an already-loaded tab is a
+same-document navigation — the failure is the normal case, not an edge case.
+
+The contradictory display came from the same hash being read at two different
+times: `hasUrlParams()` runs on every render and saw the params, so the banner
+appeared; `urlHadKeyId` and the form values were fixed at mount, when the hash
+was different. The reporter's variant reached it via disconnect — the URL still
+held the link, but `handleDisconnect` blanked the form, and re-entering that URL
+could not restore it.
+
+**Fix.** Two changes in `src/components/App.jsx`, both scoped to the
+non-connected states:
+
+1. A `hashchange` listener re-applies URL connection params, refreshes
+   `urlHadKeyId`, and bumps `formResetKey` so `CredentialForm` — which reads
+   `initial` only at mount — actually remounts. It ignores a hash carrying no
+   connection params, so folder navigation's `#prefix=` rewrites are inert.
+2. `handleDisconnect` merges `readUrlParams()` over the values it restores rather
+   than blanking them, and forces the same remount only when the URL supplied
+   something, leaving the ordinary disconnect path unchanged.
+
+Scoped to disconnected/failed on purpose: `pushPrefixHistory()` only runs while
+`Browser` is mounted, so there is no self-inflicted hash churn to react to, and a
+pasted link must never swap the credentials of a live session out from under an
+in-flight operation.
+
+**Limit, deliberately not fixed.** Re-entering a URL *identical* to the current
+one fires no event at all — not even `hashchange`. Nothing can be done from
+JavaScript; the changelog says to reload. Fix 2 covers the common shape of it.
+
+**Why it wasn't caught earlier.** Pre-existing since share links shipped;
+v1.38.4 had no `hashchange` listener either, and the release that surfaced it did
+not touch `url-params.js`, `CredentialForm.jsx`, or `s3-client.js`. Every test —
+component and e2e — navigated to the link as a *fresh page load*, which is the
+one path that works. Nothing exercised "app already loaded, then the URL
+changes." My own first reproduction hit the bug exactly, and I dismissed it as a
+harness artifact because it contradicted what I expected.
+
+**Test case.** `test/components/app.test.jsx` — "a share link pasted while the
+app is already open is applied": mount with an empty hash, assert the form is
+empty, set the hash and dispatch `HashChangeEvent`, assert all four fields
+populate. Fails against the pre-fix build. Paired with "a hashchange carrying no
+connection details leaves the form alone", a guard that a `#prefix=` rewrite does
+not disturb the form (passes either way — it guards the fix, it does not
+reproduce the bug). `test/e2e/browser/profiles.test.mjs` — "BUG-047 — a share
+link survives disconnect": in a real browser, load via a share link, connect,
+disconnect, and assert endpoint/bucket/keyId survive. Fails against the pre-fix
+bundle.
+
+---
+
 ## BUG-046 — Saving a profile blanks the credential form when the storage write silently fails
 
 **Date:** 2026-07-26

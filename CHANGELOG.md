@@ -7,6 +7,18 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.39.1] — 2026-07-27 — Share links work when Bucketer is already open
+
+Opening a share link in a tab that already had Bucketer loaded did nothing — the
+connect form stayed empty even though the banner said the details had been
+pre-filled. All of Bucketer's link parameters live in the part of the URL after
+the `#`, which never reaches a server; the trade-off is that the browser treats
+such a link as "same page" and does not reload, so nothing re-read it.
+
+- Pasting a share link into a tab that already has Bucketer open now fills the form, instead of silently doing nothing.
+- Disconnecting no longer clears connection details that came from the link in your address bar. Re-entering that link could not bring them back, so they are kept.
+- Re-entering a link identical to the one already in the address bar still does nothing — the browser tells the page nothing at all in that case. Reload the page (F5).
+
 ## [1.39.0] — 2026-07-26 — Connection model
 
 Internal restructuring with no change to how the app looks or behaves. A saved
