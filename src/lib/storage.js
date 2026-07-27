@@ -17,6 +17,7 @@
 // (credentials are not persisted) rather than crashing.
 
 import { THEME_PREFS } from './theme.js';
+import { CONNECTION_STORAGE_KEYS, deleteAllConnectionData, repairCredentialProviders } from './connections.js';
 
 // Credential fields — wiped by clearCredentials() on disconnect.
 const CREDENTIAL_KEYS = {
@@ -43,8 +44,9 @@ const SETTINGS_KEYS = {
   fileMtimeAutoLoad:     's3b_file_mtime_auto_load',
 };
 
-// Convenience: all keyed storage keys (excludes capabilities, which has its own clear path).
-const LS_KEYS = { ...CREDENTIAL_KEYS, ...SETTINGS_KEYS, capabilities: 's3b_capabilities' };
+// Convenience: all keyed storage keys. Capability state now lives on the
+// connection record (see connections.js) rather than in a global key.
+const LS_KEYS = { ...CREDENTIAL_KEYS, ...SETTINGS_KEYS };
 const SS_KEY_SECRET = 's3b_secret_key';
 
 // Wrap storage access — private browsing throws on every read/write.
@@ -82,7 +84,7 @@ export function saveCredentials({ endpoint, bucket, keyId, secretKey, provider, 
 
 // Called on disconnect AND on credential change. Only removes credential fields —
 // settings survive so the user's preferences are intact after reconnect.
-// Does not clear capability state — caller must call clearCapabilities() separately.
+// Capability state lives on the connection record and is not touched here.
 export function clearCredentials() {
   Object.values(CREDENTIAL_KEYS).forEach(k => safeRemove(localStorage, k));
   safeRemove(sessionStorage, SS_KEY_SECRET);
@@ -182,33 +184,6 @@ export const saveFileMtimeAutoLoad     = _fileMtimeAutoLoad.save;
 export const loadMultiOriginUpload     = _multiOriginUpload.load;
 export const saveMultiOriginUpload     = _multiOriginUpload.save;
 
-// Per-operation permission state (§4.12). Each of { list, download, upload, delete }
-// starts as 'unknown' (assumed permitted) and transitions to 'denied' only after an
-// actual operation fails with AccessDenied / 403 / 401. The UI disables buttons only
-// for 'denied' — 'unknown' means not yet tested, so operations remain enabled.
-// Stored as JSON in a single key; parse failure returns safe defaults so a corrupted
-// entry never breaks the app. Clearing credentials must also clear this (caller's job).
-export function loadCapabilities() {
-  try {
-    const raw = localStorage.getItem(LS_KEYS.capabilities);
-    return raw ? JSON.parse(raw) : defaultCapabilities();
-  } catch {
-    return defaultCapabilities();
-  }
-}
-
-export function saveCapabilities(caps) {
-  safeSet(localStorage, LS_KEYS.capabilities, JSON.stringify(caps));
-}
-
-export function clearCapabilities() {
-  safeRemove(localStorage, LS_KEYS.capabilities);
-}
-
-export function defaultCapabilities() {
-  return { list: 'unknown', download: 'unknown', upload: 'unknown', delete: 'unknown' };
-}
-
 // Valid providers are short alphanumeric identifiers. The longest known value is
 // 'do_spaces' (9 chars); 20 is a safe ceiling. Anything with whitespace or beyond
 // that length is corrupted data (e.g. credentials text pasted into the wrong field).
@@ -228,16 +203,21 @@ export function repairStorageInvariants() {
   // Repair profiles whose provider field is corrupted. The name is regenerated
   // from bucket only — if provider was wrong the name was almost certainly wrong too.
   const data = loadProfiles();
-  if (!data.profiles.length) return;
-  let dirty = false;
-  for (const profile of data.profiles) {
-    if (profile.provider && !isValidProvider(profile.provider)) {
-      profile.provider = null;
-      profile.name = profile.bucket || 'Default';
-      dirty = true;
+  if (data.profiles.length) {
+    let dirty = false;
+    for (const profile of data.profiles) {
+      if (profile.provider && !isValidProvider(profile.provider)) {
+        profile.provider = null;
+        profile.name = profile.bucket || 'Default';
+        dirty = true;
+      }
     }
+    if (dirty) saveProfilesData(data);
   }
-  if (dirty) saveProfilesData(data);
+
+  // Repair credentials too — the provider field now lives there as well
+  // (connections.js), and must be clean before migration runs.
+  repairCredentialProviders(isValidProvider);
 }
 
 // Theme preference — standalone key (outside LS_KEYS) so it survives both
@@ -319,6 +299,8 @@ export function wipeAllAppData() {
     ...Object.values(LS_KEYS),
     LS_KEY_PROFILES,
     LS_KEY_LAST_PROFILE_ID,
+    ...CONNECTION_STORAGE_KEYS,
+    's3b_capabilities',   // legacy key — removed so an upgrade leaves nothing behind
     's3b_active_uploads',
   ];
   allLSKeys.forEach(k => safeRemove(localStorage, k));
@@ -332,10 +314,12 @@ export function resetSettings() {
   Object.values(SETTINGS_KEYS).forEach(k => safeRemove(localStorage, k));
 }
 
-// Removes all saved profiles and the last-selected profile ID in one operation.
+// Removes all saved connections, credentials, legacy profiles, and the
+// last-selected pointer in one operation.
 export function deleteAllProfiles() {
   safeRemove(localStorage, LS_KEY_PROFILES);
   safeRemove(localStorage, LS_KEY_LAST_PROFILE_ID);
+  deleteAllConnectionData();
 }
 
 // Idempotent — reads legacy flat keys and creates a default profile if no profiles

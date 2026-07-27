@@ -27,12 +27,17 @@ import { diagnosticsProps } from '../lib/connection-diagnostics.js';
 import { detectProvider, PROVIDER_LABELS } from '../lib/provider.js';
 import {
   loadCredentials, saveCredentials, clearCredentials,
-  loadCapabilities, saveCapabilities, clearCapabilities, defaultCapabilities,
   loadUpdateCheckEnabled, saveUpdateCheckEnabled,
   loadPrefetchSizeLimit, savePrefetchSizeLimit,
-  loadProfiles, saveProfile, deleteProfile, loadLastProfileId, saveLastProfileId,
-  migrateProfilesFromLegacy, repairStorageInvariants,
+  loadLastProfileId, saveLastProfileId, repairStorageInvariants,
+  migrateProfilesFromLegacy,
 } from '../lib/storage.js';
+import {
+  listResolvedConnections, resolveConnection, findOrCreateCredential,
+  saveConnectionRecord, deleteConnectionRecord, migrateProfilesToConnections,
+  defaultCapabilities, loadConnectionCapabilities, saveConnectionCapabilities,
+  defaultConnectionName, hasMigratedConnections,
+} from '../lib/connections.js';
 import { readUrlParams, hasUrlParams, buildShareUrl } from '../lib/url-params.js';
 import { FileBanner } from './FileBanner.jsx';
 import { CredentialForm } from './CredentialForm.jsx';
@@ -65,24 +70,32 @@ if (_iconLink) _iconLink.href = logoUrl;
 // Session states: disconnected | connecting | connected | failed
 export function App() {
   const [session, setSession] = useState('disconnected');
-  // selectedProfileId must be declared before credentials so the credentials
-  // initializer can pre-fill the form from the saved profile on first load.
-  const [selectedProfileId, setSelectedProfileId] = useState(() => loadLastProfileId());
+  // selectedConnectionId must be declared before credentials so the credentials
+  // initializer can pre-fill the form from the saved connection on first load.
+  const [selectedConnectionId, setSelectedConnectionId] = useState(() => loadLastProfileId());
   const [credentials, setCredentials] = useState(() => {
     const stored = loadCredentials();
     const fromUrl = readUrlParams();
     const lastId = loadLastProfileId();
     if (lastId) {
-      const profile = loadProfiles().profiles.find(p => p.id === lastId);
-      if (profile) return { ...profile, secretKey: stored.secretKey || '', ...fromUrl };
+      const conn = resolveConnection(lastId);
+      if (conn) return { ...conn, secretKey: stored.secretKey || '', ...fromUrl };
     }
     return { ...stored, ...fromUrl };
   });
   const [client, setClient] = useState(null);
   const [connectionError, setConnectionError] = useState(null);
-  const [capabilities, setCapabilities] = useState(() => loadCapabilities());
+  const [capabilities, setCapabilities] = useState(() => {
+    const lastId = loadLastProfileId();
+    return lastId ? loadConnectionCapabilities(lastId) : defaultCapabilities();
+  });
   const [currentPrefix, setCurrentPrefix] = useState('');
   const [browserKey, setBrowserKey] = useState(0); // force re-mount on reconnect
+  // Bumped once when the mount effect hydrates `credentials` from a just-migrated
+  // connection (see the `else if (conn)` branch below). CredentialForm reads
+  // `initial` only in its own useState initializer, so without a key change,
+  // setCredentials() alone is invisible to an already-mounted form.
+  const [formResetKey, setFormResetKey] = useState(0);
   const [logKey, setLogKey] = useState(0);         // incremented to refresh upload log
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { changelogOpen, setChangelogOpen, aboutOpen, setAboutOpen, storageOpen, setStorageOpen, duplicatesOpen, setDuplicatesOpen } = useModalStates();
@@ -92,7 +105,7 @@ export function App() {
   // True when the incoming share link pre-filled the access key ID — used to focus the
   // Secret Key field and adapt the pre-fill banner. Computed once from the URL hash.
   const [urlHadKeyId] = useState(() => !!readUrlParams().keyId);
-  const [profiles, setProfiles] = useState(() => loadProfiles().profiles);
+  const [connections, setConnections] = useState(() => listResolvedConnections());
   // Delete requests confirm BEFORE entering the master queue (a queued task is
   // always already authorized). One pending request at a time; a new request
   // replaces an unconfirmed one.
@@ -105,22 +118,24 @@ export function App() {
   // Capability state is updated reactively as operations fail (§4.12).
   // The idempotency check (prev[op] === state) prevents unnecessary re-renders and
   // storage writes when the same operation fails multiple times in rapid succession.
+  //
+  // Persisted against the selected connection. With no connection selected the
+  // credentials are ad-hoc, and their capabilities are session-only — persisting
+  // them to a global key is what let bucket A's state apply to bucket B.
   const handleCapabilityChange = useCallback((op, state) => {
     setCapabilities(prev => {
       if (prev[op] === state) return prev;
       const next = { ...prev, [op]: state };
-      saveCapabilities(next);
+      if (selectedConnectionId) saveConnectionCapabilities(selectedConnectionId, next);
       return next;
     });
-  }, []);
+  }, [selectedConnectionId]);
 
   // Resets all capabilities to 'unknown' and re-mounts Browser to trigger a fresh probe.
-  // Called from CapabilityPanel when the user wants to re-check permissions after
-  // changing bucket policy or key permissions without disconnecting and reconnecting.
   function handleRefreshPermissions() {
     const fresh = defaultCapabilities();
     setCapabilities(fresh);
-    saveCapabilities(fresh);
+    if (selectedConnectionId) saveConnectionCapabilities(selectedConnectionId, fresh);
     setBrowserKey(k => k + 1); // re-mount browser → triggers new listing probe
   }
 
@@ -134,8 +149,28 @@ export function App() {
     const fullCreds = { ...creds, provider };
 
     saveCredentials(fullCreds);
-    clearCapabilities();
-    setCapabilities(defaultCapabilities());
+    // Always reset to 'unknown' on connect, regardless of whether a connection is
+    // selected — matches pre-branch behaviour exactly. A stale 'denied' hides UI
+    // (upload section, drop overlay, Find duplicates, download/delete/move/copy),
+    // so it must self-heal on the next connect rather than persist forever just
+    // because the user fixed their bucket policy at the provider. Do NOT change
+    // this to restore the stored per-connection value — that was tried on this
+    // branch and reverted (whole-branch review, Finding 2).
+    const resetCaps = defaultCapabilities();
+    setCapabilities(resetCaps);
+    // Reset the stored record too, so it stays consistent with in-memory state:
+    // handleCapabilityChange merges new observations against in-memory `prev` and
+    // saveConnectionCapabilities overwrites the whole stored field, so a stored
+    // record that disagreed with the fresh in-memory reset would be silently
+    // truncated by the very first post-connect capability write (Browser's initial
+    // listing probe fires almost immediately). This mirrors the pre-branch
+    // reset-on-connect behaviour for the stored record too, not just in-memory.
+    // The record still accumulates normally after this point via
+    // handleCapabilityChange/saveConnectionCapabilities, and
+    // selecting a connection without reconnecting (handleSelectProfile, and
+    // eventually Phase 3's connection switcher) still reads its full history via
+    // loadConnectionCapabilities — only an actual connect resets it.
+    if (selectedConnectionId) saveConnectionCapabilities(selectedConnectionId, resetCaps);
     setCredentials(fullCreds);
 
     try {
@@ -157,15 +192,12 @@ export function App() {
     setClient(null);
     setConnectionError(null);
     clearCredentials();
-    clearCapabilities();
     setCapabilities(defaultCapabilities());
-    // Repopulate form from the selected profile (minus secret key) so the user only
-    // has to re-enter their secret key to reconnect. Without this, the form is blank
-    // while the profile row still appears highlighted, and clicking it is a no-op
-    // (same selectedProfileId → same key → CredentialForm doesn't remount).
-    const profile = selectedProfileId ? profiles.find(p => p.id === selectedProfileId) : null;
-    const nextCreds = profile
-      ? { ...profile, secretKey: '' }
+    // Repopulate form from the selected connection (minus secret key) so the user
+    // only has to re-enter their secret key to reconnect.
+    const conn = selectedConnectionId ? resolveConnection(selectedConnectionId) : null;
+    const nextCreds = conn
+      ? { ...conn, secretKey: '' }
       : { endpoint: '', bucket: '', keyId: '', secretKey: '', provider: null, regionOverride: '' };
     setCredentials(nextCreds);
     setLiveFormData(nextCreds);
@@ -177,26 +209,52 @@ export function App() {
   // Migration runs first so the profile list is populated before state reads it.
   useEffect(() => {
     repairStorageInvariants();
-    migrateProfilesFromLegacy();
-    const updatedProfiles = loadProfiles().profiles;
-    setProfiles(updatedProfiles);
+    // Restores the pre-branch migration chain: a user who last opened Bucketer
+    // before profiles shipped (~v1.15.0) still has only bare flat credential keys,
+    // not an s3b_profiles record. migrateProfilesToConnections() reads s3b_profiles
+    // only, so without this call such a user gets no connection created at all.
+    //
+    // Only reach for the legacy flat-key chain when the connection migration has
+    // never run. migrateProfilesFromLegacy() decides for itself by inspecting
+    // s3b_profiles, which connections-model users never write — so calling it
+    // unconditionally makes it synthesise a phantom profile from the flat keys
+    // that saveCredentials() rewrites on every connect, and clobber
+    // s3b_last_profile_id with an id that matches no connection.
+    if (!hasMigratedConnections()) migrateProfilesFromLegacy();
+    migrateProfilesToConnections();
+    const updated = listResolvedConnections();
+    setConnections(updated);
     const lastId = loadLastProfileId();
-    if (lastId) setSelectedProfileId(lastId);
+    if (lastId) setSelectedConnectionId(lastId);
 
     const stored = loadCredentials();
     const fromUrl = readUrlParams();
-    const profile = lastId ? updatedProfiles.find(p => p.id === lastId) : null;
-    // Prefer flat credentials (written by saveCredentials on every connect) over profile
-    // data. This ensures that connecting with modified credentials — without saving a new
-    // profile — is correctly restored on reload. Flat credentials are absent only after a
-    // disconnect (clearCredentials wipes them) or on first load, in which case we fall
-    // back to the saved profile so the form is pre-filled.
+    const conn = lastId ? updated.find(c => c.id === lastId) : null;
+    // Prefer flat credentials (written by saveCredentials on every connect) over
+    // connection data, so connecting with modified credentials — without saving —
+    // is restored correctly on reload.
     const base = stored.endpoint
       ? stored
-      : (profile ? { ...profile, secretKey: stored.secretKey || '' } : stored);
+      : (conn ? { ...conn, secretKey: stored.secretKey || '' } : stored);
     const merged = { ...base, ...fromUrl };
     if (merged.endpoint && merged.bucket && merged.keyId && merged.secretKey) {
       handleConnect(merged);
+    } else if (conn && !stored.endpoint) {
+      // First load after migration: the `credentials` initializer above ran BEFORE
+      // migrateProfilesToConnections(), so resolveConnection() found nothing and the
+      // form fell back to the (empty) flat credential keys. Now that connections
+      // exist, populate the form from the selected one — otherwise every upgrading
+      // user gets a blank form on first load with their profile row highlighted.
+      // Gated on `!stored.endpoint`: when flat credentials DO exist, `base` above
+      // already picked them (by design — they are the last-connected values), and
+      // this branch must not override that choice with the connection's values,
+      // or the picker can highlight connection A while the form shows B's data.
+      setCredentials(merged);
+      setLiveFormData(merged);
+      // selectedConnectionId is unchanged (it was already `lastId` before migration
+      // ran), so CredentialForm's key does not change and it will not remount to
+      // pick up the credentials update above — force it explicitly.
+      setFormResetKey(k => k + 1);
     }
   }, []);
 
@@ -289,11 +347,12 @@ export function App() {
   }
 
   function handleSelectProfile(id) {
-    const profile = profiles.find(p => p.id === id);
-    if (!profile) return;
-    setSelectedProfileId(id);
+    const conn = resolveConnection(id);
+    if (!conn) return;
+    setSelectedConnectionId(id);
     saveLastProfileId(id);
-    const creds = { ...profile, secretKey: '' };
+    setCapabilities(loadConnectionCapabilities(id));
+    const creds = { ...conn, secretKey: '' };
     setCredentials(creds);
     setLiveFormData(creds);
   }
@@ -310,34 +369,74 @@ export function App() {
       : liveFormData.provider;
     const provider = providerSource || detectProvider(ep);
 
-    // If a profile is currently selected, update it in place (same id) rather than
-    // always creating a new one, so repeated saves don't accumulate duplicates.
-    const existingProfile = selectedProfileId ? profiles.find(p => p.id === selectedProfileId) : null;
-    const profile = {
-      id: existingProfile ? existingProfile.id : Date.now(),
-      name,
-      endpoint: ep,
-      bucket: (liveFormData.bucket || '').trim(),
-      keyId: (liveFormData.keyId || '').trim(),
+    const existing = selectedConnectionId ? connections.find(c => c.id === selectedConnectionId) : null;
+    const id = existing ? existing.id : Date.now();
+    const trimmedBucket = (liveFormData.bucket || '').trim();
+
+    const cred = findOrCreateCredential({
+      endpoint:       ep,
+      keyId:          (liveFormData.keyId || '').trim(),
       provider,
       regionOverride: (liveFormData.regionOverride || '').trim(),
+    });
+
+    const conn = {
+      id,
+      name:         name || defaultConnectionName({ provider, bucket: trimmedBucket }),
+      credentialId: cred.id,
+      bucket:       trimmedBucket,
     };
-    saveProfile(profile);
-    const updated = loadProfiles().profiles;
-    setProfiles(updated);
-    setSelectedProfileId(profile.id);
-    saveLastProfileId(profile.id);
+    // Only set capabilities when creating. On update, omit the key so
+    // saveConnectionRecord's merge keeps what is in storage: capability changes are
+    // written directly to localStorage and are not reflected in the `connections`
+    // React snapshot, so reading them from state here would revert them.
+    if (!existing) conn.capabilities = null;
+    saveConnectionRecord(conn);
+
+    const updated = listResolvedConnections();
+    setConnections(updated);
+    setSelectedConnectionId(id);
+    saveLastProfileId(id);
     // Sync credentials so the form doesn't reset when it remounts on key change.
-    const creds = { ...profile, secretKey: liveFormData.secretKey || '' };
+    //
+    // Built from what we just wrote (`cred`, `conn`), NOT from a read-back
+    // (`updated.find(...)`). Every storage write above goes through a wrapper
+    // (safeSetRaw) that swallows failure by design — private browsing, blocked
+    // site data, quota exhaustion. If the write silently doesn't land, a
+    // read-back finds no matching row, `saved` is `undefined`, and
+    // `{ ...undefined }` collapses to `{}` — blanking endpoint/bucket/keyId/
+    // provider in the very form the user just filled in, made immediately
+    // visible by the remount the selectedConnectionId change triggers on
+    // CredentialForm's key. `cred` and `conn` are already in memory and always
+    // defined, so this shape is built to match resolveConnection()'s field set
+    // exactly (id/name/bucket/capabilities/credentialId/endpoint/keyId/provider/
+    // regionOverride), so CredentialForm receives the identical shape whether or
+    // not the write actually landed.
+    const creds = {
+      id,
+      name:           conn.name,
+      bucket:         conn.bucket,
+      // Mirrors the `if (!existing) conn.capabilities = null;` branch above: a
+      // new connection's capabilities are null; an updated one keeps whatever
+      // was already known (existing is the pre-write snapshot from React state —
+      // the same source conn.capabilities deliberately avoided overwriting).
+      capabilities:   existing ? (existing.capabilities ?? null) : null,
+      credentialId:   cred.id,
+      endpoint:       cred.endpoint,
+      keyId:          cred.keyId,
+      provider:       cred.provider,
+      regionOverride: cred.regionOverride,
+      secretKey:      liveFormData.secretKey || '',
+    };
     setCredentials(creds);
     setLiveFormData(creds);
   }
 
   function handleDeleteProfile(id) {
-    deleteProfile(id);
-    setProfiles(loadProfiles().profiles);
-    if (selectedProfileId === id) {
-      setSelectedProfileId(null);
+    deleteConnectionRecord(id);
+    setConnections(listResolvedConnections());
+    if (selectedConnectionId === id) {
+      setSelectedConnectionId(null);
       saveLastProfileId(null);
     }
   }
@@ -419,8 +518,8 @@ export function App() {
           <div class="splash">
             <h2>Connect to a bucket</h2>
             <ProfilePicker
-              profiles={profiles}
-              selectedId={selectedProfileId}
+              profiles={connections}
+              selectedId={selectedConnectionId}
               onSelect={handleSelectProfile}
               onDelete={handleDeleteProfile}
               onSave={handleSaveProfile}
@@ -436,7 +535,7 @@ export function App() {
               </div>
             )}
             <CredentialForm
-              key={selectedProfileId ?? 'manual'}
+              key={`${selectedConnectionId ?? 'manual'}-${formResetKey}`}
               initial={credentials}
               onSave={handleConnect}
               onFormChange={setLiveFormData}
@@ -491,9 +590,9 @@ export function App() {
         <div class="app-body">
           {sidebarOpen && <div class="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
           <aside class={`sidebar${sidebarOpen ? ' sidebar-open' : ''}`}>
-            {selectedProfileId && profiles.find(p => p.id === selectedProfileId) && (
+            {selectedConnectionId && connections.find(p => p.id === selectedConnectionId) && (
               <div class="profile-active-name">
-                {profiles.find(p => p.id === selectedProfileId).name}
+                {connections.find(p => p.id === selectedConnectionId).name}
               </div>
             )}
             <CredentialForm

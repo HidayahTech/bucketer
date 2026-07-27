@@ -7,6 +7,23 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.39.0] — 2026-07-26 — Connection model
+
+Internal restructuring with no change to how the app looks or behaves. A saved
+profile used to be one record holding both a credential and a bucket. It is now
+a credential plus a connection that points at it, so one key shared across
+several buckets is stored once instead of once per bucket — and the same bucket
+can be reached by two different keys, for example a read-only key for browsing
+and a read-write key for changes. Existing profiles migrate automatically on
+first load, and credentials that were duplicated across profiles are merged.
+
+- Saved profiles are now stored as `s3b_credentials` (endpoint, key ID, provider, region) plus `s3b_connections` (name, bucket, and a reference to the credential). The thing you name and click is still the pairing, exactly as before.
+- Migration runs once on first load. It keeps your profile names and selection, merges credentials that were identical across profiles, and skips any single malformed record rather than abandoning the ones after it. Your old `s3b_profiles` record is left untouched for one release as a rollback path.
+- Permissions (list, download, upload, delete) are now remembered per connection instead of in one global setting. Previously, a permission denial learned against one bucket was applied to every bucket. They are still learned only from operations that actually fail — nothing is probed — and still reset on each connect.
+- "Clear all app data" and "Delete all profiles" now clear the new records too. Previously a wipe would have left stored credentials on disk.
+- Deleting a connection now also removes its credential, unless another connection still uses it.
+- The storage inspector names the new keys and says which connection the permissions shown belong to.
+
 ## [1.38.4] — 2026-07-26 — Changelog modal strips inline bold markers
 
 - Bullets no longer show literal asterisks (e.g. "New **Run diagnostics** button").

@@ -10,10 +10,13 @@ import {
   loadCredentials, clearCredentials,
   loadMaxKeys, loadPartConcurrency, loadPartSizeMB,
   loadFileConcurrency, loadListingCacheTTL, loadUpdateCheckEnabled,
-  loadCapabilities, clearCapabilities,
-  loadProfiles, deleteProfile,
+  loadLastProfileId,
   wipeAllAppData, resetSettings, deleteAllProfiles,
 } from '../lib/storage.js';
+import {
+  listResolvedConnections, loadCredentialRecords, deleteConnectionRecord,
+  clearAllConnectionCapabilities, defaultCapabilities, loadConnectionCapabilities,
+} from '../lib/connections.js';
 import {
   loadUploadLog, clearUploadLog,
   loadAllResumeRecords, clearAllResumeRecords,
@@ -79,10 +82,20 @@ export function StorageModal({ onClose, isConnected }) {
   async function load() {
     const creds   = loadCredentials();
     const secret  = !!sessionStorage.getItem('s3b_secret_key');
-    const { profiles } = loadProfiles();
+    const profiles = listResolvedConnections();
+    const { credentials } = loadCredentialRecords();
     const log     = await loadUploadLog().catch(() => []);
     const resume  = await loadAllResumeRecords().catch(() => []);
-    const caps    = loadCapabilities();
+    const selectedId    = loadLastProfileId();
+    const selected      = selectedId ? profiles.find(p => p.id === selectedId) : null;
+    // Fall back to the first connection only when nothing is selected, so the panel
+    // still shows something on a fresh load; either way it is labelled below.
+    const capsConnection = selected || profiles[0] || null;
+    // Routed through loadConnectionCapabilities() rather than reading
+    // capsConnection.capabilities raw, so this goes through the same
+    // validate-and-merge-over-defaults path as every other reader instead of being
+    // a second, divergent one.
+    const caps           = capsConnection ? loadConnectionCapabilities(capsConnection.id) : defaultCapabilities();
     const active  = loadActiveUploads();
     const settings = {
       maxKeys:            loadMaxKeys(),
@@ -92,7 +105,9 @@ export function StorageModal({ onClose, isConnected }) {
       listingCacheTTL:    loadListingCacheTTL(),
       updateCheckEnabled: loadUpdateCheckEnabled(),
     };
-    setData({ creds, secret, profiles, log, resume, caps, active, settings });
+    setData({ creds, secret, profiles, credentials, log, resume, caps,
+              capsConnection: capsConnection ? capsConnection.name : null,
+              active, settings });
   }
 
   useEffect(() => {
@@ -120,7 +135,7 @@ export function StorageModal({ onClose, isConnected }) {
     else if (action === 'log')      await clearUploadLog();
     else if (action === 'resume')   await clearAllResumeRecords();
     else if (action === 'settings') resetSettings();
-    else if (action === 'caps')     clearCapabilities();
+    else if (action === 'caps')     clearAllConnectionCapabilities();
     else if (action === 'active')   clearActiveUploads();
     setCleared(action);
     setTimeout(() => setCleared(c => c === action ? null : c), 2500);
@@ -193,7 +208,7 @@ export function StorageModal({ onClose, isConnected }) {
             <details class="sv-section" open>
               <SectionHead title="Saved Profiles" badge={data.profiles.length} />
               <div class="sv-section-body">
-                <StoreLoc>localStorage · <KeyName name="s3b_profiles" /> (JSON array) · <KeyName name="s3b_last_profile_id" /> (selected profile)</StoreLoc>
+                <StoreLoc>localStorage · <KeyName name="s3b_connections" /> (JSON array) · <KeyName name="s3b_credentials" /> ({data.credentials.length} stored) · <KeyName name="s3b_last_profile_id" /> (selected)</StoreLoc>
                 {data.profiles.length === 0 ? (
                   <Empty text="No saved profiles." />
                 ) : (
@@ -216,7 +231,7 @@ export function StorageModal({ onClose, isConnected }) {
                           <td class="sv-val sv-mono" title={p.keyId}>{truncate(p.keyId, 10)}</td>
                           <td>
                             <button type="button" class="btn btn-ghost btn-sm sv-del-btn"
-                              onClick={async () => { deleteProfile(p.id); await load(); }}
+                              onClick={async () => { deleteConnectionRecord(p.id); await load(); }}
                               title="Delete this profile">✕</button>
                           </td>
                         </tr>
@@ -225,7 +240,7 @@ export function StorageModal({ onClose, isConnected }) {
                   </table>
                 )}
                 <ConfirmDialog id="profiles" controller={controller} label="Delete all profiles"
-                  warning="All saved profiles will be removed. Credentials on your storage provider are unaffected."
+                  warning="All saved profiles and their stored credentials will be removed. Credentials on your storage provider are unaffected."
                   danger />
               </div>
             </details>
@@ -356,8 +371,10 @@ export function StorageModal({ onClose, isConnected }) {
             <details class="sv-section" open>
               <SectionHead title="Runtime State" />
               <div class="sv-section-body">
-                <p class="sv-sub-heading">Capabilities</p>
-                <StoreLoc><KeyName name="s3b_capabilities" /> (JSON) · localStorage · values: <KeyName name="'unknown' | 'permitted' | 'denied'" /></StoreLoc>
+                <p class="sv-sub-heading">
+                  Capabilities{data.capsConnection ? ` — ${data.capsConnection}` : ''}
+                </p>
+                <StoreLoc>per connection in <KeyName name="s3b_connections" /> (JSON) · localStorage · values: <KeyName name="'unknown' | 'permitted' | 'denied'" /></StoreLoc>
                 <table class="sv-table">
                   <tbody>
                     {['list', 'download', 'upload', 'delete'].map(op => (
@@ -372,8 +389,9 @@ export function StorageModal({ onClose, isConnected }) {
                   {cleared === 'caps' && <span class="sv-cleared-msg">✓ Reset</span>}
                   {confirmAction === 'caps' ? (
                     <>
+                      <span class="sv-confirm-warn">This clears capability state for every saved connection, not just the one shown above.</span>
                       <button type="button" class="btn btn-ghost btn-sm" onClick={() => setConfirm(null)}>Cancel</button>
-                      <button type="button" class="btn btn-ghost btn-sm" onClick={() => act('caps')}>Reset capabilities</button>
+                      <button type="button" class="btn btn-ghost btn-sm" onClick={() => act('caps')}>Reset all connections</button>
                     </>
                   ) : (
                     <button type="button" class="btn btn-ghost btn-sm" onClick={() => setConfirm('caps')}>Reset capabilities</button>

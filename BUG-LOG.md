@@ -4,6 +4,55 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-046 — Saving a profile blanks the credential form when the storage write silently fails
+
+**Date:** 2026-07-26
+
+**Symptom:**
+On the splash screen: type endpoint, bucket, key ID, and secret key; click "Save as profile…"; name it; click Save. In Safari private browsing, with site data blocked for the origin, or under storage quota exhaustion, the endpoint, bucket, key ID, and provider fields cleared instantly — the secret key was the only field left standing. `canSaveProfile()` then evaluated false against the now-empty fields, disabling the Save button, so the user could not even retry without retyping everything from scratch.
+
+**Root cause:**
+`handleSaveProfile` (`src/components/App.jsx`) persists a credential and a connection via `saveCredentialRecord`/`saveConnectionRecord`, both of which write through `safeSetRaw` — a wrapper that deliberately swallows `localStorage.setItem` exceptions (private browsing, blocked site data, and quota exhaustion all throw there) so the app degrades instead of crashing. After those writes, the handler re-read its own write back from storage to build the `credentials`/`liveFormData` state used to repopulate the form: `const saved = updated.find(c => c.id === id); const creds = { ...saved, secretKey: ... };`. When the write silently didn't land, `updated` (from `listResolvedConnections()`) had no matching row, `saved` was `undefined`, and `{ ...undefined }` evaluated to `{}` — collapsing `creds` to just `{ secretKey }`. `setSelectedConnectionId(id)` then changed `CredentialForm`'s `key` prop, forcing an immediate remount against that blanked `initial`. Confirmed by reading `safeSetRaw`'s try/catch (`storage.js`) and `findOrCreateCredential`/`saveConnectionRecord` (`connections.js`), which both return valid in-memory objects regardless of whether the underlying write succeeded — and by a component test that stubs the write to throw and observes the blank exactly as described.
+
+**Fix:**
+Build the post-save `credentials`/`liveFormData` object from the in-memory `cred` (returned by `findOrCreateCredential`, always defined) and `conn` (the object the handler itself constructed, always defined) instead of reading the write back from storage. The constructed shape matches `resolveConnection()`'s field set exactly (`id`, `name`, `bucket`, `capabilities`, `credentialId`, `endpoint`, `keyId`, `provider`, `regionOverride`) plus `secretKey`, so `CredentialForm` receives an identical shape whether or not the write actually landed. `capabilities` mirrors the same `existing`-based branch the handler already uses to decide whether this is a create or an update.
+
+**Why it wasn't caught earlier:**
+This handler had already been reviewed five times across the connection-model whole-branch review (the original task review, plus rounds 1–4 of the review's own fix cycle), and every pass asked "which records exist and are they consistent with each other" — never "what does this handler do when one of its own writes silently fails." The storage layer's core design (swallow write errors, degrade gracefully) is exactly what makes this module unusually prone to that class of bug: every write is a potential silent no-op, but nothing in the surrounding code is written defensively against that possibility unless someone asks the question directly. There was also zero test coverage anywhere in the suite for a throwing `localStorage` — private browsing and quota exhaustion are both hazards the codebase explicitly designs for elsewhere (`FileBanner.jsx` names private browsing directly), but no test had ever simulated the write actually failing.
+
+**Test case:**
+`test/components/app.test.jsx` — "App — a storage write that silently fails does not blank the form (BUG-046)": stubs `Object.getPrototypeOf(localStorage).setItem` (not the instance property — jsdom's `Storage` is a legacy platform object where instance-level assignment silently stores a literal key named `"setItem"` instead of overriding the method, confirmed by direct experiment) to throw, drives the splash form and the ProfilePicker "Save as profile…" flow, and asserts the endpoint/bucket/key-ID inputs still hold their typed values afterward. Fails against the pre-fix commit with the endpoint reading back as `''`; passes after. Restores the prototype method in `finally`, since the stub sits on state shared by every other test in the file.
+
+---
+
+## BUG-045 — Deleting a connection resurrects it as a phantom on the next reload
+
+**Date:** 2026-07-26
+
+**Symptom:**
+On the `connection-model` branch, deleting a saved connection did not stay deleted. The most ordinary sequence reproduced it: connect to a bucket, save the connection under a name (e.g. "My Bucket"), delete it, reload the page. The connection reappeared under a new, auto-generated id and a generic auto-generated name instead of the one the user had given it — the delete silently didn't stick.
+
+**Root cause:**
+Three successive attempts at the surrounding migration logic each answered the same underlying question — "is this user already on the connection model, so the legacy flat-key migration chain should not run?" — by *deriving* it from mutable evidence instead of *recording* it as a fact:
+
+1. The original form of this class of bug: `migrateProfilesToConnections()` used `connections.length > 0` as its "already migrated" sentinel. Deleting the last connection emptied the list, making the next mount look "unmigrated" and resurrect every deleted connection from the never-deleted `s3b_profiles` record. Fixed by introducing an explicit `s3b_connections_migrated` marker for *that* function's own guard.
+2. `migrateProfilesFromLegacy()` was then wired in ahead of `migrateProfilesToConnections()` to restore migration for users who never reached the `s3b_profiles` stage. Gating it on the marker alone broke for a connection created via `handleSaveProfile` (which never sets the marker) once the user reloaded before ever triggering a real migration — same resurrection, different trigger.
+3. `hasMigratedConnections()` was widened to `marker set OR connections.length > 0`, fixing case 2 — but the `connections.length > 0` arm reintroduced exactly the same conflation as the original bug, one level up: `deleteConnectionRecord` empties the connection list, so deleting the *only* connection a user had ever saved (regardless of whether the marker had ever been set) flipped this predicate back to `false`, and the legacy chain resurrected it from the flat credential keys `saveCredentials()` leaves behind on every connect.
+
+Confirmed via a reproduction script and an automated test (`test/components/app.test.jsx`, "F1 round 4"): fresh install → connect → save a connection → delete it → reload produced a new connection with a fresh id and a generated name in place of the deleted one.
+
+**Fix:**
+Stopped deriving the fact and started recording it. `saveConnectionRecord()` (`src/lib/connections.js`) now sets the `s3b_connections_migrated` marker itself, unconditionally, the instant any connection is created — whether by `migrateProfilesToConnections()`'s conversion loop or by `handleSaveProfile`. `hasMigratedConnections()` still checks the marker first and falls back to `connections.length > 0` only for records written by a build predating this fix; that fallback is documented as non-monotonic (it can flip back to `false` after a delete) precisely so a future change doesn't rely on it as authoritative. `migrateProfilesToConnections()`'s own guard is untouched and stays marker-only.
+
+**Why it wasn't caught earlier:**
+Every unit test in the suite exercised a single function or a single mount in isolation. This class of bug lives entirely in a *sequence* — connect, then save, then delete, then reload — spanning three functions across two modules and a component's mount effect. No single-function test can see a predicate that is correct at every point it's checked in isolation but wrong once the operations are composed in the order a real user performs them. Three rounds of code review each caught the case immediately in front of them (missing-case reviews) rather than the structural pattern (a derived, non-monotonic predicate standing in for a recorded fact) until an adversarial fourth-round review looked for the pattern itself instead of another missing case.
+
+**Test case:**
+`test/components/app.test.jsx` — "App — a deleted connection does not resurrect after this sequence: connect, save, delete, reload (Finding A, F1 round 4)": seeds live flat credential keys, saves a real connection via `saveConnectionRecord`, deletes it via `deleteConnectionRecord`, mounts `App` once (the actual mount-effect ordering), and asserts the connection list stays empty and no phantom `s3b_profiles` record is written. Failed against the pre-fix commit (`5797003`) with a resurrected connection; passes after.
+`test/connections.test.js` — `hasMigratedConnections` describe block: direct unit coverage of both arms of the predicate (marker-only, connections-only, neither, and an orphaned connection whose raw record counts even though the resolved view filters it out) — previously had no direct test at all, which is how the predicate passed review three times without one.
+
+---
+
 ## BUG-044 — In-app changelog truncates every wrapped bullet (#50)
 
 **Date:** 2026-07-26
