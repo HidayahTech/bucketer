@@ -14,6 +14,7 @@ import { mount, fire, setInput } from '../helpers/render.js';
 import { App } from '../../src/components/App.jsx';
 import { saveConnectionCapabilities, saveConnectionRecord, findOrCreateCredential, deleteConnectionRecord } from '../../src/lib/connections.js';
 import { deleteAllProfiles } from '../../src/lib/storage.js';
+import { buildShareUrl, readUrlParams } from '../../src/lib/url-params.js';
 
 const CRED_KEYS = [
   's3b_endpoint', 's3b_bucket', 's3b_key_id', 's3b_provider',
@@ -640,6 +641,103 @@ describe('App — a storage write that silently fails does not blank the form (B
       proto.setItem = originalSetItem;
       cleanup();
       clearAppStorage();
+    }
+  });
+});
+
+// Connection share links (#endpoint=…&bucket=…&keyId=…) are produced by
+// ShareLinkMenu via buildShareUrl(credentials) and consumed on mount via
+// readUrlParams(). The connection model rewrote both ends of that path: the
+// credentials the link is built FROM are now assembled from a credential record
+// plus a connection record, and the mount effect that applies an incoming link
+// gained a branch that re-populates the form after migration.
+//
+// The "shared-link pre-fill banner" tests above cover a recipient with empty
+// storage. These cover the case that actually exercises the rewritten mount
+// effect: a link arriving at someone who already has a saved connection.
+describe('App — connection share links', () => {
+  const SHARED = {
+    endpoint:       'https://s3.eu-central-003.backblazeb2.com',
+    bucket:         'shared-bucket',
+    provider:       'b2',
+    regionOverride: 'eu-central-003',
+    keyId:          'SHAREDKEY123',
+  };
+
+  function setShareHash(creds, opts) {
+    const url = buildShareUrl(creds, opts);
+    window.location.hash = url.slice(url.indexOf('#'));
+  }
+
+  function seedOwnConnection() {
+    localStorage.setItem('s3b_profiles', JSON.stringify({ version: 1, profiles: [
+      { id: 5, name: 'Mine', endpoint: 'https://s3.us-west-004.backblazeb2.com',
+        bucket: 'my-bucket', keyId: 'MYKEY', provider: 'b2', regionOverride: 'us-west-004' },
+    ]}));
+    localStorage.setItem('s3b_last_profile_id', '5');
+  }
+
+  test('every shared field survives buildShareUrl -> readUrlParams', () => {
+    clearAppStorage();
+    setShareHash(SHARED, { includeKeyId: true });
+    try {
+      assert.deepEqual(readUrlParams(), SHARED,
+        'a link must round-trip endpoint, bucket, provider, region and key ID');
+    } finally {
+      window.location.hash = ''; clearAppStorage();
+    }
+  });
+
+  test('the secret key is never encoded into a share link', () => {
+    const url = buildShareUrl({ ...SHARED, secretKey: 'TOPSECRET' }, { includeKeyId: true });
+    assert.equal(url.includes('TOPSECRET'), false, 'secret key must never reach the URL');
+  });
+
+  test('a share link overrides the recipient\'s own saved connection in the form', async () => {
+    clearAppStorage();
+    seedOwnConnection();
+    setShareHash(SHARED, { includeKeyId: true });
+    const { query, cleanup } = mount(h(App, {}));
+    try {
+      await new Promise(resolve => setTimeout(resolve, 0));
+      assert.equal(query('#cred-endpoint')?.value, SHARED.endpoint,
+        'endpoint must come from the link, not the saved connection');
+      assert.equal(query('#cred-bucket')?.value, SHARED.bucket,
+        'bucket must come from the link, not the saved connection');
+      assert.equal(query('#cred-keyid')?.value, SHARED.keyId,
+        'key ID must come from the link, not the saved connection');
+    } finally {
+      cleanup(); window.location.hash = ''; clearAppStorage();
+    }
+  });
+
+  test('opening a share link does not overwrite the stored connection', async () => {
+    clearAppStorage();
+    seedOwnConnection();
+    setShareHash(SHARED, { includeKeyId: true });
+    const { cleanup } = mount(h(App, {}));
+    try {
+      await new Promise(resolve => setTimeout(resolve, 0));
+      const { connections } = JSON.parse(localStorage.getItem('s3b_connections'));
+      assert.equal(connections.length, 1, 'the link must not create a second connection');
+      assert.equal(connections[0].bucket, 'my-bucket',
+        'the recipient\'s stored connection must keep its own bucket');
+    } finally {
+      cleanup(); window.location.hash = ''; clearAppStorage();
+    }
+  });
+
+  test('a link without a key ID leaves that field empty for the recipient', async () => {
+    clearAppStorage();
+    setShareHash(SHARED);   // no includeKeyId
+    const { query, cleanup } = mount(h(App, {}));
+    try {
+      await new Promise(resolve => setTimeout(resolve, 0));
+      assert.equal(query('#cred-endpoint')?.value, SHARED.endpoint);
+      assert.equal(query('#cred-keyid')?.value, '',
+        'a link that omitted the key ID must not pre-fill one');
+    } finally {
+      cleanup(); window.location.hash = ''; clearAppStorage();
     }
   });
 });
