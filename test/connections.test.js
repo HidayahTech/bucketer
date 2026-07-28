@@ -603,4 +603,27 @@ describe('saveConnectionRecord collects a superseded credential (#53)', () => {
     assert.equal(loadCredentialRecords().credentials.length, 1);
     assert.equal(loadConnectionRecords().connections[0].name, 'Renamed');
   });
+
+  test('an explicitly undefined credentialId does not orphan the connection', () => {
+    const a = findOrCreateCredential({ endpoint: 'https://a.example.com', keyId: 'k1', provider: 'b2', regionOverride: '' });
+    saveConnectionRecord({ id: 1, name: 'C', credentialId: a.id, bucket: 'b', capabilities: null });
+
+    saveConnectionRecord({ id: 1, name: 'X', credentialId: undefined });
+
+    assert.equal(loadCredentialRecords().credentials.length, 1,
+      'a credential must never be collected because a caller passed undefined');
+    assert.equal(loadConnectionRecords().connections[0].credentialId, a.id,
+      'and the connection must not be left pointing at nothing');
+  });
+
+  test('a partial update that omits credentialId leaves it untouched', () => {
+    const a = findOrCreateCredential({ endpoint: 'https://a.example.com', keyId: 'k1', provider: 'b2', regionOverride: '' });
+    saveConnectionRecord({ id: 1, name: 'C', credentialId: a.id, bucket: 'b', capabilities: null });
+
+    saveConnectionRecord({ id: 1, name: 'Renamed' });
+
+    assert.equal(loadCredentialRecords().credentials.length, 1);
+    assert.equal(loadConnectionRecords().connections[0].credentialId, a.id);
+    assert.equal(loadConnectionRecords().connections[0].name, 'Renamed');
+  });
 });

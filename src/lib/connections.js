@@ -143,7 +143,12 @@ export function deleteCredentialRecord(id) {
 
 export function saveConnectionRecord(conn) {
   // eslint-disable-next-line no-unused-vars
-  const { secretKey: _dropped, ...safeConn } = conn;
+  const { secretKey: _dropped, ...incoming } = conn;
+  // Filter out undefined values: they would override stored values via spread, but
+  // callers pass partial objects where an absent key means "leave it alone".
+  const safeConn = Object.fromEntries(
+    Object.entries(incoming).filter(([, v]) => v !== undefined)
+  );
   const data = loadConnectionRecords();
   const idx = data.connections.findIndex(c => c.id === safeConn.id);
   const previousCredentialId = idx >= 0 ? data.connections[idx].credentialId : null;
@@ -163,7 +168,14 @@ export function saveConnectionRecord(conn) {
   // The new connection record is already persisted at this point, so
   // deleteCredentialRecord's reference check will see the updated link and
   // correctly decide whether anything still uses the old credential (#53).
-  if (previousCredentialId !== null && previousCredentialId !== safeConn.credentialId) {
+  // Check 'credentialId' in safeConn separately: partial updates are a load-bearing
+  // feature (e.g. omitting capabilities to leave it untouched). An absent key means
+  // "leave it alone", not "it changed to undefined". Explicit undefined would orphan
+  // the connection, so we must guard against that case.
+  if (previousCredentialId !== null
+      && 'credentialId' in safeConn
+      && safeConn.credentialId !== undefined
+      && previousCredentialId !== safeConn.credentialId) {
     deleteCredentialRecord(previousCredentialId);
   }
 }
