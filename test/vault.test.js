@@ -11,6 +11,13 @@ global.localStorage = {
   removeItem: k     => { delete ls[k]; },
 };
 
+const ss = {};
+global.sessionStorage = {
+  getItem:    k     => Object.prototype.hasOwnProperty.call(ss, k) ? ss[k] : null,
+  setItem:    (k,v) => { ss[k] = String(v); },
+  removeItem: k     => { delete ss[k]; },
+};
+
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { webcrypto } from 'node:crypto';
@@ -19,7 +26,13 @@ import {
   deriveVaultKey, wrapSecret, unwrapSecret, newSalt,
   loadVaultRecord, vaultExists, saveVaultRecord, deleteVaultRecord,
   getVaultEntry, setVaultEntry, deleteVaultEntry, clearVaultEntries,
+  createVault, unlockVault, isUnlocked, lockVault, resetVault,
+  rememberSecret, recallSecret, SS_KEY_VAULT_KEY,
 } from '../src/lib/vault.js';
+import {
+  findOrCreateCredential, saveConnectionRecord,
+  loadConnectionRecords, loadCredentialRecords,
+} from '../src/lib/connections.js';
 
 const subtle = webcrypto.subtle;
 const getRandomValues = webcrypto.getRandomValues.bind(webcrypto);
@@ -188,5 +201,127 @@ describe('vault record', () => {
     clearVaultEntries();
     assert.equal(vaultExists(), false);
     assert.equal(ls['s3b_vault'], undefined);
+  });
+});
+
+describe('unlock lifecycle', () => {
+  beforeEach(() => {
+    for (const k of Object.keys(ls)) delete ls[k];
+    for (const k of Object.keys(ss)) delete ss[k];
+  });
+
+  test('a fresh vault can be created and is then unlocked', async () => {
+    const r = await createVault('hunter2', subtle, getRandomValues);
+    assert.equal(r.ok, true);
+    assert.equal(vaultExists(), true);
+    assert.equal(isUnlocked(), true);
+  });
+
+  test('creation fails loudly when the record cannot persist', async () => {
+    const original = global.localStorage.setItem;
+    global.localStorage.setItem = () => { throw new Error('private browsing'); };
+    try {
+      const r = await createVault('hunter2', subtle, getRandomValues);
+      assert.equal(r.ok, false, 'a vault that did not persist must never report success');
+      assert.equal(isUnlocked(), false, 'and must not appear unlocked');
+    } finally { global.localStorage.setItem = original; }
+  });
+
+  test('the correct passphrase unlocks after a lock', async () => {
+    await createVault('hunter2', subtle, getRandomValues);
+    lockVault();
+    assert.equal(isUnlocked(), false);
+    assert.deepEqual(await unlockVault('hunter2', subtle), { ok: true });
+    assert.equal(isUnlocked(), true);
+  });
+
+  test('a wrong passphrase is rejected and reported as such', async () => {
+    await createVault('hunter2', subtle, getRandomValues);
+    lockVault();
+    const r = await unlockVault('hunter3', subtle);
+    assert.equal(r.ok, false);
+    assert.equal(r.reason, 'wrong-passphrase');
+    assert.equal(isUnlocked(), false);
+  });
+
+  test('unlocking with no vault reports no-vault, not a wrong passphrase', async () => {
+    const r = await unlockVault('anything', subtle);
+    assert.equal(r.reason, 'no-vault');
+  });
+
+  test('a corrupt vault is distinguished from a wrong passphrase', async () => {
+    await createVault('hunter2', subtle, getRandomValues);
+    lockVault();
+    const rec = loadVaultRecord();
+    rec.check = { iv: 'not', ct: 'valid' };
+    saveVaultRecord(rec);
+    const r = await unlockVault('hunter2', subtle);
+    assert.equal(r.ok, false);
+    assert.equal(r.reason, 'corrupt', 'the UI offers reset for corrupt, not for a typo');
+  });
+
+  test('the session key survives a simulated reload', async () => {
+    await createVault('hunter2', subtle, getRandomValues);
+    await rememberSecret('cred1', 'SECRET', subtle);
+    // A reload clears module state but not sessionStorage.
+    assert.ok(ss[SS_KEY_VAULT_KEY], 'the derived key must be in sessionStorage');
+    assert.equal(isUnlocked(), true);
+    assert.equal(await recallSecret('cred1', subtle), 'SECRET');
+  });
+
+  test('lockVault forgets the key but keeps the ciphertexts', async () => {
+    await createVault('hunter2', subtle, getRandomValues);
+    await rememberSecret('cred1', 'SECRET', subtle);
+    lockVault();
+    assert.equal(isUnlocked(), false);
+    assert.equal(ss[SS_KEY_VAULT_KEY], undefined);
+    assert.ok(getVaultEntry('cred1'), 'locking must not destroy anything');
+    await unlockVault('hunter2', subtle);
+    assert.equal(await recallSecret('cred1', subtle), 'SECRET');
+  });
+
+  test('resetVault destroys ciphertexts and leaves connections alone', async () => {
+    const c = findOrCreateCredential({ endpoint: 'e', keyId: 'k', provider: 'b2', regionOverride: '' });
+    saveConnectionRecord({ id: 1, name: 'C', credentialId: c.id, bucket: 'b', capabilities: null });
+    await createVault('hunter2', subtle, getRandomValues);
+    await rememberSecret(c.id, 'SECRET', subtle);
+
+    resetVault();
+    assert.equal(vaultExists(), false);
+    assert.equal(isUnlocked(), false);
+    assert.equal(loadConnectionRecords().connections.length, 1, 'connections survive a vault reset');
+    assert.equal(loadCredentialRecords().credentials.length, 1);
+  });
+});
+
+describe('remember / recall', () => {
+  beforeEach(() => {
+    for (const k of Object.keys(ls)) delete ls[k];
+    for (const k of Object.keys(ss)) delete ss[k];
+  });
+
+  test('a remembered secret is recalled verbatim', async () => {
+    await createVault('hunter2', subtle, getRandomValues);
+    assert.equal(await rememberSecret('cred1', 'aws/secret+KEY==', subtle), true);
+    assert.equal(await recallSecret('cred1', subtle), 'aws/secret+KEY==');
+  });
+
+  test('a credential with no entry recalls null, not an error', async () => {
+    await createVault('hunter2', subtle, getRandomValues);
+    assert.equal(await recallSecret('never-remembered', subtle), null);
+  });
+
+  test('remember and recall are inert while locked', async () => {
+    await createVault('hunter2', subtle, getRandomValues);
+    lockVault();
+    assert.equal(await rememberSecret('cred1', 'SECRET', subtle), false);
+    assert.equal(await recallSecret('cred1', subtle), null);
+  });
+
+  test('the plaintext secret never appears in localStorage', async () => {
+    await createVault('hunter2', subtle, getRandomValues);
+    await rememberSecret('cred1', 'PLAINTEXTMARKER', subtle);
+    assert.equal(JSON.stringify(ls).includes('PLAINTEXTMARKER'), false,
+      'this is the entire point of the feature');
   });
 });

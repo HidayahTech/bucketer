@@ -172,3 +172,127 @@ export function clearVaultEntries() {
   record.entries = {};
   saveVaultRecord(record);
 }
+
+// The unlock lifecycle: deriving the key is the expensive, deliberate part
+// (600,000 PBKDF2 rounds); everything below holds onto that result for the
+// session rather than re-deriving it on every read.
+//
+// The derived key is exported raw and kept in sessionStorage, not a module
+// variable — see the threat-model note at the top of this file. That choice
+// also makes isUnlocked() correct across a reload: module state resets on
+// reload but sessionStorage does not, so isUnlocked() must read the same
+// storage the key actually lives in, or a reload would show "locked" while
+// an unlocked key sits right there.
+export const SS_KEY_VAULT_KEY = 's3b_vault_key';
+
+function safeGetSession(key) {
+  try { return sessionStorage.getItem(key); } catch { return null; }
+}
+function safeSetSession(key, value) {
+  try { sessionStorage.setItem(key, value); } catch { /* private mode — session ends unlocked-in-memory only */ }
+}
+function safeRemoveSession(key) {
+  try { sessionStorage.removeItem(key); } catch { /* */ }
+}
+
+async function storeSessionKey(key, subtle) {
+  const raw = await subtle.exportKey('raw', key);
+  safeSetSession(SS_KEY_VAULT_KEY, toBase64(new Uint8Array(raw)));
+}
+
+// null when locked. Re-imports on every call rather than caching a CryptoKey
+// in a module variable, for the same reload reason isUnlocked() reads storage.
+async function importSessionKey(subtle) {
+  const raw = safeGetSession(SS_KEY_VAULT_KEY);
+  if (raw === null) return null;
+  return subtle.importKey('raw', fromBase64(raw), 'AES-GCM', true, ['encrypt', 'decrypt']);
+}
+
+export function isUnlocked() {
+  return safeGetSession(SS_KEY_VAULT_KEY) !== null;
+}
+
+export function lockVault() {
+  safeRemoveSession(SS_KEY_VAULT_KEY);
+}
+
+// Destroys the ciphertexts (and the passphrase's salt/check with them) and
+// forgets the session key. Only ever touches the vault's own storage key —
+// connections.js's credentials and connections are a different record and
+// must survive a reset untouched.
+export function resetVault() {
+  deleteVaultRecord();
+  lockVault();
+}
+
+// Generates a salt, derives a key, wraps CHECK_PLAINTEXT as `check`, and
+// persists the record. Returns { ok: false } — never throws, never appears
+// unlocked — when the record did not actually land (private browsing).
+export async function createVault(passphrase, subtle, getRandomValues) {
+  const salt = newSalt(getRandomValues);
+  const key = await deriveVaultKey(passphrase, salt, PBKDF2_ITERATIONS, subtle);
+  const check = await wrapSecret(key, CHECK_PLAINTEXT, subtle);
+  const record = {
+    version: VAULT_VERSION,
+    salt: toBase64(salt),
+    iterations: PBKDF2_ITERATIONS,
+    check,
+    entries: {},
+  };
+  if (!saveVaultRecord(record)) return { ok: false };
+  await storeSessionKey(key, subtle);
+  return { ok: true };
+}
+
+// Derives from the stored salt and iterations, then verifies the passphrase
+// by unwrapping `check` and comparing to CHECK_PLAINTEXT — this works even
+// when the vault holds no entries, which is why `check` exists at all.
+//
+// 'wrong-passphrase' vs 'corrupt': AES-GCM's auth tag cannot cryptographically
+// tell "wrong key" apart from "tampered ciphertext of the same shape" — both
+// surface from subtle.decrypt as the same OperationError. Only unambiguous
+// structural breakage (malformed base64, a record subtle.decrypt never even
+// gets to run against) is reported as 'corrupt'; an OperationError defaults to
+// 'wrong-passphrase', the non-destructive bucket, since the UI offers a
+// destructive reset only for 'corrupt'.
+export async function unlockVault(passphrase, subtle) {
+  const record = loadVaultRecord();
+  if (!record) return { ok: false, reason: 'no-vault' };
+
+  let key;
+  try {
+    const salt = fromBase64(record.salt);
+    key = await deriveVaultKey(passphrase, salt, record.iterations, subtle);
+  } catch {
+    return { ok: false, reason: 'corrupt' };
+  }
+
+  let checked;
+  try {
+    checked = await unwrapSecret(key, record.check, subtle);
+  } catch (err) {
+    return { ok: false, reason: err && err.name === 'OperationError' ? 'wrong-passphrase' : 'corrupt' };
+  }
+  if (checked !== CHECK_PLAINTEXT) return { ok: false, reason: 'corrupt' };
+
+  await storeSessionKey(key, subtle);
+  return { ok: true };
+}
+
+// No-op (false) while locked — there is no session key to wrap with.
+export async function rememberSecret(credentialId, secret, subtle) {
+  const key = await importSessionKey(subtle);
+  if (!key) return false;
+  const wrapped = await wrapSecret(key, secret, subtle);
+  return setVaultEntry(credentialId, wrapped);
+}
+
+// null while locked, and null (not a throw) for a credential with no entry —
+// that is the ordinary case for a connection the user never chose to remember.
+export async function recallSecret(credentialId, subtle) {
+  const key = await importSessionKey(subtle);
+  if (!key) return null;
+  const wrapped = getVaultEntry(credentialId);
+  if (!wrapped) return null;
+  return unwrapSecret(key, wrapped, subtle);
+}
