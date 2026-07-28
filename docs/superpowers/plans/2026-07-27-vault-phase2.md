@@ -266,7 +266,8 @@ describe('key derivation', () => {
   test('a different salt derives a different key', async () => {
     const a = await deriveVaultKey('pass', SALT, PBKDF2_ITERATIONS, subtle);
     const b = await deriveVaultKey('pass', newSalt(getRandomValues), PBKDF2_ITERATIONS, subtle);
-    await assert.rejects(() => unwrapSecret(b, await wrapSecret(a, 'x', subtle), subtle));
+    const wrapped = await wrapSecret(a, 'x', subtle);
+    await assert.rejects(() => unwrapSecret(b, wrapped, subtle));
   });
 
   test('the derived key is extractable — sessionStorage handoff depends on it', async () => {
