@@ -262,6 +262,44 @@ Phase 1 landing invisibly is deliberate: the migration is the riskiest element
 and gets a release of its own to prove out before anything is built on it. Each
 phase is a minor release.
 
+### Phase 1 as-built — what Phase 2 must account for
+
+**Phase 1 shipped as v1.39.0 on 2026-07-27** (merge `7790159`, patched by v1.39.1).
+It landed the model this spec describes, but review surfaced three facts this
+document was written before, and each changes Phase 2's scope.
+
+**1. There is a migration marker: `s3b_connections_migrated`.** It did not exist
+in this spec. It records — as a fact, not a derivation — that a device is on the
+connection model, written both by migration and by `saveConnectionRecord()`. It
+must be cleared alongside the vault by any wipe path, and the reasoning behind it
+(`BUG-045`) is why the vault must not infer state it can record instead.
+
+**2. Credentials are now garbage-collected, so vault entries must cascade.** The
+edge case below asked for "blocked or cascade"; Phase 1 chose cascade —
+`deleteConnectionRecord()` calls `deleteCredentialRecord()`, which refuses while
+another connection still references the credential. Since vault entries key on
+`credentialId`, **deleting the last connection using a credential must also delete
+that credential's vault entry**, or the vault accumulates ciphertexts under ids
+that no longer exist anywhere and no UI can reach.
+
+**3. Editing a connection onto different credentials mints a new credential id**
+([#53](https://gitlab.com/hidayahtech/bucketer/-/work_items/53), open). Today it
+orphans the old credential record. Once the vault exists it orphans a *secret*
+too, and worse: the secret the user just typed would be silently forgotten,
+because the vault entry sits under the old id while the connection now points at
+a new one. Phase 2 must therefore:
+
+- fix #53 so the superseded credential is collected, and
+- **re-wrap the secret under the new credential id** when a connection is saved
+  with the vault unlocked and a secret present in the form.
+
+Fixing #53 first, as its own change, is the cheaper order — it is small, it is
+independently testable, and it stops the orphan class growing before secrets are
+attached to it.
+
+**Line references in this document predate Phase 1** and have all shifted; treat
+them as pointers to the right function, not the right line.
+
 ### Phase 4 — paste-anything
 
 `src/lib/credential-paste.js` is a pure function from pasted text to partial form
