@@ -146,6 +146,7 @@ export function saveConnectionRecord(conn) {
   const { secretKey: _dropped, ...safeConn } = conn;
   const data = loadConnectionRecords();
   const idx = data.connections.findIndex(c => c.id === safeConn.id);
+  const previousCredentialId = idx >= 0 ? data.connections[idx].credentialId : null;
   if (idx >= 0) data.connections[idx] = { ...data.connections[idx], ...safeConn };
   else data.connections.push({ ...safeConn });
   saveConnectionData(data);
@@ -158,6 +159,13 @@ export function saveConnectionRecord(conn) {
   // connection after a user saved one and then deleted it (see
   // hasMigratedConnections() for the full explanation).
   safeSetRaw(LS_KEY_MIGRATED, '1');
+  // If this is an update and the credential changed, garbage-collect the old one.
+  // The new connection record is already persisted at this point, so
+  // deleteCredentialRecord's reference check will see the updated link and
+  // correctly decide whether anything still uses the old credential (#53).
+  if (previousCredentialId !== null && previousCredentialId !== safeConn.credentialId) {
+    deleteCredentialRecord(previousCredentialId);
+  }
 }
 
 // Also garbage-collects the connection's credential: an explicitly deleted

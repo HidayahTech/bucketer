@@ -563,3 +563,44 @@ describe('repairCredentialProviders', () => {
     assert.deepEqual(loadCredentialRecords().credentials, []);
   });
 });
+
+describe('saveConnectionRecord collects a superseded credential (#53)', () => {
+  test('re-pointing a connection at new credentials deletes the old credential', () => {
+    const a = findOrCreateCredential({ endpoint: 'https://a.example.com', keyId: 'k1', provider: 'b2', regionOverride: '' });
+    saveConnectionRecord({ id: 1, name: 'C', credentialId: a.id, bucket: 'b', capabilities: null });
+    assert.equal(loadCredentialRecords().credentials.length, 1);
+
+    const b = findOrCreateCredential({ endpoint: 'https://b.example.com', keyId: 'k2', provider: 'b2', regionOverride: '' });
+    saveConnectionRecord({ id: 1, name: 'C', credentialId: b.id, bucket: 'b' });
+
+    const { credentials } = loadCredentialRecords();
+    assert.deepEqual(credentials.map(c => c.id), [b.id],
+      'the superseded credential must not linger with nothing referencing it');
+  });
+
+  test('a credential still used by another connection survives', () => {
+    const a = findOrCreateCredential({ endpoint: 'https://a.example.com', keyId: 'k1', provider: 'b2', regionOverride: '' });
+    saveConnectionRecord({ id: 1, name: 'C1', credentialId: a.id, bucket: 'b1', capabilities: null });
+    saveConnectionRecord({ id: 2, name: 'C2', credentialId: a.id, bucket: 'b2', capabilities: null });
+
+    const b = findOrCreateCredential({ endpoint: 'https://b.example.com', keyId: 'k2', provider: 'b2', regionOverride: '' });
+    saveConnectionRecord({ id: 1, name: 'C1', credentialId: b.id, bucket: 'b1' });
+
+    const ids = loadCredentialRecords().credentials.map(c => c.id).sort();
+    assert.deepEqual(ids, [a.id, b.id].sort(), 'connection 2 still uses credential a');
+  });
+
+  test('creating a connection deletes nothing', () => {
+    const a = findOrCreateCredential({ endpoint: 'https://a.example.com', keyId: 'k1', provider: 'b2', regionOverride: '' });
+    saveConnectionRecord({ id: 1, name: 'C', credentialId: a.id, bucket: 'b', capabilities: null });
+    assert.equal(loadCredentialRecords().credentials.length, 1);
+  });
+
+  test('updating a connection without changing its credential deletes nothing', () => {
+    const a = findOrCreateCredential({ endpoint: 'https://a.example.com', keyId: 'k1', provider: 'b2', regionOverride: '' });
+    saveConnectionRecord({ id: 1, name: 'C', credentialId: a.id, bucket: 'b', capabilities: null });
+    saveConnectionRecord({ id: 1, name: 'Renamed', credentialId: a.id, bucket: 'b' });
+    assert.equal(loadCredentialRecords().credentials.length, 1);
+    assert.equal(loadConnectionRecords().connections[0].name, 'Renamed');
+  });
+});
