@@ -19,10 +19,11 @@
 //
 // `subtle` is injected rather than read from a global so the derivation and
 // wrap/unwrap paths are exercised identically under plain Node (`node --test`,
-// no jsdom) and in the browser bundle. IV bytes come from the global `crypto`
-// object directly (same convention as file-identity.js's use of
-// `crypto.subtle`) since Node ships WebCrypto as a global and the interface
-// here has no separate slot for an injected RNG.
+// no jsdom) and in the browser bundle. In the browser, the caller passes:
+//   subtle = window.crypto.subtle
+// IV bytes come from the global `crypto` object directly (same convention as
+// file-identity.js's use of `crypto.subtle`) since Node ships WebCrypto as a
+// global and the interface here has no separate slot for an injected RNG.
 //
 // This module is pure: no DOM, no storage, no record shape. It imports
 // nothing.
