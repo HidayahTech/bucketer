@@ -60,6 +60,16 @@ async function waitFor(condition, { tries = 60, intervalMs = 10 } = {}) {
   return condition();
 }
 
+// Whether ANY reset-activating control is present — not just the confirm-step
+// .btn-danger, which never renders until the ghost "Reset vault…" trigger
+// beneath it has already been clicked. Checking .btn-danger alone would pass
+// even if the trigger were wrongly shown for a non-'corrupt' reason, since the
+// test never clicks through to the second step. Text-based rather than a CSS
+// class, matching the "no dictated selectors" scope of this task.
+function hasResetTrigger(form) {
+  return [...form.querySelectorAll('button')].some(b => /reset/i.test(b.textContent));
+}
+
 describe('VaultUnlock — password-manager fields', () => {
   test('the username field is readonly and carries the exact vault constant', () => {
     const { query, cleanup } = mount(h(VaultUnlock, defaultProps()));
@@ -164,6 +174,8 @@ describe('VaultUnlock — wrong passphrase vs corrupt vault', () => {
       const shown = await waitFor(() => /wrong/i.test(text()));
       assert.ok(shown, 'a wrong-passphrase error must be shown');
       assert.equal(query('.btn-danger'), null, 'a wrong passphrase must NOT offer a reset control');
+      assert.ok(!hasResetTrigger(query('form')),
+        'a wrong passphrase must NOT show even the first-step "Reset vault…" trigger');
     } finally { cleanup(); }
   });
 
@@ -184,8 +196,26 @@ describe('VaultUnlock — wrong passphrase vs corrupt vault', () => {
       fire(query('form'), 'submit');
       const shown = await waitFor(() => /corrupt/i.test(text()));
       assert.ok(shown, 'a corrupt-vault error must be shown');
-      assert.ok(query('.btn-danger') || text().toLowerCase().includes('reset'),
-        'a corrupt vault must offer a reset control');
+      assert.ok(hasResetTrigger(query('form')), 'a corrupt vault must offer a reset control');
+    } finally { cleanup(); }
+  });
+
+  // Real-crypto fixtures naturally cover the states createVault() produces
+  // (wrong-passphrase, corrupt) and can quietly skip ones that don't — this
+  // exercises 'no-vault' by simply never calling createVault(). Only 'corrupt'
+  // is allowed to offer reset; this pins that 'no-vault' does not, since it is
+  // a distinct, non-destructive reason.
+  test('a no-vault result shows an error and renders no reset control', async () => {
+    // beforeEach already clears localStorage — no vault exists.
+    const { query, text, cleanup } = mount(h(VaultUnlock, defaultProps()));
+    try {
+      setInput(query('input[autocomplete="current-password"]'), PASSPHRASE);
+      fire(query('form'), 'submit');
+      const shown = await waitFor(() => /no vault/i.test(text()));
+      assert.ok(shown, 'a no-vault error must be shown');
+      assert.equal(query('.btn-danger'), null, 'a no-vault result must NOT offer a reset control');
+      assert.ok(!hasResetTrigger(query('form')),
+        'a no-vault result must NOT show even the first-step "Reset vault…" trigger');
     } finally { cleanup(); }
   });
 });
