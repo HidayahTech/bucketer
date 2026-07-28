@@ -124,22 +124,41 @@ describe('VaultUnlock — connection list', () => {
 });
 
 describe('VaultUnlock — unlock submission', () => {
-  test('submitting calls onUnlock with the typed passphrase', async () => {
+  // Round-2 review: the original brief mandated onUnlock(passphrase), but the
+  // passphrase has no use once unlockVault() has already derived and persisted
+  // the session key — and unlike that single-purpose key, passphrases are
+  // reused across services, so retaining it is the more sensitive leak of the
+  // two. onUnlock is now called with no argument.
+  test('submitting calls onUnlock with no argument', async () => {
     await createVault(PASSPHRASE, window.crypto.subtle, getRandomValues);
     // createVault leaves the vault unlocked (session key set) — clear that so
     // this test exercises the actual unlock submission, not an already-open vault.
     sessionStorage.clear();
 
-    let unlockedWith = null;
+    let calls = null;
     const { query, cleanup } = mount(h(VaultUnlock, defaultProps({
-      onUnlock: passphrase => { unlockedWith = passphrase; },
+      onUnlock: (...args) => { calls = args; },
     })));
     try {
       setInput(query('input[autocomplete="current-password"]'), PASSPHRASE);
       fire(query('form'), 'submit');
-      const ok = await waitFor(() => unlockedWith !== null);
+      const ok = await waitFor(() => calls !== null);
       assert.ok(ok, 'onUnlock must be called after a correct passphrase is submitted');
-      assert.equal(unlockedWith, PASSPHRASE, 'onUnlock must receive the exact typed passphrase');
+      assert.deepEqual(calls, [], 'onUnlock must be called with no argument — the passphrase has already done its job by the time unlockVault resolves');
+    } finally { cleanup(); }
+  });
+
+  test('the passphrase input is cleared after a successful unlock', async () => {
+    await createVault(PASSPHRASE, window.crypto.subtle, getRandomValues);
+    sessionStorage.clear();
+
+    const { query, cleanup } = mount(h(VaultUnlock, defaultProps()));
+    try {
+      const input = query('input[autocomplete="current-password"]');
+      setInput(input, PASSPHRASE);
+      fire(query('form'), 'submit');
+      const cleared = await waitFor(() => input.value === '');
+      assert.ok(cleared, 'the passphrase field must be cleared once unlock succeeds — it must not linger in the DOM or component state');
     } finally { cleanup(); }
   });
 

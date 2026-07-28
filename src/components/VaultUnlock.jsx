@@ -43,7 +43,17 @@ export function VaultUnlock({ connections = [], onUnlock, onReset }) {
     const result = await unlockVault(passphrase, window.crypto.subtle);
     setUnlocking(false);
     if (result.ok) {
-      onUnlock(passphrase);
+      // Clear the passphrase from our own state — and thus the rendered input —
+      // before handing control to the parent via onUnlock(). unlockVault() has
+      // already derived the session key and persisted it; nothing downstream
+      // needs the passphrase itself, and unlike that single-purpose derived key,
+      // a passphrase is often reused across services, so it is the more
+      // sensitive of the two things left in memory once unlock succeeds. Clearing
+      // first (not after) means there is no window in which a re-render —
+      // whether triggered by our own state or provoked by onUnlock() itself —
+      // could still show it.
+      setPassphrase('');
+      onUnlock();
     } else {
       setError(result.reason);
       setConfirmingReset(false);
