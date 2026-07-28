@@ -228,6 +228,7 @@ export function CredentialForm({ initial, onSave, onFormChange, loading, autoFoc
         <label htmlFor="cred-endpoint">Endpoint URL</label>
         <input
           id="cred-endpoint"
+          name="cred-endpoint"
           type="url"
           value={form.endpoint}
           onInput={set('endpoint')}
@@ -249,6 +250,7 @@ export function CredentialForm({ initial, onSave, onFormChange, loading, autoFoc
         <label htmlFor="cred-bucket">Bucket Name</label>
         <input
           id="cred-bucket"
+          name="cred-bucket"
           type="text"
           value={form.bucket}
           onInput={set('bucket')}
@@ -265,6 +267,7 @@ export function CredentialForm({ initial, onSave, onFormChange, loading, autoFoc
         <label htmlFor="cred-keyid">Key ID</label>
         <input
           id="cred-keyid"
+          name="cred-keyid"
           type="text"
           value={form.keyId}
           onInput={set('keyId')}
@@ -281,6 +284,7 @@ export function CredentialForm({ initial, onSave, onFormChange, loading, autoFoc
         <label htmlFor="cred-secretkey">Secret Key</label>
         <input
           id="cred-secretkey"
+          name="cred-secretkey"
           ref={secretRef}
           type="password"
           value={form.secretKey}
@@ -310,6 +314,7 @@ export function CredentialForm({ initial, onSave, onFormChange, loading, autoFoc
         <label htmlFor="cred-region">Region</label>
         <input
           id="cred-region"
+          name="cred-region"
           type="text"
           value={form.regionOverride}
           onInput={set('regionOverride')}

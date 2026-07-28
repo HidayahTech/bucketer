@@ -9,23 +9,34 @@
 import '../helpers/with-dom.js';
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
+import { webcrypto } from 'node:crypto';
 import { h } from 'preact';
 import { mount, fire, setInput } from '../helpers/render.js';
 import { App } from '../../src/components/App.jsx';
 import { saveConnectionCapabilities, saveConnectionRecord, findOrCreateCredential, deleteConnectionRecord } from '../../src/lib/connections.js';
 import { deleteAllProfiles } from '../../src/lib/storage.js';
 import { buildShareUrl, readUrlParams } from '../../src/lib/url-params.js';
+import { createVault, rememberSecret, recallSecret, vaultExists, isUnlocked, SS_KEY_VAULT_KEY } from '../../src/lib/vault.js';
+import { VAULT_USERNAME } from '../../src/components/VaultUnlock.jsx';
+
+// jsdom does not implement SubtleCrypto — patch in Node's real WebCrypto, the same
+// technique test/components/vault-unlock.test.jsx uses, so the Task 6 tests below can
+// exercise real createVault/rememberSecret/recallSecret end to end through App.jsx.
+window.crypto.subtle = webcrypto.subtle;
+const getRandomValues = webcrypto.getRandomValues.bind(webcrypto);
+const PASSPHRASE = 'correct horse battery staple';
 
 const CRED_KEYS = [
   's3b_endpoint', 's3b_bucket', 's3b_key_id', 's3b_provider',
   's3b_region_override', 's3b_capabilities', 's3b_profiles',
   's3b_last_profile_id', 's3b_connections', 's3b_credentials',
-  's3b_connections_migrated',
+  's3b_connections_migrated', 's3b_vault', 's3b_vault_offer_dismissed',
 ];
 
 function clearAppStorage() {
   CRED_KEYS.forEach(k => localStorage.removeItem(k));
   sessionStorage.removeItem('s3b_secret_key');
+  sessionStorage.removeItem(SS_KEY_VAULT_KEY);
 }
 
 describe('App — disconnected state', () => {
@@ -783,5 +794,309 @@ describe('App — connection share links', () => {
     } finally {
       cleanup(); window.location.hash = ''; clearAppStorage();
     }
+  });
+});
+
+// ── Task 6 (vault-phase2): wiring the vault into App.jsx ─────────────────────────────
+//
+// #cred-endpoint (CredentialForm) vs #vault-passphrase (VaultUnlock) are used to
+// distinguish "connect form rendered" from "unlock screen rendered" rather than
+// autocomplete attributes — CredentialForm's own Secret Key field already uses
+// autocomplete="current-password" (matching VaultUnlock's passphrase field by
+// design), so that attribute alone cannot tell the two screens apart once both
+// exist in the same file.
+describe('App — vault lock screen (Task 6)', () => {
+  test('a vault present and locked renders VaultUnlock, not the connect form', async () => {
+    clearAppStorage();
+    await createVault(PASSPHRASE, window.crypto.subtle, getRandomValues);
+    sessionStorage.removeItem(SS_KEY_VAULT_KEY); // createVault leaves it unlocked — start locked
+    const { query, cleanup } = mount(h(App, {}));
+    try {
+      assert.ok(query('#vault-passphrase'),
+        'the vault passphrase field must render when a vault exists and is locked');
+      assert.equal(query('#cred-endpoint'), null,
+        'the connect form must not render while locked');
+    } finally { cleanup(); clearAppStorage(); }
+  });
+
+  test('no vault renders the connect form exactly as today, not the unlock screen', () => {
+    clearAppStorage();
+    const { query, cleanup } = mount(h(App, {}));
+    try {
+      assert.ok(query('#cred-endpoint'), 'the connect form must render when there is no vault');
+      assert.equal(query('#vault-passphrase'), null,
+        'the vault unlock screen must not render when there is no vault');
+    } finally { cleanup(); clearAppStorage(); }
+  });
+
+  test('unlocking reveals the connect form', async () => {
+    clearAppStorage();
+    await createVault(PASSPHRASE, window.crypto.subtle, getRandomValues);
+    sessionStorage.removeItem(SS_KEY_VAULT_KEY);
+    const { query, cleanup } = mount(h(App, {}));
+    try {
+      const passInput = query('#vault-passphrase');
+      assert.ok(passInput, 'precondition: starts locked');
+      setInput(passInput, PASSPHRASE);
+      fire(passInput.closest('form'), 'submit');
+
+      let revealed = false;
+      for (let i = 0; i < 60 && !revealed; i++) {
+        await new Promise(r => setTimeout(r, 10));
+        revealed = !!query('#cred-endpoint');
+      }
+      assert.ok(revealed, 'the connect form must appear after a successful unlock');
+    } finally { cleanup(); clearAppStorage(); }
+  });
+});
+
+describe('App — vault-backed auto-connect (Task 6)', () => {
+  test('a connection whose secret is remembered auto-connects on mount without the user typing anything', async () => {
+    clearAppStorage();
+    await createVault(PASSPHRASE, window.crypto.subtle, getRandomValues);
+    // Leave sessionStorage's vault key intact — this is the "already unlocked, page
+    // reloaded in the same tab" scenario the mount-effect recall path exists for
+    // (sessionStorage survives a same-tab reload; it does not survive a fresh tab).
+    localStorage.setItem('s3b_connections_migrated', '1');
+    localStorage.setItem('s3b_credentials', JSON.stringify({
+      version: 1,
+      credentials: [{ id: 'credV', label: 'V', endpoint: 'http://127.0.0.1:1', keyId: 'AKIDVAULT', provider: null, regionOverride: '' }],
+    }));
+    localStorage.setItem('s3b_connections', JSON.stringify({
+      version: 2,
+      connections: [{ id: 501, name: 'Vault conn', credentialId: 'credV', bucket: 'vault-bucket', capabilities: null }],
+    }));
+    localStorage.setItem('s3b_last_profile_id', '501');
+    await rememberSecret('credV', 'sekrit-value', window.crypto.subtle);
+
+    const { query, cleanup } = mount(h(App, {}));
+    try {
+      let connected = false;
+      for (let i = 0; i < 80 && !connected; i++) {
+        await new Promise(r => setTimeout(r, 10));
+        connected = !!query('[data-testid="app-connected"]');
+      }
+      assert.ok(connected, 'the app must auto-connect using the remembered secret without any typing');
+    } finally { cleanup(); clearAppStorage(); }
+  });
+
+  // Design doc: "Clicking a connection focuses the passphrase; Enter unlocks and
+  // connects into that connection in one motion" — unlocking must not merely reveal
+  // the connect form, it must attempt the same recall-and-connect the mount effect
+  // does, immediately, for a genuinely fresh tab (no prior sessionStorage) too.
+  test('unlocking auto-connects into the selected connection when its secret is remembered (one motion)', async () => {
+    clearAppStorage();
+    await createVault(PASSPHRASE, window.crypto.subtle, getRandomValues);
+    localStorage.setItem('s3b_connections_migrated', '1');
+    localStorage.setItem('s3b_credentials', JSON.stringify({
+      version: 1,
+      credentials: [{ id: 'credU', label: 'U', endpoint: 'http://127.0.0.1:1', keyId: 'AKIDUNLOCK', provider: null, regionOverride: '' }],
+    }));
+    localStorage.setItem('s3b_connections', JSON.stringify({
+      version: 2,
+      connections: [{ id: 777, name: 'Unlock conn', credentialId: 'credU', bucket: 'unlock-bucket', capabilities: null }],
+    }));
+    localStorage.setItem('s3b_last_profile_id', '777');
+    await rememberSecret('credU', 'unlocked-secret', window.crypto.subtle);
+    sessionStorage.removeItem(SS_KEY_VAULT_KEY); // re-lock before mounting — fresh-tab scenario
+
+    const { query, cleanup } = mount(h(App, {}));
+    try {
+      const passInput = query('#vault-passphrase');
+      assert.ok(passInput, 'precondition: starts locked');
+      setInput(passInput, PASSPHRASE);
+      fire(passInput.closest('form'), 'submit');
+
+      let connected = false;
+      for (let i = 0; i < 80 && !connected; i++) {
+        await new Promise(r => setTimeout(r, 10));
+        connected = !!query('[data-testid="app-connected"]');
+      }
+      assert.ok(connected, 'unlocking must auto-connect into the selected connection in one motion');
+    } finally { cleanup(); clearAppStorage(); }
+  });
+});
+
+describe('App — post-connect vault offer (Task 6)', () => {
+  test('the offer appears after the first successful connect when no vault exists', () => {
+    clearAppStorage();
+    const { query, text, cleanup } = mount(h(App, {}));
+    try {
+      setInput(query('#cred-endpoint'), 'http://127.0.0.1:1');
+      setInput(query('#cred-bucket'), 'offer-bucket');
+      setInput(query('#cred-keyid'), 'AKIDOFFER');
+      setInput(query('#cred-secretkey'), 'offer-secret');
+      fire(query('button[type="submit"]'), 'click');
+      assert.ok(/retype it/i.test(text()),
+        'the post-connect vault offer must appear after a successful connect with no vault present');
+    } finally { cleanup(); clearAppStorage(); }
+  });
+
+  test('the offer never appears once a vault already exists', () => {
+    clearAppStorage();
+    localStorage.setItem('s3b_vault', JSON.stringify({
+      version: 1, salt: 'c2FsdA==', iterations: 1, check: { iv: 'aXY=', ct: 'Y3Q=' }, entries: {},
+    }));
+    // Simulate "already unlocked" directly rather than awaiting createVault — the
+    // condition under test (vaultExists()) does not depend on the record being
+    // real/decryptable, only present, so an ordinary (non-async) seed keeps this
+    // test fast and lock-state-independent of a real derivation.
+    sessionStorage.setItem(SS_KEY_VAULT_KEY, 'irrelevant-for-this-test');
+    const { query, text, cleanup } = mount(h(App, {}));
+    try {
+      setInput(query('#cred-endpoint'), 'http://127.0.0.1:1');
+      setInput(query('#cred-bucket'), 'offer-bucket-2');
+      setInput(query('#cred-keyid'), 'AKIDOFFER2');
+      setInput(query('#cred-secretkey'), 'offer-secret-2');
+      fire(query('button[type="submit"]'), 'click');
+      assert.ok(!/retype it/i.test(text()),
+        'the offer must never appear once a vault already exists');
+    } finally { cleanup(); clearAppStorage(); }
+  });
+
+  test('dismissing the offer persists so it never reappears, even after a fresh mount', () => {
+    clearAppStorage();
+    {
+      const { query, text, cleanup } = mount(h(App, {}));
+      setInput(query('#cred-endpoint'), 'http://127.0.0.1:1');
+      setInput(query('#cred-bucket'), 'dismiss-bucket');
+      setInput(query('#cred-keyid'), 'AKIDDISMISS');
+      setInput(query('#cred-secretkey'), 'dismiss-secret');
+      fire(query('button[type="submit"]'), 'click');
+      assert.ok(/retype it/i.test(text()), 'precondition: the offer is showing');
+      const closeBtn = query('.banner-close');
+      assert.ok(closeBtn, 'the offer banner must use the existing banner-close dismiss control');
+      fire(closeBtn, 'click');
+      assert.ok(!/retype it/i.test(text()), 'the offer must disappear once dismissed');
+      cleanup();
+    }
+    try {
+      const { query, text, cleanup } = mount(h(App, {}));
+      setInput(query('#cred-endpoint'), 'http://127.0.0.1:1');
+      setInput(query('#cred-bucket'), 'dismiss-bucket-2');
+      setInput(query('#cred-keyid'), 'AKIDDISMISS2');
+      setInput(query('#cred-secretkey'), 'dismiss-secret-2');
+      fire(query('button[type="submit"]'), 'click');
+      assert.ok(!/retype it/i.test(text()),
+        'a dismissed offer must never reappear, even after a fresh App mount');
+      cleanup();
+    } finally {
+      clearAppStorage();
+    }
+  });
+
+  test('accepting the offer creates the vault and remembers the just-connected secret', async () => {
+    clearAppStorage();
+    const { query, cleanup } = mount(h(App, {}));
+    try {
+      setInput(query('#cred-endpoint'), 'http://127.0.0.1:1');
+      setInput(query('#cred-bucket'), 'accept-bucket');
+      setInput(query('#cred-keyid'), 'AKIDACCEPT');
+      setInput(query('#cred-secretkey'), 'accept-secret');
+      fire(query('button[type="submit"]'), 'click');
+
+      const userInput = query('#vault-offer-username');
+      assert.ok(userInput, 'the offer must include the vault username field so password managers save it correctly matched to the unlock screen');
+      assert.equal(userInput.value, VAULT_USERNAME, 'the offer username must be the exact same constant VaultUnlock uses');
+      assert.equal(userInput.readOnly, true);
+
+      const passInput = query('input[autocomplete="new-password"]');
+      assert.ok(passInput, 'the offer must include a new-password passphrase field so managers offer to generate one');
+      setInput(passInput, PASSPHRASE);
+      fire(passInput.closest('form'), 'submit');
+
+      let created = false;
+      for (let i = 0; i < 80 && !created; i++) {
+        await new Promise(r => setTimeout(r, 10));
+        created = vaultExists();
+      }
+      assert.ok(created, 'accepting the offer must create the vault');
+
+      const { credentials } = JSON.parse(localStorage.getItem('s3b_credentials'));
+      const cred = credentials.find(c => c.endpoint === 'http://127.0.0.1:1' && c.keyId === 'AKIDACCEPT');
+      assert.ok(cred, 'a credential must be persisted for the just-connected values');
+
+      // vaultExists() flips true as soon as createVault's own write lands, but
+      // rememberSecret is a SEPARATE await after that inside handleAcceptVaultOffer
+      // — poll recallSecret itself rather than assuming it has landed the instant
+      // vaultExists() does (the vaultExists() poll above caught this as a real,
+      // reproducible flake before this loop was added).
+      let recalled = null;
+      for (let i = 0; i < 80 && recalled === null; i++) {
+        recalled = await recallSecret(cred.id, window.crypto.subtle);
+        if (!recalled) await new Promise(r => setTimeout(r, 10));
+      }
+      assert.equal(recalled, 'accept-secret', 'the just-typed secret must be remembered under the new credential');
+    } finally { cleanup(); clearAppStorage(); }
+  });
+});
+
+// Task 1 (#53) collects the credential a re-pointed connection stops using. Without
+// this Task 6 addition, a secret the user just typed to replace an old key would be
+// wrapped under an id that saveConnectionRecord's own cascade deletes moments later —
+// remembered, then immediately silently forgotten.
+describe('App — re-wrap on credential change while the vault is unlocked (Task 6)', () => {
+  test('pointing a saved connection at a new credential while a secret is typed remembers it under the new credential id', async () => {
+    clearAppStorage();
+    await createVault(PASSPHRASE, window.crypto.subtle, getRandomValues);
+    const oldCred = findOrCreateCredential({ endpoint: 'https://s3.old.example.com', keyId: 'kOld', provider: null, regionOverride: '' });
+    saveConnectionRecord({ id: 900, name: 'Rewrap conn', credentialId: oldCred.id, bucket: 'buck', capabilities: null });
+    localStorage.setItem('s3b_last_profile_id', '900');
+    // Deliberately no rememberSecret call for oldCred's entry — nothing to
+    // auto-connect with, so the splash form (not the connected view) is what
+    // renders and is under test here.
+
+    const { query, cleanup } = mount(h(App, {}));
+    try {
+      for (let i = 0; i < 20 && query('#cred-endpoint')?.value !== 'https://s3.old.example.com'; i++) {
+        await new Promise(r => setTimeout(r, 0));
+      }
+      assert.equal(query('#cred-endpoint')?.value, 'https://s3.old.example.com',
+        'precondition: form pre-filled from the saved connection');
+
+      setInput(query('#cred-endpoint'), 'https://s3.new.example.com');
+      setInput(query('#cred-keyid'), 'kNew');
+      setInput(query('#cred-secretkey'), 'new-secret');
+
+      fire(query('.profile-save-trigger'), 'click');
+      fire(query('.profile-save-form button[type="submit"]'), 'click');
+
+      const { credentials } = JSON.parse(localStorage.getItem('s3b_credentials'));
+      const newCred = credentials.find(c => c.endpoint === 'https://s3.new.example.com');
+      assert.ok(newCred, 'a new credential must be created for the new endpoint/key');
+
+      let recalled = null;
+      for (let i = 0; i < 60 && recalled === null; i++) {
+        recalled = await recallSecret(newCred.id, window.crypto.subtle);
+        if (!recalled) await new Promise(r => setTimeout(r, 10));
+      }
+      assert.equal(recalled, 'new-secret',
+        'the typed secret must be wrapped under the new credential id, not silently forgotten');
+    } finally { cleanup(); clearAppStorage(); }
+  });
+});
+
+describe('App — disconnect does not lock the vault (Task 6)', () => {
+  test('disconnecting leaves the vault unlocked', () => {
+    clearAppStorage();
+    localStorage.setItem('s3b_vault', JSON.stringify({
+      version: 1, salt: 'c2FsdA==', iterations: 1, check: { iv: 'aXY=', ct: 'Y3Q=' }, entries: {},
+    }));
+    sessionStorage.setItem(SS_KEY_VAULT_KEY, 'irrelevant-for-this-test'); // vault starts unlocked
+    const { query, cleanup } = mount(h(App, {}));
+    try {
+      setInput(query('#cred-endpoint'), 'http://127.0.0.1:1');
+      setInput(query('#cred-bucket'), 'disc-bucket');
+      setInput(query('#cred-keyid'), 'AKIDDISC');
+      setInput(query('#cred-secretkey'), 'disc-secret');
+      fire(query('button[type="submit"]'), 'click');
+      assert.ok(isUnlocked(), 'precondition: the vault is unlocked while connected');
+
+      const disconnectBtn = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Disconnect');
+      assert.ok(disconnectBtn, 'the Disconnect button must be present once connected');
+      fire(disconnectBtn, 'click');
+
+      assert.ok(isUnlocked(), 'disconnecting must not lock the vault — only a tab close should end the session');
+    } finally { cleanup(); clearAppStorage(); }
   });
 });

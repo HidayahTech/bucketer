@@ -1,7 +1,9 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // Root session state machine (§4.14).
 //
-// Four mutually exclusive session states drive what the user sees:
+// Five mutually exclusive session states drive what the user sees:
+//   locked:       a vault exists but has not been unlocked this session; only the
+//                 vault passphrase screen (VaultUnlock) is shown
 //   disconnected: no credentials; only credential entry UI shown
 //   connecting:   credentials saved, initial ListObjectsV2 probe in flight
 //   connected:    probe succeeded; full Browser UI rendered
@@ -39,8 +41,12 @@ import {
   defaultConnectionName, hasMigratedConnections,
 } from '../lib/connections.js';
 import { readUrlParams, hasUrlParams, buildShareUrl } from '../lib/url-params.js';
+import {
+  vaultExists, isUnlocked, recallSecret, rememberSecret, createVault,
+} from '../lib/vault.js';
 import { FileBanner } from './FileBanner.jsx';
 import { CredentialForm } from './CredentialForm.jsx';
+import { VaultUnlock, VAULT_USERNAME } from './VaultUnlock.jsx';
 import { ShareLinkMenu } from './ShareLinkMenu.jsx';
 import { Browser } from './Browser.jsx';
 import { UploadQueue } from './UploadQueue.jsx';
@@ -67,9 +73,24 @@ import { useModalStates } from '../hooks/useModalStates.js';
 const _iconLink = document.querySelector('link[rel="icon"]');
 if (_iconLink) _iconLink.href = logoUrl;
 
-// Session states: disconnected | connecting | connected | failed
+// Persists that the user dismissed the post-connect vault offer, so it is never
+// shown twice — the offer itself also stops appearing once a vault exists, but a
+// user who dismisses without ever creating one needs this separate, durable flag.
+// localStorage (not sessionStorage): "never shown twice" must survive a tab close.
+const VAULT_OFFER_DISMISSED_KEY = 's3b_vault_offer_dismissed';
+function isVaultOfferDismissed() {
+  try { return localStorage.getItem(VAULT_OFFER_DISMISSED_KEY) === '1'; } catch { return false; }
+}
+function dismissVaultOfferPermanently() {
+  try { localStorage.setItem(VAULT_OFFER_DISMISSED_KEY, '1'); } catch { /* private mode — offer may reappear next session, acceptable degradation */ }
+}
+
+// Session states: locked | disconnected | connecting | connected | failed
 export function App() {
-  const [session, setSession] = useState('disconnected');
+  // Computed once at mount from vault.js's own storage reads — unlike recalling a
+  // secret, vaultExists()/isUnlocked() do not depend on connection migration having
+  // run yet, so (unlike recallSecret) this is safe inside a useState initializer.
+  const [session, setSession] = useState(() => (vaultExists() && !isUnlocked()) ? 'locked' : 'disconnected');
   // selectedConnectionId must be declared before credentials so the credentials
   // initializer can pre-fill the form from the saved connection on first load.
   const [selectedConnectionId, setSelectedConnectionId] = useState(() => loadLastProfileId());
@@ -112,6 +133,13 @@ export function App() {
   // always already authorized). One pending request at a time; a new request
   // replaces an unconfirmed one.
   const [pendingDelete, setPendingDelete] = useState(null);
+  // The post-connect vault offer ("Save this key so you don't have to retype it next
+  // time?"). Shown after a successful connect when no vault exists yet and the user
+  // has not already dismissed it (see isVaultOfferDismissed above); reset on
+  // disconnect since the "you just connected" context it refers to is gone.
+  const [showVaultOffer, setShowVaultOffer] = useState(false);
+  const [vaultOfferBusy, setVaultOfferBusy] = useState(false);
+  const [vaultOfferError, setVaultOfferError] = useState(null);
   const addFilesRef = useRef(null);
   const browserActionsRef = useRef(null);
   const logKeyDebounceRef = useRef(null);
@@ -180,17 +208,129 @@ export function App() {
       setClient(c);
       setSession('connected');
       setBrowserKey(k => k + 1);
+      // The post-connect vault offer (§ decisions: never gate first-run behind a
+      // passphrase — offer only after the app has demonstrated it works). Gated on
+      // both conditions so it never re-appears once accepted (vaultExists() becomes
+      // true) or dismissed (isVaultOfferDismissed() persists that).
+      if (!vaultExists() && !isVaultOfferDismissed()) setShowVaultOffer(true);
     } catch (err) {
       setSession('failed');
       setConnectionError(err);
     }
   }
 
+  // Recalls the remembered secret for `connId`'s credential (when the vault is
+  // unlocked and an entry exists) and connects with it — used both by the mount
+  // effect (a same-tab reload after an earlier unlock: sessionStorage's vault key
+  // survives a reload) and immediately after a fresh unlock (VaultUnlock's onUnlock
+  // below), so unlocking and connecting happen in one motion per the design.
+  // recallSecret can reject on a malformed vault session key from external
+  // tampering only — caught so that degrades to the ordinary manual-entry screen
+  // instead of surfacing an unhandled rejection. Returns whether it connected, so
+  // callers can fall back (e.g. to pre-filling the form) when it did not.
+  function tryAutoConnectViaVault(connId, extraFields = {}) {
+    if (!connId) return Promise.resolve(false);
+    const conn = resolveConnection(connId);
+    if (!conn) return Promise.resolve(false);
+    return recallSecret(conn.credentialId, window.crypto.subtle)
+      .then(secret => {
+        if (!secret) return false;
+        handleConnect({ ...conn, ...extraFields, secretKey: secret });
+        return true;
+      })
+      .catch(() => false);
+  }
+
+  // VaultUnlock has already unlocked and persisted the session key by the time this
+  // fires (see VaultUnlock.jsx) — App just needs to leave the locked screen and, per
+  // the design ("unlocking and connecting happen in one motion"), try to connect
+  // straight into whatever connection is already selected.
+  function handleVaultUnlock() {
+    setSession('disconnected');
+    tryAutoConnectViaVault(selectedConnectionId);
+  }
+
+  // VaultUnlock's onReset already called resetVault() (destroys the vault record and
+  // locks) before invoking this — nothing left to unlock, so fall through to the
+  // ordinary connect screen.
+  function handleVaultReset() {
+    setSession('disconnected');
+  }
+
+  async function handleAcceptVaultOffer(passphrase) {
+    setVaultOfferBusy(true);
+    setVaultOfferError(null);
+    let result;
+    try {
+      result = await createVault(passphrase, window.crypto.subtle, window.crypto.getRandomValues.bind(window.crypto));
+    } catch {
+      result = { ok: false };
+    }
+    if (!result.ok) {
+      setVaultOfferBusy(false);
+      setVaultOfferError('Could not save the vault on this device.');
+      return;
+    }
+
+    // A plain "Connect" submission never carries a credentialId — CredentialForm's
+    // onSave only produces the six raw form fields — so find-or-create one from the
+    // values that were just used to connect (the same fingerprint handleSaveProfile
+    // itself uses). If this connect never went through an already-saved connection,
+    // also persist one (auto-named): without a saved connection there is nothing for
+    // a future launch to select and recall from, and the remembered secret would be
+    // unreachable. liveFormData is deliberately NOT used here (unlike
+    // handleSaveProfile) — it goes stale for the sidebar's reconnect CredentialForm,
+    // which is not wired to onFormChange, so it can lag behind the connection that
+    // actually just succeeded; `credentials` is what handleConnect itself just set.
+    const existing = selectedConnectionId ? connections.find(c => c.id === selectedConnectionId) : null;
+    const cred = findOrCreateCredential({
+      endpoint:       credentials.endpoint,
+      keyId:          credentials.keyId,
+      provider:       credentials.provider,
+      regionOverride: credentials.regionOverride,
+    });
+    if (!existing) {
+      const id = Date.now();
+      saveConnectionRecord({
+        id,
+        name:         defaultConnectionName({ provider: credentials.provider, bucket: credentials.bucket }),
+        credentialId: cred.id,
+        bucket:       credentials.bucket,
+        capabilities: null,
+      });
+      setConnections(listResolvedConnections());
+      setSelectedConnectionId(id);
+      saveLastProfileId(id);
+    }
+
+    // rememberSecret can reject on a malformed vault session key (external
+    // tampering only) — the vault was just created above, so unreachable in
+    // practice, but guarded per house policy against any promise rejection here.
+    try {
+      await rememberSecret(cred.id, credentials.secretKey, window.crypto.subtle);
+    } catch { /* see above */ }
+
+    dismissVaultOfferPermanently();
+    setShowVaultOffer(false);
+    setVaultOfferBusy(false);
+  }
+
+  function handleDismissVaultOffer() {
+    dismissVaultOfferPermanently();
+    setShowVaultOffer(false);
+    setVaultOfferError(null);
+  }
+
   // Clears all session state atomically. Credentials and capabilities are removed from
   // localStorage so the next page load starts at the disconnected splash screen.
   // browserKey increment remounts Browser to discard any cached listing state.
+  // Deliberately does NOT lock the vault (contract: disconnect is switching
+  // connections, not leaving — only a tab close ends the vault session), and hides
+  // the post-connect offer since the "you just connected" context it refers to is gone.
   function handleDisconnect() {
     setSession('disconnected');
+    setShowVaultOffer(false);
+    setVaultOfferError(null);
     setClient(null);
     setConnectionError(null);
     clearCredentials();
@@ -277,24 +417,37 @@ export function App() {
       ? stored
       : (conn ? { ...conn, secretKey: stored.secretKey || '' } : stored);
     const merged = { ...base, ...fromUrl };
-    if (merged.endpoint && merged.bucket && merged.keyId && merged.secretKey) {
-      handleConnect(merged);
-    } else if (conn && !stored.endpoint) {
-      // First load after migration: the `credentials` initializer above ran BEFORE
-      // migrateProfilesToConnections(), so resolveConnection() found nothing and the
-      // form fell back to the (empty) flat credential keys. Now that connections
-      // exist, populate the form from the selected one — otherwise every upgrading
-      // user gets a blank form on first load with their profile row highlighted.
-      // Gated on `!stored.endpoint`: when flat credentials DO exist, `base` above
-      // already picked them (by design — they are the last-connected values), and
-      // this branch must not override that choice with the connection's values,
-      // or the picker can highlight connection A while the form shows B's data.
+    // First load after migration: the `credentials` initializer above ran BEFORE
+    // migrateProfilesToConnections(), so resolveConnection() found nothing and the
+    // form fell back to the (empty) flat credential keys. Now that connections
+    // exist, populate the form from the selected one — otherwise every upgrading
+    // user gets a blank form on first load with their profile row highlighted.
+    // Gated on `!stored.endpoint`: when flat credentials DO exist, `base` above
+    // already picked them (by design — they are the last-connected values), and
+    // this branch must not override that choice with the connection's values,
+    // or the picker can highlight connection A while the form shows B's data.
+    function prefillFromMigratedConnection() {
       setCredentials(merged);
       setLiveFormData(merged);
       // selectedConnectionId is unchanged (it was already `lastId` before migration
       // ran), so CredentialForm's key does not change and it will not remount to
       // pick up the credentials update above — force it explicitly.
       setFormResetKey(k => k + 1);
+    }
+    if (merged.endpoint && merged.bucket && merged.keyId && merged.secretKey) {
+      handleConnect(merged);
+    } else if (isUnlocked() && conn) {
+      // Vault-backed auto-connect (contract: "auto-connect through the vault" — this
+      // is the whole point of the feature). The flat-credential check above requires
+      // a secret in sessionStorage, which is empty in a fresh tab and cleared on
+      // disconnect; a same-tab reload after an earlier unlock still has the vault's
+      // session key, though, so recall from it instead. Falls back to the ordinary
+      // pre-fill below when this credential has no remembered secret.
+      tryAutoConnectViaVault(lastId, fromUrl).then(connected => {
+        if (!connected && !stored.endpoint) prefillFromMigratedConnection();
+      });
+    } else if (conn && !stored.endpoint) {
+      prefillFromMigratedConnection();
     }
   }, []);
 
@@ -432,6 +585,17 @@ export function App() {
     // React snapshot, so reading them from state here would revert them.
     if (!existing) conn.capabilities = null;
     saveConnectionRecord(conn);
+    // Re-wrap under the (possibly new) credential id while the vault is unlocked and
+    // the form holds a secret. Task 1's cascade in saveConnectionRecord/
+    // deleteCredentialRecord already collected the superseded credential above when
+    // this re-points an existing connection — without this, the user's just-typed
+    // secret would be wrapped under an id nothing references any more and silently
+    // forgotten the moment it was superseded. Fire-and-forget with a catch:
+    // rememberSecret can reject on a malformed vault session key from external
+    // tampering only, and this is not on an async path the caller awaits.
+    if (isUnlocked() && liveFormData.secretKey) {
+      rememberSecret(cred.id, liveFormData.secretKey, window.crypto.subtle).catch(() => {});
+    }
 
     const updated = listResolvedConnections();
     setConnections(updated);
@@ -552,45 +716,59 @@ export function App() {
 
       <UpdateBanner enabled={updateCheckEnabled} />
       <FileBanner />
+      {showVaultOffer && (
+        <VaultOfferBanner
+          busy={vaultOfferBusy}
+          error={vaultOfferError}
+          onCreate={handleAcceptVaultOffer}
+          onDismiss={handleDismissVaultOffer}
+        />
+      )}
 
-      {session === 'disconnected' || session === 'connecting' || session === 'failed' ? (
+      {session === 'locked' || session === 'disconnected' || session === 'connecting' || session === 'failed' ? (
         <div class="main-content">
           <div class="splash">
-            <h2>Connect to a bucket</h2>
-            <ProfilePicker
-              profiles={connections}
-              selectedId={selectedConnectionId}
-              onSelect={handleSelectProfile}
-              onDelete={handleDeleteProfile}
-              onSave={handleSaveProfile}
-              currentFormData={liveFormData}
-            />
-            {urlParamsPresent && (
-              <div class="banner banner-info" style={{ marginBottom: '1rem' }}>
-                <div class="banner-body">
-                  {urlHadKeyId
-                    ? 'Connection details pre-filled from URL — enter your Secret Key to connect.'
-                    : 'Endpoint and bucket pre-filled from URL — enter your Key ID and Secret Key to connect.'}
-                </div>
-              </div>
-            )}
-            <CredentialForm
-              key={`${selectedConnectionId ?? 'manual'}-${formResetKey}`}
-              initial={credentials}
-              onSave={handleConnect}
-              onFormChange={setLiveFormData}
-              loading={session === 'connecting'}
-              autoFocusSecret={urlHadKeyId && !credentials.secretKey}
-            />
-            {session === 'failed' && connectionError && (
-              <div style={{ marginTop: '1rem' }}>
-                <ErrorBlock
-                  error={connectionError}
-                  title="Connection failed"
-                  guidance="Check your endpoint URL, bucket name, and credentials. If this looks like a CORS error, ensure CORS is configured on your bucket."
-                  diagnostics={diagnosticsProps(credentials)}
+            <h2>{session === 'locked' ? 'Unlock your vault' : 'Connect to a bucket'}</h2>
+            {session === 'locked' ? (
+              <VaultUnlock connections={connections} onUnlock={handleVaultUnlock} onReset={handleVaultReset} />
+            ) : (
+              <>
+                <ProfilePicker
+                  profiles={connections}
+                  selectedId={selectedConnectionId}
+                  onSelect={handleSelectProfile}
+                  onDelete={handleDeleteProfile}
+                  onSave={handleSaveProfile}
+                  currentFormData={liveFormData}
                 />
-              </div>
+                {urlParamsPresent && (
+                  <div class="banner banner-info" style={{ marginBottom: '1rem' }}>
+                    <div class="banner-body">
+                      {urlHadKeyId
+                        ? 'Connection details pre-filled from URL — enter your Secret Key to connect.'
+                        : 'Endpoint and bucket pre-filled from URL — enter your Key ID and Secret Key to connect.'}
+                    </div>
+                  </div>
+                )}
+                <CredentialForm
+                  key={`${selectedConnectionId ?? 'manual'}-${formResetKey}`}
+                  initial={credentials}
+                  onSave={handleConnect}
+                  onFormChange={setLiveFormData}
+                  loading={session === 'connecting'}
+                  autoFocusSecret={urlHadKeyId && !credentials.secretKey}
+                />
+                {session === 'failed' && connectionError && (
+                  <div style={{ marginTop: '1rem' }}>
+                    <ErrorBlock
+                      error={connectionError}
+                      title="Connection failed"
+                      guidance="Check your endpoint URL, bucket name, and credentials. If this looks like a CORS error, ensure CORS is configured on your bucket."
+                      diagnostics={diagnosticsProps(credentials)}
+                    />
+                  </div>
+                )}
+              </>
             )}
 
             <hr class="splash-divider" />
@@ -748,6 +926,7 @@ export function App() {
 
 function StatusBadge({ session }) {
   const cls = {
+    locked:       'status-disconnected', // no dedicated CSS state — reads the same as disconnected
     disconnected: 'status-disconnected',
     connecting:   'status-connecting',
     connected:    'status-connected',
@@ -755,6 +934,7 @@ function StatusBadge({ session }) {
   }[session] || 'status-disconnected';
 
   const label = {
+    locked:       'Locked',
     disconnected: 'Disconnected',
     connecting:   'Connecting',
     connected:    'Connected',
@@ -766,5 +946,59 @@ function StatusBadge({ session }) {
       <span class="dot" />
       {label}
     </span>
+  );
+}
+
+// The post-connect vault offer: "Save this key so you don't have to retype it next
+// time?" Follows the existing banner idiom (FileBanner.jsx, UpdateBanner.jsx) rather
+// than a modal takeover — dismissible via the same .banner-close control, not a gate.
+// The passphrase field it collects is the vault CREATION form (there is no separate
+// component for that in this plan — VaultUnlock.jsx only unlocks an existing vault),
+// so it repeats VaultUnlock's password-manager fields: the same readonly account
+// value (VAULT_USERNAME, imported — must match VaultUnlock's exactly so a manager
+// matches the two screens as one saved login) and autocomplete="new-password" so a
+// manager offers to generate the passphrase, per the design doc.
+function VaultOfferBanner({ busy, error, onCreate, onDismiss }) {
+  const [passphrase, setPassphrase] = useState('');
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    if (busy || !passphrase) return;
+    onCreate(passphrase);
+  }
+
+  return (
+    <div class="banner banner-info" role="status">
+      <div class="banner-body">
+        <div>Save this key so you don't have to retype it next time?</div>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '.4rem' }}>
+          <label htmlFor="vault-offer-username" class="hint">Account</label>
+          <input
+            id="vault-offer-username"
+            name="vault-username"
+            type="text"
+            value={VAULT_USERNAME}
+            readOnly
+            autocomplete="username"
+            style={{ width: '14rem' }}
+          />
+          <label htmlFor="vault-offer-passphrase" class="hint">Passphrase</label>
+          <input
+            id="vault-offer-passphrase"
+            name="vault-new-passphrase"
+            type="password"
+            value={passphrase}
+            onInput={e => setPassphrase(e.target.value)}
+            autocomplete="new-password"
+            required
+          />
+          <button type="submit" class="btn btn-primary btn-sm" disabled={busy}>
+            {busy ? <><span class="spinner" /> Saving…</> : 'Save key'}
+          </button>
+          {error && <span class="field-error">{error}</span>}
+        </form>
+      </div>
+      <button class="banner-close" onClick={onDismiss} aria-label="Dismiss">✕</button>
+    </div>
   );
 }

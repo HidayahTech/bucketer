@@ -132,6 +132,51 @@ test('App.jsx does not import capability functions from storage.js', () => {
   );
 });
 
+// ── Task 6 (vault-phase2): App.jsx must not call recallSecret from a useState
+// initializer ─────────────────────────────────────────────────────────────────────────
+// The `credentials` useState initializer runs BEFORE the mount effect, so migration
+// and unlock state — anything the vault provides, recalled secrets in particular —
+// are not established yet when it runs. Calling recallSecret() (async) from inside a
+// useState initializer would silently do nothing useful and risks an unawaited
+// rejection on a synchronous code path. This file has produced three ordering bugs
+// from exactly this class of mistake (see the BUG-017 and Finding 4/5/A regression
+// tests above); recall belongs in the mount effect, never an initializer.
+
+describe('App.jsx — recallSecret is not called from inside a useState initializer (Task 6 ordering hazard)', () => {
+  const source = src('components/App.jsx');
+
+  test('no useState(...) call argument contains recallSecret', () => {
+    // Bracket-match each useState( ... ) call's full argument text (paren-depth
+    // walk, not a fixed-length window) so a braced arrow-function initializer's
+    // nested parens don't truncate the scan early, then check for recallSecret
+    // anywhere inside it.
+    const callPattern = /useState\(/g;
+    let m;
+    const offenders = [];
+    while ((m = callPattern.exec(source)) !== null) {
+      let depth = 1;
+      let i = m.index + m[0].length;
+      while (i < source.length && depth > 0) {
+        if (source[i] === '(') depth++;
+        else if (source[i] === ')') depth--;
+        i++;
+      }
+      const argText = source.slice(m.index, i);
+      if (argText.includes('recallSecret')) {
+        const lineNo = source.slice(0, m.index).split('\n').length;
+        offenders.push(`line ${lineNo}`);
+      }
+    }
+    assert.deepEqual(
+      offenders, [],
+      `App.jsx must not call recallSecret from inside a useState(...) initializer ` +
+      `(found at: ${offenders.join(', ')}) — the credentials initializer runs before ` +
+      `the mount effect, so the migration and unlock state recall depends on are not ` +
+      `established yet; recall belongs in the mount effect`
+    );
+  });
+});
+
 // ── T3-1: Wasabi billing warning must appear in delete confirmation dialogs ───────────
 // Wasabi charges for a minimum of 90 days per object. A user who deletes test data
 // minutes after uploading is billed for the remainder of the retention window.
