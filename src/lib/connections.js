@@ -20,6 +20,7 @@
 // every read and write, and the app must degrade rather than crash.
 
 import { PROVIDER_LABELS } from './provider.js';
+import { deleteVaultEntry } from './vault.js';
 
 const LS_KEY_CREDENTIALS = 's3b_credentials';
 const LS_KEY_CONNECTIONS = 's3b_connections';
@@ -131,13 +132,16 @@ export function saveCredentialRecord(cred) {
 // Refuses to delete a credential that connections still reference. An orphaned
 // credentialId is a corruption class nothing can repair — the endpoint and key
 // ID are gone — so it must never be created in the first place.
-// Returns true when the deletion happened, false when it was refused.
+// Returns true when the deletion happened, false when it was refused. The
+// vault entry cascade below must fire only on the true path: a still-shared
+// credential's ciphertext must survive a refused deletion.
 export function deleteCredentialRecord(id) {
   const { connections } = loadConnectionRecords();
   if (connections.some(c => c.credentialId === id)) return false;
   const data = loadCredentialRecords();
   data.credentials = data.credentials.filter(c => c.id !== id);
   saveCredentialData(data);
+  deleteVaultEntry(id);
   return true;
 }
 

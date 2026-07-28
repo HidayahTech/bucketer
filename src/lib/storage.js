@@ -18,6 +18,7 @@
 
 import { THEME_PREFS } from './theme.js';
 import { CONNECTION_STORAGE_KEYS, deleteAllConnectionData, repairCredentialProviders } from './connections.js';
+import { VAULT_STORAGE_KEYS } from './vault.js';
 
 // Credential fields — wiped by clearCredentials() on disconnect.
 const CREDENTIAL_KEYS = {
@@ -315,6 +316,7 @@ export function wipeAllAppData() {
     LS_KEY_PROFILES,
     LS_KEY_LAST_PROFILE_ID,
     ...CONNECTION_STORAGE_KEYS,
+    ...VAULT_STORAGE_KEYS,
     LEGACY_KEY_CAPABILITIES,   // retired v1.39.0 — cleared so an upgrade leaves nothing behind
     's3b_active_uploads',
   ];

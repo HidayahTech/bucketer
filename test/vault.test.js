@@ -1,11 +1,24 @@
 // Vault crypto. Node ships WebCrypto, so this runs in the plain unit layer with
 // no jsdom and no browser. `subtle` is injected rather than read from a global.
-import { test, describe } from 'node:test';
+
+// The record-layer functions below read localStorage as a bare global at call
+// time (not import time), so an in-memory store just needs to exist before any
+// function runs — placed above the imports for that reason.
+const ls = {};
+global.localStorage = {
+  getItem:    k     => Object.prototype.hasOwnProperty.call(ls, k) ? ls[k] : null,
+  setItem:    (k,v) => { ls[k] = String(v); },
+  removeItem: k     => { delete ls[k]; },
+};
+
+import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { webcrypto } from 'node:crypto';
 import {
   VAULT_VERSION, PBKDF2_ITERATIONS, CHECK_PLAINTEXT,
   deriveVaultKey, wrapSecret, unwrapSecret, newSalt,
+  loadVaultRecord, vaultExists, saveVaultRecord, deleteVaultRecord,
+  getVaultEntry, setVaultEntry, deleteVaultEntry,
 } from '../src/lib/vault.js';
 
 const subtle = webcrypto.subtle;
@@ -96,5 +109,63 @@ describe('key derivation', () => {
     const k = await deriveVaultKey('pass', SALT, PBKDF2_ITERATIONS, subtle);
     assert.equal(k.extractable, true);
     await assert.doesNotReject(() => subtle.exportKey('raw', k));
+  });
+});
+
+describe('vault record', () => {
+  beforeEach(() => { for (const k of Object.keys(ls)) delete ls[k]; });
+
+  test('absent vault reads as null and does not exist', () => {
+    assert.equal(loadVaultRecord(), null);
+    assert.equal(vaultExists(), false);
+  });
+
+  test('corrupt vault reads as null rather than throwing', () => {
+    ls['s3b_vault'] = '{not json';
+    assert.equal(loadVaultRecord(), null);
+    assert.equal(vaultExists(), false);
+  });
+
+  test('saves and reads back a record', () => {
+    const rec = { version: VAULT_VERSION, salt: 'c2FsdA==', iterations: PBKDF2_ITERATIONS, check: { iv: 'aXY=', ct: 'Y3Q=' }, entries: {} };
+    assert.equal(saveVaultRecord(rec), true);
+    assert.equal(vaultExists(), true);
+    assert.deepEqual(loadVaultRecord(), rec);
+  });
+
+  test('reports failure when the write does not land', () => {
+    const original = global.localStorage.setItem;
+    global.localStorage.setItem = () => { throw new Error('quota'); };
+    try {
+      assert.equal(saveVaultRecord({ version: VAULT_VERSION, salt: 's', iterations: 1, check: {}, entries: {} }), false,
+        'a vault that did not persist must not report success');
+    } finally { global.localStorage.setItem = original; }
+  });
+
+  test('entries round-trip by credential id', () => {
+    saveVaultRecord({ version: VAULT_VERSION, salt: 's', iterations: PBKDF2_ITERATIONS, check: {}, entries: {} });
+    assert.equal(getVaultEntry('cred1'), null);
+    setVaultEntry('cred1', { iv: 'aXY=', ct: 'Y3Q=' });
+    assert.deepEqual(getVaultEntry('cred1'), { iv: 'aXY=', ct: 'Y3Q=' });
+    deleteVaultEntry('cred1');
+    assert.equal(getVaultEntry('cred1'), null);
+  });
+
+  test('deleting an entry that does not exist is a no-op', () => {
+    saveVaultRecord({ version: VAULT_VERSION, salt: 's', iterations: PBKDF2_ITERATIONS, check: {}, entries: {} });
+    assert.doesNotThrow(() => deleteVaultEntry('never-existed'));
+  });
+
+  test('setEntry on an absent vault does not create a headless record', () => {
+    assert.equal(setVaultEntry('cred1', { iv: 'a', ct: 'b' }), false,
+      'entries without a salt and check value would be undecryptable');
+    assert.equal(vaultExists(), false);
+  });
+
+  test('deleteVaultRecord removes everything', () => {
+    saveVaultRecord({ version: VAULT_VERSION, salt: 's', iterations: PBKDF2_ITERATIONS, check: {}, entries: { a: { iv: 'i', ct: 'c' } } });
+    deleteVaultRecord();
+    assert.equal(vaultExists(), false);
+    assert.equal(ls['s3b_vault'], undefined);
   });
 });

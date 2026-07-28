@@ -25,8 +25,14 @@
 // file-identity.js's use of `crypto.subtle`) since Node ships WebCrypto as a
 // global and the interface here has no separate slot for an injected RNG.
 //
-// This module is pure: no DOM, no storage, no record shape. It imports
-// nothing.
+// The crypto core above is pure. Below it is the record layer: reading and
+// writing the wrapped ciphertexts to localStorage under one key
+// (s3b_vault), keyed internally by credential id — the secret belongs to the
+// credential (connections.js), not to any one connection that uses it, so
+// connections sharing a credential share one ciphertext. Like connections.js,
+// this reads the `localStorage` global at call time, not at import time.
+// This module imports nothing — connections.js imports this one, never the
+// reverse.
 
 export const VAULT_VERSION = 1;
 export const PBKDF2_ITERATIONS = 600_000;
@@ -85,4 +91,70 @@ export async function wrapSecret(key, plaintext, subtle) {
 export async function unwrapSecret(key, { iv, ct }, subtle) {
   const plainBuf = await subtle.decrypt({ name: 'AES-GCM', iv: fromBase64(iv) }, key, fromBase64(ct));
   return new TextDecoder().decode(plainBuf);
+}
+
+const LS_KEY_VAULT = 's3b_vault';
+export const VAULT_STORAGE_KEYS = [LS_KEY_VAULT];
+
+function safeGetRaw(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+function safeRemoveRaw(key) {
+  try { localStorage.removeItem(key); } catch { /* */ }
+}
+
+// null on absent OR corrupt — never throws. Mirrors loadCredentialRecords'
+// empty-envelope discipline in connections.js.
+export function loadVaultRecord() {
+  try {
+    const raw = safeGetRaw(LS_KEY_VAULT);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object' || !parsed.entries || typeof parsed.entries !== 'object') return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function vaultExists() {
+  return loadVaultRecord() !== null;
+}
+
+// Returns whether the write actually landed: private browsing swallows
+// localStorage.setItem by design, and a vault that silently did not persist
+// would report success while storing nothing. So this does not trust the
+// absence of a thrown error — it reads the value back and compares.
+export function saveVaultRecord(record) {
+  const json = JSON.stringify(record);
+  try { localStorage.setItem(LS_KEY_VAULT, json); } catch { /* checked below */ }
+  return safeGetRaw(LS_KEY_VAULT) === json;
+}
+
+export function deleteVaultRecord() {
+  safeRemoveRaw(LS_KEY_VAULT);
+}
+
+export function getVaultEntry(credentialId) {
+  const record = loadVaultRecord();
+  if (!record) return null;
+  return record.entries[credentialId] ?? null;
+}
+
+// false when there is no vault to add to yet — an entry without the salt and
+// check value it would need to be decrypted later is worse than useless, so
+// this refuses to conjure a headless record just to hold it.
+export function setVaultEntry(credentialId, wrapped) {
+  const record = loadVaultRecord();
+  if (!record) return false;
+  record.entries[credentialId] = wrapped;
+  return saveVaultRecord(record);
+}
+
+// Safe to call for an id with no entry — a no-op, not an error.
+export function deleteVaultEntry(credentialId) {
+  const record = loadVaultRecord();
+  if (!record || !(credentialId in record.entries)) return;
+  delete record.entries[credentialId];
+  saveVaultRecord(record);
 }

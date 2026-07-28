@@ -428,6 +428,7 @@ export function StorageModal({ onClose, isConnected }) {
               <ul class="sv-wipe-list">
                 <li>Connection details and credential fields</li>
                 <li>All saved profiles</li>
+                <li>Vault-encrypted credential secrets</li>
                 <li>Upload history and resume records</li>
                 <li>All settings</li>
                 <li>Capability state and the active-uploads tracker</li>

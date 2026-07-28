@@ -28,6 +28,9 @@ import {
   defaultCapabilities, loadConnectionCapabilities, saveConnectionCapabilities, clearAllConnectionCapabilities,
   repairCredentialProviders,
 } from '../src/lib/connections.js';
+import {
+  saveVaultRecord, setVaultEntry, getVaultEntry, VAULT_VERSION, PBKDF2_ITERATIONS,
+} from '../src/lib/vault.js';
 
 beforeEach(() => { for (const k of Object.keys(ls)) delete ls[k]; });
 
@@ -625,5 +628,38 @@ describe('saveConnectionRecord collects a superseded credential (#53)', () => {
     assert.equal(loadCredentialRecords().credentials.length, 1);
     assert.equal(loadConnectionRecords().connections[0].credentialId, a.id);
     assert.equal(loadConnectionRecords().connections[0].name, 'Renamed');
+  });
+});
+
+describe('deleting a credential cascades to its vault entry', () => {
+  test('the ciphertext goes when the credential goes', () => {
+    saveVaultRecord({ version: VAULT_VERSION, salt: 's', iterations: PBKDF2_ITERATIONS, check: {}, entries: {} });
+    const c = findOrCreateCredential({ endpoint: 'e', keyId: 'k', provider: 'b2', regionOverride: '' });
+    setVaultEntry(c.id, { iv: 'aXY=', ct: 'Y3Q=' });
+
+    assert.equal(deleteCredentialRecord(c.id), true);
+    assert.equal(getVaultEntry(c.id), null, 'a ciphertext under a deleted id is unreachable forever');
+  });
+
+  test('a refused deletion leaves the ciphertext alone', () => {
+    saveVaultRecord({ version: VAULT_VERSION, salt: 's', iterations: PBKDF2_ITERATIONS, check: {}, entries: {} });
+    const c = findOrCreateCredential({ endpoint: 'e', keyId: 'k', provider: 'b2', regionOverride: '' });
+    setVaultEntry(c.id, { iv: 'aXY=', ct: 'Y3Q=' });
+    saveConnectionRecord({ id: 1, name: 'C', credentialId: c.id, bucket: 'b', capabilities: null });
+
+    assert.equal(deleteCredentialRecord(c.id), false, 'still referenced');
+    assert.deepEqual(getVaultEntry(c.id), { iv: 'aXY=', ct: 'Y3Q=' },
+      'the credential survived, so its secret must too');
+  });
+
+  test('deleting the last connection cascades all the way to the ciphertext', () => {
+    saveVaultRecord({ version: VAULT_VERSION, salt: 's', iterations: PBKDF2_ITERATIONS, check: {}, entries: {} });
+    const c = findOrCreateCredential({ endpoint: 'e', keyId: 'k', provider: 'b2', regionOverride: '' });
+    setVaultEntry(c.id, { iv: 'aXY=', ct: 'Y3Q=' });
+    saveConnectionRecord({ id: 1, name: 'C', credentialId: c.id, bucket: 'b', capabilities: null });
+
+    deleteConnectionRecord(1);
+    assert.equal(loadCredentialRecords().credentials.length, 0);
+    assert.equal(getVaultEntry(c.id), null);
   });
 });
