@@ -158,3 +158,17 @@ export function deleteVaultEntry(credentialId) {
   delete record.entries[credentialId];
   saveVaultRecord(record);
 }
+
+// Empties every entry but keeps the vault record itself — for bulk credential
+// deletion (deleteAllProfiles in storage.js) that removes credentials by raw
+// key rather than one at a time through deleteCredentialRecord, and so cannot
+// rely on that function's cascade to drop the now-orphaned ciphertexts. The
+// vault's salt/iterations/check are the user's passphrase, not their
+// credentials, and must survive. No-op when there is no vault — must not
+// create one.
+export function clearVaultEntries() {
+  const record = loadVaultRecord();
+  if (!record) return;
+  record.entries = {};
+  saveVaultRecord(record);
+}

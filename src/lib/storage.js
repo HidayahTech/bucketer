@@ -18,7 +18,7 @@
 
 import { THEME_PREFS } from './theme.js';
 import { CONNECTION_STORAGE_KEYS, deleteAllConnectionData, repairCredentialProviders } from './connections.js';
-import { VAULT_STORAGE_KEYS } from './vault.js';
+import { VAULT_STORAGE_KEYS, clearVaultEntries } from './vault.js';
 
 // Credential fields — wiped by clearCredentials() on disconnect.
 const CREDENTIAL_KEYS = {
@@ -332,11 +332,18 @@ export function resetSettings() {
 }
 
 // Removes all saved connections, credentials, legacy profiles, and the
-// last-selected pointer in one operation.
+// last-selected pointer in one operation. Also empties the vault's entries:
+// deleteAllConnectionData() removes every credential by raw key, not one at a
+// time through deleteCredentialRecord, so its cascade never runs here — without
+// this, every ciphertext would be stranded under a credential id that no
+// longer exists anywhere. The vault record itself (the user's passphrase) is
+// deliberately left intact; this is not "clear everything" (that's
+// wipeAllAppData), just the credentials the user asked to delete.
 export function deleteAllProfiles() {
   safeRemove(localStorage, LS_KEY_PROFILES);
   safeRemove(localStorage, LS_KEY_LAST_PROFILE_ID);
   deleteAllConnectionData();
+  clearVaultEntries();
 }
 
 // Idempotent — reads legacy flat keys and creates a default profile if no profiles

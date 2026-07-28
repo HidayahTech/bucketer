@@ -18,7 +18,7 @@ import {
   VAULT_VERSION, PBKDF2_ITERATIONS, CHECK_PLAINTEXT,
   deriveVaultKey, wrapSecret, unwrapSecret, newSalt,
   loadVaultRecord, vaultExists, saveVaultRecord, deleteVaultRecord,
-  getVaultEntry, setVaultEntry, deleteVaultEntry,
+  getVaultEntry, setVaultEntry, deleteVaultEntry, clearVaultEntries,
 } from '../src/lib/vault.js';
 
 const subtle = webcrypto.subtle;
@@ -165,6 +165,27 @@ describe('vault record', () => {
   test('deleteVaultRecord removes everything', () => {
     saveVaultRecord({ version: VAULT_VERSION, salt: 's', iterations: PBKDF2_ITERATIONS, check: {}, entries: { a: { iv: 'i', ct: 'c' } } });
     deleteVaultRecord();
+    assert.equal(vaultExists(), false);
+    assert.equal(ls['s3b_vault'], undefined);
+  });
+
+  // deleteAllProfiles() (storage.js) bulk-removes every credential without going
+  // through deleteCredentialRecord's one-at-a-time cascade, so it needs a way to
+  // drop every now-orphaned entry without touching the passphrase itself (salt,
+  // iterations, check) — the user did not ask to re-choose a passphrase by
+  // deleting their profiles.
+  test('clearVaultEntries empties entries but keeps the vault record', () => {
+    saveVaultRecord({ version: VAULT_VERSION, salt: 's', iterations: PBKDF2_ITERATIONS, check: { iv: 'i', ct: 'c' }, entries: { a: { iv: 'i', ct: 'c' } } });
+    clearVaultEntries();
+    assert.equal(vaultExists(), true);
+    const record = loadVaultRecord();
+    assert.deepEqual(record.entries, {});
+    assert.equal(record.salt, 's');
+    assert.deepEqual(record.check, { iv: 'i', ct: 'c' });
+  });
+
+  test('clearVaultEntries is a no-op when no vault exists — it must not create one', () => {
+    clearVaultEntries();
     assert.equal(vaultExists(), false);
     assert.equal(ls['s3b_vault'], undefined);
   });

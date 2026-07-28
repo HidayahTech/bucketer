@@ -557,6 +557,15 @@ describe('wipeAllAppData covers the connection model keys', () => {
     wipeAllAppData();
     assert.equal(ls['s3b_capabilities'], undefined);
   });
+
+  // wipeAllAppData is "clear everything, passphrase included" — unlike
+  // deleteAllProfiles below, it must remove the vault record outright, not just
+  // its entries.
+  test('removes the vault record entirely', () => {
+    ls['s3b_vault'] = JSON.stringify({ version: 1, salt: 's', iterations: 600000, check: { iv: 'i', ct: 'c' }, entries: { a: { iv: 'i', ct: 'c' } } });
+    wipeAllAppData();
+    assert.equal(ls['s3b_vault'], undefined);
+  });
 });
 
 describe('repairStorageInvariants clears the retired capability key', () => {
@@ -594,5 +603,32 @@ describe('deleteAllProfiles covers the connection model keys', () => {
     assert.equal(ls['s3b_credentials'], undefined);
     assert.equal(ls['s3b_connections'], undefined);
     assert.equal(ls['s3b_profiles'], undefined);
+  });
+});
+
+// deleteAllProfiles() removes every credential by raw key deletion
+// (deleteAllConnectionData), never routing through deleteCredentialRecord one at
+// a time — so it cannot rely on that function's cascade to clean up the vault.
+// Every entry left behind would be keyed by a credential id that no longer
+// exists anywhere, unreachable and undeletable through any UI. But the vault
+// record itself (salt/iterations/check) is the user's passphrase, not their
+// credentials, and deleting profiles must not silently force a new one.
+describe('deleteAllProfiles and the vault', () => {
+  test('empties vault entries while leaving the vault record, salt, and check intact', () => {
+    ls['s3b_vault'] = JSON.stringify({
+      version: 1, salt: 's', iterations: 600000, check: { iv: 'i', ct: 'c' },
+      entries: { c1: { iv: 'i1', ct: 'c1' }, c2: { iv: 'i2', ct: 'c2' } },
+    });
+    deleteAllProfiles();
+    const vault = JSON.parse(ls['s3b_vault']);
+    assert.deepEqual(vault.entries, {});
+    assert.equal(vault.salt, 's');
+    assert.deepEqual(vault.check, { iv: 'i', ct: 'c' });
+  });
+
+  test('is a no-op with respect to the vault when no vault exists — it must not create one', () => {
+    assert.equal(ls['s3b_vault'], undefined);
+    deleteAllProfiles();
+    assert.equal(ls['s3b_vault'], undefined);
   });
 });
