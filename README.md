@@ -321,6 +321,24 @@ Multipart uploads (≥ 5 MB) save a resume record in IndexedDB. If interrupted:
 3. Resume opens the file picker — the browser requires this because file handles don't persist across sessions.
 4. The app calls `ListParts` to get the authoritative list of uploaded parts, then continues from where it left off.
 
+### Large transfers
+
+Downloading a single file hands off to the browser's own download manager, which works at any
+size. Downloading *hundreds of gigabytes* is a different problem: at 5 Mbit/s, 1 TB takes about
+18 days of continuous transfer, and no browser tab survives that. Laptop sleep, browser updates,
+and tab discarding all interrupt it.
+
+For transfers at that scale, use a dedicated tool. **Download with a transfer tool…** in the
+sidebar generates a ready-to-run job — an `rclone` remote definition plus the matching
+`rclone copy` command, and an `aws s3 sync` equivalent — scoped to the folder you are viewing.
+Re-running either command resumes where it left off and skips files already downloaded.
+
+The generated config uses a placeholder for your secret key by default. You can choose to include
+the real key, but the config then carries credentials with the same bucket access you have — store
+the file accordingly, and rotate the key if it is ever exposed. Bucketer deliberately does **not**
+export lists of presigned URLs for this purpose: those are bearer tokens valid for up to seven
+days that cannot be revoked, whereas credentials can be rotated.
+
 ### Hidden versions and deleted files
 
 When versioning is enabled on a bucket, deleting a file creates a delete marker rather than removing the content. The **Hidden versions & deleted files** panel (below the file listing) surfaces these using `ListObjectVersions`. Removing a delete marker undeletes the file. Old versions can also be purged individually or in bulk.

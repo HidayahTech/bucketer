@@ -7,6 +7,20 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.40.0] — 2026-07-30 — Download with a transfer tool
+
+Downloading one file works at any size, because the browser's own download manager
+does the work. Downloading hundreds of gigabytes is a different problem: at 5 Mbit/s,
+1 TB takes roughly 18 days of continuous transfer, and no browser tab survives that —
+sleep, browser updates, and tab discarding all interrupt it.
+
+For transfers at that scale, Bucketer now hands the job to a tool built for it.
+
+- A new **Download with a transfer tool…** option in the sidebar generates a ready-to-run job for the folder you are viewing: an rclone remote definition, the matching `rclone copy` command, and an `aws s3 sync` equivalent.
+- The commands carry settings suited to an unreliable link, and re-running either one resumes where it left off instead of starting over.
+- The generated config uses a placeholder for your secret key. You can choose to include the real key, which then shows a warning explaining what the file grants and that rotating the key revokes it.
+- Bucketer deliberately does not export lists of presigned links for this. Those are bearer tokens valid for up to seven days that cannot be revoked, whereas a key can be rotated.
+
 ## [1.39.1] — 2026-07-27 — Share links work when Bucketer is already open
 
 Opening a share link in a tab that already had Bucketer loaded did nothing — the

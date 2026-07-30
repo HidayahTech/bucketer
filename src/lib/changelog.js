@@ -1,9 +1,20 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.39.1';
+export const CURRENT_VERSION = '1.40.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.40.0",
+    "date": "2026-07-30",
+    "title": "Download with a transfer tool",
+    "changes": [
+      "A new Download with a transfer tool… option in the sidebar generates a ready-to-run job for the folder you are viewing: an rclone remote definition, the matching rclone copy command, and an aws s3 sync equivalent.",
+      "The commands carry settings suited to an unreliable link, and re-running either one resumes where it left off instead of starting over.",
+      "The generated config uses a placeholder for your secret key. You can choose to include the real key, which then shows a warning explaining what the file grants and that rotating the key revokes it.",
+      "Bucketer deliberately does not export lists of presigned links for this. Those are bearer tokens valid for up to seven days that cannot be revoked, whereas a key can be rotated."
+    ]
+  },
   {
     "version": "1.39.1",
     "date": "2026-07-27",

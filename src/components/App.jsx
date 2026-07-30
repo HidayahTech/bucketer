@@ -65,6 +65,7 @@ import { ChangelogModal } from './ChangelogModal.jsx';
 import { AboutModal } from './AboutModal.jsx';
 import { ProfilePicker } from './ProfilePicker.jsx';
 import { StorageModal } from './StorageModal.jsx';
+import { TransferHandoff } from './TransferHandoff.jsx';
 import { DuplicatesModal } from './DuplicatesModal.jsx';
 import { CURRENT_VERSION } from '../lib/changelog.js';
 import { useWindowDragDrop } from '../hooks/useWindowDragDrop.js';
@@ -119,7 +120,7 @@ export function App() {
   const [formResetKey, setFormResetKey] = useState(0);
   const [logKey, setLogKey] = useState(0);         // incremented to refresh upload log
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { changelogOpen, setChangelogOpen, aboutOpen, setAboutOpen, storageOpen, setStorageOpen, duplicatesOpen, setDuplicatesOpen } = useModalStates();
+  const { changelogOpen, setChangelogOpen, aboutOpen, setAboutOpen, storageOpen, setStorageOpen, duplicatesOpen, setDuplicatesOpen, handoffOpen, setHandoffOpen } = useModalStates();
   const [liveFormData, setLiveFormData] = useState(credentials);
   const [updateCheckEnabled, setUpdateCheckEnabled] = useState(() => loadUpdateCheckEnabled());
   const [prefetchSizeLimit, setPrefetchSizeLimit] = useState(() => loadPrefetchSizeLimit());
@@ -653,6 +654,13 @@ export function App() {
       {changelogOpen && <ChangelogModal onClose={() => setChangelogOpen(false)} />}
       {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}
       {storageOpen && <StorageModal onClose={() => setStorageOpen(false)} isConnected={session === 'connected'} />}
+      {handoffOpen && (
+        <TransferHandoff
+          credentials={credentials}
+          currentPrefix={currentPrefix}
+          onClose={() => setHandoffOpen(false)}
+        />
+      )}
       {duplicatesOpen && session === 'connected' && (
         <DuplicatesModal
           client={client}
@@ -828,6 +836,21 @@ export function App() {
               prefetchSizeLimit={prefetchSizeLimit}
               onPrefetchSizeLimitChange={(val) => { savePrefetchSizeLimit(val); setPrefetchSizeLimit(val); }}
             />
+            <hr style={{ border: 'none', borderTop: '1px solid var(--border)' }} />
+            <div class="handoff-entry">
+              <button
+                type="button"
+                class="btn btn-ghost btn-sm"
+                data-testid="open-handoff"
+                onClick={() => setHandoffOpen(true)}
+              >
+                Download with a transfer tool…
+              </button>
+              <p class="handoff-entry-hint">
+                For very large downloads. Generates a ready-to-run rclone or AWS CLI job for the
+                folder you are viewing.
+              </p>
+            </div>
             <hr style={{ border: 'none', borderTop: '1px solid var(--border)' }} />
             <details class="s3-primer">
               <summary class="s3-primer-summary">About S3 buckets</summary>
