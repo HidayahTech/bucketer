@@ -20,11 +20,13 @@ export function useModalStates() {
   const [storageOpen,     setStorageOpen]     = useState(false);
   const [duplicatesOpen,  setDuplicatesOpen]  = useState(false);
   const [handoffOpen,     setHandoffOpen]     = useState(false);
+  const [downloadOpen,    setDownloadOpen]    = useState(false);
   return {
     changelogOpen, setChangelogOpen,
     aboutOpen, setAboutOpen,
     storageOpen, setStorageOpen,
     duplicatesOpen, setDuplicatesOpen,
     handoffOpen, setHandoffOpen,
+    downloadOpen, setDownloadOpen,
   };
 }

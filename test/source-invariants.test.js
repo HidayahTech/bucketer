@@ -1460,3 +1460,29 @@ describe('Browser.jsx — drag-and-drop move wiring (v1.26.0)', () => {
     );
   });
 });
+
+// BUG-048: a regex written with literal control bytes (\x00-\x1F) instead of escape
+// sequences loaded fine in Node, so the whole unit suite passed, but esbuild mangled the
+// NUL byte into U+FFFD in the bundle and the resulting /[\uFFFD-\u001F]/ threw
+// "Range out of order in character class" at module load — a blank page in the browser.
+// Raw control bytes are also invisible in review. Nothing in src/ should contain them.
+describe('source hygiene', () => {
+  test('no source file contains raw control characters', () => {
+    const offenders = [];
+    const walk = (dir) => {
+      for (const entry of readdirSync(resolve(ROOT, dir), { withFileTypes: true })) {
+        const rel = `${dir}/${entry.name}`;
+        if (entry.isDirectory()) { walk(rel); continue; }
+        if (!/\.(js|jsx|css)$/.test(entry.name)) continue;
+        const text = readFileSync(resolve(ROOT, rel), 'utf8');
+        for (let i = 0; i < text.length; i += 1) {
+          const code = text.charCodeAt(i);
+          const isControl = (code < 0x20 && code !== 0x0a && code !== 0x09) || code === 0x7f;
+          if (isControl) { offenders.push(`${rel} (0x${code.toString(16)})`); break; }
+        }
+      }
+    };
+    walk('src');
+    assert.deepEqual(offenders, [], 'write control characters as \\uXXXX escapes, not raw bytes');
+  });
+});

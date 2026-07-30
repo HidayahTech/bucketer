@@ -391,6 +391,13 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 .queue-op-header { display: flex; align-items: center; gap: .5rem; }
 .queue-op-summary { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .queue-op-icon { font-size: .9rem; flex-shrink: 0; }
+/* Marks a row whose transfer the app does not control, so it can never be mistaken at a
+   glance for one whose progress Bucketer actually knows. */
+.queue-op-badge {
+  flex-shrink: 0; padding: .1rem .4rem; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface-raised);
+  color: var(--text-muted); font-size: .6875rem; white-space: nowrap; cursor: help;
+}
 .queue-op-ok  { color: var(--text-success); }
 .queue-op-err { color: var(--text-danger); }
 .queue-op-cancelled { color: var(--text-muted); }
@@ -777,6 +784,37 @@ details[open] .upload-log-summary::before { transform: rotate(90deg); }
 .about-body code { font-family: var(--mono); font-size: .8rem; background: var(--surface-raised); padding: .1rem .3rem; border-radius: 3px; }
 .about-tagline { font-size: .875rem; color: var(--text); border-top: 1px solid var(--border); padding-top: 1rem; }
 .about-author { border-top: 1px solid var(--border); padding-top: 1rem; }
+
+/* ── Download job panel (browser-managed folder download) ────────────────── */
+.download-job-dialog {
+  max-width: 560px; max-height: 85vh; width: 100%;
+  overflow: hidden; display: flex; flex-direction: column; gap: .75rem;
+}
+.download-job-body { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: .875rem; }
+.download-job-scope { margin: 0; font-size: .875rem; color: var(--text); }
+.download-job-note, .download-job-hint {
+  margin: 0; font-size: .8125rem; color: var(--text-muted); line-height: 1.5;
+}
+.download-job-modes { display: flex; gap: .5rem; flex-wrap: wrap; }
+.download-job-actions { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+.download-job-status { margin: 0; font-size: .875rem; color: var(--text); }
+.download-job-warning {
+  margin: 0; padding: .625rem .75rem; border-radius: var(--radius);
+  background: var(--warn-bg); color: var(--text); font-size: .8125rem; line-height: 1.45;
+}
+.download-job-error {
+  margin: 0; padding: .625rem .75rem; border-radius: var(--radius);
+  background: var(--danger-bg); color: var(--text-danger); font-size: .8125rem;
+}
+.download-job-unfinished {
+  border: 1px solid var(--border); border-radius: var(--radius); padding: .625rem .75rem;
+  display: flex; flex-direction: column; gap: .5rem;
+}
+.download-job-unfinished-title { margin: 0; font-size: .8125rem; font-weight: 600; }
+.download-job-unfinished-row {
+  display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; font-size: .8125rem;
+}
+.download-job-unfinished-scope { flex: 1; min-width: 0; color: var(--text-muted); }
 
 /* ── Transfer handoff (large downloads via rclone / AWS CLI) ─────────────── */
 .handoff-entry { display: flex; flex-direction: column; gap: .35rem; padding: .75rem 0; }

@@ -56,6 +56,24 @@ export function createTransferTask({ files, prefixes, dest, capturedPrefix, buck
   };
 }
 
+// A browser-managed download. `tier` is what keeps this row honest: the app hands files
+// to the browser's download manager and can observe only that it did so, so the row must
+// render differently from tasks whose progress the app actually knows.
+export function createDownloadTask({ fileCount, bucket, capturedPrefix }) {
+  return {
+    kind: 'download',
+    tier: 'browser-managed',
+    status: 'running',
+    subPhase: 'enumerating',
+    subject: subjectLabel(fileCount, 0),
+    files: [], prefixes: [], capturedPrefix, bucket,
+    current: 0, total: fileCount || null,
+    errors: [],
+    collapsed: false,
+    cancelRequested: false,
+  };
+}
+
 // Engine progress update → task-store patch. countField is 'deleted' (delete
 // engine) or 'moved' (move/copy engine). `cancelled: true` on a done update
 // marks a run that stopped early because cancellation was requested.

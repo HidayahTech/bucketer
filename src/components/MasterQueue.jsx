@@ -18,7 +18,23 @@ const VERBS = {
   rename: { active: 'Renaming', done: 'Renamed' },
 };
 
+// Downloads are deliberately not routed through VERBS. The app hands a file to the
+// browser's download manager and cannot see bytes, completion, or failure after that, so
+// every phrase here is limited to what it genuinely knows: how many it sent. Saying
+// "Downloaded" would be the exact lie docs/intent/master-queue.md warned about.
+function downloadSummary(t) {
+  const total = t.total != null ? t.total : null;
+  const ofText = total != null ? ` of ${total}` : '';
+  const errText = t.errors.length > 0 ? ` · ${t.errors.length} failed` : '';
+
+  if (t.status === 'cancelled') return `Stopped — sent ${t.current}${ofText} to your browser${errText}`;
+  if (t.status === 'done') return `Sent ${t.current}${ofText} to your browser — check your downloads${errText}`;
+  if (t.subPhase === 'enumerating') return 'Listing files to download…';
+  return `Sending to your browser — ${t.current}${ofText}${errText}`;
+}
+
 function taskSummary(t) {
+  if (t.kind === 'download') return downloadSummary(t);
   const verbs = VERBS[t.kind];
   const skipped = t.errors.filter(e => e.skipped).length;
   const failed  = t.errors.length - skipped;
@@ -71,6 +87,15 @@ function TaskRow({ task, store }) {
         {task.status === 'done' && failed > 0 && <span class="queue-op-icon queue-op-err">✕</span>}
         {task.status === 'cancelled' && <span class="queue-op-icon queue-op-cancelled">⊘</span>}
         <span class="queue-op-summary">{taskSummary(task)}</span>
+        {task.tier === 'browser-managed' && (
+          <span
+            class="queue-op-badge"
+            data-testid="task-badge"
+            title="Your browser is doing the transfer. Bucketer can see which files it handed over, but not their progress."
+          >
+            Browser-managed
+          </span>
+        )}
         {!isSettled && (
           <button type="button" class="btn btn-ghost btn-sm" style={{ flexShrink: 0 }}
             data-testid="task-cancel" disabled={task.cancelRequested}

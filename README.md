@@ -321,6 +321,29 @@ Multipart uploads (≥ 5 MB) save a resume record in IndexedDB. If interrupted:
 3. Resume opens the file picker — the browser requires this because file handles don't persist across sessions.
 4. The app calls `ListParts` to get the authoritative list of uploaded parts, then continues from where it left off.
 
+### Downloading a folder
+
+**Download this folder…** in the sidebar queues every file beneath the folder you are
+viewing. Bucketer lists the folder first and shows what it found before anything starts,
+so you commit with the real file count and size in front of you.
+
+Your browser performs the transfers. That makes them reliable, but it also bounds what
+Bucketer can tell you: it knows which files it has handed over, and nothing about their
+progress afterwards. The queue row reflects exactly that — a count of files sent, no
+percentage, no ETA, and a Cancel that stops sending rather than claiming to stop a
+transfer it does not control.
+
+Two consequences worth knowing before you start:
+
+- **Files arrive flat.** Browsers cannot create folders when downloading, so everything
+  lands in your downloads folder. You choose whether each file keeps just its own name
+  (`trip.jpg`) or the whole path (`photos__2024__trip.jpg`).
+- **Progress is remembered, not the transfers.** The worklist is stored in IndexedDB, so
+  closing the tab and returning later lets you resume from the files not yet sent. Files
+  already handed to the browser continue on their own.
+
+For anything approaching a terabyte, prefer a transfer tool — see below.
+
 ### Large transfers
 
 Downloading a single file hands off to the browser's own download manager, which works at any

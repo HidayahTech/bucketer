@@ -56,6 +56,12 @@ export const MAX_ADAPTIVE_MEMORY_BYTES = DEFAULT_UPLOAD_MEMORY_MB * 1024 * 1024;
 // but short enough that a leaked URL expires overnight without manual rotation.
 export const PRESIGN_EXPIRES = 3600;
 
+// Pause between handing successive files to the browser's download manager. Browsers
+// throttle — and prompt about — rapid programmatic downloads, so the queue is paced
+// rather than dumped. The cost is negligible: issuing a few thousand files takes minutes
+// while the transfers themselves take hours or days.
+export const DOWNLOAD_ISSUE_DELAY_MS = 250;
+
 // Maximum bytes fetched for text preview. Prevents loading multi-GB log files
 // into browser memory. Response status 206 indicates truncation.
 export const TEXT_PREVIEW_LIMIT = 100 * 1024;

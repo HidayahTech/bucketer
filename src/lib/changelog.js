@@ -1,9 +1,21 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.40.0';
+export const CURRENT_VERSION = '1.41.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.41.0",
+    "date": "2026-07-30",
+    "title": "Download a whole folder, and pick up where you left off",
+    "changes": [
+      "Download this folder… in the sidebar queues every file beneath the folder you are viewing.",
+      "Before anything starts, Bucketer lists the folder and tells you what it found — \"412 files, 840 GB\" — so you can decide with the real numbers in front of you, and warns that most providers bill for egress.",
+      "Files arrive as a flat list, because browsers cannot create folders when downloading. You choose whether each file keeps just its own name or the whole folder path in the name.",
+      "An interrupted job reappears the next time you open the panel, showing how much is left, and can be resumed or discarded.",
+      "The queue row is honest about what it knows. Your browser does the transferring, so Bucketer shows how many files it has handed over and nothing more — no percentage, no ETA, no speed, and a Cancel that says it stops sending rather than pretending to stop a transfer it does not control."
+    ]
+  },
   {
     "version": "1.40.0",
     "date": "2026-07-30",

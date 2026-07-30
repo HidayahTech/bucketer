@@ -18,7 +18,9 @@
 //
 // Browser component is re-mounted (key={browserKey} increment) on every reconnect to
 // flush its in-memory listing cache and force a fresh listing probe.
-import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks';
+import { GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import logoUrl from '../assets/bucketer-logo.svg';
 import { BucketerLogo } from './BucketerLogo.jsx';
 import { ThemeToggle } from './ThemeToggle.jsx';
@@ -55,7 +57,17 @@ import { MasterQueue } from './MasterQueue.jsx';
 import { runDeleteOperation } from '../lib/delete-queue.js';
 import { runMoveOperation, runCopyOperation, runRenameOperation } from '../lib/move-queue.js';
 import { taskStore } from '../lib/task-store.js';
-import { createDeleteTask, createTransferTask, engineUpdateToPatch } from '../lib/queue-tasks.js';
+import { createDeleteTask, createTransferTask, createDownloadTask, engineUpdateToPatch } from '../lib/queue-tasks.js';
+import { DownloadJobPanel } from './DownloadJobPanel.jsx';
+import {
+  saveJob, loadJob, loadAllJobs, deleteJob, countItemsByStatus,
+  ITEM_STATUS, JOB_STATUS,
+} from '../lib/download-records.js';
+import { enumerateJob } from '../lib/download-manifest.js';
+import { runDownloadJob } from '../lib/download-queue.js';
+import { issueBrowserDownload } from '../lib/download-issue.js';
+import { presignGetParams } from '../lib/presign-params.js';
+import { PRESIGN_EXPIRES, DOWNLOAD_ISSUE_DELAY_MS } from '../lib/constants.js';
 import { CapabilityPanel } from './CapabilityPanel.jsx';
 import { SettingsPanel } from './SettingsPanel.jsx';
 import { UploadLog } from './UploadLog.jsx';
@@ -120,7 +132,7 @@ export function App() {
   const [formResetKey, setFormResetKey] = useState(0);
   const [logKey, setLogKey] = useState(0);         // incremented to refresh upload log
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { changelogOpen, setChangelogOpen, aboutOpen, setAboutOpen, storageOpen, setStorageOpen, duplicatesOpen, setDuplicatesOpen, handoffOpen, setHandoffOpen } = useModalStates();
+  const { changelogOpen, setChangelogOpen, aboutOpen, setAboutOpen, storageOpen, setStorageOpen, duplicatesOpen, setDuplicatesOpen, handoffOpen, setHandoffOpen, downloadOpen, setDownloadOpen } = useModalStates();
   const [liveFormData, setLiveFormData] = useState(credentials);
   const [updateCheckEnabled, setUpdateCheckEnabled] = useState(() => loadUpdateCheckEnabled());
   const [prefetchSizeLimit, setPrefetchSizeLimit] = useState(() => loadPrefetchSizeLimit());
@@ -502,6 +514,79 @@ export function App() {
     }
   }
 
+  // Record/enumeration wiring handed to DownloadJobPanel, which stays free of IndexedDB
+  // and the SDK. Rebuilt only when the connection changes.
+  const downloadApi = useMemo(() => ({
+    listUnfinished: async () => {
+      const jobs = await loadAllJobs();
+      const mine = jobs.filter(j => j.bucket === credentials.bucket && j.status !== JOB_STATUS.DONE);
+      const withRemaining = await Promise.all(mine.map(async j => ({
+        ...j, remaining: await countItemsByStatus(j.id, ITEM_STATUS.PENDING),
+      })));
+      return withRemaining.filter(j => j.remaining > 0);
+    },
+    startJob: async ({ bucket, prefix, mode }) => {
+      const job = {
+        id: crypto.randomUUID(),
+        bucket, prefix, mode,
+        status: JOB_STATUS.ENUMERATING,
+        enumeration: {},
+        counters: { total: 0, bytesTotal: 0 },
+        createdAt: Date.now(),
+      };
+      await saveJob(job);
+      return job;
+    },
+    enumerate: (job, opts) => enumerateJob(client, job, opts),
+    discard: (id) => deleteJob(id),
+  }), [client, credentials.bucket]);
+
+  // The panel has already listed the folder and taken the user's confirmation, so this
+  // starts issuing straight away. Note it never touches capabilities: presigning is a
+  // local signing operation, so its success proves nothing about read permission.
+  async function handleDownloadStart(job) {
+    const fresh = await loadJob(job.id);
+    if (!fresh) return;
+
+    const total = fresh.counters?.total ?? 0;
+    const task = createDownloadTask({ fileCount: total, bucket: fresh.bucket, capturedPrefix: fresh.prefix });
+    const id = taskStore.add(task);
+    taskStore.update(id, { subPhase: null, total }, true);
+    await saveJob({ ...fresh, status: JOB_STATUS.RUNNING });
+
+    const presign = (key, filename) => getSignedUrl(client, new GetObjectCommand(presignGetParams({
+      Bucket: fresh.bucket,
+      Key: key,
+      ResponseContentDisposition: `attachment; filename="${encodeURIComponent(filename)}"`,
+    })), { expiresIn: PRESIGN_EXPIRES });
+
+    try {
+      const result = await runDownloadJob(fresh, {
+        presign,
+        issue: issueBrowserDownload,
+        shouldCancel: () => taskStore.isCancelRequested(id),
+        onProgress: ({ issued }) => taskStore.update(id, { current: issued }, false),
+      }, { delayMs: DOWNLOAD_ISSUE_DELAY_MS });
+
+      taskStore.update(id, {
+        status:   result.cancelled ? 'cancelled' : 'done',
+        subPhase: null,
+        current:  result.issued,
+        errors:   result.errors,
+      }, true);
+
+      // A cancelled job keeps its manifest so it can be resumed; a finished one is
+      // dropped, since the queue row is the record and the items are dead weight.
+      if (result.cancelled) await saveJob({ ...fresh, status: JOB_STATUS.PAUSED });
+      else await deleteJob(fresh.id);
+    } catch (err) {
+      taskStore.update(id, {
+        status: 'done', subPhase: null,
+        errors: [{ key: '(unexpected)', message: err.message || String(err) }],
+      }, true);
+    }
+  }
+
   // The MovePickerModal is the confirmation step, so a move/copy request starts
   // its task directly.
   async function handleMoveRequest({ files, prefixes, dest, capturedPrefix, mode = 'move', renameTo }) {
@@ -654,6 +739,16 @@ export function App() {
       {changelogOpen && <ChangelogModal onClose={() => setChangelogOpen(false)} />}
       {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}
       {storageOpen && <StorageModal onClose={() => setStorageOpen(false)} isConnected={session === 'connected'} />}
+      {downloadOpen && session === 'connected' && (
+        <DownloadJobPanel
+          bucket={credentials.bucket}
+          prefix={currentPrefix}
+          api={downloadApi}
+          onStart={handleDownloadStart}
+          onClose={() => setDownloadOpen(false)}
+          onUseTransferTool={() => { setDownloadOpen(false); setHandoffOpen(true); }}
+        />
+      )}
       {handoffOpen && (
         <TransferHandoff
           credentials={credentials}
@@ -838,6 +933,18 @@ export function App() {
             />
             <hr style={{ border: 'none', borderTop: '1px solid var(--border)' }} />
             <div class="handoff-entry">
+              <button
+                type="button"
+                class="btn btn-ghost btn-sm"
+                data-testid="open-download-job"
+                onClick={() => setDownloadOpen(true)}
+              >
+                Download this folder…
+              </button>
+              <p class="handoff-entry-hint">
+                Queues every file beneath the folder you are viewing and hands them to your
+                browser, remembering what it has already sent so you can stop and resume.
+              </p>
               <button
                 type="button"
                 class="btn btn-ghost btn-sm"

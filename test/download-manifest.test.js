@@ -1,0 +1,166 @@
+// Copyright (C) 2026 HidayahTech, LLC
+// Tests for src/lib/download-manifest.js — checkpointed enumeration.
+//
+// Enumeration of a TB-scale prefix can itself take long enough to be interrupted, so it
+// has to be resumable in its own right: every page is committed with the token that
+// follows it, and a resumed run must not re-list what it already recorded.
+import { indexedDB, IDBKeyRange } from 'fake-indexeddb';
+global.indexedDB = indexedDB;
+global.IDBKeyRange = IDBKeyRange;
+
+import { test, describe, beforeEach } from 'node:test';
+import assert from 'node:assert/strict';
+import { enumerateJob } from '../src/lib/download-manifest.js';
+import {
+  saveJob, loadJob, loadAllJobs, deleteJob,
+  countItemsByStatus, eachItemByStatus, ITEM_STATUS,
+} from '../src/lib/download-records.js';
+import { NAMING_MODES } from '../src/lib/download-naming.js';
+
+function mockClient(pages) {
+  const calls = [];
+  return {
+    calls,
+    async send(cmd) {
+      calls.push({ ...cmd.input });
+      const idx = pages.findIndex(p => (p.token ?? undefined) === cmd.input.ContinuationToken);
+      const page = pages[idx === -1 ? 0 : idx];
+      return { Contents: page.contents, IsTruncated: !!page.next, NextContinuationToken: page.next };
+    },
+  };
+}
+
+const obj = (Key, Size = 10) => ({ Key, Size, ETag: `"${Key}"`, LastModified: new Date(1700000000000) });
+
+const job = (over = {}) => ({
+  id: 'job-1', bucket: 'bkt', prefix: '', mode: NAMING_MODES.LEAF,
+  status: 'enumerating', enumeration: {}, counters: { total: 0, bytesTotal: 0 }, ...over,
+});
+
+async function reset() {
+  for (const j of await loadAllJobs()) await deleteJob(j.id);
+}
+
+async function keysOf(jobId, status = ITEM_STATUS.PENDING) {
+  const out = [];
+  await eachItemByStatus(jobId, status, it => { out.push(it.key); });
+  return out.sort();
+}
+
+describe('enumerateJob', () => {
+  beforeEach(reset);
+
+  test('persists every object and marks enumeration done', async () => {
+    await saveJob(job());
+    const client = mockClient([{ token: undefined, contents: [obj('a'), obj('b')] }]);
+
+    const result = await enumerateJob(client, await loadJob('job-1'), {});
+
+    assert.deepEqual(await keysOf('job-1'), ['a', 'b']);
+    assert.equal(result.done, true);
+    assert.equal((await loadJob('job-1')).enumeration.done, true);
+  });
+
+  test('records size and etag for later verification', async () => {
+    await saveJob(job());
+    const client = mockClient([{ token: undefined, contents: [obj('a', 42)] }]);
+    await enumerateJob(client, await loadJob('job-1'), {});
+
+    let found;
+    await eachItemByStatus('job-1', ITEM_STATUS.PENDING, it => { found = it; });
+    assert.equal(found.size, 42);
+    assert.equal(found.etag, '"a"');
+    assert.equal(found.lastModified, 1700000000000);
+  });
+
+  // A zero-byte key ending in "/" is a folder marker, not a file anyone wants downloaded.
+  test('skips directory markers', async () => {
+    await saveJob(job());
+    const client = mockClient([{ token: undefined, contents: [obj('videos/', 0), obj('videos/a.mp4')] }]);
+    await enumerateJob(client, await loadJob('job-1'), {});
+
+    assert.deepEqual(await keysOf('job-1'), ['videos/a.mp4']);
+    assert.equal((await loadJob('job-1')).counters.total, 1);
+  });
+
+  test('assigns a local name per naming mode', async () => {
+    await saveJob(job({ mode: NAMING_MODES.FLATTEN }));
+    const client = mockClient([{ token: undefined, contents: [obj('videos/2024/a.mp4')] }]);
+    await enumerateJob(client, await loadJob('job-1'), {});
+
+    let found;
+    await eachItemByStatus('job-1', ITEM_STATUS.PENDING, it => { found = it; });
+    assert.equal(found.localName, 'videos__2024__a.mp4');
+  });
+
+  test('resumes from the stored token without re-listing', async () => {
+    await saveJob(job({ enumeration: { continuationToken: 't1' } }));
+    const client = mockClient([
+      { token: undefined, contents: [obj('a')], next: 't1' },
+      { token: 't1', contents: [obj('b')] },
+    ]);
+    await enumerateJob(client, await loadJob('job-1'), {});
+
+    assert.deepEqual(await keysOf('job-1'), ['b']);
+    assert.equal(client.calls.length, 1);
+    assert.equal(client.calls[0].ContinuationToken, 't1');
+  });
+
+  test('a cancelled enumeration leaves a resumable token and is not done', async () => {
+    await saveJob(job());
+    const client = mockClient([
+      { token: undefined, contents: [obj('a')], next: 't1' },
+      { token: 't1', contents: [obj('b')], next: 't2' },
+      { token: 't2', contents: [obj('c')] },
+    ]);
+
+    let pages = 0;
+    const result = await enumerateJob(client, await loadJob('job-1'), {
+      onProgress: () => { pages += 1; },
+      shouldCancel: () => pages >= 1,
+    });
+
+    assert.equal(result.cancelled, true);
+    assert.equal(result.done, false);
+    const stored = await loadJob('job-1');
+    assert.equal(stored.enumeration.continuationToken, 't1');
+    assert.equal(stored.enumeration.done, undefined);
+    assert.deepEqual(await keysOf('job-1'), ['a']);
+  });
+
+  test('reports running totals as it goes', async () => {
+    await saveJob(job());
+    const client = mockClient([
+      { token: undefined, contents: [obj('a', 5)], next: 't1' },
+      { token: 't1', contents: [obj('b', 7)] },
+    ]);
+
+    const seen = [];
+    await enumerateJob(client, await loadJob('job-1'), { onProgress: p => seen.push({ ...p }) });
+
+    assert.equal(seen.length, 2);
+    assert.deepEqual(seen[seen.length - 1], { objects: 2, bytes: 12 });
+  });
+
+  test('an empty prefix completes with nothing recorded', async () => {
+    await saveJob(job());
+    const client = mockClient([{ token: undefined, contents: [] }]);
+    const result = await enumerateJob(client, await loadJob('job-1'), {});
+
+    assert.equal(result.objects, 0);
+    assert.equal(result.done, true);
+    assert.equal(await countItemsByStatus('job-1', ITEM_STATUS.PENDING), 0);
+  });
+
+  test('a page of nothing but directory markers still advances the token', async () => {
+    await saveJob(job());
+    const client = mockClient([
+      { token: undefined, contents: [obj('a/', 0)], next: 't1' },
+      { token: 't1', contents: [obj('a/x.txt')] },
+    ]);
+    await enumerateJob(client, await loadJob('job-1'), {});
+
+    assert.deepEqual(await keysOf('job-1'), ['a/x.txt']);
+    assert.equal((await loadJob('job-1')).enumeration.done, true);
+  });
+});
