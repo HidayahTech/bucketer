@@ -6,6 +6,7 @@
 // translate engine updates into task patches so the engines stay untouched
 // and independently testable.
 import { leafName } from './format.js';
+import { TIERS } from './browser-capability.js';
 
 export function subjectLabel(fileCount, prefixCount) {
   return [
@@ -56,13 +57,14 @@ export function createTransferTask({ files, prefixes, dest, capturedPrefix, buck
   };
 }
 
-// A browser-managed download. `tier` is what keeps this row honest: the app hands files
-// to the browser's download manager and can observe only that it did so, so the row must
-// render differently from tasks whose progress the app actually knows.
-export function createDownloadTask({ fileCount, bucket, capturedPrefix }) {
+// A download task. `tier` names the mechanism actually in use and is what keeps this row
+// honest — a row whose progress the app cannot observe must not render like one whose it can.
+// The vocabulary is shared with browser-capability.js so the panel and the queue cannot
+// drift into describing the same download two different ways.
+export function createDownloadTask({ fileCount, bucket, capturedPrefix, tier = TIERS.HANDOFF }) {
   return {
     kind: 'download',
-    tier: 'browser-managed',
+    tier,
     status: 'running',
     subPhase: 'enumerating',
     subject: subjectLabel(fileCount, 0),

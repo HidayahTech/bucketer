@@ -10,6 +10,7 @@
 import { useState, useEffect } from 'preact/hooks';
 import { leafName } from '../lib/format.js';
 import { taskStore } from '../lib/task-store.js';
+import { tierLabel, TIERS } from '../lib/browser-capability.js';
 
 const VERBS = {
   delete: { active: 'Deleting', done: 'Deleted' },
@@ -87,13 +88,15 @@ function TaskRow({ task, store }) {
         {task.status === 'done' && failed > 0 && <span class="queue-op-icon queue-op-err">✕</span>}
         {task.status === 'cancelled' && <span class="queue-op-icon queue-op-cancelled">⊘</span>}
         <span class="queue-op-summary">{taskSummary(task)}</span>
-        {task.tier === 'browser-managed' && (
+        {task.tier && (
           <span
             class="queue-op-badge"
             data-testid="task-badge"
-            title="Your browser is doing the transfer. Bucketer can see which files it handed over, but not their progress."
+            title={task.tier === TIERS.HANDOFF
+              ? 'Your browser is doing the transfer. Bucketer can see which files it handed over, but not their progress.'
+              : 'Bucketer is performing this transfer and can report its real progress.'}
           >
-            Browser-managed
+            {tierLabel(task.tier)}
           </span>
         )}
         {!isSettled && (

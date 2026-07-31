@@ -12,6 +12,10 @@ import assert from 'node:assert/strict';
 import { mount, fire } from '../helpers/render.js';
 import { DownloadJobPanel } from '../../src/components/DownloadJobPanel.jsx';
 import { NAMING_MODES } from '../../src/lib/download-naming.js';
+import { TIERS } from '../../src/lib/browser-capability.js';
+
+const DESKTOP = { directoryPicker: false, opfs: true, streamingFetch: true, likelyMobile: false };
+const MOBILE = { ...DESKTOP, likelyMobile: true };
 
 const NOOP = () => {};
 
@@ -183,6 +187,49 @@ describe('DownloadJobPanel', () => {
     fire(m.query('[data-testid="discard-old"]'), 'click');
     await flush();
     assert.equal(discarded, 'old');
+    m.cleanup();
+  });
+
+  // Capability disclosure. The mechanism in use is named rather than left implicit, and the
+  // mobile warning exists because backgrounding and page-memory limits are the real ceiling
+  // on a phone and neither is something the app can detect or work around.
+  test('names the mechanism this download will use', () => {
+    const m = mount(<DownloadJobPanel bucket="bkt" prefix="" api={fakeApi()} onStart={NOOP}
+      onClose={NOOP} capabilities={DESKTOP} />);
+    assert.notEqual(m.query('[data-testid="tier-notice"]'), null);
+    m.cleanup();
+  });
+
+  test('warns on a phone, where the real limits are not detectable', () => {
+    const m = mount(<DownloadJobPanel bucket="bkt" prefix="" api={fakeApi()} onStart={NOOP}
+      onClose={NOOP} capabilities={MOBILE} />);
+    const warn = m.query('[data-testid="mobile-warning"]');
+    assert.notEqual(warn, null);
+    assert.ok(/switch apps|background/i.test(warn.textContent));
+    m.cleanup();
+  });
+
+  test('does not warn about phones on a desktop browser', () => {
+    const m = mount(<DownloadJobPanel bucket="bkt" prefix="" api={fakeApi()} onStart={NOOP}
+      onClose={NOOP} capabilities={DESKTOP} />);
+    assert.equal(m.query('[data-testid="mobile-warning"]'), null);
+    m.cleanup();
+  });
+
+  // Advertising a mechanism that is not built would be the same class of untruth as a
+  // progress bar the app cannot back up.
+  test('HONESTY: does not promise folder delivery it cannot perform', () => {
+    const capable = { ...DESKTOP, directoryPicker: true, writableFiles: true };
+    const m = mount(<DownloadJobPanel bucket="bkt" prefix="" api={fakeApi()} onStart={NOOP}
+      onClose={NOOP} capabilities={capable} />);
+    const body = m.text();
+    assert.ok(/flat/i.test(body), 'must still say files arrive flat');
+    m.cleanup();
+  });
+
+  test('works when no capabilities are supplied', () => {
+    const m = mount(<DownloadJobPanel bucket="bkt" prefix="" api={fakeApi()} onStart={NOOP} onClose={NOOP} />);
+    assert.notEqual(m.query('[data-testid="scan"]'), null);
     m.cleanup();
   });
 

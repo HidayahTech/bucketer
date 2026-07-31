@@ -7,6 +7,15 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.42.0] — 2026-07-31 — Downloads say what they are doing, and warn on phones
+
+Bucketer now checks what your browser is actually capable of, rather than assuming, and
+says so before you start a folder download.
+
+- The download panel names the method it will use and explains its limits in that place, instead of leaving you to discover them.
+- On a phone or tablet, it now warns before you commit: downloads there are unreliable past a few hundred megabytes, because the browser stops the tab when you switch apps and can close the page without warning if memory runs short. Neither is something Bucketer can detect or work around, so it says so rather than letting a large download fail quietly.
+- Capability is decided by asking the browser for each feature, never by its name. Browser names are easy to fake and change meaning between releases; a widely used compatibility database is currently wrong about one of the features involved.
+
 ## [1.41.1] — 2026-07-30 — Downloaded files keep their real names
 
 - Files with a space, an accent, or punctuation in their name were saved with that punctuation mangled — `my file.jpg` arrived as `my%20file.jpg`, and `café.txt` as `caf%C3%A9.txt`. They now keep the name they have in the bucket. This affected every download: single files, duplicate-finder rows, and folder downloads.

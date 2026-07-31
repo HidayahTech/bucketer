@@ -66,6 +66,7 @@ import {
 import { enumerateJob } from '../lib/download-manifest.js';
 import { runDownloadJob } from '../lib/download-queue.js';
 import { issueBrowserDownload } from '../lib/download-issue.js';
+import { detectCapabilities } from '../lib/browser-capability.js';
 import { presignDownloadParams } from '../lib/presign-params.js';
 import { DOWNLOAD_PRESIGN_EXPIRES, DOWNLOAD_ISSUE_DELAY_MS } from '../lib/constants.js';
 import { CapabilityPanel } from './CapabilityPanel.jsx';
@@ -514,6 +515,10 @@ export function App() {
     }
   }
 
+  // What this browser can actually do, by feature detection. Constant for the session, and
+  // never derived from the browser's name — see src/lib/browser-capability.js.
+  const browserCapabilities = useMemo(() => detectCapabilities(), []);
+
   // Record/enumeration wiring handed to DownloadJobPanel, which stays free of IndexedDB
   // and the SDK. Rebuilt only when the connection changes.
   const downloadApi = useMemo(() => ({
@@ -755,6 +760,7 @@ export function App() {
           bucket={credentials.bucket}
           prefix={currentPrefix}
           api={downloadApi}
+          capabilities={browserCapabilities}
           onStart={handleDownloadStart}
           onClose={() => setDownloadOpen(false)}
           onUseTransferTool={() => { setDownloadOpen(false); setHandoffOpen(true); }}

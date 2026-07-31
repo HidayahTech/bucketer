@@ -18,8 +18,10 @@ import { useState, useEffect } from 'preact/hooks';
 import { Modal } from './Modal.jsx';
 import { formatBytes } from '../lib/format.js';
 import { NAMING_MODES } from '../lib/download-naming.js';
+import { selectTier, tierLabel, TIERS } from '../lib/browser-capability.js';
 
-export function DownloadJobPanel({ bucket, prefix = '', api, onStart, onClose, onUseTransferTool }) {
+export function DownloadJobPanel({ bucket, prefix = '', api, onStart, onClose, onUseTransferTool,
+                                   capabilities = null }) {
   const [mode, setMode] = useState(NAMING_MODES.LEAF);
   const [phase, setPhase] = useState('options');   // options | listing | ready | error
   const [counts, setCounts] = useState({ objects: 0, bytes: 0 });
@@ -28,6 +30,11 @@ export function DownloadJobPanel({ bucket, prefix = '', api, onStart, onClose, o
   const [unfinished, setUnfinished] = useState([]);
 
   const scope = prefix ? `${bucket}/${prefix}` : bucket;
+
+  // Only the handoff mechanism is built, so that is what is named — a browser that could do
+  // better is not told about a capability the application does not yet have. When the other
+  // mechanisms land this becomes selectTier(capabilities, { largestFileBytes, quotaBytes }).
+  const tier = capabilities ? selectTier(capabilities, { prefer: TIERS.HANDOFF }) : TIERS.HANDOFF;
 
   // A job interrupted in an earlier session is the reason the manifest is durable at all,
   // so it has to be reachable. The download entry point is where someone will look.
@@ -91,12 +98,21 @@ export function DownloadJobPanel({ bucket, prefix = '', api, onStart, onClose, o
           Downloading <code>{scope}</code> and everything beneath it.
         </p>
 
-        <p class="download-job-note">
-          Your browser does the transferring. That makes it reliable, but it also means
-          Bucketer cannot see how far along each file is — it can only tell you which files
-          it has handed over. Files also arrive as a flat list in your downloads folder,
-          because browsers cannot create folders when downloading.
+        <p class="download-job-note" data-testid="tier-notice">
+          <strong>{tierLabel(tier)}.</strong> Your browser does the transferring. That makes it
+          reliable, but it also means Bucketer cannot see how far along each file is — it can
+          only tell you which files it has handed over. Files also arrive as a flat list in
+          your downloads folder, because browsers cannot create folders when downloading.
         </p>
+
+        {capabilities?.likelyMobile && (
+          <p class="download-job-warning" data-testid="mobile-warning">
+            This looks like a phone or tablet. Downloads there are unreliable beyond a few
+            hundred megabytes: the browser stops this tab when you switch apps, and the page
+            can be closed without warning if it runs short of memory. For anything large, use
+            a desktop browser or the command-line option.
+          </p>
+        )}
 
         {phase === 'options' && unfinished.length > 0 && (
           <div class="download-job-unfinished">

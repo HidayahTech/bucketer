@@ -1,9 +1,19 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.41.1';
+export const CURRENT_VERSION = '1.42.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.42.0",
+    "date": "2026-07-31",
+    "title": "Downloads say what they are doing, and warn on phones",
+    "changes": [
+      "The download panel names the method it will use and explains its limits in that place, instead of leaving you to discover them.",
+      "On a phone or tablet, it now warns before you commit: downloads there are unreliable past a few hundred megabytes, because the browser stops the tab when you switch apps and can close the page without warning if memory runs short. Neither is something Bucketer can detect or work around, so it says so rather than letting a large download fail quietly.",
+      "Capability is decided by asking the browser for each feature, never by its name. Browser names are easy to fake and change meaning between releases; a widely used compatibility database is currently wrong about one of the features involved."
+    ]
+  },
   {
     "version": "1.41.1",
     "date": "2026-07-30",
