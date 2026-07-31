@@ -1,9 +1,19 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.41.0';
+export const CURRENT_VERSION = '1.41.1';
 
 export const CHANGELOG = [
+  {
+    "version": "1.41.1",
+    "date": "2026-07-30",
+    "title": "Downloaded files keep their real names",
+    "changes": [
+      "Files with a space, an accent, or punctuation in their name were saved with that punctuation mangled — my file.jpg arrived as my%20file.jpg, and café.txt as caf%C3%A9.txt. They now keep the name they have in the bucket. This affected every download: single files, duplicate-finder rows, and folder downloads.",
+      "Downloads interrupted part-way can now be resumed by the browser for up to seven days. Previously the link Bucketer handed the browser expired after an hour, so a transfer interrupted after that could not be restarted and failed with an error Bucketer could not see — the case that hurt most on slow connections, where a large file takes longer than an hour to begin with.",
+      "A download queued for one bucket can no longer start against a different connection."
+    ]
+  },
   {
     "version": "1.41.0",
     "date": "2026-07-30",

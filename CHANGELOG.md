@@ -7,6 +7,12 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.41.1] — 2026-07-30 — Downloaded files keep their real names
+
+- Files with a space, an accent, or punctuation in their name were saved with that punctuation mangled — `my file.jpg` arrived as `my%20file.jpg`, and `café.txt` as `caf%C3%A9.txt`. They now keep the name they have in the bucket. This affected every download: single files, duplicate-finder rows, and folder downloads.
+- Downloads interrupted part-way can now be resumed by the browser for up to seven days. Previously the link Bucketer handed the browser expired after an hour, so a transfer interrupted after that could not be restarted and failed with an error Bucketer could not see — the case that hurt most on slow connections, where a large file takes longer than an hour to begin with.
+- A download queued for one bucket can no longer start against a different connection.
+
 ## [1.41.0] — 2026-07-30 — Download a whole folder, and pick up where you left off
 
 Downloading a folder of a few thousand files used to mean clicking each one and

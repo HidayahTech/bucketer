@@ -1486,3 +1486,59 @@ describe('source hygiene', () => {
     assert.deepEqual(offenders, [], 'write control characters as \\uXXXX escapes, not raw bytes');
   });
 });
+
+// A download manifest is durable and outlives the session that created it, while the
+// active connection lives in memory. handleDownloadStart presigns against the bucket
+// recorded on the job but signs with the current client, so those two facts must be
+// checked to agree before any URL is minted — otherwise a stale job signs for a bucket
+// the user is not connected to. Flagged by security review on the Stage 2 commit.
+describe('App.jsx — a download job cannot run against another connection', () => {
+  const source = src('components/App.jsx');
+
+  test('handleDownloadStart compares the job bucket to the live credentials', () => {
+    const start = source.indexOf('async function handleDownloadStart');
+    assert.ok(start > -1, 'handleDownloadStart must exist');
+
+    const presign = source.indexOf('const presign =', start);
+    assert.ok(presign > start, 'handleDownloadStart must build a presigner');
+
+    const preamble = source.slice(start, presign);
+    assert.ok(
+      /fresh\.bucket\s*!==\s*credentials\.bucket/.test(preamble),
+      'handleDownloadStart must reject a job whose bucket differs from the connected one, ' +
+      'and must do so before any presigned URL is created'
+    );
+  });
+});
+
+// BUG-049: Content-Disposition is the ONLY thing that names a cross-origin download, so
+// every "save to disk" call site must build it through the one tested helper rather than
+// hand-rolling a quoted string. And each must use DOWNLOAD_PRESIGN_EXPIRES: the browser
+// resumes by re-requesting the ORIGINAL URL, so a short-lived one turns a recoverable
+// interruption into a permanent 403 the app never sees.
+describe('download call sites use the shared presign helper (BUG-049)', () => {
+  const SITES = ['components/Browser.jsx', 'components/DuplicatesModal.jsx', 'components/App.jsx'];
+
+  for (const site of SITES) {
+    test(`${site} builds its download disposition via presignDownloadParams`, () => {
+      const source = src(site);
+      assert.ok(
+        /presignDownloadParams\(/.test(source),
+        `${site} must call presignDownloadParams for its download presign`
+      );
+      assert.equal(
+        /ResponseContentDisposition:\s*`attachment/.test(source), false,
+        `${site} must not hand-roll an attachment disposition — encodeURIComponent inside a ` +
+        'quoted-string parameter is what made "my file.jpg" save as "my%20file.jpg"'
+      );
+    });
+
+    test(`${site} signs downloads with DOWNLOAD_PRESIGN_EXPIRES`, () => {
+      const source = src(site);
+      assert.ok(
+        /DOWNLOAD_PRESIGN_EXPIRES/.test(source),
+        `${site} must use the long download expiry, not the short preview one`
+      );
+    });
+  }
+});

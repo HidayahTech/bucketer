@@ -66,8 +66,8 @@ import {
 import { enumerateJob } from '../lib/download-manifest.js';
 import { runDownloadJob } from '../lib/download-queue.js';
 import { issueBrowserDownload } from '../lib/download-issue.js';
-import { presignGetParams } from '../lib/presign-params.js';
-import { PRESIGN_EXPIRES, DOWNLOAD_ISSUE_DELAY_MS } from '../lib/constants.js';
+import { presignDownloadParams } from '../lib/presign-params.js';
+import { DOWNLOAD_PRESIGN_EXPIRES, DOWNLOAD_ISSUE_DELAY_MS } from '../lib/constants.js';
 import { CapabilityPanel } from './CapabilityPanel.jsx';
 import { SettingsPanel } from './SettingsPanel.jsx';
 import { UploadLog } from './UploadLog.jsx';
@@ -548,17 +548,28 @@ export function App() {
     const fresh = await loadJob(job.id);
     if (!fresh) return;
 
+    // A manifest outlives the session that built it. Nothing today can reach here with a
+    // job from another connection — listUnfinished() filters by bucket, and new jobs take
+    // theirs from the live one — but the two are separate facts stored in separate places,
+    // so the match is checked rather than assumed. Without this, a stale job would presign
+    // its own recorded bucket using the *current* client, signing for a bucket the user is
+    // not connected to.
+    if (fresh.bucket !== credentials.bucket) {
+      showToast('That download was created for a different bucket. Reconnect to it to continue.');
+      return;
+    }
+
     const total = fresh.counters?.total ?? 0;
     const task = createDownloadTask({ fileCount: total, bucket: fresh.bucket, capturedPrefix: fresh.prefix });
     const id = taskStore.add(task);
     taskStore.update(id, { subPhase: null, total }, true);
     await saveJob({ ...fresh, status: JOB_STATUS.RUNNING });
 
-    const presign = (key, filename) => getSignedUrl(client, new GetObjectCommand(presignGetParams({
-      Bucket: fresh.bucket,
-      Key: key,
-      ResponseContentDisposition: `attachment; filename="${encodeURIComponent(filename)}"`,
-    })), { expiresIn: PRESIGN_EXPIRES });
+    const presign = (key, filename) => getSignedUrl(
+      client,
+      new GetObjectCommand(presignDownloadParams({ Bucket: fresh.bucket, Key: key, filename })),
+      { expiresIn: DOWNLOAD_PRESIGN_EXPIRES },
+    );
 
     try {
       const result = await runDownloadJob(fresh, {

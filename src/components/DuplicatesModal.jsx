@@ -16,8 +16,8 @@ import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Modal } from './Modal.jsx';
 import { formatBytes, leafName } from '../lib/format.js';
-import { presignGetParams } from '../lib/presign-params.js';
-import { PRESIGN_EXPIRES, DEDUP_VERIFY_MAX_BYTES } from '../lib/constants.js';
+import { presignGetParams, presignDownloadParams } from '../lib/presign-params.js';
+import { PRESIGN_EXPIRES, DOWNLOAD_PRESIGN_EXPIRES, DEDUP_VERIFY_MAX_BYTES } from '../lib/constants.js';
 import { scanForDuplicates } from '../lib/dedup-scan.js';
 import { providerChecksumAdapter } from '../lib/provider-checksum.js';
 import { verifyAgainstReference } from '../lib/verify-bytes.js';
@@ -130,9 +130,12 @@ async function presign(client, bucket, key, extra) {
 
 async function downloadObject(client, bucket, key) {
   try {
-    const url = await presign(client, bucket, key, {
-      ResponseContentDisposition: `attachment; filename="${encodeURIComponent(leafName(key))}"`,
-    });
+    // Saved to disk, so it takes the download expiry and disposition, not the preview one.
+    const url = await getSignedUrl(
+      client,
+      new GetObjectCommand(presignDownloadParams({ Bucket: bucket, Key: key, filename: leafName(key) })),
+      { expiresIn: DOWNLOAD_PRESIGN_EXPIRES },
+    );
     const a = document.createElement('a');
     a.href = url; a.download = leafName(key);
     document.body.appendChild(a); a.click(); document.body.removeChild(a);

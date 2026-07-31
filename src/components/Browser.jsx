@@ -11,7 +11,7 @@ import { listObjectsPage } from '../lib/list-objects.js';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { formatBytes, leafName, isPermissionError } from '../lib/format.js';
 import { usePreview } from '../lib/usePreview.js';
-import { presignGetParams } from '../lib/presign-params.js';
+import { presignGetParams, presignDownloadParams } from '../lib/presign-params.js';
 import { Modal } from './Modal.jsx';
 import { PreviewMedia } from './PreviewMedia.jsx';
 import { defaultMaxKeys } from '../lib/provider.js';
@@ -19,7 +19,7 @@ import { loadMaxKeys, loadListingCacheTTL, loadFileMtimeAutoLoad } from '../lib/
 import { pushPrefixHistory } from '../lib/url-params.js';
 import { mediaKind, mimeType, mimeKind } from '../lib/media.js';
 import { resolveDroppedFiles } from '../lib/file-entries.js';
-import { PRESIGN_EXPIRES, TEXT_PREVIEW_LIMIT, FILE_MTIME_KEY } from '../lib/constants.js';
+import { PRESIGN_EXPIRES, DOWNLOAD_PRESIGN_EXPIRES, TEXT_PREVIEW_LIMIT, FILE_MTIME_KEY } from '../lib/constants.js';
 import { nameComparator, numericComparator } from '../lib/sort.js';
 import { validateObjectName } from '../lib/validate-object-name.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
@@ -526,12 +526,8 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     try {
       const url = await getSignedUrl(
         client,
-        new GetObjectCommand({
-          Bucket: bucket,
-          Key: key,
-          ResponseContentDisposition: `attachment; filename="${encodeURIComponent(leafName(key))}"`,
-        }),
-        { expiresIn: PRESIGN_EXPIRES }
+        new GetObjectCommand(presignDownloadParams({ Bucket: bucket, Key: key, filename: leafName(key) })),
+        { expiresIn: DOWNLOAD_PRESIGN_EXPIRES }
       );
       const a = document.createElement('a');
       a.href = url;

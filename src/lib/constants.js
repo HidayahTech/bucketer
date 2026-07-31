@@ -56,6 +56,26 @@ export const MAX_ADAPTIVE_MEMORY_BYTES = DEFAULT_UPLOAD_MEMORY_MB * 1024 * 1024;
 // but short enough that a leaked URL expires overnight without manual rotation.
 export const PRESIGN_EXPIRES = 3600;
 
+// Lifetime for URLs handed to the browser's own download manager. Deliberately the SigV4
+// maximum, and deliberately NOT tuned down or estimated from file size.
+//
+// A browser resuming an interrupted download re-requests the ORIGINAL URL — it cannot be
+// given a fresh signature. AWS documents the consequence: "if the connection drops and the
+// client tries to restart the download after the expiration time passes, the download
+// fails." That failure is a 403 the app cannot observe and the user cannot diagnose.
+//
+// The exposure side is small and bounded: presigned URLs cannot be revoked individually
+// (there is no registry — the URL is derived, not issued), so lifetime is the exposure
+// window. But these URLs never leave the machine, and what they grant access to is a file
+// already sitting unencrypted in the same downloads folder. A too-short expiry silently
+// kills a multi-day transfer; a long one re-exposes what is already on disk.
+//
+// Scope matters: share links (CopyLinkPopover) keep user-chosen durations, because bounding
+// exposure is the point there, and preview/inline URLs keep PRESIGN_EXPIRES for issue #13.
+// Note some providers may enforce a shorter ceiling than SigV4's 7 days, and temporary
+// (STS) credentials cap the URL at their own lifetime regardless of what is requested.
+export const DOWNLOAD_PRESIGN_EXPIRES = 7 * 24 * 60 * 60;
+
 // Pause between handing successive files to the browser's download manager. Browsers
 // throttle — and prompt about — rapid programmatic downloads, so the queue is paced
 // rather than dumped. The cost is negligible: issuing a few thousand files takes minutes
