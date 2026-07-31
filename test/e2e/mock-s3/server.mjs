@@ -120,7 +120,11 @@ export function createMockS3(opts = {}) {
     // CRITICAL for the BUG-028 regression: only expand x-amz-meta-* into concrete header names when
     // the *configured* exposeHeaders actually permits it (contains 'x-amz-meta-*' or '*'). A narrowed
     // config must genuinely hide custom metadata from the browser, exactly as real S3 does.
-    const expose = new Set(['ETag', 'Content-Length', 'Content-Type', 'x-amz-request-id', 'x-amz-version-id']);
+    // Accept-Ranges and Content-Range are always exposed: a ranged reader cannot verify what
+    // it received without them, and a browser silently withholds any response header not
+    // listed here (BUG-028's failure mode — invisible, not an error).
+    const expose = new Set(['ETag', 'Content-Length', 'Content-Type', 'x-amz-request-id',
+      'x-amz-version-id', 'Accept-Ranges', 'Content-Range']);
     for (const e of cors.exposeHeaders) if (!e.endsWith('*')) expose.add(e);
     const metaExposed = cors.exposeHeaders.some((e) => e === '*' || e.toLowerCase() === 'x-amz-meta-*');
     if (metaExposed) for (const k of metadataKeys) expose.add(`x-amz-meta-${k}`);
@@ -267,31 +271,91 @@ export function createMockS3(opts = {}) {
     const o = current(b, key);
     if (!o) { res.writeHead(404, corsHeaders(req)); return res.end(); }
     const metaHeaders = {}; for (const [k, v] of Object.entries(o.metadata)) metaHeaders[`x-amz-meta-${k}`] = v;
-    res.writeHead(200, { ...corsHeaders(req, Object.keys(o.metadata)), 'Content-Type': o.contentType, 'Content-Length': String(o.body.length), ETag: o.etag, 'Last-Modified': new Date(o.lastModified).toUTCString(), ...metaHeaders });
+    res.writeHead(200, { ...corsHeaders(req, Object.keys(o.metadata)), 'Content-Type': o.contentType, 'Content-Length': String(o.body.length), 'Accept-Ranges': 'bytes', ETag: o.etag, 'Last-Modified': new Date(o.lastModified).toUTCString(), ...metaHeaders });
     res.end();
   }
 
+  // Parse a single byte-range against a known length. Returns null for an unparseable header
+  // (which per spec is ignored, not an error) and 'unsatisfiable' for one past the end.
+  // Suffix form (bytes=-N) is included because clients do send it, even though it is the one
+  // form browsers exclude from the CORS-safelisted Range header.
+  function parseRange(header, len) {
+    const m = /^bytes=(\d*)-(\d*)$/.exec(String(header).trim());
+    if (!m) return null;
+    const [, rawStart, rawEnd] = m;
+    if (rawStart === '' && rawEnd === '') return null;
+
+    let start, end;
+    if (rawStart === '') {
+      const suffix = parseInt(rawEnd, 10);
+      if (suffix === 0) return 'unsatisfiable';
+      start = Math.max(0, len - suffix);
+      end = len - 1;
+    } else {
+      start = parseInt(rawStart, 10);
+      end = rawEnd === '' ? len - 1 : Math.min(parseInt(rawEnd, 10), len - 1);
+    }
+    if (start >= len || start > end) return 'unsatisfiable';
+    return { start, end };
+  }
+
   function getObject(req, res, b, key, q) {
-    const f = matchFault('GetObject', 'GET', key); if (f) return sendError(req, res, f.status, f.code, f.message);
+    const f = matchFault('GetObject', 'GET', key);
+    // killAtByte is not an error response: headers and a prefix of the body are written, then
+    // the socket is destroyed, which is what a dropped connection actually looks like to a
+    // client. An error status would exercise a completely different code path.
+    if (f && f.killAtByte === undefined) return sendError(req, res, f.status, f.code, f.message);
+
     const o = current(b, key);
     if (!o) return sendError(req, res, 404, 'NoSuchKey', key);
+
+    // A transfer that spans a change to the object must fail rather than silently splice two
+    // versions together. If-Match is how a client asks for that guarantee.
+    const ifMatch = req.headers['if-match'];
+    if (ifMatch && ifMatch !== '*' && ifMatch.replace(/^W\//, '') !== o.etag) {
+      return sendError(req, res, 412, 'PreconditionFailed', 'At least one of the pre-conditions you specified did not hold');
+    }
+
     const metaHeaders = {}; for (const [k, v] of Object.entries(o.metadata)) metaHeaders[`x-amz-meta-${k}`] = v;
     // Presigned response overrides (the SDK puts these in the query string): let a download set
     // Content-Disposition so the browser treats a cross-origin GET as an attachment, not a navigation.
     const overrides = {};
     if (q.get('response-content-disposition')) overrides['Content-Disposition'] = q.get('response-content-disposition');
     if (q.get('response-content-type')) overrides['Content-Type'] = q.get('response-content-type');
-    const range = req.headers.range;
-    if (range) {
-      const m = /bytes=(\d+)-(\d*)/.exec(range);
-      const start = parseInt(m[1], 10);
-      const end = m[2] ? parseInt(m[2], 10) : o.body.length - 1;
-      const slice = o.body.subarray(start, end + 1);
-      res.writeHead(206, { ...corsHeaders(req, Object.keys(o.metadata)), 'Content-Type': o.contentType, 'Content-Length': String(slice.length), 'Content-Range': `bytes ${start}-${end}/${o.body.length}`, ETag: o.etag, ...metaHeaders, ...overrides });
-      return res.end(slice);
+
+    const base = {
+      ...corsHeaders(req, Object.keys(o.metadata)),
+      'Content-Type': o.contentType,
+      'Accept-Ranges': 'bytes',
+      ETag: o.etag,
+      'Last-Modified': new Date(o.lastModified).toUTCString(),
+      ...metaHeaders,
+      ...overrides,
+    };
+
+    // A resume sends If-Range with the validator it started from. If it no longer matches the
+    // client's partial file is stale, and the correct answer is the whole object, not a slice.
+    const ifRange = req.headers['if-range'];
+    const rangeStale = ifRange && ifRange.replace(/^W\//, '') !== o.etag;
+    const range = (req.headers.range && !rangeStale) ? parseRange(req.headers.range, o.body.length) : null;
+
+    if (range === 'unsatisfiable') {
+      res.writeHead(416, { ...base, 'Content-Range': `bytes */${o.body.length}` });
+      return res.end();
     }
-    res.writeHead(200, { ...corsHeaders(req, Object.keys(o.metadata)), 'Content-Type': o.contentType, 'Content-Length': String(o.body.length), ETag: o.etag, 'Last-Modified': new Date(o.lastModified).toUTCString(), ...metaHeaders, ...overrides });
-    res.end(o.body);
+
+    const bodyOut = range ? o.body.subarray(range.start, range.end + 1) : o.body;
+    const head = range
+      ? { ...base, 'Content-Length': String(bodyOut.length), 'Content-Range': `bytes ${range.start}-${range.end}/${o.body.length}` }
+      : { ...base, 'Content-Length': String(bodyOut.length) };
+
+    res.writeHead(range ? 206 : 200, head);
+
+    if (f && f.killAtByte !== undefined) {
+      res.write(bodyOut.subarray(0, f.killAtByte));
+      return res.destroy();
+    }
+    res.end(bodyOut);
   }
 
   function deleteObject(req, res, b, key, q) {

@@ -235,3 +235,116 @@ describe('mock S3 — versioning', () => {
     assert.equal((versions.DeleteMarkers || []).length, 1, 'a delete marker exists');
   });
 });
+
+// ── Range and conditional support ────────────────────────────────────────────────
+//
+// Everything the chunked-download work needs from the mock. A resumable transfer discovers
+// range support from Accept-Ranges, resumes with Range, guards against the object changing
+// underneath it with If-Match, and must survive a connection dropped mid-body. None of that
+// could be tested before these existed.
+describe('mock S3 — range support', () => {
+  const url = (key, qs = '') => `http://127.0.0.1:${port}/${BUCKET}/${key}${qs}`;
+
+  beforeEach(async () => {
+    await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'r', Body: body('0123456789') }));
+  });
+
+  test('advertises Accept-Ranges on a plain GET', async () => {
+    const resp = await fetch(url('r'));
+    assert.equal(resp.headers.get('accept-ranges'), 'bytes');
+  });
+
+  test('advertises Accept-Ranges on HEAD, where a client looks first', async () => {
+    const resp = await fetch(url('r'), { method: 'HEAD' });
+    assert.equal(resp.headers.get('accept-ranges'), 'bytes');
+  });
+
+  test('serves a closed range as 206 with Content-Range', async () => {
+    const resp = await fetch(url('r'), { headers: { Range: 'bytes=2-5' } });
+    assert.equal(resp.status, 206);
+    assert.equal(resp.headers.get('content-range'), 'bytes 2-5/10');
+    assert.equal(await resp.text(), '2345');
+  });
+
+  test('serves an open-ended range, which is how a resume asks', async () => {
+    const resp = await fetch(url('r'), { headers: { Range: 'bytes=6-' } });
+    assert.equal(resp.status, 206);
+    assert.equal(await resp.text(), '6789');
+  });
+
+  test('serves a suffix range', async () => {
+    const resp = await fetch(url('r'), { headers: { Range: 'bytes=-3' } });
+    assert.equal(resp.status, 206);
+    assert.equal(await resp.text(), '789');
+  });
+
+  test('rejects a range beyond the object with 416', async () => {
+    const resp = await fetch(url('r'), { headers: { Range: 'bytes=99-' } });
+    assert.equal(resp.status, 416);
+    assert.equal(resp.headers.get('content-range'), 'bytes */10');
+  });
+
+  test('CORS exposes the headers a ranged reader must read', async () => {
+    const resp = await fetch(url('r'), { headers: { Origin: 'http://app.test', Range: 'bytes=0-1' } });
+    const expose = (resp.headers.get('access-control-expose-headers') || '').toLowerCase();
+    assert.ok(expose.includes('content-range'), `expected Content-Range exposed, got: ${expose}`);
+    assert.ok(expose.includes('accept-ranges'), `expected Accept-Ranges exposed, got: ${expose}`);
+  });
+});
+
+describe('mock S3 — conditional requests', () => {
+  const url = (key) => `http://127.0.0.1:${port}/${BUCKET}/${key}`;
+
+  test('If-Match passes when the object is unchanged', async () => {
+    await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'c', Body: body('hello') }));
+    const head = await fetch(url('c'), { method: 'HEAD' });
+    const resp = await fetch(url('c'), { headers: { 'If-Match': head.headers.get('etag') } });
+    assert.equal(resp.status, 200);
+  });
+
+  // The case that matters: an object replaced mid-transfer must not silently yield a file
+  // assembled from two different versions.
+  test('If-Match fails with 412 once the object has changed', async () => {
+    await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'c', Body: body('hello') }));
+    const head = await fetch(url('c'), { method: 'HEAD' });
+    const stale = head.headers.get('etag');
+    await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'c', Body: body('goodbye') }));
+
+    const resp = await fetch(url('c'), { headers: { 'If-Match': stale, Range: 'bytes=0-2' } });
+    assert.equal(resp.status, 412);
+  });
+
+  test('If-Range serves the full object when the validator no longer matches', async () => {
+    await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'c', Body: body('hello') }));
+    const head = await fetch(url('c'), { method: 'HEAD' });
+    const stale = head.headers.get('etag');
+    await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'c', Body: body('goodbye') }));
+
+    const resp = await fetch(url('c'), { headers: { 'If-Range': stale, Range: 'bytes=0-2' } });
+    assert.equal(resp.status, 200, 'a stale If-Range means start over, not a partial');
+    assert.equal(await resp.text(), 'goodbye');
+  });
+});
+
+describe('mock S3 — fault injection for transfers', () => {
+  const url = (key) => `http://127.0.0.1:${port}/${BUCKET}/${key}`;
+
+  test('drops the connection mid-body at a chosen byte', async () => {
+    await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'k', Body: body('0123456789') }));
+    mock.configure({ faults: [{ op: 'GetObject', killAtByte: 4 }] });
+
+    await assert.rejects(
+      async () => { const r = await fetch(url('k')); await r.arrayBuffer(); },
+      'a body truncated by a dropped connection must reject, not resolve short',
+    );
+  });
+
+  test('injects 503 SlowDown, which a retry policy must treat as retryable', async () => {
+    await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 's', Body: body('x') }));
+    mock.configure({ faults: [{ op: 'GetObject', status: 503, code: 'SlowDown' }] });
+
+    const resp = await fetch(url('s'));
+    assert.equal(resp.status, 503);
+    assert.ok((await resp.text()).includes('SlowDown'));
+  });
+});
