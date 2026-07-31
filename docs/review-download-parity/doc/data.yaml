@@ -1,0 +1,8 @@
+report:
+  title: "Large Downloads in the Browser"
+  subtitle: "What each browser can do, what it costs, and what is still unproven"
+  short_title: "Large Downloads in the Browser"
+  output_name: "Bucketer_Browser_Download_Capability"
+  audience: "Bucketer maintainers"
+  version: "Draft 3"
+  date: 2026-07-31

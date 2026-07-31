@@ -1,0 +1,66 @@
+{% import 'chrome/macros.html.j2' as c %}
+<section>
+  <h2>The Measurement</h2>
+
+  <p>If the application fetches a file itself, it must hold that file somewhere before handing
+  it to the user. Two mechanisms are available on browsers without folder access: keep it in
+  memory, or stage it in the browser's private storage area. The difference between them is the
+  single most consequential fact in this report.</p>
+
+  {{ c.figure('assets/02-scaling.svg', 1,
+     'Total memory used to download one file, measured across preparing the file and the
+      browser completing the download. Private storage is flat: the same cost at 2 GiB as at
+      64 MiB. Holding the file in memory tracks the file size, and on Firefox exceeds it.
+      Each point is the median of three runs.') }}
+
+  <p>Costs below are the median of three runs, in MiB of peak memory, covering both preparing
+  the file and the browser downloading it.</p>
+
+  <table class="matrix">
+    <thead>
+      <tr><th>Engine and mechanism</th><th>64 MiB</th><th>256 MiB</th><th>1024 MiB</th>
+          <th>2048 MiB</th><th>Cost per MiB of file</th></tr>
+    </thead>
+    <tr>
+      <td><strong>Chromium — private storage</strong></td>
+      <td><span class="measured">22</span></td><td><span class="measured">26</span></td>
+      <td><span class="measured">44</span></td><td><span class="measured">92</span></td>
+      <td><strong>0.04</strong></td>
+    </tr>
+    <tr>
+      <td>Chromium — in memory</td>
+      <td>61</td><td>247</td><td>1017</td><td>2055</td><td>1.00</td>
+    </tr>
+    <tr>
+      <td><strong>Firefox — private storage</strong></td>
+      <td><span class="measured">24</span></td><td><span class="measured">15</span></td>
+      <td><span class="measured">24</span></td><td><span class="measured">25</span></td>
+      <td><strong>0.01</strong></td>
+    </tr>
+    <tr>
+      <td>Firefox — in memory</td>
+      <td>37</td><td>356</td><td>1606</td><td>3313</td><td>1.62</td>
+    </tr>
+  </table>
+
+  <p class="lede">Private storage costs the same whether the file is 64 MiB or 2 GiB. Holding
+  the file in memory costs the size of the file, and on Firefox rather more.</p>
+
+  <p>That is a difference in kind rather than degree. A mechanism whose cost does not grow with
+  the file can move a file larger than the machine's memory; a mechanism that costs the size of
+  the file cannot, at any amount of memory. The final column makes the shape plain: as the file
+  grows thirty-two fold, private storage's share of it falls from a third to a twenty-fifth,
+  while the in-memory share stays flat at roughly one.</p>
+
+  {{ c.figure('assets/03-engines.svg', 2,
+     'The same comparison at 2 GiB. Firefox costs more than the file itself to hold it in
+      memory, because the download step copies again on the way out; its private-storage cost
+      is the lowest measured anywhere.') }}
+
+  <h3>The cost that does not appear above</h3>
+
+  <p>Staging means the file exists twice for a moment: once in private storage, once in the
+  downloads folder after the browser writes it out. A 40 GB download therefore needs 80 GB
+  free. That is disk, not memory, and it is a constraint to disclose before someone starts
+  rather than after they run out.</p>
+</section>

@@ -1,0 +1,99 @@
+{% import 'chrome/macros.html.j2' as c %}
+<section>
+  <h2>Errata and Method History</h2>
+
+  <p>The measurements in this report went through several revisions before they were stable.
+  Each fault below produced a number that looked entirely plausible and was wrong. They are
+  recorded here, rather than in the body, so the findings can be read as findings — but they
+  are recorded, because the corrections were large enough that anyone re-running this work
+  should know which traps are on the path.</p>
+
+  <table class="num">
+    <thead><tr><th>#</th><th>Fault</th><th>Effect, and the correction</th></tr></thead>
+    <tr>
+      <td>1</td>
+      <td><strong>Browser profile on a memory-backed directory.</strong></td>
+      <td>The test harness places its profile in a temporary directory that is RAM-backed on
+          this host, so every write intended for disk went to memory instead. Storage quota
+          read back as 3 GiB and memory appeared to climb steeply. Corrected by placing
+          profiles on real disk explicitly; the environment variable that would normally
+          redirect them is not honoured.</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td><strong>Memory attributed against a stale baseline.</strong></td>
+      <td>Cost was computed against a baseline sampled once at browser start, so every later
+          operation inherited the uncollected memory of the earlier ones. On a long sweep this
+          produced figures that <em>fell</em> as files grew — impossible, and the signal that
+          the metric was broken. Corrected by measuring against the memory in use immediately
+          before each operation, and ultimately by running one operation per browser.</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td><strong>Sampling slower than the operation sampled.</strong></td>
+      <td>The read-out step completes in a fraction of a second while sampling ran every fifth
+          of a second, so it frequently captured nothing and reported an empty result.
+          Corrected by sampling far faster than the shortest operation.</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td><strong>Read-back measured with a one-byte request.</strong></td>
+      <td>The step that hands the file to the user was exercised by requesting a single byte,
+          which measured essentially nothing and produced a misleadingly free-looking result.
+          Corrected by reading the entire file.</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td><strong>Reading the file back through the page instead of downloading it.</strong>
+          The most consequential fault.</td>
+      <td>Reading every byte through page code measures JavaScript pulling the file into its
+          own heap, which is not what a download does. On Firefox this reported the read-out
+          of a 2 GiB file at 2177 MiB. Measured through an actual download link, the same
+          operation costs 6 MiB — a difference of roughly 360 times, and the difference between
+          concluding the approach is unusable and concluding it is the best available.
+          Corrected by triggering a real download and letting the browser complete it.</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td><strong>Single measurements, no control.</strong></td>
+      <td>Early figures were single observations, so there was no way to distinguish a finding
+          from noise, and successive runs appeared to contradict each other. Corrected by
+          repeating every cell three times and adding a run that allocates nothing to establish
+          the noise floor.</td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td><strong>A missing capability read as a browser finding.</strong></td>
+      <td>The automated WebKit build reports no storage interface, which was briefly taken as
+          evidence about Safari. Direct introspection showed the entire interface absent — not
+          one capability — which real Safari has. It is a property of that build. Safari rows
+          are now documented, never measured.</td>
+    </tr>
+  </table>
+
+  {{ c.note('The pattern worth carrying forward',
+     'Five of the seven faults share one shape: the measurement was of something adjacent to
+      the question rather than the question itself. A proxy that is easy to measure will
+      cheerfully return a precise, stable, reproducible number for the wrong thing. Repetition
+      and controls catch noise; only measuring the actual operation catches this.') }}
+
+  <h3>Document history</h3>
+
+  <table class="kv">
+    <tr>
+      <td>Draft 1</td>
+      <td>Initial findings, single measurements, mixed native and containerised execution.</td>
+    </tr>
+    <tr>
+      <td>Draft 2</td>
+      <td>Uniform containerised execution for all engines; size sweep added; per-operation
+          memory attribution corrected.</td>
+    </tr>
+    <tr>
+      <td>Draft 3</td>
+      <td>One operation per browser launch; three repetitions with a control; read-out measured
+          through a real download. Figures from earlier drafts are superseded and should not be
+          quoted.</td>
+    </tr>
+  </table>
+</section>

@@ -1,0 +1,63 @@
+{% import 'chrome/macros.html.j2' as c %}
+<section>
+  <h2>How This Was Measured</h2>
+
+  <p>Every figure in this report comes from one of two sources, and they are never mixed.
+  <strong>Measured</strong> figures were produced by a probe run against real browser engines
+  on this hardware. <strong>Documented</strong> figures come from vendor material, and are
+  labelled wherever they appear.</p>
+
+  <h3>The measurement</h3>
+
+  <table class="kv">
+    <tr>
+      <td>One operation per browser</td>
+      <td>Each measurement launches a fresh browser with a fresh profile, performs exactly one
+          operation at one file size, and exits. Nothing can inherit memory from a previous
+          operation, because there is no previous operation.</td>
+    </tr>
+    <tr>
+      <td>Three repetitions</td>
+      <td>Every cell is measured three times. Tables report the median with the observed range,
+          so the reader can see how stable a figure is rather than trusting a single number.</td>
+    </tr>
+    <tr>
+      <td>A control</td>
+      <td>A run that allocates nothing, measured identically. Whatever it reports is the noise
+          floor: Chromium 1 MiB, Firefox 8 MiB, WebKit under zero. No result below roughly
+          10 MiB is treated as meaningful.</td>
+    </tr>
+    <tr>
+      <td>The real download path</td>
+      <td>The file is prepared, then handed to the browser through an ordinary download link,
+          and the browser's own download machinery is allowed to complete it. Cost is measured
+          across that whole operation.</td>
+    </tr>
+    <tr>
+      <td>Memory from outside</td>
+      <td>Resident memory of the entire browser process tree, sampled twenty-five times a
+          second from outside the browser, attributed against the memory in use immediately
+          before each operation.</td>
+    </tr>
+    <tr>
+      <td>Identical conditions</td>
+      <td>All three engines run in the same container image, on the same host, with profiles on
+          the same real disk. No engine is special-cased.</td>
+    </tr>
+  </table>
+
+  {{ c.warn('One engine could not be measured',
+     'The WebKit build available for automated testing exposes no storage interface at all —
+      not merely the capability under test, but the entire interface, in a secure context,
+      under every configuration tried. Real Safari has it. This is a property of that build,
+      which is not Safari. Every Safari row in this report is therefore documented rather than
+      measured, and is marked as such.') }}
+
+  <h3>What the measurement does not cover</h3>
+
+  <p>All measurement was on desktop Linux; no macOS, no Windows, no mobile hardware. The sweep
+  stops at 2 GiB because the test machine has 8 GiB free and a larger case would measure the
+  host rather than the browser. Storage quota figures belong to the machine that produced them
+  and imply nothing about a user's computer. Resident memory is coarse and includes memory not
+  yet reclaimed, so the transient peak is reported — it is the figure that exhausts a device.</p>
+</section>

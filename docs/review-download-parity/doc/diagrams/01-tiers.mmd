@@ -1,0 +1,11 @@
+flowchart TD
+  A[Download requested] --> B{Folder access?}
+  B -->|yes| T1[Tier 1<br/>Managed folder]
+  B -->|no| C{Fits in quota?}
+  C -->|yes| T2[Tier 2<br/>Staged]
+  C -->|no| T3[Tier 3<br/>Browser handoff]
+
+  classDef full fill:#e9f8fb,stroke:#0892a3,color:#20202a
+  classDef part fill:#f4ecfb,stroke:#6b21a8,color:#20202a
+  class T1,T2 full
+  class T3 part

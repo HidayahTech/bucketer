@@ -1,0 +1,75 @@
+{% import 'chrome/macros.html.j2' as c %}
+<section>
+  <h2>Telling the User</h2>
+
+  <p>Capability that varies by browser has to be communicated, and the ways to get this wrong
+  are well documented. The governing rule already exists in Bucketer's own design notes: the
+  interface must never claim progress it cannot observe.</p>
+
+  <h3>Five principles, from how other products handle it</h3>
+
+  <table class="kv">
+    <tr>
+      <td>Gate the feature, not the application</td>
+      <td>Document editors gate only offline mode; a web code editor gates local folder access
+          while the editor still loads. Blocking an entire application is defensible only when
+          no fallback exists. Here one always does.</td>
+    </tr>
+    <tr>
+      <td>Describe the layer, not the deficiency</td>
+      <td>Public-sector service guidance frames progressive enhancement as what each layer
+          provides, never as a judgment on the user's choice of browser.</td>
+    </tr>
+    <tr>
+      <td>Disclose before commitment</td>
+      <td>The job panel already lists the folder and its size before offering to start.
+          Capability belongs in that same moment, not at the point of failure.</td>
+    </tr>
+    <tr>
+      <td>Never invent a percentage</td>
+      <td>Version control tools show a real bounded count in place of an unknowable one.
+          Browsers themselves fall back to bytes-received when a total is unavailable. Honest
+          partial information beats invented precision.</td>
+    </tr>
+    <tr>
+      <td>Explain disabled controls inline</td>
+      <td>Unexplained disabled controls are a documented top complaint, and hover text alone
+          fails for accessibility.</td>
+    </tr>
+  </table>
+
+  <h3>Where it appears</h3>
+
+  <p>Three placements, reusing patterns the application already has: a capability line in the
+  job-creation panel beside the delivery choice; the existing queue badge extended to name the
+  tier in use; and an inline explanation of what this browser can and cannot do, available
+  where a user would ask rather than hidden behind a hover.</p>
+
+  <h3>Proposed wording</h3>
+
+  <p>Factual, describing what happens rather than instructing the reader how to feel.</p>
+
+  <blockquote>Chrome and Edge on desktop can download straight into a folder you choose, with
+  progress and resume. This browser downloads files individually into your Downloads folder
+  instead.</blockquote>
+
+  <blockquote>Files arrive as a flat list — no browser can create folders when downloading from
+  a webpage.</blockquote>
+
+  <blockquote>12 of 412 files handed to your browser. Bucketer cannot see their progress or
+  confirm they finished — check your browser's download list.</blockquote>
+
+  <blockquote>Downloads over a few hundred megabytes are unreliable on phones: the browser
+  stops this tab when you switch apps. For anything large, use a desktop browser or the
+  command-line option.</blockquote>
+
+  <blockquote>This job is 840 GB. A transfer tool will finish sooner and survives restarts —
+  this tab cannot.</blockquote>
+
+  <h3>What to avoid</h3>
+
+  <p>Blocking the whole application when a fallback exists. Bare technical error strings with
+  no consequence or next step. Repeating a capability notice every session rather than once.
+  Detecting the browser's name instead of its capabilities. And any percentage, estimate or
+  transfer rate on the tier where the application cannot see the transfer.</p>
+</section>

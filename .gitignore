@@ -9,6 +9,13 @@ perf/index.html
 # Claude Code scratch (transient, never committed)
 .claude-scratch/
 
+# doclab build products (see docs/review-download-parity/doc/). Anchored with a
+# leading slash: a bare `assets/` would also swallow the tracked src/assets/ logo.
+/output/
+/assets/
+# Mermaid's intermediate SVG, emitted beside its source before doclab prepares it.
+docs/**/diagrams/*.svg
+
 # aider tool artifacts
 .aider*
 

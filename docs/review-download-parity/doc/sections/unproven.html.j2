@@ -1,0 +1,56 @@
+{% import 'chrome/macros.html.j2' as c %}
+<section>
+  <h2>What Remains Unproven</h2>
+
+  <p>The staged tier rests, on Safari specifically, on three assumptions stacked on one
+  another. None has been verified, and — notably — none appears to have been verified publicly
+  by anyone.</p>
+
+  {{ c.warn('Nobody has published this',
+     'An extensive search found no blog post, bug report, benchmark or library issue in which
+      anyone stages a multi-gigabyte file in private origin storage on real Safari and reports
+      what the export step costs. The one discussion thread that proposes exactly this
+      technique has its author stating plainly that he never tested Safari. The absence of
+      evidence is itself the finding.') }}
+
+  <table class="num">
+    <thead><tr><th>#</th><th>Assumption</th><th>If it is wrong</th></tr></thead>
+    <tr>
+      <td>1</td>
+      <td>Safari's file handle returns a lazy, disk-backed object rather than copying into
+          memory.</td>
+      <td>The entire Safari case collapses; Safari falls back to the handoff tier.</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>Exporting a gigabyte-scale staged file actually completes on macOS and iPhone.</td>
+      <td>Same, plus a failure that may be silent rather than reported.</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>The roughly 100 MB page-memory ceiling on iPhone does not apply to this storage
+          traffic.</td>
+      <td>The staged tier is unusable on iPhone at any meaningful size.</td>
+    </tr>
+  </table>
+
+  <h3>Also open</h3>
+
+  <p>Whether Chrome for Android's four launch defects have been fixed. Whether persistent
+  storage reliably exempts a paused job from Safari's seven-day expiry. Memory ceilings for
+  Android browsers, for which no current figures appear to exist publicly. And whether other
+  Chromium-derived Android browsers inherited the folder-access change.</p>
+
+  <h3>How these get answered</h3>
+
+  <p>Not by more reading. Assumptions one to three need real Apple hardware, because the
+  automated tooling used for this investigation cannot drive the real browser. The Android
+  defects need a real Android device, and are the easiest to settle: a probe page exists that
+  reports the automated portion and prompts for the two observations only a person can make —
+  whether the folder picker responds promptly on a large photo folder, and whether saving
+  offers a filename or only an overwrite.</p>
+
+  <p>Two device checks and one product decision would close this investigation. Further
+  literature search has reached diminishing returns; the same walls were hit repeatedly, and
+  the gaps that remain are gaps in what has been published, not in what has been read.</p>
+</section>

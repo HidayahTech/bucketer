@@ -1,0 +1,78 @@
+{% import 'chrome/macros.html.j2' as c %}
+<section>
+  <h2>What Each Browser Can Do</h2>
+
+  <p>Desktop rows are measured. Mobile rows are researched, not measured.</p>
+
+  <table class="matrix">
+    <thead>
+      <tr>
+        <th>Target</th><th>Progress</th><th>Completion</th>
+        <th>Resume</th><th>Folder tree</th><th>Practical ceiling</th>
+      </tr>
+    </thead>
+    <tr>
+      <td><strong>Chromium, desktop</strong></td>
+      <td>yes</td><td>yes</td><td>yes, exact byte</td><td>yes</td><td>bounded by disk</td>
+    </tr>
+    <tr>
+      <td><strong>Chromium, Android</strong></td>
+      <td>yes</td><td>yes</td><td>unreliable</td><td>yes, with defects</td>
+      <td>low GB, screen on</td>
+    </tr>
+    <tr>
+      <td><strong>Firefox, desktop</strong></td>
+      <td>yes</td><td>yes</td><td>yes</td><td>no, flat</td>
+      <td>about 10 GB without a grant</td>
+    </tr>
+    <tr>
+      <td><strong>Firefox, Android</strong></td>
+      <td>yes</td><td>yes</td><td>unreliable</td><td>no, flat</td><td>hundreds of MB</td>
+    </tr>
+    <tr>
+      <td><strong>Safari, desktop</strong></td>
+      <td>yes</td><td>yes</td><td>7-day expiry</td><td>no, flat</td>
+      <td>77 GB quota, mechanism unverified</td>
+    </tr>
+    <tr>
+      <td><strong>Safari, iPhone and iPad</strong></td>
+      <td>yes</td><td>yes</td><td>7-day expiry</td><td>no, flat</td><td>about 100 MB</td>
+    </tr>
+  </table>
+
+  <h3>Folder access on Android, settled</h3>
+
+  <p>Two authoritative-looking sources contradicted each other. The contradiction is resolved:
+  folder access shipped on Chrome for Android in version 132, confirmed by the vendor's own
+  release records and by an engineer on the implementation thread. The compatibility database
+  that reports otherwise is stale.</p>
+
+  <p>Two caveats survive. The embedded-browser variant used inside native applications did not
+  ship and remains disabled. And four defects filed at launch — a picker that freezes on large
+  photo folders, saving that only offers to overwrite rather than name a new file, ignored file
+  filters, and an error on one save path — appear to be unresolved; a developer was still
+  asking after their status eight months later without an answer.</p>
+
+  <h3>Safari, in detail</h3>
+
+  <p>Safari is the most constrained desktop target and the least verified. The write interface
+  used by the staging path did not exist until Safari 26, released September 2025; earlier
+  versions require a materially more complex worker-based path. Private windows disable the
+  storage entirely. Against that, the quota is generous — about 77 GB on desktop and 38 GB on
+  iPhone — and far exceeds Firefox's default.</p>
+
+  {{ c.warn('Seven-day expiry',
+     'Safari deletes data a site created after seven days of browser use without a visit to
+      that site. Chromium and Firefox do not. Whether this matters depends entirely on how long
+      a paused download may realistically sit before someone returns to it — a product
+      question that has not been settled, and one this report deliberately does not answer.') }}
+
+  <h3>Mobile, briefly</h3>
+
+  <p>On iPhone and iPad, JavaScript is suspended almost immediately once the browser is sent to
+  the background, and downloads are reported as cancelled when the user switches applications.
+  Keeping the screen awake does not help: that facility prevents the screen dimming and does
+  nothing once another application comes to the front. The practical ceiling on those devices
+  is around 100 MB, and the failure mode is the page dying without any error the application
+  can catch.</p>
+</section>

@@ -1,0 +1,154 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bucketer capability probe</title>
+<style>
+  body { font: 15px/1.5 system-ui, sans-serif; margin: 0; padding: 1rem; max-width: 40rem; }
+  h1 { font-size: 1.1rem; } h2 { font-size: .95rem; margin: 1.5rem 0 .4rem; }
+  button { font: inherit; padding: .6rem .9rem; margin: .2rem .3rem .2rem 0; border-radius: 6px;
+           border: 1px solid #888; background: #f4f4f4; }
+  pre { background: #f4f4f4; padding: .6rem; border-radius: 6px; overflow-x: auto; font-size: 12px; }
+  .ok { color: #1a7f37; } .no { color: #b3261e; } .warn { color: #8a6d00; }
+  ol { padding-left: 1.2rem; } li { margin: .35rem 0; }
+</style>
+<body>
+<h1>Bucketer capability probe</h1>
+<p id="ctx"></p>
+
+<h2>1. What this browser has</h2>
+<pre id="presence">…</pre>
+
+<h2>2. Storage quota</h2>
+<pre id="quota">…</pre>
+
+<h2>3. Private storage (OPFS) — 64 MiB write, then export</h2>
+<p>Runs automatically. This is the mechanism a Firefox/Safari download would use.</p>
+<pre id="opfs">…</pre>
+
+<h2>4. Folder picker <span class="warn">(needs your observation)</span></h2>
+<p>Tap, then <strong>pick a large folder such as DCIM or Camera</strong>. We are testing whether the
+picker opens promptly or freezes.</p>
+<button id="dirBtn">Open folder picker</button>
+<pre id="dir">not run</pre>
+
+<h2>5. Save picker <span class="warn">(needs your observation)</span></h2>
+<p>Tap, and note whether you get to <strong>type a new filename</strong> or are only offered existing
+files to overwrite.</p>
+<button id="saveBtn">Open save picker</button>
+<pre id="save">not run</pre>
+
+<h2>6. Send results back</h2>
+<button id="copyBtn">Copy all results</button>
+<p>Also note by hand: did either picker take more than a few seconds, hang, or close the browser?</p>
+
+<script>
+const MiB = 1024 * 1024;
+const R = {};
+const put = (id, v) => { document.getElementById(id).textContent =
+  typeof v === 'string' ? v : JSON.stringify(v, null, 2); };
+
+document.getElementById('ctx').innerHTML =
+  `<code>${navigator.userAgent}</code><br>secure context: ` +
+  (isSecureContext ? '<span class="ok">yes</span>'
+                   : '<span class="no">NO — serve over https:// or localhost, results below will be wrong</span>');
+R.ua = navigator.userAgent;
+R.isSecureContext = isSecureContext;
+
+// 1 — presence. `in` rather than property access: reading a getter off a prototype throws.
+const FSFH = window.FileSystemFileHandle?.prototype;
+R.presence = {
+  showDirectoryPicker: typeof window.showDirectoryPicker === 'function',
+  showSaveFilePicker: typeof window.showSaveFilePicker === 'function',
+  showOpenFilePicker: typeof window.showOpenFilePicker === 'function',
+  createWritable: typeof FSFH?.createWritable === 'function',
+  opfs: typeof navigator.storage?.getDirectory === 'function',
+  storageEstimate: typeof navigator.storage?.estimate === 'function',
+  backgroundFetch: !!window.ServiceWorkerRegistration && ('backgroundFetch' in window.ServiceWorkerRegistration.prototype),
+  responseBodyStream: 'body' in Response.prototype,
+};
+put('presence', R.presence);
+
+// 2 — quota
+(async () => {
+  try {
+    const e = await navigator.storage.estimate();
+    R.quota = { quotaMiB: Math.round((e.quota || 0) / MiB), usageMiB: Math.round((e.usage || 0) / MiB) };
+  } catch (err) { R.quota = { error: String(err) }; }
+  put('quota', R.quota);
+})();
+
+// 3 — OPFS write + export. 64 MiB: small enough to be safe on a phone, large enough to be meaningful.
+(async () => {
+  if (!R.presence.opfs) { R.opfs = { skipped: 'no OPFS' }; put('opfs', R.opfs); return; }
+  const out = {};
+  try {
+    const chunk = new Uint8Array(4 * MiB).fill(65);
+    const root = await navigator.storage.getDirectory();
+    const fh = await root.getFileHandle('probe.bin', { create: true });
+
+    let t = performance.now();
+    if (typeof fh.createWritable === 'function') {
+      const ws = await fh.createWritable();
+      for (let i = 0; i < 16; i++) await ws.write(chunk);
+      await ws.close();
+      out.writeVia = 'createWritable';
+    } else {
+      out.writeVia = 'createWritable MISSING — Safari < 26 needs a worker + createSyncAccessHandle';
+    }
+    out.writeMs = Math.round(performance.now() - t);
+
+    const file = await fh.getFile();
+    out.fileSizeMiB = Math.round(file.size / MiB);
+
+    t = performance.now();
+    const url = URL.createObjectURL(file);
+    const probe = await fetch(url, { headers: { Range: 'bytes=0-0' } });
+    out.exportMs = Math.round(performance.now() - t);
+    out.exportReadBack = probe.ok || probe.status === 206;
+    URL.revokeObjectURL(url);
+    await root.removeEntry('probe.bin');
+    out.ok = true;
+  } catch (err) { out.ok = false; out.error = err ? `${err.name}: ${err.message}` : 'rejected with null'; }
+  R.opfs = out;
+  put('opfs', out);
+})();
+
+// 4 / 5 — pickers. Must run from a real tap; results partly depend on what you observe.
+document.getElementById('dirBtn').onclick = async () => {
+  const t = performance.now();
+  put('dir', 'picker opening…');
+  try {
+    const h = await window.showDirectoryPicker();
+    let n = 0;
+    for await (const _ of h.values()) { n++; if (n > 500) break; }
+    R.dirPicker = { ok: true, name: h.name, entriesSeen: n, totalMs: Math.round(performance.now() - t) };
+  } catch (err) {
+    R.dirPicker = { ok: false, error: err ? `${err.name}: ${err.message}` : 'null',
+                    totalMs: Math.round(performance.now() - t) };
+  }
+  put('dir', R.dirPicker);
+};
+
+document.getElementById('saveBtn').onclick = async () => {
+  const t = performance.now();
+  put('save', 'picker opening…');
+  try {
+    const h = await window.showSaveFilePicker({ suggestedName: 'bucketer-probe-test.txt' });
+    const w = await h.createWritable();
+    await w.write('hello');
+    await w.close();
+    R.savePicker = { ok: true, name: h.name, suggestedNameHonoured: h.name === 'bucketer-probe-test.txt',
+                     totalMs: Math.round(performance.now() - t) };
+  } catch (err) {
+    R.savePicker = { ok: false, error: err ? `${err.name}: ${err.message}` : 'null',
+                     totalMs: Math.round(performance.now() - t) };
+  }
+  put('save', R.savePicker);
+};
+
+document.getElementById('copyBtn').onclick = async () => {
+  const text = JSON.stringify(R, null, 2);
+  try { await navigator.clipboard.writeText(text); document.getElementById('copyBtn').textContent = 'Copied'; }
+  catch { put('presence', text); alert('Clipboard blocked — results printed in section 1, copy by hand.'); }
+};
+</script>

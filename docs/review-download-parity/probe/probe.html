@@ -1,0 +1,227 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>capability probe — single shot</title>
+<body><pre id="out">running…</pre></body>
+<script>
+// SINGLE-SHOT probe. One mechanism, one size, one browser launch.
+//
+// An earlier design ran every mechanism and size inside one browser, which made each
+// measurement depend on what ran before it. This version does exactly one thing so the
+// runner can attribute memory without untangling accumulation.
+//
+//   ?mech=control|opfs|blob|idb&size=<MiB>
+
+const MiB = 1024 * 1024;
+const CHUNK = 8 * MiB;
+const q = new URLSearchParams(location.search);
+const MECH = q.get('mech') || 'control';
+const SIZE = parseInt(q.get('size') || '64', 10);
+
+const out = document.getElementById('out');
+const log = m => { out.textContent += '\n' + m; };
+
+function presence() {
+  const FSFH = window.FileSystemFileHandle?.prototype;
+  return {
+    showDirectoryPicker: typeof window.showDirectoryPicker === 'function',
+    showSaveFilePicker: typeof window.showSaveFilePicker === 'function',
+    createWritable: typeof FSFH?.createWritable === 'function',
+    createSyncAccessHandle: typeof FSFH?.createSyncAccessHandle === 'function',
+    opfs: typeof navigator.storage?.getDirectory === 'function',
+    storageEstimate: typeof navigator.storage?.estimate === 'function',
+    storagePersist: typeof navigator.storage?.persist === 'function',
+    backgroundFetch: !!window.ServiceWorkerRegistration && ('backgroundFetch' in window.ServiceWorkerRegistration.prototype),
+    serviceWorker: 'serviceWorker' in navigator,
+    responseBodyStream: 'body' in Response.prototype,
+  };
+}
+
+// A fresh pattern buffer per run; reused across chunks so the source data is not itself
+// the thing being measured.
+const pattern = new Uint8Array(CHUNK).fill(65);
+const nChunks = Math.max(1, Math.round(SIZE / (CHUNK / MiB)));
+
+// Read every byte back out through the object URL, discarding as we go. This is the closest
+// available proxy for handing the file to a download manager, and unlike a one-byte probe it
+// actually reveals whether the bytes can flow without being materialised in memory.
+async function drain(url) {
+  const resp = await fetch(url);
+  const reader = resp.body.getReader();
+  let n = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    n += value.byteLength;
+  }
+  return n;
+}
+
+// Control: allocate nothing, wait about as long as a real operation. Whatever this reports
+// is the measurement's noise floor, and no smaller number elsewhere means anything.
+async function runControl() {
+  await new Promise(r => setTimeout(r, 2000));
+  return { note: 'no allocation' };
+}
+
+async function runOpfs(mark) {
+  const root = await navigator.storage.getDirectory();
+  const fh = await root.getFileHandle('probe.bin', { create: true });
+
+  mark('write');
+  const ws = await fh.createWritable();
+  for (let i = 0; i < nChunks; i++) await ws.write(pattern);
+  await ws.close();
+  mark('/write');
+
+  await new Promise(r => setTimeout(r, 2500));
+
+  mark('export');
+  const file = await fh.getFile();
+  const url = URL.createObjectURL(file);
+  const drained = await drain(url);
+  URL.revokeObjectURL(url);
+  mark('/export');
+
+  const size = file.size;
+  const readBack = drained === size;
+  await root.removeEntry('probe.bin');
+  return { bytes: size, readBack };
+}
+
+async function runBlob(mark) {
+  mark('build');
+  const parts = [];
+  for (let i = 0; i < nChunks; i++) parts.push(new Blob([pattern]));
+  const blob = new Blob(parts);
+  mark('/build');
+
+  await new Promise(r => setTimeout(r, 2500));
+
+  mark('export');
+  const url = URL.createObjectURL(blob);
+  const drained = await drain(url);
+  URL.revokeObjectURL(url);
+  mark('/export');
+
+  return { bytes: blob.size, readBack: drained === blob.size };
+}
+
+async function runIdb(mark) {
+  const db = await new Promise((res, rej) => {
+    const r = indexedDB.open('probe-db', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('chunks', { autoIncrement: true });
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+
+  mark('store');
+  await new Promise((res, rej) => {
+    const tx = db.transaction('chunks', 'readwrite');
+    const s = tx.objectStore('chunks');
+    for (let i = 0; i < nChunks; i++) s.put(new Blob([pattern]));
+    tx.oncomplete = res; tx.onerror = () => rej(tx.error); tx.onabort = () => rej(tx.error);
+  });
+  mark('/store');
+
+  await new Promise(r => setTimeout(r, 2500));
+
+  mark('assemble');
+  const chunks = await new Promise((res, rej) => {
+    const tx = db.transaction('chunks', 'readonly');
+    const rq = tx.objectStore('chunks').getAll();
+    rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error);
+  });
+  const blob = new Blob(chunks);
+  mark('/assemble');
+
+  await new Promise(r => setTimeout(r, 2500));
+
+  mark('export');
+  const url = URL.createObjectURL(blob);
+  const drained = await drain(url);
+  URL.revokeObjectURL(url);
+  mark('/export');
+
+  const size = blob.size;
+  const readBack = drained === size;
+  db.close();
+  await new Promise(res => { const d = indexedDB.deleteDatabase('probe-db'); d.onsuccess = res; d.onerror = res; d.onblocked = res; });
+  return { bytes: size, readBack };
+}
+
+// Prepare a file by the given mechanism and hand its object URL to the runner WITHOUT
+// reading it here. The runner then triggers a real <a download> and waits for the browser's
+// download event, so the cost measured is the actual download path rather than a fetch()
+// standing in for it. Draining through fetch() measures JavaScript reading the blob, which
+// is not necessarily what the download manager does.
+async function prepareOnly(mark) {
+  if (MECH === 'opfs-dl') {
+    const root = await navigator.storage.getDirectory();
+    const fh = await root.getFileHandle('probe.bin', { create: true });
+    mark('write');
+    const ws = await fh.createWritable();
+    for (let i = 0; i < nChunks; i++) await ws.write(pattern);
+    await ws.close();
+    mark('/write');
+    const file = await fh.getFile();
+    window.__DLURL = URL.createObjectURL(file);
+    return { bytes: file.size };
+  }
+  mark('build');
+  const parts = [];
+  for (let i = 0; i < nChunks; i++) parts.push(new Blob([pattern]));
+  const blob = new Blob(parts);
+  mark('/build');
+  window.__DLURL = URL.createObjectURL(blob);
+  return { bytes: blob.size };
+}
+
+// Called by the runner once it is watching for the download event.
+window.__triggerDownload = () => {
+  const a = document.createElement('a');
+  a.href = window.__DLURL;
+  a.download = 'probe.bin';
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => a.remove(), 1000);
+};
+
+(async () => {
+  const marks = [];
+  const mark = label => marks.push({ label, t: Date.now() });
+
+  const result = { mech: MECH, size: SIZE, ua: navigator.userAgent, presence: presence(), marks };
+  try {
+    result.quota = navigator.storage?.estimate
+      ? await navigator.storage.estimate().then(e => Math.round((e.quota || 0) / MiB))
+      : null;
+  } catch { result.quota = null; }
+
+  // A settling window before anything runs, so the runner has a stable pre-measurement.
+  window.__READY = true;
+  await new Promise(r => setTimeout(r, 2500));
+
+  try {
+    if (MECH === 'control') result.detail = await runControl(mark);
+    else if (MECH === 'opfs') {
+      if (!result.presence.opfs) throw new Error('OPFS unavailable');
+      result.detail = await runOpfs(mark);
+    }
+    else if (MECH === 'blob') result.detail = await runBlob(mark);
+    else if (MECH === 'idb') result.detail = await runIdb(mark);
+    else if (MECH === 'opfs-dl' || MECH === 'blob-dl') {
+      if (MECH === 'opfs-dl' && !result.presence.opfs) throw new Error('OPFS unavailable');
+      result.detail = await prepareOnly(mark);
+      result.awaitingDownload = true;
+    }
+    else throw new Error('unknown mechanism ' + MECH);
+    result.ok = true;
+  } catch (err) {
+    result.ok = false;
+    result.error = err ? `${err.name}: ${err.message}` : 'rejected with null';
+  }
+
+  await new Promise(r => setTimeout(r, 2500));   // settle window for the runner
+  window.__RESULT = result;
+  log('DONE ' + JSON.stringify(result.ok));
+})().catch(e => { window.__RESULT = { ok: false, fatal: String(e) }; });
+</script>

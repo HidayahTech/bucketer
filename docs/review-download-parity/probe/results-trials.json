@@ -1,0 +1,4213 @@
+{
+  "config": {
+    "SIZES": [
+      64,
+      256,
+      1024,
+      2048
+    ],
+    "MECHS": [
+      "control",
+      "opfs",
+      "blob",
+      "idb"
+    ],
+    "ENGINES": [
+      "chromium",
+      "firefox",
+      "webkit"
+    ],
+    "REPS": 3,
+    "SAMPLE_MS": 40
+  },
+  "runs": [
+    {
+      "engine": "chromium",
+      "mech": "control",
+      "size": 0,
+      "rep": 1,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "idle": {
+          "preMiB": 509,
+          "peakDeltaMiB": 0,
+          "settledDeltaMiB": 0,
+          "ms": 2000
+        }
+      }
+    },
+    {
+      "engine": "chromium",
+      "mech": "control",
+      "size": 0,
+      "rep": 2,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "idle": {
+          "preMiB": 510,
+          "peakDeltaMiB": 1,
+          "settledDeltaMiB": 0,
+          "ms": 2000
+        }
+      }
+    },
+    {
+      "engine": "chromium",
+      "mech": "control",
+      "size": 0,
+      "rep": 3,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "idle": {
+          "preMiB": 505,
+          "peakDeltaMiB": 1,
+          "settledDeltaMiB": 1,
+          "ms": 2000
+        }
+      }
+    },
+    {
+      "engine": "chromium",
+      "mech": "opfs",
+      "size": 64,
+      "rep": 1,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "write": {
+          "preMiB": 504,
+          "peakDeltaMiB": 12,
+          "settledDeltaMiB": 5,
+          "ms": 154
+        },
+        "export": {
+          "preMiB": 509,
+          "peakDeltaMiB": 98,
+          "settledDeltaMiB": 63,
+          "ms": 94
+        }
+      },
+      "bytes": 67108864,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "opfs",
+      "size": 64,
+      "rep": 2,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "write": {
+          "preMiB": 506,
+          "peakDeltaMiB": 16,
+          "settledDeltaMiB": 5,
+          "ms": 151
+        },
+        "export": {
+          "preMiB": 511,
+          "peakDeltaMiB": 90,
+          "settledDeltaMiB": 63,
+          "ms": 85
+        }
+      },
+      "bytes": 67108864,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "opfs",
+      "size": 64,
+      "rep": 3,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "write": {
+          "preMiB": 508,
+          "peakDeltaMiB": 16,
+          "settledDeltaMiB": 5,
+          "ms": 157
+        },
+        "export": {
+          "preMiB": 514,
+          "peakDeltaMiB": 80,
+          "settledDeltaMiB": 63,
+          "ms": 89
+        }
+      },
+      "bytes": 67108864,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "opfs",
+      "size": 256,
+      "rep": 1,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "write": {
+          "preMiB": 506,
+          "peakDeltaMiB": 22,
+          "settledDeltaMiB": 10,
+          "ms": 579
+        },
+        "export": {
+          "preMiB": 516,
+          "peakDeltaMiB": 228,
+          "settledDeltaMiB": 19,
+          "ms": 309
+        }
+      },
+      "bytes": 268435456,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "opfs",
+      "size": 256,
+      "rep": 2,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "write": {
+          "preMiB": 509,
+          "peakDeltaMiB": 21,
+          "settledDeltaMiB": 10,
+          "ms": 591
+        },
+        "export": {
+          "preMiB": 519,
+          "peakDeltaMiB": 208,
+          "settledDeltaMiB": 13,
+          "ms": 331
+        }
+      },
+      "bytes": 268435456,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "opfs",
+      "size": 256,
+      "rep": 3,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "write": {
+          "preMiB": 507,
+          "peakDeltaMiB": 21,
+          "settledDeltaMiB": 10,
+          "ms": 590
+        },
+        "export": {
+          "preMiB": 517,
+          "peakDeltaMiB": 224,
+          "settledDeltaMiB": 193,
+          "ms": 314
+        }
+      },
+      "bytes": 268435456,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "opfs",
+      "size": 1024,
+      "rep": 1,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "write": {
+          "preMiB": 506,
+          "peakDeltaMiB": 36,
+          "settledDeltaMiB": 26,
+          "ms": 2381
+        },
+        "export": {
+          "preMiB": 532,
+          "peakDeltaMiB": 513,
+          "settledDeltaMiB": 171,
+          "ms": 1325
+        }
+      },
+      "bytes": 1073741824,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "opfs",
+      "size": 1024,
+      "rep": 2,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "write": {
+          "preMiB": 510,
+          "peakDeltaMiB": 41,
+          "settledDeltaMiB": 25,
+          "ms": 2572
+        },
+        "export": {
+          "preMiB": 535,
+          "peakDeltaMiB": 498,
+          "settledDeltaMiB": 83,
+          "ms": 1317
+        }
+      },
+      "bytes": 1073741824,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "opfs",
+      "size": 1024,
+      "rep": 3,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "write": {
+          "preMiB": 511,
+          "peakDeltaMiB": 37,
+          "settledDeltaMiB": 25,
+          "ms": 2434
+        },
+        "export": {
+          "preMiB": 536,
+          "peakDeltaMiB": 417,
+          "settledDeltaMiB": 81,
+          "ms": 1367
+        }
+      },
+      "bytes": 1073741824,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "opfs",
+      "size": 2048,
+      "rep": 1,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "write": {
+          "preMiB": 506,
+          "peakDeltaMiB": 84,
+          "settledDeltaMiB": 31,
+          "ms": 5221
+        },
+        "export": {
+          "preMiB": 537,
+          "peakDeltaMiB": 789,
+          "settledDeltaMiB": 90,
+          "ms": 2607
+        }
+      },
+      "bytes": 2147483648,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "opfs",
+      "size": 2048,
+      "rep": 2,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "write": {
+          "preMiB": 507,
+          "peakDeltaMiB": 82,
+          "settledDeltaMiB": 30,
+          "ms": 5239
+        },
+        "export": {
+          "preMiB": 537,
+          "peakDeltaMiB": 1127,
+          "settledDeltaMiB": 225,
+          "ms": 2478
+        }
+      },
+      "bytes": 2147483648,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "opfs",
+      "size": 2048,
+      "rep": 3,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "write": {
+          "preMiB": 506,
+          "peakDeltaMiB": 69,
+          "settledDeltaMiB": 31,
+          "ms": 4944
+        },
+        "export": {
+          "preMiB": 537,
+          "peakDeltaMiB": 679,
+          "settledDeltaMiB": 63,
+          "ms": 2543
+        }
+      },
+      "bytes": 2147483648,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "blob",
+      "size": 64,
+      "rep": 1,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 507,
+          "peakDeltaMiB": 49,
+          "settledDeltaMiB": 65,
+          "ms": 75
+        },
+        "export": {
+          "preMiB": 572,
+          "peakDeltaMiB": 96,
+          "settledDeltaMiB": 60,
+          "ms": 99
+        }
+      },
+      "bytes": 67108864,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "blob",
+      "size": 64,
+      "rep": 2,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 506,
+          "peakDeltaMiB": 65,
+          "settledDeltaMiB": 66,
+          "ms": 86
+        },
+        "export": {
+          "preMiB": 572,
+          "peakDeltaMiB": 88,
+          "settledDeltaMiB": 60,
+          "ms": 91
+        }
+      },
+      "bytes": 67108864,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "blob",
+      "size": 64,
+      "rep": 3,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 509,
+          "peakDeltaMiB": 55,
+          "settledDeltaMiB": 66,
+          "ms": 77
+        },
+        "export": {
+          "preMiB": 575,
+          "peakDeltaMiB": 118,
+          "settledDeltaMiB": 60,
+          "ms": 99
+        }
+      },
+      "bytes": 67108864,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "blob",
+      "size": 256,
+      "rep": 1,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 507,
+          "peakDeltaMiB": 233,
+          "settledDeltaMiB": 258,
+          "ms": 321
+        },
+        "export": {
+          "preMiB": 765,
+          "peakDeltaMiB": 184,
+          "settledDeltaMiB": 51,
+          "ms": 310
+        }
+      },
+      "bytes": 268435456,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "blob",
+      "size": 256,
+      "rep": 2,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 508,
+          "peakDeltaMiB": 254,
+          "settledDeltaMiB": 258,
+          "ms": 326
+        },
+        "export": {
+          "preMiB": 766,
+          "peakDeltaMiB": 249,
+          "settledDeltaMiB": 73,
+          "ms": 307
+        }
+      },
+      "bytes": 268435456,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "blob",
+      "size": 256,
+      "rep": 3,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 510,
+          "peakDeltaMiB": 253,
+          "settledDeltaMiB": 258,
+          "ms": 329
+        },
+        "export": {
+          "preMiB": 768,
+          "peakDeltaMiB": 239,
+          "settledDeltaMiB": 77,
+          "ms": 295
+        }
+      },
+      "bytes": 268435456,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "blob",
+      "size": 1024,
+      "rep": 1,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 507,
+          "peakDeltaMiB": 1026,
+          "settledDeltaMiB": 1029,
+          "ms": 1296
+        },
+        "export": {
+          "preMiB": 1536,
+          "peakDeltaMiB": 1062,
+          "settledDeltaMiB": 325,
+          "ms": 1176
+        }
+      },
+      "bytes": 1073741824,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "blob",
+      "size": 1024,
+      "rep": 2,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 505,
+          "peakDeltaMiB": 1015,
+          "settledDeltaMiB": 1028,
+          "ms": 1319
+        },
+        "export": {
+          "preMiB": 1533,
+          "peakDeltaMiB": 492,
+          "settledDeltaMiB": 22,
+          "ms": 1175
+        }
+      },
+      "bytes": 1073741824,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "blob",
+      "size": 1024,
+      "rep": 3,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 507,
+          "peakDeltaMiB": 1039,
+          "settledDeltaMiB": 1029,
+          "ms": 1290
+        },
+        "export": {
+          "preMiB": 1536,
+          "peakDeltaMiB": 416,
+          "settledDeltaMiB": 71,
+          "ms": 1172
+        }
+      },
+      "bytes": 1073741824,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "blob",
+      "size": 2048,
+      "rep": 1,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 507,
+          "peakDeltaMiB": 2057,
+          "settledDeltaMiB": 22,
+          "ms": 2595
+        },
+        "export": {
+          "preMiB": 529,
+          "peakDeltaMiB": 916,
+          "settledDeltaMiB": 160,
+          "ms": 2566
+        }
+      },
+      "bytes": 2147483648,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "blob",
+      "size": 2048,
+      "rep": 2,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 506,
+          "peakDeltaMiB": 2059,
+          "settledDeltaMiB": 21,
+          "ms": 2616
+        },
+        "export": {
+          "preMiB": 527,
+          "peakDeltaMiB": 663,
+          "settledDeltaMiB": 147,
+          "ms": 2527
+        }
+      },
+      "bytes": 2147483648,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "blob",
+      "size": 2048,
+      "rep": 3,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 510,
+          "peakDeltaMiB": 2053,
+          "settledDeltaMiB": 22,
+          "ms": 2630
+        },
+        "export": {
+          "preMiB": 532,
+          "peakDeltaMiB": 598,
+          "settledDeltaMiB": 129,
+          "ms": 2578
+        }
+      },
+      "bytes": 2147483648,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "idb",
+      "size": 64,
+      "rep": 1,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 507,
+          "peakDeltaMiB": 76,
+          "settledDeltaMiB": 70,
+          "ms": 126
+        },
+        "assemble": {
+          "preMiB": 577,
+          "peakDeltaMiB": 0,
+          "settledDeltaMiB": 0,
+          "ms": 2
+        },
+        "export": {
+          "preMiB": 577,
+          "peakDeltaMiB": 26,
+          "settledDeltaMiB": -21,
+          "ms": 104
+        }
+      },
+      "bytes": 67108864,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "idb",
+      "size": 64,
+      "rep": 2,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 507,
+          "peakDeltaMiB": 68,
+          "settledDeltaMiB": 70,
+          "ms": 121
+        },
+        "assemble": {
+          "preMiB": 577,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": 1,
+          "ms": 1
+        },
+        "export": {
+          "preMiB": 578,
+          "peakDeltaMiB": 43,
+          "settledDeltaMiB": -6,
+          "ms": 116
+        }
+      },
+      "bytes": 67108864,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "idb",
+      "size": 64,
+      "rep": 3,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 506,
+          "peakDeltaMiB": 74,
+          "settledDeltaMiB": 70,
+          "ms": 119
+        },
+        "assemble": {
+          "preMiB": 576,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": 0,
+          "ms": 1
+        },
+        "export": {
+          "preMiB": 576,
+          "peakDeltaMiB": 16,
+          "settledDeltaMiB": 15,
+          "ms": 109
+        }
+      },
+      "bytes": 67108864,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "idb",
+      "size": 256,
+      "rep": 1,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 507,
+          "peakDeltaMiB": 272,
+          "settledDeltaMiB": 262,
+          "ms": 448
+        },
+        "assemble": {
+          "preMiB": 770,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": 0,
+          "ms": 4
+        },
+        "export": {
+          "preMiB": 770,
+          "peakDeltaMiB": 0,
+          "settledDeltaMiB": -125,
+          "ms": 371
+        }
+      },
+      "bytes": 268435456,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "idb",
+      "size": 256,
+      "rep": 2,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 508,
+          "peakDeltaMiB": 270,
+          "settledDeltaMiB": 264,
+          "ms": 435
+        },
+        "assemble": {
+          "preMiB": 772,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": 1,
+          "ms": 3
+        },
+        "export": {
+          "preMiB": 773,
+          "peakDeltaMiB": 48,
+          "settledDeltaMiB": -169,
+          "ms": 364
+        }
+      },
+      "bytes": 268435456,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "idb",
+      "size": 256,
+      "rep": 3,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 510,
+          "peakDeltaMiB": 263,
+          "settledDeltaMiB": 263,
+          "ms": 421
+        },
+        "assemble": {
+          "preMiB": 773,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": 1,
+          "ms": 4
+        },
+        "export": {
+          "preMiB": 774,
+          "peakDeltaMiB": 20,
+          "settledDeltaMiB": -89,
+          "ms": 367
+        }
+      },
+      "bytes": 268435456,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "idb",
+      "size": 1024,
+      "rep": 1,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 506,
+          "peakDeltaMiB": 1038,
+          "settledDeltaMiB": 1035,
+          "ms": 1650
+        },
+        "assemble": {
+          "preMiB": 1541,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": 2,
+          "ms": 11
+        },
+        "export": {
+          "preMiB": 1543,
+          "peakDeltaMiB": 16,
+          "settledDeltaMiB": -796,
+          "ms": 1385
+        }
+      },
+      "bytes": 1073741824,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "idb",
+      "size": 1024,
+      "rep": 2,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 507,
+          "peakDeltaMiB": 1038,
+          "settledDeltaMiB": 1035,
+          "ms": 1676
+        },
+        "assemble": {
+          "preMiB": 1542,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": 2,
+          "ms": 11
+        },
+        "export": {
+          "preMiB": 1544,
+          "peakDeltaMiB": 52,
+          "settledDeltaMiB": -757,
+          "ms": 1497
+        }
+      },
+      "bytes": 1073741824,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "idb",
+      "size": 1024,
+      "rep": 3,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 508,
+          "peakDeltaMiB": 1038,
+          "settledDeltaMiB": 1035,
+          "ms": 1645
+        },
+        "assemble": {
+          "preMiB": 1543,
+          "peakDeltaMiB": 0,
+          "settledDeltaMiB": 2,
+          "ms": 11
+        },
+        "export": {
+          "preMiB": 1545,
+          "peakDeltaMiB": 30,
+          "settledDeltaMiB": -728,
+          "ms": 1359
+        }
+      },
+      "bytes": 1073741824,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "idb",
+      "size": 2048,
+      "rep": 1,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 506,
+          "peakDeltaMiB": 2054,
+          "settledDeltaMiB": 28,
+          "ms": 3846
+        },
+        "assemble": {
+          "preMiB": 534,
+          "peakDeltaMiB": 1,
+          "settledDeltaMiB": 6,
+          "ms": 18
+        },
+        "export": {
+          "preMiB": 540,
+          "peakDeltaMiB": 581,
+          "settledDeltaMiB": 581,
+          "ms": 2622
+        }
+      },
+      "bytes": 2147483648,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "idb",
+      "size": 2048,
+      "rep": 2,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 510,
+          "peakDeltaMiB": 2074,
+          "settledDeltaMiB": 37,
+          "ms": 3840
+        },
+        "assemble": {
+          "preMiB": 547,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": 5,
+          "ms": 17
+        },
+        "export": {
+          "preMiB": 552,
+          "peakDeltaMiB": 471,
+          "settledDeltaMiB": 228,
+          "ms": 2634
+        }
+      },
+      "bytes": 2147483648,
+      "readBack": true
+    },
+    {
+      "engine": "chromium",
+      "mech": "idb",
+      "size": 2048,
+      "rep": 3,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": true,
+        "showSaveFilePicker": true,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": true,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 508,
+          "peakDeltaMiB": 2060,
+          "settledDeltaMiB": 28,
+          "ms": 3814
+        },
+        "assemble": {
+          "preMiB": 536,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": 5,
+          "ms": 16
+        },
+        "export": {
+          "preMiB": 541,
+          "peakDeltaMiB": 437,
+          "settledDeltaMiB": 157,
+          "ms": 2753
+        }
+      },
+      "bytes": 2147483648,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "control",
+      "size": 0,
+      "rep": 1,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "idle": {
+          "preMiB": 792,
+          "peakDeltaMiB": 7,
+          "settledDeltaMiB": 6,
+          "ms": 2000
+        }
+      }
+    },
+    {
+      "engine": "firefox",
+      "mech": "control",
+      "size": 0,
+      "rep": 2,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "idle": {
+          "preMiB": 800,
+          "peakDeltaMiB": 8,
+          "settledDeltaMiB": 7,
+          "ms": 2000
+        }
+      }
+    },
+    {
+      "engine": "firefox",
+      "mech": "control",
+      "size": 0,
+      "rep": 3,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "idle": {
+          "preMiB": 795,
+          "peakDeltaMiB": 8,
+          "settledDeltaMiB": 7,
+          "ms": 2000
+        }
+      }
+    },
+    {
+      "engine": "firefox",
+      "mech": "opfs",
+      "size": 64,
+      "rep": 1,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "write": {
+          "preMiB": 815,
+          "peakDeltaMiB": 22,
+          "settledDeltaMiB": 10,
+          "ms": 190
+        },
+        "export": {
+          "preMiB": 825,
+          "peakDeltaMiB": 81,
+          "settledDeltaMiB": 70,
+          "ms": 76
+        }
+      },
+      "bytes": 67108864,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "opfs",
+      "size": 64,
+      "rep": 2,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "write": {
+          "preMiB": 797,
+          "peakDeltaMiB": 11,
+          "settledDeltaMiB": 9,
+          "ms": 202
+        },
+        "export": {
+          "preMiB": 806,
+          "peakDeltaMiB": 72,
+          "settledDeltaMiB": 71,
+          "ms": 62
+        }
+      },
+      "bytes": 67108864,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "opfs",
+      "size": 64,
+      "rep": 3,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "write": {
+          "preMiB": 797,
+          "peakDeltaMiB": 22,
+          "settledDeltaMiB": 9,
+          "ms": 192
+        },
+        "export": {
+          "preMiB": 806,
+          "peakDeltaMiB": 76,
+          "settledDeltaMiB": 70,
+          "ms": 65
+        }
+      },
+      "bytes": 67108864,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "opfs",
+      "size": 256,
+      "rep": 1,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "write": {
+          "preMiB": 797,
+          "peakDeltaMiB": 11,
+          "settledDeltaMiB": 9,
+          "ms": 464
+        },
+        "export": {
+          "preMiB": 805,
+          "peakDeltaMiB": 275,
+          "settledDeltaMiB": 258,
+          "ms": 271
+        }
+      },
+      "bytes": 268435456,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "opfs",
+      "size": 256,
+      "rep": 2,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "write": {
+          "preMiB": 797,
+          "peakDeltaMiB": 23,
+          "settledDeltaMiB": 9,
+          "ms": 494
+        },
+        "export": {
+          "preMiB": 806,
+          "peakDeltaMiB": 278,
+          "settledDeltaMiB": 250,
+          "ms": 258
+        }
+      },
+      "bytes": 268435456,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "opfs",
+      "size": 256,
+      "rep": 3,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "write": {
+          "preMiB": 798,
+          "peakDeltaMiB": 11,
+          "settledDeltaMiB": 9,
+          "ms": 466
+        },
+        "export": {
+          "preMiB": 807,
+          "peakDeltaMiB": 280,
+          "settledDeltaMiB": 259,
+          "ms": 260
+        }
+      },
+      "bytes": 268435456,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "opfs",
+      "size": 1024,
+      "rep": 1,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "write": {
+          "preMiB": 796,
+          "peakDeltaMiB": 18,
+          "settledDeltaMiB": 9,
+          "ms": 1521
+        },
+        "export": {
+          "preMiB": 805,
+          "peakDeltaMiB": 1153,
+          "settledDeltaMiB": 1025,
+          "ms": 1096
+        }
+      },
+      "bytes": 1073741824,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "opfs",
+      "size": 1024,
+      "rep": 2,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "write": {
+          "preMiB": 799,
+          "peakDeltaMiB": 18,
+          "settledDeltaMiB": 9,
+          "ms": 1514
+        },
+        "export": {
+          "preMiB": 808,
+          "peakDeltaMiB": 1086,
+          "settledDeltaMiB": 1021,
+          "ms": 1103
+        }
+      },
+      "bytes": 1073741824,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "opfs",
+      "size": 1024,
+      "rep": 3,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "write": {
+          "preMiB": 798,
+          "peakDeltaMiB": 18,
+          "settledDeltaMiB": 9,
+          "ms": 1548
+        },
+        "export": {
+          "preMiB": 807,
+          "peakDeltaMiB": 1067,
+          "settledDeltaMiB": 1008,
+          "ms": 1133
+        }
+      },
+      "bytes": 1073741824,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "opfs",
+      "size": 2048,
+      "rep": 1,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "write": {
+          "preMiB": 796,
+          "peakDeltaMiB": 20,
+          "settledDeltaMiB": 11,
+          "ms": 3181
+        },
+        "export": {
+          "preMiB": 791,
+          "peakDeltaMiB": 2237,
+          "settledDeltaMiB": 2049,
+          "ms": 2234
+        }
+      },
+      "bytes": 2147483648,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "opfs",
+      "size": 2048,
+      "rep": 2,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "write": {
+          "preMiB": 794,
+          "peakDeltaMiB": 23,
+          "settledDeltaMiB": 11,
+          "ms": 3190
+        },
+        "export": {
+          "preMiB": 790,
+          "peakDeltaMiB": 2177,
+          "settledDeltaMiB": 2049,
+          "ms": 2381
+        }
+      },
+      "bytes": 2147483648,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "opfs",
+      "size": 2048,
+      "rep": 3,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "write": {
+          "preMiB": 797,
+          "peakDeltaMiB": 18,
+          "settledDeltaMiB": 10,
+          "ms": 3183
+        },
+        "export": {
+          "preMiB": 790,
+          "peakDeltaMiB": 2132,
+          "settledDeltaMiB": 2053,
+          "ms": 2152
+        }
+      },
+      "bytes": 2147483648,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "blob",
+      "size": 64,
+      "rep": 1,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 797,
+          "peakDeltaMiB": 27,
+          "settledDeltaMiB": 66,
+          "ms": 40
+        },
+        "export": {
+          "preMiB": 869,
+          "peakDeltaMiB": 116,
+          "settledDeltaMiB": 134,
+          "ms": 148
+        }
+      },
+      "bytes": 67108864,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "blob",
+      "size": 64,
+      "rep": 2,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 797,
+          "peakDeltaMiB": 25,
+          "settledDeltaMiB": 66,
+          "ms": 43
+        },
+        "export": {
+          "preMiB": 870,
+          "peakDeltaMiB": 117,
+          "settledDeltaMiB": 132,
+          "ms": 134
+        }
+      },
+      "bytes": 67108864,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "blob",
+      "size": 64,
+      "rep": 3,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 799,
+          "peakDeltaMiB": 46,
+          "settledDeltaMiB": 66,
+          "ms": 38
+        },
+        "export": {
+          "preMiB": 871,
+          "peakDeltaMiB": 127,
+          "settledDeltaMiB": 132,
+          "ms": 140
+        }
+      },
+      "bytes": 67108864,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "blob",
+      "size": 256,
+      "rep": 1,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 798,
+          "peakDeltaMiB": 236,
+          "settledDeltaMiB": 265,
+          "ms": 140
+        },
+        "export": {
+          "preMiB": 1063,
+          "peakDeltaMiB": 497,
+          "settledDeltaMiB": 526,
+          "ms": 584
+        }
+      },
+      "bytes": 268435456,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "blob",
+      "size": 256,
+      "rep": 2,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 814,
+          "peakDeltaMiB": 223,
+          "settledDeltaMiB": 258,
+          "ms": 137
+        },
+        "export": {
+          "preMiB": 1078,
+          "peakDeltaMiB": 512,
+          "settledDeltaMiB": 528,
+          "ms": 545
+        }
+      },
+      "bytes": 268435456,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "blob",
+      "size": 256,
+      "rep": 3,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 798,
+          "peakDeltaMiB": 226,
+          "settledDeltaMiB": 258,
+          "ms": 137
+        },
+        "export": {
+          "preMiB": 1062,
+          "peakDeltaMiB": 516,
+          "settledDeltaMiB": 528,
+          "ms": 589
+        }
+      },
+      "bytes": 268435456,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "blob",
+      "size": 1024,
+      "rep": 1,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 798,
+          "peakDeltaMiB": 955,
+          "settledDeltaMiB": 1033,
+          "ms": 550
+        },
+        "export": {
+          "preMiB": 1830,
+          "peakDeltaMiB": 2102,
+          "settledDeltaMiB": 2096,
+          "ms": 2728
+        }
+      },
+      "bytes": 1073741824,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "blob",
+      "size": 1024,
+      "rep": 2,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 796,
+          "peakDeltaMiB": 1003,
+          "settledDeltaMiB": 1031,
+          "ms": 666
+        },
+        "export": {
+          "preMiB": 1826,
+          "peakDeltaMiB": 2093,
+          "settledDeltaMiB": 2098,
+          "ms": 2662
+        }
+      },
+      "bytes": 1073741824,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "blob",
+      "size": 1024,
+      "rep": 3,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 796,
+          "peakDeltaMiB": 991,
+          "settledDeltaMiB": 1032,
+          "ms": 605
+        },
+        "export": {
+          "preMiB": 1828,
+          "peakDeltaMiB": 2075,
+          "settledDeltaMiB": 2098,
+          "ms": 2905
+        }
+      },
+      "bytes": 1073741824,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "blob",
+      "size": 2048,
+      "rep": 1,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 796,
+          "peakDeltaMiB": 2003,
+          "settledDeltaMiB": 2056,
+          "ms": 1151
+        },
+        "export": {
+          "preMiB": 2851,
+          "peakDeltaMiB": 4157,
+          "settledDeltaMiB": 4171,
+          "ms": 6650
+        }
+      },
+      "bytes": 2147483648,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "blob",
+      "size": 2048,
+      "rep": 2,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 795,
+          "peakDeltaMiB": 2026,
+          "settledDeltaMiB": 2056,
+          "ms": 1115
+        },
+        "export": {
+          "preMiB": 2851,
+          "peakDeltaMiB": 4165,
+          "settledDeltaMiB": 4180,
+          "ms": 5338
+        }
+      },
+      "bytes": 2147483648,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "blob",
+      "size": 2048,
+      "rep": 3,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 794,
+          "peakDeltaMiB": 1980,
+          "settledDeltaMiB": 2057,
+          "ms": 1101
+        },
+        "export": {
+          "preMiB": 2850,
+          "peakDeltaMiB": 4156,
+          "settledDeltaMiB": 4175,
+          "ms": 5009
+        }
+      },
+      "bytes": 2147483648,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "idb",
+      "size": 64,
+      "rep": 1,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 793,
+          "peakDeltaMiB": 95,
+          "settledDeltaMiB": 18,
+          "ms": 150
+        },
+        "assemble": {
+          "preMiB": 811,
+          "peakDeltaMiB": -1,
+          "settledDeltaMiB": -1,
+          "ms": 1
+        },
+        "export": {
+          "preMiB": 802,
+          "peakDeltaMiB": 28,
+          "settledDeltaMiB": 51,
+          "ms": 68
+        }
+      },
+      "bytes": 67108864,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "idb",
+      "size": 64,
+      "rep": 2,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 799,
+          "peakDeltaMiB": 87,
+          "settledDeltaMiB": 12,
+          "ms": 152
+        },
+        "assemble": {
+          "preMiB": 817,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": -1,
+          "ms": 2
+        },
+        "export": {
+          "preMiB": 807,
+          "peakDeltaMiB": 65,
+          "settledDeltaMiB": 52,
+          "ms": 69
+        }
+      },
+      "bytes": 67108864,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "idb",
+      "size": 64,
+      "rep": 3,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 794,
+          "peakDeltaMiB": 69,
+          "settledDeltaMiB": 17,
+          "ms": 160
+        },
+        "assemble": {
+          "preMiB": 811,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": -1,
+          "ms": 1
+        },
+        "export": {
+          "preMiB": 804,
+          "peakDeltaMiB": 37,
+          "settledDeltaMiB": 50,
+          "ms": 78
+        }
+      },
+      "bytes": 67108864,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "idb",
+      "size": 256,
+      "rep": 1,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 795,
+          "peakDeltaMiB": 368,
+          "settledDeltaMiB": 98,
+          "ms": 598
+        },
+        "assemble": {
+          "preMiB": 892,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": -7,
+          "ms": 2
+        },
+        "export": {
+          "preMiB": 873,
+          "peakDeltaMiB": 432,
+          "settledDeltaMiB": 439,
+          "ms": 542
+        }
+      },
+      "bytes": 268435456,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "idb",
+      "size": 256,
+      "rep": 2,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 798,
+          "peakDeltaMiB": 398,
+          "settledDeltaMiB": 99,
+          "ms": 612
+        },
+        "assemble": {
+          "preMiB": 896,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": -6,
+          "ms": 3
+        },
+        "export": {
+          "preMiB": 882,
+          "peakDeltaMiB": 420,
+          "settledDeltaMiB": 433,
+          "ms": 513
+        }
+      },
+      "bytes": 268435456,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "idb",
+      "size": 256,
+      "rep": 3,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 798,
+          "peakDeltaMiB": 386,
+          "settledDeltaMiB": 100,
+          "ms": 708
+        },
+        "assemble": {
+          "preMiB": 896,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": -4,
+          "ms": 2
+        },
+        "export": {
+          "preMiB": 884,
+          "peakDeltaMiB": 430,
+          "settledDeltaMiB": 432,
+          "ms": 498
+        }
+      },
+      "bytes": 268435456,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "idb",
+      "size": 1024,
+      "rep": 1,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 792,
+          "peakDeltaMiB": 1727,
+          "settledDeltaMiB": 86,
+          "ms": 2433
+        },
+        "assemble": {
+          "preMiB": 865,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": -5,
+          "ms": 8
+        },
+        "export": {
+          "preMiB": 860,
+          "peakDeltaMiB": 1996,
+          "settledDeltaMiB": 2007,
+          "ms": 2104
+        }
+      },
+      "bytes": 1073741824,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "idb",
+      "size": 1024,
+      "rep": 2,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 816,
+          "peakDeltaMiB": 1728,
+          "settledDeltaMiB": 86,
+          "ms": 2207
+        },
+        "assemble": {
+          "preMiB": 902,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": -19,
+          "ms": 7
+        },
+        "export": {
+          "preMiB": 882,
+          "peakDeltaMiB": 2014,
+          "settledDeltaMiB": 2010,
+          "ms": 1989
+        }
+      },
+      "bytes": 1073741824,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "idb",
+      "size": 1024,
+      "rep": 3,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 795,
+          "peakDeltaMiB": 1699,
+          "settledDeltaMiB": 82,
+          "ms": 2241
+        },
+        "assemble": {
+          "preMiB": 877,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": -22,
+          "ms": 6
+        },
+        "export": {
+          "preMiB": 855,
+          "peakDeltaMiB": 1987,
+          "settledDeltaMiB": 2017,
+          "ms": 2017
+        }
+      },
+      "bytes": 1073741824,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "idb",
+      "size": 2048,
+      "rep": 1,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 793,
+          "peakDeltaMiB": 3450,
+          "settledDeltaMiB": 85,
+          "ms": 4468
+        },
+        "assemble": {
+          "preMiB": 872,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": 1,
+          "ms": 12
+        },
+        "export": {
+          "preMiB": 869,
+          "peakDeltaMiB": 4070,
+          "settledDeltaMiB": 4081,
+          "ms": 4298
+        }
+      },
+      "bytes": 2147483648,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "idb",
+      "size": 2048,
+      "rep": 2,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 818,
+          "peakDeltaMiB": 3447,
+          "settledDeltaMiB": 88,
+          "ms": 4451
+        },
+        "assemble": {
+          "preMiB": 898,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": 0,
+          "ms": 15
+        },
+        "export": {
+          "preMiB": 897,
+          "peakDeltaMiB": 4066,
+          "settledDeltaMiB": 4078,
+          "ms": 4246
+        }
+      },
+      "bytes": 2147483648,
+      "readBack": true
+    },
+    {
+      "engine": "firefox",
+      "mech": "idb",
+      "size": 2048,
+      "rep": 3,
+      "ok": true,
+      "quota": 10240,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": true,
+        "createSyncAccessHandle": false,
+        "opfs": true,
+        "storageEstimate": true,
+        "storagePersist": true,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 797,
+          "peakDeltaMiB": 3432,
+          "settledDeltaMiB": 80,
+          "ms": 4443
+        },
+        "assemble": {
+          "preMiB": 876,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": -1,
+          "ms": 12
+        },
+        "export": {
+          "preMiB": 872,
+          "peakDeltaMiB": 4086,
+          "settledDeltaMiB": 4089,
+          "ms": 4322
+        }
+      },
+      "bytes": 2147483648,
+      "readBack": true
+    },
+    {
+      "engine": "webkit",
+      "mech": "control",
+      "size": 0,
+      "rep": 1,
+      "ok": true,
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "idle": {
+          "preMiB": 747,
+          "peakDeltaMiB": -4,
+          "settledDeltaMiB": -7,
+          "ms": 2000
+        }
+      }
+    },
+    {
+      "engine": "webkit",
+      "mech": "control",
+      "size": 0,
+      "rep": 2,
+      "ok": true,
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "idle": {
+          "preMiB": 729,
+          "peakDeltaMiB": -3,
+          "settledDeltaMiB": -3,
+          "ms": 2000
+        }
+      }
+    },
+    {
+      "engine": "webkit",
+      "mech": "control",
+      "size": 0,
+      "rep": 3,
+      "ok": true,
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "idle": {
+          "preMiB": 730,
+          "peakDeltaMiB": -3,
+          "settledDeltaMiB": -3,
+          "ms": 2000
+        }
+      }
+    },
+    {
+      "engine": "webkit",
+      "mech": "opfs",
+      "size": 64,
+      "rep": 1,
+      "ok": false,
+      "error": "Error: OPFS unavailable",
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {}
+    },
+    {
+      "engine": "webkit",
+      "mech": "opfs",
+      "size": 64,
+      "rep": 2,
+      "ok": false,
+      "error": "Error: OPFS unavailable",
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {}
+    },
+    {
+      "engine": "webkit",
+      "mech": "opfs",
+      "size": 64,
+      "rep": 3,
+      "ok": false,
+      "error": "Error: OPFS unavailable",
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {}
+    },
+    {
+      "engine": "webkit",
+      "mech": "opfs",
+      "size": 256,
+      "rep": 1,
+      "ok": false,
+      "error": "Error: OPFS unavailable",
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {}
+    },
+    {
+      "engine": "webkit",
+      "mech": "opfs",
+      "size": 256,
+      "rep": 2,
+      "ok": false,
+      "error": "Error: OPFS unavailable",
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {}
+    },
+    {
+      "engine": "webkit",
+      "mech": "opfs",
+      "size": 256,
+      "rep": 3,
+      "ok": false,
+      "error": "Error: OPFS unavailable",
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {}
+    },
+    {
+      "engine": "webkit",
+      "mech": "opfs",
+      "size": 1024,
+      "rep": 1,
+      "ok": false,
+      "error": "Error: OPFS unavailable",
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {}
+    },
+    {
+      "engine": "webkit",
+      "mech": "opfs",
+      "size": 1024,
+      "rep": 2,
+      "ok": false,
+      "error": "Error: OPFS unavailable",
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {}
+    },
+    {
+      "engine": "webkit",
+      "mech": "opfs",
+      "size": 1024,
+      "rep": 3,
+      "ok": false,
+      "error": "Error: OPFS unavailable",
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {}
+    },
+    {
+      "engine": "webkit",
+      "mech": "opfs",
+      "size": 2048,
+      "rep": 1,
+      "ok": false,
+      "error": "Error: OPFS unavailable",
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {}
+    },
+    {
+      "engine": "webkit",
+      "mech": "opfs",
+      "size": 2048,
+      "rep": 2,
+      "ok": false,
+      "error": "Error: OPFS unavailable",
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {}
+    },
+    {
+      "engine": "webkit",
+      "mech": "opfs",
+      "size": 2048,
+      "rep": 3,
+      "ok": false,
+      "error": "Error: OPFS unavailable",
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {}
+    },
+    {
+      "engine": "webkit",
+      "mech": "blob",
+      "size": 64,
+      "rep": 1,
+      "ok": true,
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 729,
+          "peakDeltaMiB": 83,
+          "settledDeltaMiB": 61,
+          "ms": 54
+        },
+        "export": {
+          "preMiB": 790,
+          "peakDeltaMiB": 137,
+          "settledDeltaMiB": 129,
+          "ms": 128
+        }
+      },
+      "bytes": 67108864,
+      "readBack": true
+    },
+    {
+      "engine": "webkit",
+      "mech": "blob",
+      "size": 64,
+      "rep": 2,
+      "ok": true,
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 733,
+          "peakDeltaMiB": 97,
+          "settledDeltaMiB": 60,
+          "ms": 64
+        },
+        "export": {
+          "preMiB": 793,
+          "peakDeltaMiB": 181,
+          "settledDeltaMiB": 130,
+          "ms": 155
+        }
+      },
+      "bytes": 67108864,
+      "readBack": true
+    },
+    {
+      "engine": "webkit",
+      "mech": "blob",
+      "size": 64,
+      "rep": 3,
+      "ok": true,
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 730,
+          "peakDeltaMiB": 26,
+          "settledDeltaMiB": 61,
+          "ms": 55
+        },
+        "export": {
+          "preMiB": 791,
+          "peakDeltaMiB": 158,
+          "settledDeltaMiB": 129,
+          "ms": 128
+        }
+      },
+      "bytes": 67108864,
+      "readBack": true
+    },
+    {
+      "engine": "webkit",
+      "mech": "blob",
+      "size": 256,
+      "rep": 1,
+      "ok": true,
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 732,
+          "peakDeltaMiB": 291,
+          "settledDeltaMiB": 250,
+          "ms": 231
+        },
+        "export": {
+          "preMiB": 982,
+          "peakDeltaMiB": 635,
+          "settledDeltaMiB": 513,
+          "ms": 441
+        }
+      },
+      "bytes": 268435456,
+      "readBack": true
+    },
+    {
+      "engine": "webkit",
+      "mech": "blob",
+      "size": 256,
+      "rep": 2,
+      "ok": true,
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 729,
+          "peakDeltaMiB": 282,
+          "settledDeltaMiB": 249,
+          "ms": 220
+        },
+        "export": {
+          "preMiB": 979,
+          "peakDeltaMiB": 615,
+          "settledDeltaMiB": 513,
+          "ms": 463
+        }
+      },
+      "bytes": 268435456,
+      "readBack": true
+    },
+    {
+      "engine": "webkit",
+      "mech": "blob",
+      "size": 256,
+      "rep": 3,
+      "ok": true,
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 730,
+          "peakDeltaMiB": 286,
+          "settledDeltaMiB": 253,
+          "ms": 246
+        },
+        "export": {
+          "preMiB": 983,
+          "peakDeltaMiB": 624,
+          "settledDeltaMiB": 513,
+          "ms": 440
+        }
+      },
+      "bytes": 268435456,
+      "readBack": true
+    },
+    {
+      "engine": "webkit",
+      "mech": "blob",
+      "size": 1024,
+      "rep": 1,
+      "ok": true,
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 727,
+          "peakDeltaMiB": 1148,
+          "settledDeltaMiB": 1021,
+          "ms": 802
+        },
+        "export": {
+          "preMiB": 1748,
+          "peakDeltaMiB": 1975,
+          "settledDeltaMiB": 2050,
+          "ms": 1708
+        }
+      },
+      "bytes": 1073741824,
+      "readBack": true
+    },
+    {
+      "engine": "webkit",
+      "mech": "blob",
+      "size": 1024,
+      "rep": 2,
+      "ok": true,
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 731,
+          "peakDeltaMiB": 1199,
+          "settledDeltaMiB": 1021,
+          "ms": 800
+        },
+        "export": {
+          "preMiB": 1752,
+          "peakDeltaMiB": 2004,
+          "settledDeltaMiB": 2050,
+          "ms": 1617
+        }
+      },
+      "bytes": 1073741824,
+      "readBack": true
+    },
+    {
+      "engine": "webkit",
+      "mech": "blob",
+      "size": 1024,
+      "rep": 3,
+      "ok": true,
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 730,
+          "peakDeltaMiB": 1185,
+          "settledDeltaMiB": 1021,
+          "ms": 875
+        },
+        "export": {
+          "preMiB": 1751,
+          "peakDeltaMiB": 2042,
+          "settledDeltaMiB": 2049,
+          "ms": 1646
+        }
+      },
+      "bytes": 1073741824,
+      "readBack": true
+    },
+    {
+      "engine": "webkit",
+      "mech": "blob",
+      "size": 2048,
+      "rep": 1,
+      "ok": true,
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 729,
+          "peakDeltaMiB": 2389,
+          "settledDeltaMiB": 2045,
+          "ms": 1620
+        },
+        "export": {
+          "preMiB": 2774,
+          "peakDeltaMiB": 4082,
+          "settledDeltaMiB": 4098,
+          "ms": 3423
+        }
+      },
+      "bytes": 2147483648,
+      "readBack": true
+    },
+    {
+      "engine": "webkit",
+      "mech": "blob",
+      "size": 2048,
+      "rep": 2,
+      "ok": true,
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 729,
+          "peakDeltaMiB": 2439,
+          "settledDeltaMiB": 2046,
+          "ms": 1594
+        },
+        "export": {
+          "preMiB": 2775,
+          "peakDeltaMiB": 4085,
+          "settledDeltaMiB": 4097,
+          "ms": 3473
+        }
+      },
+      "bytes": 2147483648,
+      "readBack": true
+    },
+    {
+      "engine": "webkit",
+      "mech": "blob",
+      "size": 2048,
+      "rep": 3,
+      "ok": true,
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "build": {
+          "preMiB": 734,
+          "peakDeltaMiB": 2360,
+          "settledDeltaMiB": 2045,
+          "ms": 1678
+        },
+        "export": {
+          "preMiB": 2779,
+          "peakDeltaMiB": 4079,
+          "settledDeltaMiB": 4097,
+          "ms": 3870
+        }
+      },
+      "bytes": 2147483648,
+      "readBack": true
+    },
+    {
+      "engine": "webkit",
+      "mech": "idb",
+      "size": 64,
+      "rep": 1,
+      "ok": true,
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 729,
+          "peakDeltaMiB": 88,
+          "settledDeltaMiB": 11,
+          "ms": 287
+        },
+        "assemble": {
+          "preMiB": 740,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": 0,
+          "ms": 2
+        },
+        "export": {
+          "preMiB": 740,
+          "peakDeltaMiB": 131,
+          "settledDeltaMiB": 65,
+          "ms": 85
+        }
+      },
+      "bytes": 67108864,
+      "readBack": true
+    },
+    {
+      "engine": "webkit",
+      "mech": "idb",
+      "size": 64,
+      "rep": 2,
+      "ok": true,
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 731,
+          "peakDeltaMiB": 88,
+          "settledDeltaMiB": 15,
+          "ms": 286
+        },
+        "assemble": {
+          "preMiB": 746,
+          "peakDeltaMiB": 1,
+          "settledDeltaMiB": 0,
+          "ms": 2
+        },
+        "export": {
+          "preMiB": 746,
+          "peakDeltaMiB": 148,
+          "settledDeltaMiB": 66,
+          "ms": 102
+        }
+      },
+      "bytes": 67108864,
+      "readBack": true
+    },
+    {
+      "engine": "webkit",
+      "mech": "idb",
+      "size": 64,
+      "rep": 3,
+      "ok": true,
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 729,
+          "peakDeltaMiB": 88,
+          "settledDeltaMiB": 12,
+          "ms": 352
+        },
+        "assemble": {
+          "preMiB": 741,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": 0,
+          "ms": 3
+        },
+        "export": {
+          "preMiB": 741,
+          "peakDeltaMiB": 142,
+          "settledDeltaMiB": 65,
+          "ms": 85
+        }
+      },
+      "bytes": 67108864,
+      "readBack": true
+    },
+    {
+      "engine": "webkit",
+      "mech": "idb",
+      "size": 256,
+      "rep": 1,
+      "ok": true,
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 731,
+          "peakDeltaMiB": 276,
+          "settledDeltaMiB": 13,
+          "ms": 989
+        },
+        "assemble": {
+          "preMiB": 744,
+          "peakDeltaMiB": 0,
+          "settledDeltaMiB": -16,
+          "ms": 3
+        },
+        "export": {
+          "preMiB": 728,
+          "peakDeltaMiB": 416,
+          "settledDeltaMiB": 28,
+          "ms": 242
+        }
+      },
+      "bytes": 268435456,
+      "readBack": true
+    },
+    {
+      "engine": "webkit",
+      "mech": "idb",
+      "size": 256,
+      "rep": 2,
+      "ok": true,
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 730,
+          "peakDeltaMiB": 280,
+          "settledDeltaMiB": 16,
+          "ms": 1007
+        },
+        "assemble": {
+          "preMiB": 746,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": -16,
+          "ms": 4
+        },
+        "export": {
+          "preMiB": 730,
+          "peakDeltaMiB": 403,
+          "settledDeltaMiB": 27,
+          "ms": 236
+        }
+      },
+      "bytes": 268435456,
+      "readBack": true
+    },
+    {
+      "engine": "webkit",
+      "mech": "idb",
+      "size": 256,
+      "rep": 3,
+      "ok": true,
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 729,
+          "peakDeltaMiB": 277,
+          "settledDeltaMiB": 12,
+          "ms": 1005
+        },
+        "assemble": {
+          "preMiB": 741,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": -16,
+          "ms": 3
+        },
+        "export": {
+          "preMiB": 725,
+          "peakDeltaMiB": 395,
+          "settledDeltaMiB": 25,
+          "ms": 356
+        }
+      },
+      "bytes": 268435456,
+      "readBack": true
+    },
+    {
+      "engine": "webkit",
+      "mech": "idb",
+      "size": 1024,
+      "rep": 1,
+      "ok": true,
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 731,
+          "peakDeltaMiB": 1048,
+          "settledDeltaMiB": 16,
+          "ms": 4219
+        },
+        "assemble": {
+          "preMiB": 747,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": -15,
+          "ms": 7
+        },
+        "export": {
+          "preMiB": 731,
+          "peakDeltaMiB": 1272,
+          "settledDeltaMiB": 173,
+          "ms": 980
+        }
+      },
+      "bytes": 1073741824,
+      "readBack": true
+    },
+    {
+      "engine": "webkit",
+      "mech": "idb",
+      "size": 1024,
+      "rep": 2,
+      "ok": true,
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 730,
+          "peakDeltaMiB": 1044,
+          "settledDeltaMiB": 12,
+          "ms": 3904
+        },
+        "assemble": {
+          "preMiB": 742,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": -15,
+          "ms": 7
+        },
+        "export": {
+          "preMiB": 727,
+          "peakDeltaMiB": 1383,
+          "settledDeltaMiB": 173,
+          "ms": 1048
+        }
+      },
+      "bytes": 1073741824,
+      "readBack": true
+    },
+    {
+      "engine": "webkit",
+      "mech": "idb",
+      "size": 1024,
+      "rep": 3,
+      "ok": true,
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 730,
+          "peakDeltaMiB": 1048,
+          "settledDeltaMiB": 16,
+          "ms": 3945
+        },
+        "assemble": {
+          "preMiB": 746,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": -16,
+          "ms": 6
+        },
+        "export": {
+          "preMiB": 730,
+          "peakDeltaMiB": 1204,
+          "settledDeltaMiB": 318,
+          "ms": 1055
+        }
+      },
+      "bytes": 1073741824,
+      "readBack": true
+    },
+    {
+      "engine": "webkit",
+      "mech": "idb",
+      "size": 2048,
+      "rep": 1,
+      "ok": true,
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 731,
+          "peakDeltaMiB": 2071,
+          "settledDeltaMiB": 12,
+          "ms": 8020
+        },
+        "assemble": {
+          "preMiB": 743,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": -15,
+          "ms": 9
+        },
+        "export": {
+          "preMiB": 728,
+          "peakDeltaMiB": 2524,
+          "settledDeltaMiB": 2053,
+          "ms": 2149
+        }
+      },
+      "bytes": 2147483648,
+      "readBack": true
+    },
+    {
+      "engine": "webkit",
+      "mech": "idb",
+      "size": 2048,
+      "rep": 2,
+      "ok": true,
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 731,
+          "peakDeltaMiB": 2080,
+          "settledDeltaMiB": 15,
+          "ms": 7924
+        },
+        "assemble": {
+          "preMiB": 746,
+          "peakDeltaMiB": 1,
+          "settledDeltaMiB": -15,
+          "ms": 9
+        },
+        "export": {
+          "preMiB": 731,
+          "peakDeltaMiB": 2524,
+          "settledDeltaMiB": 2053,
+          "ms": 2200
+        }
+      },
+      "bytes": 2147483648,
+      "readBack": true
+    },
+    {
+      "engine": "webkit",
+      "mech": "idb",
+      "size": 2048,
+      "rep": 3,
+      "ok": true,
+      "quota": null,
+      "presence": {
+        "showDirectoryPicker": false,
+        "showSaveFilePicker": false,
+        "createWritable": false,
+        "createSyncAccessHandle": false,
+        "opfs": false,
+        "storageEstimate": false,
+        "storagePersist": false,
+        "backgroundFetch": false,
+        "serviceWorker": true,
+        "responseBodyStream": true
+      },
+      "spans": {
+        "store": {
+          "preMiB": 728,
+          "peakDeltaMiB": 2072,
+          "settledDeltaMiB": 16,
+          "ms": 7886
+        },
+        "assemble": {
+          "preMiB": 744,
+          "peakDeltaMiB": null,
+          "settledDeltaMiB": -15,
+          "ms": 9
+        },
+        "export": {
+          "preMiB": 729,
+          "peakDeltaMiB": 2554,
+          "settledDeltaMiB": 2052,
+          "ms": 2143
+        }
+      },
+      "bytes": 2147483648,
+      "readBack": true
+    }
+  ]
+}

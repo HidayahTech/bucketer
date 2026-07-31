@@ -1,0 +1,63 @@
+# Investigation report on browser capability for large downloads in Bucketer.
+#
+#   doclab build docs/review-download-parity/doc/report.yaml
+#
+# No `product:` — Bucketer is not a registered product in doclab's org.yaml, and
+# adding one there is a change to shared config, not this document's business.
+doctype: report
+content_dir: docs/review-download-parity/doc
+data: [docs/review-download-parity/doc/data.yaml]
+css: [docs/review-download-parity/doc/doc.css]
+
+title: "{{ report.title }}"
+subtitle: "{{ report.subtitle }}"
+running_title: "{{ report.short_title }}"
+output_name: "{{ report.output_name }}"
+toc: true
+
+cover:
+  meta:
+    - label: "Prepared for"
+      value: "{{ report.audience }}"
+    - label: "Prepared by"
+      value: "{{ org.legal_name }}"
+    - label: "Status"
+      value: "{{ report.version }} — findings complete, design not built"
+    - label: "Date"
+      value: "{{ report.date | longdate }}"
+
+sections:
+  - id: summary
+    title: "Summary"
+    tpl: sections/summary.html.j2
+  - id: method
+    title: "How We Know"
+    tpl: sections/method.html.j2
+  - id: capability
+    title: "What Each Browser Can Do"
+    tpl: sections/capability.html.j2
+    flow: true
+  - id: cost
+    title: "What Staging Costs"
+    tpl: sections/cost.html.j2
+    flow: true
+  - id: design
+    title: "The Proposed Design"
+    tpl: sections/design.html.j2
+    flow: true
+  - id: unproven
+    title: "What Remains Unproven"
+    tpl: sections/unproven.html.j2
+    flow: true
+  - id: disclosure
+    title: "Telling the User"
+    tpl: sections/disclosure.html.j2
+    flow: true
+  - id: conclusion
+    title: "Conclusion"
+    tpl: sections/conclusion.html.j2
+    flow: true
+  - id: errata
+    title: "Errata and Method History"
+    tpl: sections/errata.html.j2
+    flow: true

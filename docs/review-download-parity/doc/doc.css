@@ -1,0 +1,8 @@
+/* Document-specific overrides, loaded after the house sheet and the doctype layer. */
+
+/* The capability matrices are wide and read better a shade tighter than body copy. */
+table.matrix { font-size: 0.86em; }
+table.matrix td, table.matrix th { padding: 0.25rem 0.4rem; }
+
+/* Measured numbers should stand out from the prose around them. */
+td .measured { font-variant-numeric: tabular-nums; font-weight: 600; }

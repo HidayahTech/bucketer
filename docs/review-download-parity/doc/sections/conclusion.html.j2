@@ -1,0 +1,150 @@
+{% import 'chrome/macros.html.j2' as c %}
+<section>
+  <h2>Conclusion</h2>
+
+  <p class="lede">Bucketer can give every browser real progress and real completion. It cannot
+  give every browser the same destination or the same size ceiling, and no amount of engineering
+  changes that. The recommendation is to ship three mechanisms, choose between them by asking the
+  browser what it supports, and say plainly which one is in use.</p>
+
+  <h3>Everything, in one table</h3>
+
+  <p>Desktop capability rows are measured. Mobile rows and Safari's private-storage row are from
+  documentation, not measurement.</p>
+
+  <table class="matrix">
+    <thead>
+      <tr>
+        <th>Capability</th><th>Chromium desktop</th><th>Chromium Android</th>
+        <th>Firefox desktop</th><th>Firefox Android</th>
+        <th>Safari desktop</th><th>Safari iOS</th>
+      </tr>
+    </thead>
+    <tr>
+      <td>Write to a chosen folder</td>
+      <td>yes</td><td>yes, defects open</td><td>no</td><td>no</td><td>no</td><td>no</td>
+    </tr>
+    <tr>
+      <td>Private storage (flat cost)</td>
+      <td>yes</td><td>yes</td><td>yes</td><td>yes</td>
+      <td>yes, from Safari 26</td><td>yes, from Safari 26</td>
+    </tr>
+    <tr>
+      <td>Real progress and completion</td>
+      <td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td><td>yes</td>
+    </tr>
+    <tr>
+      <td>Resume after closing the tab</td>
+      <td>yes, exact byte</td><td>unreliable</td><td>yes</td><td>unreliable</td>
+      <td>7-day expiry</td><td>7-day expiry</td>
+    </tr>
+    <tr>
+      <td>Folder structure preserved</td>
+      <td>yes</td><td>yes</td><td>no, flat</td><td>no, flat</td><td>no, flat</td><td>no, flat</td>
+    </tr>
+    <tr>
+      <td>Background transfer service</td>
+      <td>yes, unused</td><td>yes, unused</td><td>no</td><td>no</td><td>no</td><td>no</td>
+    </tr>
+  </table>
+
+  <h3>Size, and what actually sets the limit</h3>
+
+  <table class="matrix">
+    <thead>
+      <tr><th>Target</th><th>Practical ceiling</th><th>What sets it</th></tr>
+    </thead>
+    <tr>
+      <td><strong>Chromium desktop</strong></td>
+      <td>free disk</td>
+      <td>Nothing else. Writes stream into the chosen folder at constant memory cost.</td>
+    </tr>
+    <tr>
+      <td><strong>Firefox desktop</strong></td>
+      <td>about 10 GB, or free disk with a granted allowance</td>
+      <td>The default storage allowance, not memory. Staging also needs twice the file's
+          space transiently.</td>
+    </tr>
+    <tr>
+      <td><strong>Safari desktop</strong></td>
+      <td>about 77 GB, unverified</td>
+      <td>A generous storage allowance. The real limit is whether the export step behaves as
+          it does elsewhere, which nobody has measured.</td>
+    </tr>
+    <tr>
+      <td><strong>Chromium Android</strong></td>
+      <td>low single-digit GB</td>
+      <td>Not storage — the tab being suspended when the user leaves the browser.</td>
+    </tr>
+    <tr>
+      <td><strong>Firefox Android</strong></td>
+      <td>hundreds of MB</td>
+      <td>The same suspension problem, with less headroom.</td>
+    </tr>
+    <tr>
+      <td><strong>Safari iOS</strong></td>
+      <td>about 100 MB</td>
+      <td>Page memory. The page is killed with no error the application can catch, and
+          JavaScript stops the moment the user switches apps.</td>
+    </tr>
+    <tr>
+      <td><strong>Any browser, handoff mode</strong></td>
+      <td>no limit</td>
+      <td>Nothing is held by the application at all. This is why the least capable mechanism
+          remains the only one for the largest jobs.</td>
+    </tr>
+  </table>
+
+  <h3>What to do</h3>
+
+  <table class="num">
+    <thead><tr><th>#</th><th>Decision</th><th>Basis</th></tr></thead>
+    <tr>
+      <td>1</td>
+      <td><strong>Use private origin storage for in-application downloads.</strong></td>
+      <td>Measured flat at 22-92 MiB on Chromium and 15-25 MiB on Firefox from 64 MiB to 2 GiB.
+          Holding the file in memory instead costs 1.00x its size on Chromium and 1.62x on
+          Firefox, which caps the feature at the machine's memory.</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td><strong>Keep the browser-handoff path for the largest jobs.</strong></td>
+      <td>It is the only mechanism with no ceiling, and it already works everywhere.</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td><strong>Keep the single-file architecture.</strong></td>
+      <td>The capability it forgoes helps only the platform that already has a better option,
+          and its main alternative has an open defect that reports success on a truncated
+          file.</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td><strong>Treat Safari as unverified, not unsupported.</strong></td>
+      <td>The mechanism is documented there and the allowance is generous, but the step the
+          design depends on has never been measured by anyone. Ship it behind detection and
+          confirm before claiming it.</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td><strong>Do not attempt large downloads on iPhone.</strong></td>
+      <td>Roughly 100 MB, killed without warning, with JavaScript suspended the moment the
+          user leaves the browser. Say so rather than fail silently.</td>
+    </tr>
+  </table>
+
+  {{ c.note('The one open product question',
+     'How long may a paused download sit before someone returns to it? Safari deletes site data
+      after seven days without a visit. If sessions are hours or days apart this is a footnote;
+      if a job may be abandoned for a month it disqualifies Safari from the staged mechanism
+      entirely. This report does not answer it, because it is a decision about the product
+      rather than a fact about browsers.') }}
+
+  <h3>Next steps, in order</h3>
+
+  <p>Two device checks and one decision close this out. On real Safari, measure whether the
+  export step costs what it costs elsewhere — that single number decides the Safari tier. On a
+  real Android device, confirm whether the folder picker and save dialog defects persist. And
+  settle the resume window above. Further desk research has reached diminishing returns: the
+  remaining gaps are gaps in what has been published, not in what has been read.</p>
+</section>

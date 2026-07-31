@@ -1,0 +1,62 @@
+{% import 'chrome/macros.html.j2' as c %}
+<section>
+  <h2>The Proposed Design</h2>
+
+  <p>Not a ladder of quality. Three genuinely different mechanisms, each honest about what it
+  is, selected by asking the browser what it supports rather than which browser it claims to
+  be.</p>
+
+  {{ c.figure('assets/01-tiers.svg', 3,
+     'Which mechanism applies, decided by capability rather than by browser name. Cyan marks
+      the paths where the application can report real progress; purple marks the path where it
+      cannot see the transfer at all. Checking for the capability rather than the browser
+      matters because browser identity strings are trivially altered and change meaning
+      between releases.') }}
+
+  <h3>Tier 1 — Managed folder</h3>
+  <p>Available on Chromium desktop, and on Android with the defects noted earlier. The
+  application streams into a folder the user chooses. Real progress, resume to the exact byte,
+  a real folder tree, and no quota ceiling. Each chunk is signed separately, so no long-lived
+  link ever exists.</p>
+
+  <h3>Tier 2 — Staged download</h3>
+  <p>Available on Chromium and Firefox, and attempted but not claimed on Safari. The
+  application fetches with streaming for real progress and completion, stages into private
+  origin storage, and exports at the end. Resume survives a reload because the staged bytes
+  persist. The costs are that files arrive flat, the total is bounded by quota, and the file
+  is briefly on disk twice.</p>
+
+  <h3>Tier 3 — Browser handoff</h3>
+  <p>Available everywhere, and shipped today. A signed link with a disposition header, handed
+  to the browser's own download manager. No progress and no completion signal — but no memory
+  ceiling either, and on Android the operating system can continue the transfer after the
+  browser exits. This remains the only viable path for genuinely large jobs outside
+  Chromium.</p>
+
+  <h3>Tier 0 — Command-line handoff</h3>
+  <p>Already shipped. For anything approaching a terabyte, a purpose-built transfer tool beats
+  any browser: it survives restarts, needs no window open, and retries indefinitely.</p>
+
+  {{ c.note('Parity is not achievable, and should not be promised',
+     'Progress and completion can be equalised across every target, because streaming reads
+      are universal. The destination cannot be: only one engine family can write a folder tree,
+      and only the handoff path escapes a quota ceiling.') }}
+
+  <h3>A decision this settles: keep the single-file architecture</h3>
+
+  <p>Bucketer ships as one self-contained HTML file that can be opened directly, audited, and
+  dropped anywhere. The capability this forgoes is a background transfer service, which
+  requires shipping a second script file alongside it. The investigation says do not:</p>
+
+  <ul>
+    <li>Safari and iPhone gain nothing from it — they support neither that service nor the
+    alternative it would enable.</li>
+    <li>On Firefox the equivalent technique has an open defect in which the transfer halts
+    part-way while the browser reports success on a <em>truncated</em> file. Silent corruption
+    is the worst possible failure for a tool people use to move their data.</li>
+    <li>Chromium already has a better option that needs no second file at all.</li>
+  </ul>
+
+  <p>It buys nothing on the one platform it would help, and fixes nothing on the platforms it
+  would not.</p>
+</section>

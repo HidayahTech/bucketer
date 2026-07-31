@@ -1,0 +1,64 @@
+{% import 'chrome/macros.html.j2' as c %}
+<section>
+  <h2>Summary</h2>
+
+  <p class="lede">A download has three jobs: get the bytes, know how it is going, and put the
+  bytes somewhere the user can find them. Every browser can do the first two. They differ
+  almost entirely on the third.</p>
+
+  <p>There are two ways to run a download in a browser. <strong>Hand it to the browser</strong>
+  — give it a link and let its own download manager take over. This works everywhere, at any
+  size, but the application is blind: no progress, no completion signal, and files land flat in
+  the downloads folder. Or <strong>run it in the application</strong> — fetch the bytes and
+  count them, which gives real progress and real completion, then put them somewhere. Where the
+  application is permitted to put them is what varies by browser, and what decides the size it
+  can handle.</p>
+
+  <h3>The findings</h3>
+
+  <table class="num">
+    <thead><tr><th>#</th><th>Finding</th><th>What follows from it</th></tr></thead>
+    <tr>
+      <td>1</td>
+      <td><strong>Staging in the browser's private storage costs the same at any file
+          size.</strong> Measured at 22–92 MiB on Chromium and 15–25 MiB on Firefox, from
+          64 MiB to 2 GiB.</td>
+      <td>This is the mechanism to use. Its cost does not grow with the file, so it can move
+          files larger than the machine's memory.</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td><strong>Holding a file in memory costs the size of the file</strong> — 1.00× on
+          Chromium, 1.62× on Firefox.</td>
+      <td>Any approach that buffers the file caps the feature at the machine's memory, however
+          much memory there is.</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td><strong>Only Chromium can write into a folder the user chooses.</strong> Firefox and
+          Safari both formally decline to implement it.</td>
+      <td>Everywhere else, files arrive as a flat list. This will not change, so it is a fact
+          to design around rather than wait out.</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td><strong>Chrome for Android does have folder access</strong>, shipped in Chrome 132; a
+          widely used compatibility database still reports otherwise and is stale.</td>
+      <td>Android is more capable than the usual reference suggests, though defects reported at
+          launch appear to remain open.</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td><strong>Safari could not be measured</strong>, and iPhone has a page-memory ceiling
+          around 100 MB with no catchable failure.</td>
+      <td>Safari is treated as unverified rather than unsupported. Large downloads should not be
+          attempted on iPhone at all.</td>
+    </tr>
+  </table>
+
+  {{ c.note('The counterintuitive part',
+     'Handing the file to the browser — the least capable option, and the one that reports
+      nothing — is the only one with no size limit at all, because the application never holds
+      the file. It therefore remains the right choice for the largest jobs, and the design keeps
+      it rather than replacing it.') }}
+</section>
