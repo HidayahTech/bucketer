@@ -1542,3 +1542,26 @@ describe('download call sites use the shared presign helper (BUG-049)', () => {
     });
   }
 });
+
+// package-lock.json carries the root package's version in two places, and npm only rewrites
+// them when it is run in a way that regenerates the lock. Hand-editing package.json — the way
+// a version bump is usually made here — leaves both behind, and `npm ci` does not care: it
+// validates the lock against package.json's DEPENDENCY ranges, not its version. The drift is
+// therefore silent and unbounded; it reached 13 releases before anyone noticed.
+//
+// Bump with `npm version <x> --no-git-tag-version`, which updates all three fields at once.
+// (--no-git-tag-version because the pre-push hook owns tagging.)
+describe('package-lock.json tracks package.json', () => {
+  const pkg  = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
+  const lock = JSON.parse(readFileSync(resolve(ROOT, 'package-lock.json'), 'utf8'));
+  const fix  = `run \`npm version ${pkg.version} --no-git-tag-version\` (or correct package.json)`;
+
+  test('the lock root version matches package.json', () => {
+    assert.equal(lock.version, pkg.version, `package-lock.json version is stale — ${fix}`);
+  });
+
+  test('the lock self-entry version matches package.json', () => {
+    assert.equal(lock.packages?.['']?.version, pkg.version,
+      `package-lock.json packages[""].version is stale — ${fix}`);
+  });
+});

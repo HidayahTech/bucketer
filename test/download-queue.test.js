@@ -189,4 +189,109 @@ describe('jobOutcome', () => {
   test('a cancelled run keeps its manifest so it can be resumed', () => {
     assert.equal(jobOutcome({ cancelled: true, failed: 0 }).keep, true);
   });
+
+  // A job stopped by a job-wide fault has no failed items and was not cancelled, so it
+  // otherwise looks like a clean run and its manifest is thrown away — discarding the
+  // enumeration of a TB-scale prefix over a fixable credentials error.
+  test('a blocked run keeps its manifest: nothing failed, but nothing was finished either', () => {
+    assert.equal(jobOutcome({ cancelled: false, failed: 0, blocked: { kind: 'denied' } }).keep, true);
+  });
+});
+
+// This tier cannot see a download fail, so a job-wide fault — bad credentials, missing CORS,
+// clock skew, a wholesale deny — otherwise issues thousands of downloads that all fail
+// silently and reports every one of them as ISSUED. The probe converts that into an error.
+describe('runDownloadJob — pre-flight and sampling', () => {
+  beforeEach(reset);
+
+  const probing = (kinds) => {
+    const calls = [];
+    const fn = async (url) => {
+      calls.push(url);
+      return { kind: kinds[calls.length - 1] ?? 'ok', message: 'probe' };
+    };
+    fn.calls = calls;
+    return fn;
+  };
+
+  test('probes the exact url it is about to issue, before issuing it', async () => {
+    await saveJob(job());
+    await appendManifestPage('job-1', [item('a')], {});
+    const probe = probing(['ok']);
+
+    const h = harness({ probe });
+    await runDownloadJob(await loadJob('job-1'), h);
+
+    assert.equal(probe.calls.length, 1);
+    assert.equal(probe.calls[0], h.issued[0].url,
+      'probing a different url than the one issued proves nothing about the download');
+  });
+
+  test('a denial stops the job before a single file is issued', async () => {
+    await saveJob(job());
+    await appendManifestPage('job-1', [item('a'), item('b')], {});
+    const h = harness({ probe: probing(['denied']) });
+
+    const result = await runDownloadJob(await loadJob('job-1'), h);
+
+    assert.equal(h.issued.length, 0, 'nothing may be handed to the download manager');
+    assert.equal(result.blocked.kind, 'denied');
+    assert.equal(result.issued, 0);
+  });
+
+  test('a blocked job leaves its items pending so a resume retries them', async () => {
+    await saveJob(job());
+    await appendManifestPage('job-1', [item('a'), item('b')], {});
+
+    await runDownloadJob(await loadJob('job-1'), harness({ probe: probing(['denied']) }));
+
+    assert.equal(await countItemsByStatus('job-1', ITEM_STATUS.PENDING), 2);
+    assert.equal(await countItemsByStatus('job-1', ITEM_STATUS.FAILED), 0,
+      'a job-wide fault is not the fault of any individual item');
+  });
+
+  test('a missing object does not stop the job', async () => {
+    await saveJob(job());
+    await appendManifestPage('job-1', [item('a'), item('b')], {});
+    const h = harness({ probe: probing(['missing']) });
+
+    const result = await runDownloadJob(await loadJob('job-1'), h);
+
+    assert.equal(result.issued, 2);
+    assert.equal(result.blocked, null);
+  });
+
+  // counters.total is left to appendManifestPage, which ADDS to it. Seeding it here as well
+  // double-counts the page and silently widens the sampling interval.
+  test('samples across the run instead of probing every file', async () => {
+    await saveJob(job());
+    await appendManifestPage('job-1', Array.from({ length: 10 }, (_, i) => item(`k${i}`)), {});
+    const probe = probing([]);
+
+    await runDownloadJob(await loadJob('job-1'), harness({ probe }), { probeBudget: 2 });
+
+    assert.equal(probe.calls.length, 2, '10 files at a budget of 2 must probe at 0 and 5, not 10 times');
+  });
+
+  test('a denial found mid-run stops the remaining files', async () => {
+    await saveJob(job());
+    await appendManifestPage('job-1', Array.from({ length: 10 }, (_, i) => item(`k${i}`)), {});
+    // Healthy at index 0, denied at the index-5 sample.
+    const h = harness({ probe: probing(['ok', 'denied']) });
+
+    const result = await runDownloadJob(await loadJob('job-1'), h, { probeBudget: 2 });
+
+    assert.equal(result.blocked.kind, 'denied');
+    assert.equal(h.issued.length, 5, 'the five files before the failed sample were already issued');
+  });
+
+  test('runs unchanged when no probe is injected', async () => {
+    await saveJob(job());
+    await appendManifestPage('job-1', [item('a'), item('b')], {});
+
+    const result = await runDownloadJob(await loadJob('job-1'), harness());
+
+    assert.equal(result.issued, 2);
+    assert.equal(result.blocked, null);
+  });
 });

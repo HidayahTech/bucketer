@@ -1,9 +1,19 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.42.1';
+export const CURRENT_VERSION = '1.43.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.43.0",
+    "date": "2026-07-31",
+    "title": "A failing download no longer takes the app down with it",
+    "changes": [
+      "A download whose link came back with an error used to replace Bucketer with the storage provider's error page, ending the job and losing everything queued behind it. Downloads now go through a hidden frame, so an error lands somewhere harmless and the queue carries on.",
+      "A folder download now checks that it can actually read a file before it starts handing files to your browser, and spot-checks a few more as it goes. If the credentials have expired, the bucket is missing its CORS rules, or this computer's clock is too far off, the job stops and says so — instead of appearing to queue thousands of files that all silently fail.",
+      "A job stopped that way keeps its list, so fixing the cause and starting again picks up where it left off rather than re-listing the whole folder."
+    ]
+  },
   {
     "version": "1.42.1",
     "date": "2026-07-31",

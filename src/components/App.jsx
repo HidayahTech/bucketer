@@ -66,6 +66,7 @@ import {
 import { enumerateJob } from '../lib/download-manifest.js';
 import { runDownloadJob, jobOutcome } from '../lib/download-queue.js';
 import { issueBrowserDownload } from '../lib/download-issue.js';
+import { probeUrl, blockedMessage } from '../lib/download-preflight.js';
 import { detectCapabilities } from '../lib/browser-capability.js';
 import { presignDownloadParams } from '../lib/presign-params.js';
 import { DOWNLOAD_PRESIGN_EXPIRES, DOWNLOAD_ISSUE_DELAY_MS } from '../lib/constants.js';
@@ -588,15 +589,22 @@ export function App() {
       const result = await runDownloadJob(fresh, {
         presign,
         issue: issueBrowserDownload,
+        probe: probeUrl,
         shouldCancel: () => taskStore.isCancelRequested(id),
         onProgress: ({ issued }) => taskStore.update(id, { current: issued }, false),
       }, { delayMs: DOWNLOAD_ISSUE_DELAY_MS });
+
+      // A job-wide stop leads the error list rather than joining it: it explains why the
+      // run ended, whereas the per-item entries are only the keys that individually failed.
+      const errors = result.blocked
+        ? [{ key: '(job stopped)', message: blockedMessage(result.blocked) }, ...result.errors]
+        : result.errors;
 
       taskStore.update(id, {
         status:   result.cancelled ? 'cancelled' : 'done',
         subPhase: null,
         current:  result.issued,
-        errors:   result.errors,
+        errors,
       }, true);
 
       // The manifest is only dead weight when nothing failed. Keeping it after a run with

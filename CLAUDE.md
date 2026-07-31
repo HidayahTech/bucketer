@@ -16,6 +16,10 @@ Always ask for confirmation before committing or pushing.
 
 **Version tags are created and pushed automatically.** After every version bump commit, the pre-push hook creates an annotated tag for the current `package.json` version if one does not already exist, then immediately pushes it to the remote. No manual `git tag` or `git push --tags` is needed. Every version bump that reaches the remote will have a corresponding tag. The hook detects recursive tag-only pushes (its own inner push) via stdin and skips the build/test cycle for those to avoid redundant work.
 
+**Bump the version with `npm version <x.y.z> --no-git-tag-version`,** not by hand-editing `package.json`. `package-lock.json` records the root version in two places and only npm keeps them current; a hand-edit leaves both behind, and nothing complains — `npm ci` validates the lock against `package.json`'s *dependency ranges*, never its version. That drift ran silently for 13 releases (frozen at 1.37.5 while shipping 1.43.0). `--no-git-tag-version` is correct here because the pre-push hook owns tagging (below).
+
+A guard test enforces it: `test/source-invariants.test.js` → "package-lock.json tracks package.json" fails if either lock version field diverges, and its message names the command to fix it. It is a test rather than a build invariant deliberately — the lock's version never reaches build output, so it does not belong in the list under **Build Invariants**; the nearest precedent is the `.gitlab-ci.yml` ↔ locked-playwright lockstep test. Both run in the pre-push hook regardless.
+
 `@anthropic-ai/claude-code` is not a project dependency and must never appear in `package.json`, `package-lock.json`, or any commit. It is installed separately in `.tools/` (gitignored). See **Claude Code Setup** below.
 
 ## Build Invariants
@@ -113,10 +117,20 @@ npm run test:e2e:matrix    # e2e across E2E_ENGINES × E2E_DEVICES ("desktop" = 
 npm run test:e2e:container # full 3×3 e2e matrix incl. WebKit, in the Playwright image (Podman/Docker)
 ```
 
-WebKit cannot run natively on a stock Fedora host — use `test:e2e:container` for anything
-WebKit. The container image tag derives from the locked playwright version in
-`package-lock.json`; a unit test (`test/e2e-matrix-helpers.test.js`) fails if
-`.gitlab-ci.yml` pins a different image, so bump the dependency and the CI image together.
+Run **every** engine through `test:e2e:container`, not just WebKit. WebKit cannot launch on a
+stock Fedora host at all, but that is not the only reason: mixing a host browser with a
+containerised one makes the lanes non-comparable, and the project has already been bitten by
+it. `docs/review-download-parity/README.md` states the rule — "All three engines run in one
+container so no engine is special-cased" — and that report's errata lists "mixed native and
+containerised execution" as a superseded method whose findings were withdrawn.
+
+So: scope with `E2E_ENGINES` only for an explicitly-labelled control run, never to make a
+coverage claim, and record the image tag and browser versions alongside any cross-engine
+result. "Passes in three engines" means nothing without saying which builds, in what.
+
+The container image tag derives from the locked playwright version in `package-lock.json`; a
+unit test (`test/e2e-matrix-helpers.test.js`) fails if `.gitlab-ci.yml` pins a different
+image, so bump the dependency and the CI image together.
 
 ## Claude Code Setup
 
