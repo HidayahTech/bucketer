@@ -44,6 +44,7 @@ node docs/review-download-parity/probe/analyze.mjs   # stats + regenerates the c
 | `probe/run.mjs` | Matrix runner. Fresh browser per measurement, repeated, with a control. |
 | `probe/analyze.mjs` | Median and spread across repetitions; writes the charts. |
 | `probe/chart.mjs` | Dependency-free SVG line and bar charts. See below. |
+| `probe/presign/` | Times SigV4 presigning through the app's own code path. Settled per-chunk vs per-file signing. |
 | `probe/mobile-probe.html` | Serve over HTTPS and open on a phone; reports what only a device can answer. |
 | `probe/results-download.json` | The headline data: real download path, 3 reps, 4 sizes. |
 | `probe/results-trials.json` | Supporting sweep. Source of the noise floor and capability presence. |

@@ -184,13 +184,29 @@ because this is the low-BDP regime:
 
 | Parameter | Value |
 |---|---|
-| Auth | one presigned URL per object, re-minted before its 7-day cap |
+| Auth | **one presigned URL per chunk**, short-lived — see below |
 | Transport | raw `fetch(url, { headers: { Range } })` — never `client.send(GetObjectCommand)` for chunk bytes (constraint 1) |
 | Chunk size | 8 MiB default, adaptive 4–32 MiB via the `resolveProbe` >10% rule in `src/lib/concurrency-strategy.js` |
 | Concurrency | 2–4; drop to 1 after repeated stalls (the bufferbloat signature) |
 | Stall detection | no bytes for 30 s → abort and re-request that range only |
 | Retry | reuse the classification in `src/lib/s3-retry.js`, with a far higher ceiling than uploads' 4 — over days, transient failure is the normal case |
 | Memory | mirror `capConcurrencyByMemory` (`chunkSize × concurrency ≤ budget`) — the BUG-033 lesson |
+
+**Why per-chunk signing, measured 2026-07-31.** An earlier draft signed once per object to
+avoid paying for signatures. Measured through the app's own code path
+(`docs/review-download-parity/probe/presign/`), a SigV4 presign costs **0.30 ms on Chromium
+and at most 1 ms on Firefox** — Firefox clamps timer precision to 1 ms, so its figure is a
+ceiling rather than a measurement. Signing all 256 chunks of a 2 GiB file therefore costs
+77 ms on Chromium and under 256 ms on Firefox, against a transfer measured in minutes to
+days: roughly 0.008% of an 8 MiB chunk's time on a 5 Mbps link. A fresh client costs the same
+as a reused one, so signing-key caching is not a factor.
+
+Since it is affordable, per-chunk is the right choice on other grounds: no long-lived URL ever
+exists. Presigned URLs cannot be revoked individually — the signature is a pure function of
+the key and the request, with no server-side registry to mark spent — so the only lever on
+exposure is lifetime, and per-chunk signing keeps it to the life of a single chunk. This does
+**not** apply to the browser-handoff tier, where the browser's own resume re-requests the
+original URL and therefore needs the long expiry recorded in `DOWNLOAD_PRESIGN_EXPIRES`.
 
 **Integrity:** pin size and ETag from a `HeadObject` at start; periodically re-anchor with a
 HEAD and compare the ETag **client-side**. Do not use `If-Match` — it is not CORS-safelisted
