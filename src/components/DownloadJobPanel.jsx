@@ -14,7 +14,7 @@
 //
 // `api` is the only seam — App supplies the record/enumeration wiring, tests supply fakes,
 // and this component touches neither IndexedDB nor the SDK.
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import { Modal } from './Modal.jsx';
 import { formatBytes } from '../lib/format.js';
 import { NAMING_MODES } from '../lib/download-naming.js';
@@ -28,6 +28,7 @@ export function DownloadJobPanel({ bucket, prefix = '', api, onStart, onClose, o
   const [job, setJob] = useState(null);
   const [error, setError] = useState(null);
   const [unfinished, setUnfinished] = useState([]);
+  const scanCancelled = useRef(false);
 
   const scope = prefix ? `${bucket}/${prefix}` : bucket;
 
@@ -55,11 +56,26 @@ export function DownloadJobPanel({ bucket, prefix = '', api, onStart, onClose, o
   async function scan() {
     setPhase('listing');
     setError(null);
+    scanCancelled.current = false;
     let created = null;
     try {
       created = await api.startJob({ bucket, prefix, mode });
       setJob(created);
-      const result = await api.enumerate(created, { onProgress: p => setCounts({ ...p }) });
+      const result = await api.enumerate(created, {
+        onProgress: p => setCounts({ ...p }),
+        shouldCancel: () => scanCancelled.current,
+      });
+
+      // A half-enumerated manifest is not worth keeping: it would resume as a job that
+      // silently omits everything the crawl never reached.
+      if (result.cancelled) {
+        try { await api.discard(created.id); } catch { /* best effort */ }
+        setJob(null);
+        setCounts({ objects: 0, bytes: 0 });
+        setPhase('options');
+        return;
+      }
+
       setCounts({ objects: result.objects, bytes: result.bytes });
       setPhase('ready');
     } catch (err) {
@@ -73,6 +89,14 @@ export function DownloadJobPanel({ bucket, prefix = '', api, onStart, onClose, o
   }
 
   async function close() {
+    // While a crawl is running, deleting its job would pull the record out from under it and
+    // the next page it writes would fail. Signal the crawl instead; scan() discards once it
+    // has actually stopped.
+    if (phase === 'listing') {
+      scanCancelled.current = true;
+      onClose();
+      return;
+    }
     // Backing out after listing must not leave an orphaned job behind.
     if (job && phase !== 'started') { try { await api.discard(job.id); } catch { /* best effort */ } }
     onClose();
@@ -179,9 +203,17 @@ export function DownloadJobPanel({ bucket, prefix = '', api, onStart, onClose, o
         )}
 
         {phase === 'listing' && (
-          <p class="download-job-status">
-            Listing files… found {counts.objects.toLocaleString()} so far.
-          </p>
+          <>
+            <p class="download-job-status">
+              Listing files… found {counts.objects.toLocaleString()} so far.
+            </p>
+            <div class="download-job-actions">
+              <button type="button" class="btn btn-ghost btn-sm" data-testid="cancel-scan"
+                onClick={() => { scanCancelled.current = true; }}>
+                Stop listing
+              </button>
+            </div>
+          </>
         )}
 
         {phase === 'error' && (

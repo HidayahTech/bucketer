@@ -14,7 +14,7 @@ global.IDBKeyRange = IDBKeyRange;
 
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { runDownloadJob } from '../src/lib/download-queue.js';
+import { runDownloadJob, jobOutcome } from '../src/lib/download-queue.js';
 import {
   saveJob, loadJob, loadAllJobs, deleteJob,
   appendManifestPage, countItemsByStatus, ITEM_STATUS,
@@ -170,5 +170,23 @@ describe('runDownloadJob', () => {
     const result = await runDownloadJob(await loadJob('job-1'), h);
     assert.equal(h.issued.length, 0);
     assert.equal(result.issued, 0);
+  });
+});
+
+// A manifest is only dead weight when every item succeeded. Deleting it after a run with
+// failures loses the record of WHICH files failed, and re-running then re-enumerates and
+// re-issues the whole job — the worst outcome precisely in the large-job case this feature
+// exists for.
+describe('jobOutcome', () => {
+  test('a clean run has nothing worth keeping', () => {
+    assert.deepEqual(jobOutcome({ cancelled: false, failed: 0 }), { keep: false });
+  });
+
+  test('a run with failures keeps its manifest so the failures can be retried', () => {
+    assert.equal(jobOutcome({ cancelled: false, failed: 3 }).keep, true);
+  });
+
+  test('a cancelled run keeps its manifest so it can be resumed', () => {
+    assert.equal(jobOutcome({ cancelled: true, failed: 0 }).keep, true);
   });
 });

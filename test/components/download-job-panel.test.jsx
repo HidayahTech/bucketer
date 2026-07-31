@@ -233,6 +233,70 @@ describe('DownloadJobPanel', () => {
     m.cleanup();
   });
 
+  // Enumeration of a large prefix can run for minutes. Without a way to stop it the only
+  // exit is closing the panel, which previously discarded the job out from under a crawl
+  // that was still writing to it.
+  test('offers a way to stop a long listing', async () => {
+    const api = fakeApi({ enumerate: () => new Promise(() => {}) });   // never settles
+    const m = mount(<DownloadJobPanel bucket="bkt" prefix="" api={api} onStart={NOOP} onClose={NOOP} />);
+    fire(m.query('[data-testid="scan"]'), 'click');
+    await flush();
+    assert.notEqual(m.query('[data-testid="cancel-scan"]'), null);
+    m.cleanup();
+  });
+
+  test('cancelling a listing stops the crawl and discards the partial job', async () => {
+    let cancelSeen = false;
+    let discarded = null;
+    const api = fakeApi({
+      enumerate: async (_job, { shouldCancel }) => {
+        // Stand in for a crawl that checks between pages.
+        for (let i = 0; i < 100; i++) {
+          if (shouldCancel?.()) { cancelSeen = true; return { objects: 5, bytes: 5, cancelled: true, done: false }; }
+          await new Promise(r => setTimeout(r, 1));
+        }
+        return { objects: 5, bytes: 5, cancelled: false, done: true };
+      },
+      discard: async (id) => { discarded = id; },
+    });
+
+    const m = mount(<DownloadJobPanel bucket="bkt" prefix="" api={api} onStart={NOOP} onClose={NOOP} />);
+    fire(m.query('[data-testid="scan"]'), 'click');
+    await flush();
+    fire(m.query('[data-testid="cancel-scan"]'), 'click');
+    await new Promise(r => setTimeout(r, 60));
+
+    assert.equal(cancelSeen, true, 'the crawl must be told to stop');
+    assert.equal(discarded, 'job-1', 'a half-enumerated job is not worth keeping');
+    assert.equal(m.query('[data-testid="start"]'), null);
+    m.cleanup();
+  });
+
+  // Closing must not delete the job while a crawl is still writing pages into it.
+  test('closing mid-listing cancels rather than discarding underneath the crawl', async () => {
+    const order = [];
+    const api = fakeApi({
+      enumerate: async (_job, { shouldCancel }) => {
+        for (let i = 0; i < 100; i++) {
+          if (shouldCancel?.()) { order.push('crawl-stopped'); return { objects: 1, bytes: 1, cancelled: true, done: false }; }
+          await new Promise(r => setTimeout(r, 1));
+        }
+        return { objects: 1, bytes: 1, cancelled: false, done: true };
+      },
+      discard: async () => { order.push('discard'); },
+    });
+
+    const m = mount(<DownloadJobPanel bucket="bkt" prefix="" api={api} onStart={NOOP} onClose={NOOP} />);
+    fire(m.query('[data-testid="scan"]'), 'click');
+    await flush();
+    fire(m.query('[data-testid="panel-close"]'), 'click');
+    await new Promise(r => setTimeout(r, 60));
+
+    assert.deepEqual(order, ['crawl-stopped', 'discard'],
+      'the crawl must stop before its job is deleted, not after');
+    m.cleanup();
+  });
+
   test('an empty folder cannot be started', async () => {
     const api = fakeApi({
       enumerate: async (_j, { onProgress }) => {

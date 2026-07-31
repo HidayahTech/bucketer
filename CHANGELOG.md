@@ -7,6 +7,11 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.42.1] — 2026-07-31 — A folder download you can stop, and that remembers what failed
+
+- Listing a folder can now be stopped. A large folder can take minutes to list, and until now the only way out was closing the panel — which deleted the job while the listing was still writing to it.
+- A download that finishes with failures now keeps its list, and offering it again retries just the files that failed. Previously the list was deleted as soon as the run ended, so recovering meant re-listing the folder and re-downloading everything, which is worst in exactly the large jobs this is for.
+
 ## [1.42.0] — 2026-07-31 — Downloads say what they are doing, and warn on phones
 
 Bucketer now checks what your browser is actually capable of, rather than assuming, and

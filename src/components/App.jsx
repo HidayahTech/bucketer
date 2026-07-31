@@ -60,11 +60,11 @@ import { taskStore } from '../lib/task-store.js';
 import { createDeleteTask, createTransferTask, createDownloadTask, engineUpdateToPatch } from '../lib/queue-tasks.js';
 import { DownloadJobPanel } from './DownloadJobPanel.jsx';
 import {
-  saveJob, loadJob, loadAllJobs, deleteJob, countItemsByStatus,
+  saveJob, loadJob, loadAllJobs, deleteJob, countItemsByStatus, resetFailedToPending,
   ITEM_STATUS, JOB_STATUS,
 } from '../lib/download-records.js';
 import { enumerateJob } from '../lib/download-manifest.js';
-import { runDownloadJob } from '../lib/download-queue.js';
+import { runDownloadJob, jobOutcome } from '../lib/download-queue.js';
 import { issueBrowserDownload } from '../lib/download-issue.js';
 import { detectCapabilities } from '../lib/browser-capability.js';
 import { presignDownloadParams } from '../lib/presign-params.js';
@@ -525,8 +525,12 @@ export function App() {
     listUnfinished: async () => {
       const jobs = await loadAllJobs();
       const mine = jobs.filter(j => j.bucket === credentials.bucket && j.status !== JOB_STATUS.DONE);
+      // Failed items count as outstanding: a resume retries them, so a job whose only
+      // remaining work is failures must still be offered rather than looking complete.
       const withRemaining = await Promise.all(mine.map(async j => ({
-        ...j, remaining: await countItemsByStatus(j.id, ITEM_STATUS.PENDING),
+        ...j,
+        remaining: await countItemsByStatus(j.id, ITEM_STATUS.PENDING)
+                 + await countItemsByStatus(j.id, ITEM_STATUS.FAILED),
       })));
       return withRemaining.filter(j => j.remaining > 0);
     },
@@ -564,6 +568,10 @@ export function App() {
       return;
     }
 
+    // Resuming must actually retry what failed last time; items are left in FAILED so the
+    // previous run could report them, and a resume only picks up PENDING.
+    await resetFailedToPending(fresh.id);
+
     const total = fresh.counters?.total ?? 0;
     const task = createDownloadTask({ fileCount: total, bucket: fresh.bucket, capturedPrefix: fresh.prefix });
     const id = taskStore.add(task);
@@ -591,9 +599,10 @@ export function App() {
         errors:   result.errors,
       }, true);
 
-      // A cancelled job keeps its manifest so it can be resumed; a finished one is
-      // dropped, since the queue row is the record and the items are dead weight.
-      if (result.cancelled) await saveJob({ ...fresh, status: JOB_STATUS.PAUSED });
+      // The manifest is only dead weight when nothing failed. Keeping it after a run with
+      // failures is what lets a resume retry just those files instead of re-enumerating and
+      // re-issuing the whole job.
+      if (jobOutcome(result).keep) await saveJob({ ...fresh, status: JOB_STATUS.PAUSED });
       else await deleteJob(fresh.id);
     } catch (err) {
       taskStore.update(id, {

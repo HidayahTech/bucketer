@@ -137,6 +137,32 @@ export async function updateItem(jobId, key, patch) {
   return txDone(tx);
 }
 
+// Return failed items to the queue so a resume actually retries them. They are left in
+// FAILED while a run is in progress so it can report them, but a resume only picks up
+// PENDING — without this they would be skipped forever.
+export async function resetFailedToPending(jobId) {
+  const db = await openDB();
+  const tx = db.transaction(DL_ITEM_STORE, 'readwrite');
+  const idx = tx.objectStore(DL_ITEM_STORE).index('by_job_status');
+  const req = idx.openCursor(IDBKeyRange.only([jobId, ITEM_STATUS.FAILED]));
+  let reset = 0;
+
+  await new Promise((resolve, reject) => {
+    req.onsuccess = () => {
+      const cursor = req.result;
+      if (!cursor) return resolve();
+      const { error, ...rest } = cursor.value;   // drop the stale failure reason
+      cursor.update({ ...rest, status: ITEM_STATUS.PENDING });
+      reset += 1;
+      cursor.continue();
+    };
+    req.onerror = () => reject(req.error);
+  });
+
+  await txDone(tx);
+  return reset;
+}
+
 export async function countItemsByStatus(jobId, status) {
   const db = await openDB();
   const tx = db.transaction(DL_ITEM_STORE, 'readonly');

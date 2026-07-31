@@ -1,9 +1,18 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.42.0';
+export const CURRENT_VERSION = '1.42.1';
 
 export const CHANGELOG = [
+  {
+    "version": "1.42.1",
+    "date": "2026-07-31",
+    "title": "A folder download you can stop, and that remembers what failed",
+    "changes": [
+      "Listing a folder can now be stopped. A large folder can take minutes to list, and until now the only way out was closing the panel — which deleted the job while the listing was still writing to it.",
+      "A download that finishes with failures now keeps its list, and offering it again retries just the files that failed. Previously the list was deleted as soon as the run ended, so recovering meant re-listing the folder and re-downloading everything, which is worst in exactly the large jobs this is for."
+    ]
+  },
   {
     "version": "1.42.0",
     "date": "2026-07-31",

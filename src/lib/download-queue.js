@@ -78,3 +78,13 @@ export async function runDownloadJob(job, {
 
   return { issued, failed, cancelled: false, errors };
 }
+
+// What to do with the manifest once a run ends.
+//
+// A manifest is dead weight ONLY when every item succeeded. Deleting it after a run with
+// failures throws away the record of which files failed, and re-running then re-enumerates
+// and re-issues the entire job — the worst possible outcome in exactly the large-job case
+// this feature exists for. Keeping it lets a resume retry just the failures.
+export function jobOutcome({ cancelled = false, failed = 0 } = {}) {
+  return (cancelled || failed > 0) ? { keep: true } : { keep: false };
+}

@@ -19,7 +19,7 @@ import assert from 'node:assert/strict';
 import {
   saveJob, loadJob, loadAllJobs, deleteJob,
   appendManifestPage, updateItem, countItemsByStatus,
-  eachItemByStatus, takeItemsByStatus, ITEM_STATUS,
+  eachItemByStatus, takeItemsByStatus, resetFailedToPending, ITEM_STATUS,
 } from '../src/lib/download-records.js';
 
 const job = (over = {}) => ({
@@ -158,5 +158,42 @@ describe('download-records', () => {
 
     assert.equal(await loadJob('job-1'), null);
     assert.equal(await countItemsByStatus('job-1', ITEM_STATUS.PENDING), 0);
+  });
+});
+
+// Resuming must actually retry what failed. Items are left in FAILED so the run can report
+// them, but a resume that only picks up PENDING would skip them forever.
+describe('resetFailedToPending', () => {
+  beforeEach(reset);   // sibling of the block above, so it needs its own isolation
+
+  test('returns failed items to the queue and reports how many', async () => {
+    await saveJob(job());
+    await appendManifestPage('job-1', [item('a'), item('b'), item('c')], {});
+    await updateItem('job-1', 'a', { status: ITEM_STATUS.FAILED, error: 'boom' });
+    await updateItem('job-1', 'b', { status: ITEM_STATUS.ISSUED });
+
+    assert.equal(await resetFailedToPending('job-1'), 1);
+    assert.equal(await countItemsByStatus('job-1', ITEM_STATUS.PENDING), 2);
+    assert.equal(await countItemsByStatus('job-1', ITEM_STATUS.FAILED), 0);
+  });
+
+  test('leaves items that already succeeded alone', async () => {
+    await saveJob(job());
+    await appendManifestPage('job-1', [item('a')], {});
+    await updateItem('job-1', 'a', { status: ITEM_STATUS.ISSUED });
+
+    assert.equal(await resetFailedToPending('job-1'), 0);
+    assert.equal(await countItemsByStatus('job-1', ITEM_STATUS.ISSUED), 1);
+  });
+
+  test('does not reach into another job', async () => {
+    await saveJob(job());
+    await saveJob(job({ id: 'job-2' }));
+    await appendManifestPage('job-1', [item('a')], {});
+    await appendManifestPage('job-2', [item('a')], {});
+    await updateItem('job-2', 'a', { status: ITEM_STATUS.FAILED });
+
+    assert.equal(await resetFailedToPending('job-1'), 0);
+    assert.equal(await countItemsByStatus('job-2', ITEM_STATUS.FAILED), 1);
   });
 });
