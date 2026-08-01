@@ -1,9 +1,17 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.43.0';
+export const CURRENT_VERSION = '1.43.1';
 
 export const CHANGELOG = [
+  {
+    "version": "1.43.1",
+    "date": "2026-08-01",
+    "title": "A stable footing for the browser test matrix",
+    "changes": [
+      "The containerized browser tests move to a newer base image (Playwright noble instead of jammy). The old image's C library has a startup race that crashed Chromium in roughly two full test runs out of three, each crash taking a random test with it while the summary still read \"fail 0\". Sixteen consecutive clean runs since the switch. Nothing in the app itself changed; this release exists so the test environment that gates every future release is trustworthy. Details: BUG-051 and GitLab issue #54."
+    ]
+  },
   {
     "version": "1.43.0",
     "date": "2026-07-31",

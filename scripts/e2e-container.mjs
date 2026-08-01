@@ -11,7 +11,7 @@
 // - podman preferred (rootless, Fedora default), docker fallback.
 // - Image tag derives from the LOCKED playwright version so browsers always match the suite.
 // - The repo bind-mounts at /work (:Z — SELinux relabel, standard for rootless Podman);
-//   a named volume overlays /work/node_modules so the container keeps its own jammy
+//   a named volume overlays /work/node_modules so the container keeps its own in-image
 //   npm ci, never touching host node_modules. A lock-hash marker skips reinstall while
 //   package-lock.json is unchanged.
 // - --ipc=host per Playwright's container guidance (Chromium shared memory).

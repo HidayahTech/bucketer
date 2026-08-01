@@ -4,6 +4,44 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-051 — Chromium segfaulted at launch in the e2e container, killing a random lane
+
+**Symptom.** Roughly two full containerized e2e matrix runs in three (9 of 14 measured)
+lost one lane: the browser process died with signal 11 at launch, before any page loaded.
+Each failure claimed a different test as its victim — six failures produced six different
+victims across unrelated specs — and the lane's own summary still printed "fail 0",
+because the crash killed a suite-level setup hook, so subtests were reported cancelled
+rather than failed.
+
+**Root cause.** A race in glibc 2.35 (the Playwright `jammy` image's C library): reading
+an environment variable is not safe against another thread writing one. `setenv`
+reallocates the environ array; a concurrent `getenv` walking it can dereference freed
+memory. Chromium is heavily multithreaded from early startup, which is when it fires.
+Evidence: the fault address resolves inside `getenv` (173 bytes into the 229-byte
+symbol); two crashes in different address-space layouts share identical low 12 bits of
+the instruction pointer (same instruction, not scattered corruption); trap 13 with a
+register value outside valid address space. glibc 2.39 (the `noble` image) includes the
+upstream work making the read safe in these cases. Externally caused — nothing in this
+project's code — recorded here per the BUG-025 precedent for external causes. Full
+analysis: GitLab #54.
+
+**Fix.** Container base switched jammy → noble in lockstep: `.gitlab-ci.yml` image,
+`scripts/e2e-container.mjs`, `test/e2e/matrix-helpers.mjs` (`imageTagFromLock`), and its
+unit test. Same Playwright version, same browser builds; one variable changed.
+
+**Why it wasn't caught earlier.** Three compounding masks: the crash predated the session
+that noticed it, and no baseline run existed to attribute it; the "fail 0" summary line
+actively misreported a failed lane; and the failure was treated as a boolean
+(`grep -c "Received signal 11"`) for several rounds of experiments instead of reading the
+crash dump that contained the whole answer from its first occurrence.
+
+**Test case.** `test/e2e-matrix-helpers.test.js` — "derives the pinned noble image from
+the locked playwright version" pins the base and its comment records why it is
+load-bearing. Evidence standard: 16 of 16 clean full-matrix runs post-switch against the
+64% pre-switch failure rate (matched environment, one variable).
+
+---
+
 ## BUG-050 — A failing download navigated the whole application away
 
 **Symptom.** Caught before release, during browser verification of the folder-download

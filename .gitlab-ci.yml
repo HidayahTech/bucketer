@@ -49,7 +49,7 @@ test:
 # logs (artifacts, when: always).
 .e2e-base:
   stage: test
-  image: mcr.microsoft.com/playwright:v1.60.0-jammy
+  image: mcr.microsoft.com/playwright:v1.60.0-noble
   interruptible: true
   rules:
     - if: '$RELOCK_MIRROR == "true"'

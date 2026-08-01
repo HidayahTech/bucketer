@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.43.1] — 2026-08-01 — A stable footing for the browser test matrix
+
+- The containerized browser tests move to a newer base image (Playwright noble instead of jammy). The old image's C library has a startup race that crashed Chromium in roughly two full test runs out of three, each crash taking a random test with it while the summary still read "fail 0". Sixteen consecutive clean runs since the switch. Nothing in the app itself changed; this release exists so the test environment that gates every future release is trustworthy. Details: BUG-051 and GitLab issue #54.
+
 ## [1.43.0] — 2026-07-31 — A failing download no longer takes the app down with it
 
 - A download whose link came back with an error used to replace Bucketer with the storage provider's error page, ending the job and losing everything queued behind it. Downloads now go through a hidden frame, so an error lands somewhere harmless and the queue carries on.

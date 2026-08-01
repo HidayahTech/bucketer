@@ -45,9 +45,13 @@ describe('buildCombos', () => {
 });
 
 describe('imageTagFromLock', () => {
-  test('derives the pinned jammy image from the locked playwright version', () => {
+  // The base is noble, not jammy, and that is load-bearing rather than incidental: jammy
+  // ships a C library predating the work that makes environment reads safe against a
+  // concurrent write. Chromium hits that race during startup and segfaults inside getenv,
+  // which failed the chromium lane on roughly two runs in three. See the e2e crash issue.
+  test('derives the pinned noble image from the locked playwright version', () => {
     const lock = { packages: { 'node_modules/playwright': { version: '1.60.0' } } };
-    assert.equal(imageTagFromLock(lock), 'mcr.microsoft.com/playwright:v1.60.0-jammy');
+    assert.equal(imageTagFromLock(lock), 'mcr.microsoft.com/playwright:v1.60.0-noble');
   });
   test('throws on missing or non-exact versions (a wrong image skews every result)', () => {
     assert.throws(() => imageTagFromLock({}), /Cannot derive/);

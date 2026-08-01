@@ -37,7 +37,12 @@ export function imageTagFromLock(lockJson) {
   if (!/^\d+\.\d+\.\d+$/.test(version || '')) {
     throw new Error(`Cannot derive Playwright image: package-lock.json has no exact version for node_modules/playwright (got ${JSON.stringify(version)})`);
   }
-  return `mcr.microsoft.com/playwright:v${version}-jammy`;
+  // noble, not jammy. jammy's C library predates the change that makes reading an
+  // environment variable safe against another thread writing one; Chromium loses that race
+  // during startup and segfaults inside getenv, taking whichever spec launched it with it.
+  // Measured at 9 failures in 14 full matrix runs before the switch. The base is therefore a
+  // deliberate choice, not a default — do not "simplify" it back.
+  return `mcr.microsoft.com/playwright:v${version}-noble`;
 }
 
 // Pick the first available container runtime, podman preferred (rootless Fedora default).
