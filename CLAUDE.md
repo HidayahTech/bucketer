@@ -46,6 +46,17 @@ Whenever a real bug is encountered and fixed, it must be logged in `BUG-LOG.md` 
 
 Real bugs are the highest-value source of test cases. A test derived from a bug that actually happened is worth more than a speculative edge case, because it documents a failure mode the project has already encountered. When writing tests, consult `BUG-LOG.md` first and ensure every entry has corresponding test coverage.
 
+Two further rules, from the 2026-07-31 postmortem:
+
+- **Sideways verification.** A fix names the behaviors it could plausibly break — always
+  including the behavior the changed code exists to provide — and cites a spec run for
+  each. (The v1.43.0 iframe fix proved navigation stopped and never proved downloads
+  survived; they hadn't.) The output is a list of spec runs, not an essay.
+- **Harness fidelity.** When a feature depends on an environment property (a CSP
+  directive, transport scheme, storage class, a picker API), state in the commit message
+  whether the harness represents it. If not, write "no e2e coverage: harness cannot
+  represent X" — never let a green matrix imply coverage it does not have.
+
 ## Test Suite
 
 Tests live in `test/` and run with `node --test` (no framework). The suite has two layers:
@@ -131,6 +142,26 @@ result. "Passes in three engines" means nothing without saying which builds, in 
 The container image tag derives from the locked playwright version in `package-lock.json`; a
 unit test (`test/e2e-matrix-helpers.test.js`) fails if `.gitlab-ci.yml` pins a different
 image, so bump the dependency and the CI image together.
+
+### E2E Evidence Rules
+
+Each rule demands an artifact, not prose. They exist because the 2026-07-31 postmortem
+found a shipped e2e spec that passed while the feature under test was completely inert
+(`docs/postmortem-2026-07-31/`).
+
+- **Baseline first.** Any session that will claim e2e results runs the full container
+  matrix once on the untouched tree before changing anything, and records the result. A
+  later red lane without a baseline cannot be attributed; a green one proves nothing.
+  Docs-only sessions are exempt.
+- **One observable per feature.** Before implementing, write down the single
+  user-observable that proves the feature works (e.g. "a browser `download` event fires
+  per file") and the spec that measures it. Counters, attached DOM nodes, and green suites
+  are proxies, not observables. An e2e assertion of absence ("nothing navigated") is valid
+  only next to an assertion of presence — a download event (`collectDownloads` in
+  `test/e2e/harness.mjs`) or a request in the mock's log (`mock.requestLog`).
+- **Matched-pair evidence for fixes.** A bug-fix's spec must be run against the pre-fix
+  code (restored from VCS) and shown to FAIL, then against the fix and shown to PASS —
+  same lanes, same image. Both runs go in the BUG-LOG entry.
 
 ## Claude Code Setup
 

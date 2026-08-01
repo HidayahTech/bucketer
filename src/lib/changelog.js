@@ -1,9 +1,19 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.43.1';
+export const CURRENT_VERSION = '1.43.2';
 
 export const CHANGELOG = [
+  {
+    "version": "1.43.2",
+    "date": "2026-08-01",
+    "title": "Folder downloads now actually download, everywhere",
+    "changes": [
+      "Fixed two serious problems in the folder download shipped in v1.43.0. First: against a plain-http storage endpoint (a MinIO box on your LAN, for example), the page's own security policy silently blocked every download — the app said \"Sent N of N\" while nothing arrived at all. Second: on any real network, files whose response took longer than a quarter-second could be silently cancelled by the next file being issued; a 40-file test at realistic latency delivered exactly half. Both are fixed and both now have tests that fail if they come back. (BUG-052, BUG-053)",
+      "Every file is now checked with a one-byte read just before it is handed to your browser. A file that can't be read — deleted, archived, or forbidden — is marked failed with the reason, instead of being \"sent\" into a download that could never succeed. One unreadable file no longer stops the whole job; only a run of consecutive refusals (which means your credentials, not a file) does.",
+      "The test suite can now see downloads happen: it counts real browser download events and the requests arriving at the server, over both https and http, including a slow-network scenario. \"The page didn't break\" is no longer accepted as proof that downloads work."
+    ]
+  },
   {
     "version": "1.43.1",
     "date": "2026-08-01",

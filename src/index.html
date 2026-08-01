@@ -18,7 +18,14 @@
   <meta name="twitter:description" content="A browser-based S3 bucket manager. Upload, download, and manage objects — no backend, runs entirely in your browser.">
   <meta name="twitter:image" content="https://bucketer.hidayahtech.net/og-image.png">
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: https: blob:; media-src https: blob:; frame-src https:; connect-src https: http:; worker-src blob:;">
+  <!-- frame-src mirrors connect-src (https: AND http:) deliberately. Downloads issue by
+       navigating a hidden iframe at a presigned URL; frame-src governs that navigation,
+       and http endpoints (MinIO on a LAN) are first-class. With frame-src https: alone,
+       every folder download on an http endpoint was silently blocked while the app
+       reported "Sent N of N" (BUG-052). No new plaintext exposure: connect-src already
+       carries credentials and object bytes over http when the user chooses an http
+       endpoint. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: https: blob:; media-src https: blob:; frame-src https: http:; connect-src https: http:; worker-src blob:;">
 </head>
 <body>
   <div id="app"></div>

@@ -60,17 +60,23 @@ export function createMockS3(opts = {}) {
   // Request log: the presence-assertion side of the harness. An e2e that asserts only an
   // absence ("the page did not navigate") passes just as happily when the feature is
   // inert (BUG-052: the CSP blocked the download frame from loading anything at all), so
-  // specs pair absence assertions with "the request actually arrived here". Ring-bounded;
-  // isNavGet marks a signed object GET with no Range header — a download navigation, as
-  // opposed to the one-byte pre-flight probes.
+  // specs pair absence assertions with "the request actually arrived here". Ring-bounded.
+  //
+  // isNavGet marks a signed object GET that is not the one-byte pre-flight probe. The
+  // probe is the ONLY requester that sends exactly `Range: bytes=0-0`; a download
+  // navigation usually sends no Range at all — but when the probe's 206 has primed the
+  // browser's partial-content cache for the same URL, the navigation arrives WITH a Range
+  // header asking for the remainder (measured on Chromium). Excluding all ranged requests
+  // therefore misclassifies real downloads; excluding only bytes=0-0 does not.
   const REQUEST_LOG_CAP = 2000;
   const requestEntries = [];
   function logRequest(req) {
     if (req.url.startsWith('/__admin/')) return;
     const signed = req.url.includes('X-Amz-Signature');
+    const range = req.headers.range || null;
     const isNavGet = req.method === 'GET' && signed
-      && !req.url.includes('list-type') && !req.headers.range;
-    requestEntries.push({ method: req.method, path: req.url.split('?')[0], signed, isNavGet });
+      && !req.url.includes('list-type') && range !== 'bytes=0-0';
+    requestEntries.push({ method: req.method, path: req.url.split('?')[0], signed, range, isNavGet });
     if (requestEntries.length > REQUEST_LOG_CAP) requestEntries.shift();
   }
   const requestLog = {
@@ -103,11 +109,16 @@ export function createMockS3(opts = {}) {
     if (typeof cfg.latencyMs === 'number') latencyMs = cfg.latencyMs;
     if (cfg.bucket && typeof cfg.versioning === 'boolean') bkt(cfg.bucket).versioning = cfg.versioning;
   }
-  function matchFault(op, method, key) {
+  // `skipRange: true` makes a fault ignore ranged requests. Exists so a spec can fail the
+  // download GET while the one-byte pre-flight probe (a Range GET on the same key)
+  // succeeds — the "object vanished between probe and issue" scenario, which is the case
+  // BUG-050's containment still has to handle now that probed failures never reach a frame.
+  function matchFault(op, method, key, { hasRange = false } = {}) {
     const i = faults.findIndex((f) =>
       (f.op ? f.op === op : true) &&
       (f.method ? f.method === method : true) &&
       (f.keyPrefix ? (key || '').startsWith(f.keyPrefix) : true) &&
+      (f.skipRange ? !hasRange : true) &&
       (f.times == null || f.times > 0));
     if (i === -1) return null;
     const f = faults[i];
@@ -331,7 +342,7 @@ export function createMockS3(opts = {}) {
   }
 
   function getObject(req, res, b, key, q) {
-    const f = matchFault('GetObject', 'GET', key);
+    const f = matchFault('GetObject', 'GET', key, { hasRange: !!req.headers.range });
     // killAtByte is not an error response: headers and a prefix of the body are written, then
     // the socket is destroyed, which is what a dropped connection actually looks like to a
     // client. An error status would exercise a completely different code path.
@@ -353,6 +364,11 @@ export function createMockS3(opts = {}) {
     const overrides = {};
     if (q.get('response-content-disposition')) overrides['Content-Disposition'] = q.get('response-content-disposition');
     if (q.get('response-content-type')) overrides['Content-Type'] = q.get('response-content-type');
+    // response-cache-control matters for fidelity: the app presigns every download with
+    // no-store (issue #13). Without honoring it, the one-byte pre-flight probe's 206 gets
+    // cached by the browser, and the download navigation is then served or revalidated
+    // FROM CACHE — hiding the real request from fault injection and from the request log.
+    if (q.get('response-cache-control')) overrides['Cache-Control'] = q.get('response-cache-control');
 
     const base = {
       ...corsHeaders(req, Object.keys(o.metadata)),

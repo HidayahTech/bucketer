@@ -198,10 +198,14 @@ describe('jobOutcome', () => {
   });
 });
 
-// This tier cannot see a download fail, so a job-wide fault — bad credentials, missing CORS,
-// clock skew, a wholesale deny — otherwise issues thousands of downloads that all fail
-// silently and reports every one of them as ISSUED. The probe converts that into an error.
-describe('runDownloadJob — pre-flight and sampling', () => {
+// This tier cannot see a download fail, so every file is probed before it is issued
+// (BUG-053: the probe's awaited round trip is also what paces issuance, so a pending
+// download navigation is never replaced before its response arrives). A probe failure is
+// that FILE's failure; only a streak of consecutive denials — a wholesale deny: bad
+// credentials, clock skew — blocks the job, because AWS answers 403 for a missing key
+// when the caller lacks s3:ListBucket, and one deleted object must not refuse a
+// 3,800-file download (postmortem catalog defect 7).
+describe('runDownloadJob — per-file pre-flight', () => {
   beforeEach(reset);
 
   const probing = (kinds) => {
@@ -227,62 +231,93 @@ describe('runDownloadJob — pre-flight and sampling', () => {
       'probing a different url than the one issued proves nothing about the download');
   });
 
-  test('a denial stops the job before a single file is issued', async () => {
-    await saveJob(job());
-    await appendManifestPage('job-1', [item('a'), item('b')], {});
-    const h = harness({ probe: probing(['denied']) });
-
-    const result = await runDownloadJob(await loadJob('job-1'), h);
-
-    assert.equal(h.issued.length, 0, 'nothing may be handed to the download manager');
-    assert.equal(result.blocked.kind, 'denied');
-    assert.equal(result.issued, 0);
-  });
-
-  test('a blocked job leaves its items pending so a resume retries them', async () => {
-    await saveJob(job());
-    await appendManifestPage('job-1', [item('a'), item('b')], {});
-
-    await runDownloadJob(await loadJob('job-1'), harness({ probe: probing(['denied']) }));
-
-    assert.equal(await countItemsByStatus('job-1', ITEM_STATUS.PENDING), 2);
-    assert.equal(await countItemsByStatus('job-1', ITEM_STATUS.FAILED), 0,
-      'a job-wide fault is not the fault of any individual item');
-  });
-
-  test('a missing object does not stop the job', async () => {
-    await saveJob(job());
-    await appendManifestPage('job-1', [item('a'), item('b')], {});
-    const h = harness({ probe: probing(['missing']) });
-
-    const result = await runDownloadJob(await loadJob('job-1'), h);
-
-    assert.equal(result.issued, 2);
-    assert.equal(result.blocked, null);
-  });
-
-  // counters.total is left to appendManifestPage, which ADDS to it. Seeding it here as well
-  // double-counts the page and silently widens the sampling interval.
-  test('samples across the run instead of probing every file', async () => {
+  test('probes every file, not a sample', async () => {
     await saveJob(job());
     await appendManifestPage('job-1', Array.from({ length: 10 }, (_, i) => item(`k${i}`)), {});
     const probe = probing([]);
 
-    await runDownloadJob(await loadJob('job-1'), harness({ probe }), { probeBudget: 2 });
+    await runDownloadJob(await loadJob('job-1'), harness({ probe }));
 
-    assert.equal(probe.calls.length, 2, '10 files at a budget of 2 must probe at 0 and 5, not 10 times');
+    assert.equal(probe.calls.length, 10,
+      'an unprobed file is issued with no round trip pacing it — the BUG-053 shape');
   });
 
-  test('a denial found mid-run stops the remaining files', async () => {
+  test('a network failure stops the job immediately, leaving items pending', async () => {
     await saveJob(job());
-    await appendManifestPage('job-1', Array.from({ length: 10 }, (_, i) => item(`k${i}`)), {});
-    // Healthy at index 0, denied at the index-5 sample.
-    const h = harness({ probe: probing(['ok', 'denied']) });
+    await appendManifestPage('job-1', [item('a'), item('b')], {});
+    const h = harness({ probe: probing(['network']) });
 
-    const result = await runDownloadJob(await loadJob('job-1'), h, { probeBudget: 2 });
+    const result = await runDownloadJob(await loadJob('job-1'), h);
 
+    assert.equal(h.issued.length, 0, 'nothing may be handed to the download manager');
+    assert.equal(result.blocked.kind, 'network');
+    assert.equal(await countItemsByStatus('job-1', ITEM_STATUS.PENDING), 2,
+      'a job-wide fault is not the fault of any individual item');
+  });
+
+  test('a missing object fails that file and the job continues', async () => {
+    await saveJob(job());
+    await appendManifestPage('job-1', [item('a'), item('b')], {});
+    const h = harness({ probe: probing(['missing', 'ok']) });
+
+    const result = await runDownloadJob(await loadJob('job-1'), h);
+
+    assert.equal(result.issued, 1);
+    assert.equal(result.failed, 1);
+    assert.equal(result.blocked, null);
+    assert.equal(await countItemsByStatus('job-1', ITEM_STATUS.FAILED), 1,
+      'a file that provably cannot be read must not be reported as sent');
+  });
+
+  test('a transient error fails that file and the job continues', async () => {
+    await saveJob(job());
+    await appendManifestPage('job-1', [item('a'), item('b')], {});
+
+    const result = await runDownloadJob(await loadJob('job-1'), harness({ probe: probing(['transient', 'ok']) }));
+
+    assert.equal(result.issued, 1);
+    assert.equal(result.failed, 1);
+    assert.equal(result.blocked, null);
+  });
+
+  // AWS answers 403, not 404, for a missing key when the caller lacks s3:ListBucket —
+  // so one denial may be one deleted object, and must not refuse the whole job.
+  test('a single denial fails only its own file', async () => {
+    await saveJob(job());
+    await appendManifestPage('job-1', [item('a'), item('b'), item('c')], {});
+    const h = harness({ probe: probing(['denied', 'ok', 'ok']) });
+
+    const result = await runDownloadJob(await loadJob('job-1'), h);
+
+    assert.equal(result.issued, 2);
+    assert.equal(result.failed, 1);
+    assert.equal(result.blocked, null, 'one denial is not evidence of a wholesale deny');
+  });
+
+  test('three consecutive denials block the job as a wholesale deny', async () => {
+    await saveJob(job());
+    await appendManifestPage('job-1', Array.from({ length: 6 }, (_, i) => item(`k${i}`)), {});
+    const h = harness({ probe: probing(['denied', 'denied', 'denied']) });
+
+    const result = await runDownloadJob(await loadJob('job-1'), h);
+
+    assert.equal(h.issued.length, 0);
     assert.equal(result.blocked.kind, 'denied');
-    assert.equal(h.issued.length, 5, 'the five files before the failed sample were already issued');
+    assert.equal(result.failed, 3, 'the streak files are failed, so a resume retries them');
+    assert.equal(await countItemsByStatus('job-1', ITEM_STATUS.PENDING), 3,
+      'files after the block stay pending for the resume');
+  });
+
+  test('denials separated by successes never accumulate into a block', async () => {
+    await saveJob(job());
+    await appendManifestPage('job-1', Array.from({ length: 6 }, (_, i) => item(`k${i}`)), {});
+    const h = harness({ probe: probing(['denied', 'ok', 'denied', 'ok', 'denied', 'ok']) });
+
+    const result = await runDownloadJob(await loadJob('job-1'), h);
+
+    assert.equal(result.blocked, null);
+    assert.equal(result.issued, 3);
+    assert.equal(result.failed, 3);
   });
 
   test('runs unchanged when no probe is injected', async () => {

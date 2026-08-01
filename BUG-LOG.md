@@ -4,6 +4,78 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-052 — The CSP silently blocked every folder download on an http endpoint
+
+**Symptom.** Against any http endpoint — MinIO on a LAN is a first-class supported
+configuration — a folder download issued nothing at all: no request left the browser, no
+error appeared anywhere, and the app reported "Sent N of N". Shipped in v1.43.0. The same
+block made the entire e2e environment (an http mock) inert: the download spec passed its
+"page did not navigate" assertion precisely because the frame was forbidden from loading
+anything, and zero downloads had ever occurred in e2e.
+
+**Root cause.** v1.43.0 moved download issuance from an anchor to a hidden iframe
+(BUG-050), and an iframe's navigation is governed by the bundle CSP's `frame-src` — which
+was `https:` only. `connect-src` allowed `http:`, so probes and listings worked, masking
+the block. The CSP was never considered in the iframe design; no design note mentions it.
+
+**Fix.** `frame-src https: http:` in `src/index.html`, mirroring `connect-src` — no new
+plaintext exposure, since credentials and object bytes already flow over http when the
+user chooses an http endpoint. The e2e mock gained an https listener AND kept http, so
+both transports are exercised.
+
+**Why it wasn't caught earlier.** Three layers: the failure is silent by CSP design (a
+blocked frame navigation reports nothing); the e2e harness was http-only, so the
+environment that should have caught it was the one place the feature could never work;
+and the spec asserted only an absence, which an inert feature satisfies. Found by the
+2026-08-01 independent postmortem (finding F1), by demanding a presence observable.
+
+**Test case.** `test/e2e/browser/download-completion.test.mjs` — "every issued file
+becomes a download over plain http". Matched pair: pre-fix, 0 of 8 downloads (run
+recorded 2026-08-01); post-fix, 8 of 8, http and https arms, with the mock's request log
+confirming the attachment GETs server-side.
+
+---
+
+## BUG-053 — Reassigning the shared download iframe cancelled still-pending downloads
+
+**Symptom.** In a folder download, files whose first response byte took longer than the
+250 ms issue pacing silently never downloaded, while the app counted them ISSUED and
+reported "Sent N of N". At 400 ms latency, a 40-file job delivered exactly 20 files — on
+Chromium and Firefox alike. Only files issued immediately after a sampled probe (which
+paced the loop by a full round trip) survived. Shipped in v1.43.0.
+
+**Root cause.** All downloads shared one hidden iframe; assigning `src` REPLACES the
+frame's in-flight navigation, and a navigation only becomes a download once response
+headers arrive. Probe sampling (~20 per job) meant most issues were paced only by the
+250 ms delay, so at any realistic TTFB the next assignment landed first and cancelled the
+pending download. The fix was verified against the defect it targeted (navigation, from
+BUG-050) and never against the behaviour it had to preserve (downloading).
+
+**Fix.** Two independent layers: every file is now probed before issue (the probe's
+awaited round trip guarantees at least one full RTT of pacing per file — the mechanism
+that measurably protected files in the postmortem experiments), and issuance uses a
+bounded pool of per-file iframes (`MAX_DOWNLOAD_FRAMES = 8`, oldest recycled) so
+consecutive issues never share a frame. Probe semantics also became per-file: a failed
+probe fails that file honestly instead of issuing a download that cannot succeed, and
+only a streak of 3 consecutive denials blocks the job — one denial can be one deleted
+object, because AWS returns 403 for a missing key when the caller lacks `s3:ListBucket`
+(documented; real-provider measurement still pending — see
+`docs/manual-checks/preflight-real-providers.md`).
+
+**Why it wasn't caught earlier.** No test asserted a download ever completes — the e2e
+proved the page didn't navigate, nothing more (and BUG-052 made downloads impossible in
+e2e anyway). Manual verification ("10 downloads, 1 iframe") ran at localhost latency,
+where responses always beat the pacing. Found by the independent postmortem (finding F2)
+via matched-pair latency experiments.
+
+**Test case.** `test/e2e/browser/download-completion.test.mjs` — "no file is lost when
+the response is slower than the issue pacing": 40 files at 400 ms mock latency must
+produce 40 download events. Matched pair: pre-fix 20 of 40 (run recorded 2026-08-01,
+identical loss list to the postmortem experiment); post-fix 40 of 40, with a 0 ms control
+arm proving the measurement.
+
+---
+
 ## BUG-051 — Chromium segfaulted at launch in the e2e container, killing a random lane
 
 **Symptom.** Roughly two full containerized e2e matrix runs in three (9 of 14 measured)

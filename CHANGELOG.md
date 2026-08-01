@@ -7,6 +7,12 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.43.2] — 2026-08-01 — Folder downloads now actually download, everywhere
+
+- Fixed two serious problems in the folder download shipped in v1.43.0. First: against a plain-http storage endpoint (a MinIO box on your LAN, for example), the page's own security policy silently blocked every download — the app said "Sent N of N" while nothing arrived at all. Second: on any real network, files whose response took longer than a quarter-second could be silently cancelled by the next file being issued; a 40-file test at realistic latency delivered exactly half. Both are fixed and both now have tests that fail if they come back. (BUG-052, BUG-053)
+- Every file is now checked with a one-byte read just before it is handed to your browser. A file that can't be read — deleted, archived, or forbidden — is marked failed with the reason, instead of being "sent" into a download that could never succeed. One unreadable file no longer stops the whole job; only a run of consecutive refusals (which means your credentials, not a file) does.
+- The test suite can now see downloads happen: it counts real browser download events and the requests arriving at the server, over both https and http, including a slow-network scenario. "The page didn't break" is no longer accepted as proof that downloads work.
+
 ## [1.43.1] — 2026-08-01 — A stable footing for the browser test matrix
 
 - The containerized browser tests move to a newer base image (Playwright noble instead of jammy). The old image's C library has a startup race that crashed Chromium in roughly two full test runs out of three, each crash taking a random test with it while the summary still read "fail 0". Sixteen consecutive clean runs since the switch. Nothing in the app itself changed; this release exists so the test environment that gates every future release is trustworthy. Details: BUG-051 and GitLab issue #54.

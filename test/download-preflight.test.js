@@ -2,7 +2,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  probeUrl, isBlocking, sampleInterval, blockedMessage, PROBE_KIND,
+  probeUrl, blockedMessage, PROBE_KIND,
 } from '../src/lib/download-preflight.js';
 
 const responding = (init) => {
@@ -70,27 +70,8 @@ describe('probeUrl', () => {
   });
 });
 
-describe('isBlocking', () => {
-  test('a denial stops the job: it is credentials, clock skew, or a wholesale deny', () => {
-    assert.equal(isBlocking({ kind: PROBE_KIND.DENIED }), true);
-  });
-
-  test('a network failure stops the job: CORS or offline affects every file', () => {
-    assert.equal(isBlocking({ kind: PROBE_KIND.NETWORK }), true);
-  });
-
-  test('a missing object does not stop the job: one key is gone, the rest are fine', () => {
-    assert.equal(isBlocking({ kind: PROBE_KIND.MISSING }), false);
-  });
-
-  test('a transient error does not stop the job', () => {
-    assert.equal(isBlocking({ kind: PROBE_KIND.TRANSIENT }), false);
-  });
-
-  test('a readable object does not stop the job', () => {
-    assert.equal(isBlocking({ kind: PROBE_KIND.OK }), false);
-  });
-});
+// Blocking semantics (what stops a whole job vs fails one file) are the engine's
+// business and are tested behaviorally in download-queue.test.js.
 
 // A job that stops has to tell the user something they can act on. The two blocking kinds
 // have completely different remedies, so they must not collapse into one generic message.
@@ -108,20 +89,5 @@ describe('blockedMessage', () => {
   test('never returns an empty string, whatever it is handed', () => {
     assert.ok(blockedMessage({ kind: 'something-new' }).length > 0);
     assert.ok(blockedMessage(null).length > 0);
-  });
-});
-
-describe('sampleInterval', () => {
-  test('spreads the budget across a large job rather than probing every file', () => {
-    // The point of sampling: 3,800 files must cost ~20 probes, not 3,800.
-    assert.equal(sampleInterval(3800, 20), 190);
-  });
-
-  test('never returns zero, which would make every index a sample', () => {
-    assert.equal(sampleInterval(5, 20), 1);
-  });
-
-  test('treats an unknown total as probe-once', () => {
-    assert.equal(sampleInterval(0, 20), Infinity);
   });
 });

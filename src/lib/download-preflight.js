@@ -9,11 +9,11 @@
 // silently, and the app reports every one of them as ISSUED. One probe before the first file
 // turns that into an error the user can act on.
 //
-// WHY SAMPLING RATHER THAN CHECKING EVERY FILE. Probing all 3,800 files of a job doubles its
-// request count to catch a class of failure that is, by nature, job-wide: if the credentials
-// are wrong they are wrong for every key. A first probe plus ~20 spread through the run
-// catches the same failures for half a percent of the cost. It deliberately does NOT catch
-// per-file failures — that is what the read-only folder verification is for.
+// EVERY FILE IS PROBED — the original design sampled ~20 probes per job to halve request
+// count, and that saving bought two things: per-file failures issued as if they would
+// succeed, and (BUG-053) no network round trip pacing most issues, so pending download
+// navigations were replaced before their responses arrived. download-queue.js owns the
+// per-file semantics; this module only classifies one probe's result.
 //
 // WHY A RANGE GET AND NOT A HEAD. The presigned URL signs the method: SigV4 covers it, so a
 // HEAD against a GET signature is rejected. `Range: bytes=0-0` is a GET that transfers one
@@ -56,11 +56,12 @@ export async function probeUrl(url, { fetchImpl = fetch } = {}) {
   }
 }
 
-// Only failures that affect every remaining file stop a job. A missing key or a 503 is the
-// business of the item that hit it.
-export function isBlocking(probe) {
-  return probe?.kind === PROBE_KIND.DENIED || probe?.kind === PROBE_KIND.NETWORK;
-}
+// WHAT BLOCKS A JOB lives in download-queue.js, not here: NETWORK blocks immediately
+// (CORS/offline is job-wide by nature); a single DENIED fails only its own file, and only
+// a streak of consecutive denials blocks — because AWS answers 403, not 404, for a
+// missing key when the caller lacks s3:ListBucket, so one DENIED may be one deleted
+// object [documented AWS behavior, not yet measured against real AWS — see
+// docs/manual-checks/preflight-real-providers.md].
 
 // What to tell the user when a job stops. The two blocking kinds have entirely different
 // remedies — rotate a key versus edit a bucket's CORS rules — so they are never collapsed
@@ -79,11 +80,4 @@ export function blockedMessage(probe) {
     default:
       return 'The download was stopped by a problem affecting the whole job.';
   }
-}
-
-// How many items to skip between probes so a whole job costs about `budget` of them.
-// An unknown total probes once, at the start, rather than guessing an interval.
-export function sampleInterval(total, budget) {
-  if (!total || total <= 0) return Infinity;
-  return Math.max(1, Math.ceil(total / budget));
 }
