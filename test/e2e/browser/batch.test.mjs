@@ -117,8 +117,18 @@ describe('select-all, filter, sort', () => {
       await page.locator('th:has-text("Name")').click();
       // Scope to the listing table — the UploadLog also renders tr.file-row rows (no
       // data-testid), which would inject nulls into the order assertion.
-      const order = await page.locator('.file-table tbody tr.file-row').evaluateAll((rows) => rows.map((r) => r.getAttribute('data-testid')));
-      assert.deepEqual(order, ['file-row:c.txt', 'file-row:b.txt', 'file-row:a.txt'], 'descending name order');
+      // Poll rather than read once: on a slow lane the re-render is mid-flight right
+      // after the click, and a snapshot taken then contains nulls (issue #55).
+      const readOrder = () => page.locator('.file-table tbody tr.file-row')
+        .evaluateAll((rows) => rows.map((r) => r.getAttribute('data-testid')));
+      const expected = ['file-row:c.txt', 'file-row:b.txt', 'file-row:a.txt'];
+      const deadline = Date.now() + 5000;
+      let order = await readOrder();
+      while (JSON.stringify(order) !== JSON.stringify(expected) && Date.now() < deadline) {
+        await page.waitForTimeout(100);
+        order = await readOrder();
+      }
+      assert.deepEqual(order, expected, 'descending name order');
     } finally { await context.close(); }
   });
 });

@@ -52,8 +52,19 @@ describe('issue #4 part 2 — a sub-folder created by an upload appears without 
 
 describe('issue #4 part 1 — the Refresh button pulls changes made by another client', () => {
   e2eTest('an object added out-of-band appears after clicking Refresh', async () => {
-    const { context, page } = await freshSession();
+    // Inlined session (freshSession's reset would wipe the marker): the marker exists
+    // before the app connects, so waiting for its row proves the INITIAL listing has
+    // fully landed. Without that anchor, a slow lane's first listing response can arrive
+    // AFTER the out-of-band put below, making the "not visible yet" assertion race the
+    // connect (seen on CI shared runners, issue #55).
+    ctx.mock.reset();
+    await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'already-here.txt', Body: new TextEncoder().encode('m') }));
+    const context = await newE2EContext(browser);
+    const page = await newE2EPage(context);
+    await page.goto(app.url, { waitUntil: 'domcontentloaded' });
+    await connectApp(page, ctx.browserEndpoint);
     try {
+      await page.locator('[data-testid="file-row:already-here.txt"]').waitFor({ timeout: 10000 });
       // Simulate "another device" writing directly to the bucket (no UI involved).
       await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'from-other-device.txt', Body: new TextEncoder().encode('x') }));
       // It isn't visible yet (no live sync)…

@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.44.1] — 2026-08-01 — Three browser tests stop racing slow machines
+
+- Fixed the three intermittently-failing browser tests that kept turning CI red on slow shared runners (issue #55): the profile-region test now waits for the saved profile's form pre-fill to settle before typing over it, the sort-order test polls for the re-rendered rows instead of reading them mid-update, and the refresh test anchors on a pre-existing file so the initial listing provably landed before the out-of-band change. Nothing in the app changed.
+
 ## [1.44.0] — 2026-08-01 — Know which files can't be downloaded, and which ones actually arrived
 
 - Files kept in Amazon's Glacier or Deep Archive storage can't be downloaded until you restore them, so a folder download now sets them aside and says so — how many, and how large — instead of queueing downloads that silently fail. The offer button counts and sizes only what will actually be sent. Glacier Instant Retrieval files download normally.

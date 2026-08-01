@@ -1,9 +1,17 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.44.0';
+export const CURRENT_VERSION = '1.44.1';
 
 export const CHANGELOG = [
+  {
+    "version": "1.44.1",
+    "date": "2026-08-01",
+    "title": "Three browser tests stop racing slow machines",
+    "changes": [
+      "Fixed the three intermittently-failing browser tests that kept turning CI red on slow shared runners (issue #55): the profile-region test now waits for the saved profile's form pre-fill to settle before typing over it, the sort-order test polls for the re-rendered rows instead of reading them mid-update, and the refresh test anchors on a pre-existing file so the initial listing provably landed before the out-of-band change. Nothing in the app changed."
+    ]
+  },
   {
     "version": "1.44.0",
     "date": "2026-08-01",

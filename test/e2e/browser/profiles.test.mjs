@@ -156,11 +156,22 @@ describe('BUG-026 — region re-inference after profile load', () => {
       await page.reload({ waitUntil: 'domcontentloaded' });
       const regionInput = page.locator('input[placeholder="us-east-1"]');
       await regionInput.waitFor({ timeout: 5000 });
+
+      // The pre-fill is asynchronous. On a slow lane, filling the endpoint BEFORE the
+      // pre-fill lands lets the pre-fill overwrite it right back — the region then stays
+      // us-west-004 and the final assertion flakes (seen repeatedly on CI shared runners,
+      // issue #55). Wait for the pre-fill to have settled: the url field must show the
+      // saved endpoint first.
+      const urlInput = page.locator('input[type="url"]');
+      const settle = Date.now() + 10000;
+      while (await urlInput.inputValue() !== 'https://s3.us-west-004.backblazeb2.com' && Date.now() < settle) {
+        await page.waitForTimeout(100);
+      }
       assert.equal(await regionInput.inputValue(), 'us-west-004', 'region inferred from the loaded B2 endpoint');
 
       // Change the endpoint to a different B2 region → the region must re-infer.
-      await page.locator('input[type="url"]').fill('https://s3.eu-central-003.backblazeb2.com');
-      const deadline2 = Date.now() + 5000;
+      await urlInput.fill('https://s3.eu-central-003.backblazeb2.com');
+      const deadline2 = Date.now() + 10000;
       while (await regionInput.inputValue() !== 'eu-central-003' && Date.now() < deadline2) await page.waitForTimeout(100);
       assert.equal(await regionInput.inputValue(), 'eu-central-003', 'region re-inferred after endpoint change (BUG-026)');
     } finally { await context.close(); }
