@@ -13,20 +13,32 @@ import { mount, fire } from '../helpers/render.js';
 import { DownloadJobPanel } from '../../src/components/DownloadJobPanel.jsx';
 import { NAMING_MODES } from '../../src/lib/download-naming.js';
 import { TIERS } from '../../src/lib/browser-capability.js';
+import { JOB_CLASS } from '../../src/lib/download-lifecycle.js';
 
 const DESKTOP = { directoryPicker: false, opfs: true, streamingFetch: true, likelyMobile: false };
 const MOBILE = { ...DESKTOP, likelyMobile: true };
+const CAN_PICK = { ...DESKTOP, directoryPicker: true };
 
 const NOOP = () => {};
 
+// A classified job row, as api.listJobs returns them.
+const classified = (over = {}) => ({
+  id: 'old', prefix: 'videos/', bucket: 'bkt',
+  counters: { total: 412, bytesTotal: 900, sendable: 412, bytesSendable: 900 },
+  counts: { pending: 100, failed: 72, issued: 240, done: 0 },
+  jobClass: JOB_CLASS.UNFINISHED,
+  ...over,
+});
+
 function fakeApi(over = {}) {
   return {
-    listUnfinished: async () => [],
+    listJobs: async () => [],
     startJob: async ({ mode }) => ({ id: 'job-1', mode }),
     enumerate: async (_job, { onProgress }) => {
       onProgress?.({ objects: 412, bytes: 840 * 1024 ** 3 });
       return { objects: 412, bytes: 840 * 1024 ** 3, done: true, cancelled: false };
     },
+    verify: async () => ({ confirmed: 0, missing: 0, mismatched: 0, ambiguous: 0, renamed: 0 }),
     discard: async () => {},
     ...over,
   };
@@ -148,25 +160,20 @@ describe('DownloadJobPanel', () => {
   // The durable manifest only earns its keep if an interrupted job can be picked up in a
   // later session. The panel is the download entry point, so it is where they surface.
   test('surfaces an unfinished job from a previous session', async () => {
-    const api = fakeApi({
-      listUnfinished: async () => [
-        { id: 'old', prefix: 'videos/', counters: { total: 412, bytesTotal: 900 }, remaining: 172 },
-      ],
-    });
+    const api = fakeApi({ listJobs: async () => [classified()] });
     const m = mount(<DownloadJobPanel bucket="bkt" prefix="" api={api} onStart={NOOP} onClose={NOOP} />);
     await flush();
 
     const body = m.text();
     assert.ok(/unfinished|resume|earlier|previous/i.test(body));
     assert.equal(body.includes('videos/'), true);
-    assert.equal(body.includes('172'), true);
+    assert.equal(body.includes('172'), true, 'pending + failed is what remains to send');
     m.cleanup();
   });
 
   test('resuming hands the existing job straight to onStart', async () => {
-    const existing = { id: 'old', prefix: 'videos/', counters: { total: 412 }, remaining: 172 };
     let handed = null;
-    const api = fakeApi({ listUnfinished: async () => [existing] });
+    const api = fakeApi({ listJobs: async () => [classified()] });
     const m = mount(<DownloadJobPanel bucket="bkt" prefix="" api={api} onStart={j => { handed = j; }} onClose={NOOP} />);
     await flush();
 
@@ -178,7 +185,7 @@ describe('DownloadJobPanel', () => {
   test('an unfinished job can be discarded', async () => {
     let discarded = null;
     const api = fakeApi({
-      listUnfinished: async () => [{ id: 'old', prefix: 'videos/', counters: { total: 412 }, remaining: 172 }],
+      listJobs: async () => [classified()],
       discard: async (id) => { discarded = id; },
     });
     const m = mount(<DownloadJobPanel bucket="bkt" prefix="" api={api} onStart={NOOP} onClose={NOOP} />);
@@ -187,6 +194,20 @@ describe('DownloadJobPanel', () => {
     fire(m.query('[data-testid="discard-old"]'), 'click');
     await flush();
     assert.equal(discarded, 'old');
+    m.cleanup();
+  });
+
+  // Postmortem F6 regression: a paused job with both failures and issued files is ONE
+  // row (unfinished, since work remains), never two rows with two Discards.
+  test('a job with failures and issued files renders exactly one row', async () => {
+    const api = fakeApi({ listJobs: async () => [classified({ counts: { pending: 0, failed: 2, issued: 6, done: 0 } })] });
+    const m = mount(<DownloadJobPanel bucket="bkt" prefix="" api={api} onStart={NOOP} onClose={NOOP} />);
+    await flush();
+
+    assert.equal(m.queryAll('[data-testid="discard-old"]').length, 1,
+      'one job, one row, one Discard');
+    assert.notEqual(m.query('[data-testid="resume-old"]'), null, 'work remains, so it resumes');
+    assert.ok(m.text().includes('6 already sent'), 'the sent portion is disclosed on the same row');
     m.cleanup();
   });
 
@@ -310,6 +331,187 @@ describe('DownloadJobPanel', () => {
 
     assert.equal(m.query('[data-testid="start"]'), null);
     assert.ok(/nothing|empty|no files/i.test(m.text()));
+    m.cleanup();
+  });
+});
+
+// Archived objects are recorded SKIPPED at enumeration, so they are in the totals but
+// will never be issued. Saying "Send 412 files" when 12 of them cannot be sent is a lie
+// the user only discovers by absence — and the size quoted must describe the same set as
+// the count (catalog defects 17/19: the count once shrank while the bytes did not).
+describe('DownloadJobPanel — archived objects', () => {
+  const GB = 1024 ** 3;
+  const withArchived = (archived, archivedBytes = archived * GB) => fakeApi({
+    enumerate: async () => ({
+      objects: 412, bytes: 840 * GB, archived, archivedBytes, done: true, cancelled: false,
+    }),
+  });
+
+  test('warns when some objects are archived, naming the count and size', async () => {
+    const m = mount(<DownloadJobPanel bucket="bkt" prefix="v/" api={withArchived(12)} onStart={NOOP} onClose={NOOP} />);
+    fire(m.query('[data-testid="scan"]'), 'click');
+    await flush();
+
+    const notice = m.query('[data-testid="archived-notice"]');
+    assert.notEqual(notice, null);
+    assert.match(notice.textContent, /12/, 'the archived count must be shown');
+    m.cleanup();
+  });
+
+  test('the offer counts and sizes only what can actually be sent', async () => {
+    const m = mount(<DownloadJobPanel bucket="bkt" prefix="v/" api={withArchived(12)} onStart={NOOP} onClose={NOOP} />);
+    fire(m.query('[data-testid="scan"]'), 'click');
+    await flush();
+
+    const start = m.query('[data-testid="start"]');
+    assert.match(start.textContent, /\b400\b/, '412 − 12 archived = 400');
+    assert.match(start.textContent, /828/, 'the size must be 840 GB − 12 GB, not the full total');
+    m.cleanup();
+  });
+
+  test('says nothing about archiving when nothing is archived', async () => {
+    const m = mount(<DownloadJobPanel bucket="bkt" prefix="v/" api={withArchived(0, 0)} onStart={NOOP} onClose={NOOP} />);
+    fire(m.query('[data-testid="scan"]'), 'click');
+    await flush();
+
+    assert.equal(m.query('[data-testid="archived-notice"]'), null);
+    assert.match(m.query('[data-testid="start"]').textContent, /\b412\b/);
+    m.cleanup();
+  });
+
+  test('does not offer to start when every object is archived', async () => {
+    const m = mount(<DownloadJobPanel bucket="bkt" prefix="v/" api={withArchived(412, 840 * GB)} onStart={NOOP} onClose={NOOP} />);
+    fire(m.query('[data-testid="scan"]'), 'click');
+    await flush();
+
+    assert.equal(m.query('[data-testid="start"]'), null, 'nothing sendable means no start button');
+    m.cleanup();
+  });
+});
+
+// The reachability invariant, at the rendering layer: every persisted job renders exactly
+// one row, and every row carries Discard on EVERY browser. Only the check ACTION is
+// capability-gated. (Postmortem F3 / catalog 18: a job invisible to every list had no
+// Discard, so its manifest was permanent — on Firefox and Safari even a clean one.)
+describe('DownloadJobPanel — sent and settled jobs', () => {
+  const sentJob = (over = {}) => classified({
+    id: 'job-9', prefix: 'videos/', jobClass: JOB_CLASS.SENT,
+    counts: { pending: 0, failed: 0, issued: 412, done: 0 }, ...over,
+  });
+
+  test('a sent job renders with Discard even without a directory picker', async () => {
+    const api = fakeApi({ listJobs: async () => [sentJob()] });
+    const m = mount(<DownloadJobPanel bucket="bkt" prefix="v/" api={api} capabilities={DESKTOP}
+      onStart={NOOP} onClose={NOOP} />);
+    await flush();
+
+    assert.notEqual(m.query('[data-testid="discard-job-9"]'), null,
+      'no browser may strand a manifest without a Discard');
+    assert.equal(m.query('[data-testid="verify-job-9"]'), null,
+      'the check action needs the picker; the row does not');
+    m.cleanup();
+  });
+
+  test('a sent job offers the folder check when the picker exists', async () => {
+    const api = fakeApi({ listJobs: async () => [sentJob()] });
+    const m = mount(<DownloadJobPanel bucket="bkt" prefix="v/" api={api} capabilities={CAN_PICK}
+      onStart={NOOP} onClose={NOOP} />);
+    await flush();
+
+    assert.notEqual(m.query('[data-testid="verify-job-9"]'), null);
+    assert.match(m.text(), /412/);
+    m.cleanup();
+  });
+
+  test('a settled job shows its confirmation and can be discarded', async () => {
+    const api = fakeApi({ listJobs: async () => [sentJob({
+      jobClass: JOB_CLASS.SETTLED, counts: { pending: 0, failed: 0, issued: 0, done: 412 },
+    })] });
+    const m = mount(<DownloadJobPanel bucket="bkt" prefix="v/" api={api} capabilities={DESKTOP}
+      onStart={NOOP} onClose={NOOP} />);
+    await flush();
+
+    assert.ok(/confirmed/i.test(m.text()));
+    assert.notEqual(m.query('[data-testid="discard-job-9"]'), null);
+    m.cleanup();
+  });
+
+  test('a previous check‘s summary is shown from the job record, surviving panel close', async () => {
+    const api = fakeApi({ listJobs: async () => [sentJob({
+      lastVerify: { confirmed: 400, missing: 10, mismatched: 2, ambiguous: 0, renamed: 0, at: 1 },
+    })] });
+    const m = mount(<DownloadJobPanel bucket="bkt" prefix="v/" api={api} capabilities={CAN_PICK}
+      onStart={NOOP} onClose={NOOP} />);
+    await flush();
+
+    const summary = m.query('[data-testid="verified-job-9"]');
+    assert.notEqual(summary, null);
+    assert.match(summary.textContent, /400/, 'the confirmed count must be shown');
+    assert.match(summary.textContent, /10/, 'the missing count must be shown');
+    m.cleanup();
+  });
+});
+
+describe('DownloadJobPanel — the folder check', () => {
+  const sentJob = () => classified({
+    id: 'job-9', prefix: 'videos/', jobClass: JOB_CLASS.SENT,
+    counts: { pending: 0, failed: 0, issued: 412, done: 0 },
+  });
+
+  test('checking re-lists the jobs so verdicts and class changes appear', async () => {
+    let calls = 0;
+    const api = fakeApi({
+      listJobs: async () => {
+        calls += 1;
+        return calls === 1 ? [sentJob()] : [{ ...sentJob(), lastVerify: { confirmed: 412, missing: 0, mismatched: 0, ambiguous: 0, renamed: 0, at: 1 } }];
+      },
+    });
+    global.window.showDirectoryPicker = async () => ({ values: async function* () {} });
+
+    const m = mount(<DownloadJobPanel bucket="bkt" prefix="v/" api={api} capabilities={CAN_PICK}
+      onStart={NOOP} onClose={NOOP} />);
+    await flush();
+    fire(m.query('[data-testid="verify-job-9"]'), 'click');
+    await flush(); await flush();
+
+    assert.match(m.text(), /412 confirmed/, 'the fresh verdict must be rendered');
+    m.cleanup();
+  });
+
+  // Postmortem F4 regression: a verification failure was stored into state no branch ever
+  // rendered — the bucket-mismatch guard's message was unreachable by design.
+  test('a failing check shows its reason instead of silently doing nothing', async () => {
+    const api = fakeApi({
+      listJobs: async () => [sentJob()],
+      verify: async () => { throw new Error('That download was created for a different bucket. Reconnect to it to check it.'); },
+    });
+    global.window.showDirectoryPicker = async () => ({ values: async function* () {} });
+
+    const m = mount(<DownloadJobPanel bucket="bkt" prefix="v/" api={api} capabilities={CAN_PICK}
+      onStart={NOOP} onClose={NOOP} />);
+    await flush();
+    fire(m.query('[data-testid="verify-job-9"]'), 'click');
+    await flush(); await flush();
+
+    const err = m.query('[data-testid="verify-error"]');
+    assert.notEqual(err, null, 'the error must be rendered, not swallowed');
+    assert.match(err.textContent, /different bucket/);
+    m.cleanup();
+  });
+
+  // Cancelling the folder picker throws AbortError. That is a normal user action, not a
+  // failure worth an error banner.
+  test('a cancelled folder picker leaves no error behind', async () => {
+    global.window.showDirectoryPicker = async () => { const e = new Error('abort'); e.name = 'AbortError'; throw e; };
+    const api = fakeApi({ listJobs: async () => [sentJob()] });
+
+    const m = mount(<DownloadJobPanel bucket="bkt" prefix="v/" api={api} capabilities={CAN_PICK}
+      onStart={NOOP} onClose={NOOP} />);
+    await flush();
+    fire(m.query('[data-testid="verify-job-9"]'), 'click');
+    await flush();
+
+    assert.equal(m.query('[data-testid="verify-error"]'), null, 'cancelling is not an error');
     m.cleanup();
   });
 });

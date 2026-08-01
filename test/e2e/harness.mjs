@@ -127,6 +127,28 @@ export function collectDownloads(page) {
   };
 }
 
+// Playwright cannot drive a real showDirectoryPicker (it needs a user gesture and a
+// native dialog), so verification specs install a stub that yields a synthetic folder.
+// addInitScript, not evaluate: browser-capability.js feature-detects the picker at app
+// load, so the stub must exist BEFORE the bundle runs or the verify UI never renders.
+// `files` is [{ name, size }]; getFile() exposes only .size, which is all readFolder uses.
+export function installFakeDirectoryPicker(page, files) {
+  return page.addInitScript((list) => {
+    // Both halves of the real FileSystemDirectoryHandle surface that verification uses:
+    // values() for the streaming collision pass, getFileHandle() for per-item lookups.
+    const byName = new Map(list.map((f) => [f.name, f.size]));
+    window.showDirectoryPicker = async () => ({
+      values: async function* () {
+        for (const [name, size] of byName) yield { kind: 'file', name, getFile: async () => ({ size }) };
+      },
+      getFileHandle: async (name) => {
+        if (!byName.has(name)) throw new DOMException(name, 'NotFoundError');
+        return { getFile: async () => ({ size: byName.get(name) }) };
+      },
+    });
+  }, files);
+}
+
 export function waitForHttp(url, timeoutMs = 15000) {
   const deadline = Date.now() + timeoutMs;
   return (async () => {

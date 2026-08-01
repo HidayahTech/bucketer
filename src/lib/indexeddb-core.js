@@ -12,7 +12,7 @@
 // reads/writes a specific object store. Those belong in the domain modules.
 
 export const DB_NAME    = 's3browser';
-export const DB_VERSION = 4;
+export const DB_VERSION = 5;
 
 export const STORE       = 's3browser_uploads';
 export const LOG_STORE   = 'bucketer_upload_log';
@@ -39,6 +39,15 @@ export async function openDB() {
         const items = db.createObjectStore(DL_ITEM_STORE, { keyPath: 'id' });
         items.createIndex('by_job', 'jobId');
         items.createIndex('by_job_status', ['jobId', 'status']);
+      }
+      // v5: folder verification decides "two items claim one local name" with an O(1)
+      // index count instead of materialising the whole job (BUG-021's rule). Reached via
+      // the upgrade transaction so v4 databases gain the index in place.
+      {
+        const items = e.target.transaction.objectStore(DL_ITEM_STORE);
+        if (!items.indexNames.contains('by_job_localname')) {
+          items.createIndex('by_job_localname', ['jobId', 'localName']);
+        }
       }
     };
     req.onsuccess = e => { _db = e.target.result; resolve(_db); };

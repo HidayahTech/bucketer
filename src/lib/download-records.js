@@ -104,18 +104,29 @@ export async function appendManifestPage(jobId, items, enumeration = {}) {
 
     let added = 0;
     let bytes = 0;
+    let addedSendable = 0;
+    let bytesSendable = 0;
     for (const it of items) {
       const id = itemId(jobId, it.key);
       // Re-appending a page must not double-count, so only unseen ids move the counters.
       const existing = await reqResult(store.get(id));
-      if (!existing) { added += 1; bytes += it.size || 0; }
+      if (!existing) {
+        added += 1; bytes += it.size || 0;
+        // SKIPPED rows (archived objects) are recorded but can never be issued. Keeping
+        // them out of the sendable counters is what lets the offer button and the task
+        // row describe the same set of files ("Sent 400 of 400", not "of 412") — the
+        // total/bytesTotal pair stays as manifest truth for everything enumerated.
+        if (it.status !== ITEM_STATUS.SKIPPED) { addedSendable += 1; bytesSendable += it.size || 0; }
+      }
       store.put({ ...it, id, jobId });
     }
 
     job.counters = {
       ...job.counters,
-      total:      (job.counters?.total ?? 0) + added,
-      bytesTotal: (job.counters?.bytesTotal ?? 0) + bytes,
+      total:         (job.counters?.total ?? 0) + added,
+      bytesTotal:    (job.counters?.bytesTotal ?? 0) + bytes,
+      sendable:      (job.counters?.sendable ?? 0) + addedSendable,
+      bytesSendable: (job.counters?.bytesSendable ?? 0) + bytesSendable,
     };
     job.enumeration = { ...job.enumeration, ...enumeration };
     jobs.put(job);
@@ -124,6 +135,20 @@ export async function appendManifestPage(jobId, items, enumeration = {}) {
     throw err;
   }
 
+  return txDone(tx);
+}
+
+// Read-merge-write one job row in a single transaction. Exists because
+// saveJob({ ...snapshotFromRunStart, status }) is a stale-snapshot write: any field
+// written to the row between the snapshot and the save is silently clobbered
+// (postmortem F6 — a verify stamp could vanish under a finishing run). Every partial
+// job update goes through here; whole-record saveJob remains for job creation.
+export async function updateJob(id, patch) {
+  const db = await openDB();
+  const tx = db.transaction(DL_JOB_STORE, 'readwrite');
+  const store = tx.objectStore(DL_JOB_STORE);
+  const existing = await reqResult(store.get(id));
+  if (existing) store.put({ ...existing, ...patch });
   return txDone(tx);
 }
 
@@ -168,6 +193,44 @@ export async function countItemsByStatus(jobId, status) {
   const tx = db.transaction(DL_ITEM_STORE, 'readonly');
   const idx = tx.objectStore(DL_ITEM_STORE).index('by_job_status');
   return (await reqResult(idx.count(IDBKeyRange.only([jobId, status])))) ?? 0;
+}
+
+// How many items in this job claim a local name. Verification treats >1 as unverifiable
+// (two keys mapping onto one filename can never be attributed); an index count keeps that
+// decision O(1) in memory for a million-item job (BUG-021's rule).
+export async function countItemsByLocalName(jobId, localName) {
+  const db = await openDB();
+  const tx = db.transaction(DL_ITEM_STORE, 'readonly');
+  const idx = tx.objectStore(DL_ITEM_STORE).index('by_job_localname');
+  return (await reqResult(idx.count(IDBKeyRange.only([jobId, localName])))) ?? 0;
+}
+
+// Page through a job's items in stable primary-key order, `afterKey` exclusive. Unlike
+// paging on the by_job_status index, this order is immune to items changing status
+// mid-walk — which verification does constantly (ISSUED → DONE/FAILED) — so a batched
+// walk can close its transaction between pages, do async work, and never see an item
+// twice or skip one. Items of every status are returned; callers filter.
+export async function takeItemsPage(jobId, afterKey, limit) {
+  const db = await openDB();
+  const tx = db.transaction(DL_ITEM_STORE, 'readonly');
+  const store = tx.objectStore(DL_ITEM_STORE);
+  // Item ids are `${jobId}:${key}`; '￿' bounds the range to this job's ids.
+  const lower = afterKey == null ? itemId(jobId, '') : itemId(jobId, afterKey);
+  const range = IDBKeyRange.bound(lower, `${jobId}:￿`, afterKey != null, false);
+  const out = [];
+  const req = store.openCursor(range);
+
+  await new Promise((resolve, reject) => {
+    req.onsuccess = () => {
+      const cursor = req.result;
+      if (!cursor) return resolve();
+      out.push(cursor.value);
+      if (out.length >= limit) return resolve();
+      cursor.continue();
+    };
+    req.onerror = () => reject(req.error);
+  });
+  return out;
 }
 
 // Walk items of a given status with a cursor. Return false from `fn` to stop early.

@@ -269,7 +269,7 @@ export function createMockS3(opts = {}) {
 
     const objXml = page.map((k) => {
       const o = current(b, k);
-      return `<Contents><Key>${xmlEsc(k)}</Key><LastModified>${o.lastModified}</LastModified><ETag>${xmlEsc(o.etag)}</ETag><Size>${o.body.length}</Size><StorageClass>STANDARD</StorageClass></Contents>`;
+      return `<Contents><Key>${xmlEsc(k)}</Key><LastModified>${o.lastModified}</LastModified><ETag>${xmlEsc(o.etag)}</ETag><Size>${o.body.length}</Size><StorageClass>${xmlEsc(o.storageClass || 'STANDARD')}</StorageClass></Contents>`;
     }).join('');
     const cpXml = (token ? '' : [...commonPrefixes].sort().map((p) => `<CommonPrefixes><Prefix>${xmlEsc(p)}</Prefix></CommonPrefixes>`).join(''));
     sendXml(req, res, 200,
@@ -285,7 +285,7 @@ export function createMockS3(opts = {}) {
         const isLatest = i === vs.length - 1;
         const entry = `<Key>${xmlEsc(k)}</Key><VersionId>${v.versionId || 'null'}</VersionId><IsLatest>${isLatest}</IsLatest><LastModified>${v.lastModified}</LastModified>`;
         if (v.deleteMarker) markers.push(`<DeleteMarker>${entry}</DeleteMarker>`);
-        else versions.push(`<Version>${entry}<ETag>${xmlEsc(v.etag)}</ETag><Size>${v.body.length}</Size><StorageClass>STANDARD</StorageClass></Version>`);
+        else versions.push(`<Version>${entry}<ETag>${xmlEsc(v.etag)}</ETag><Size>${v.body.length}</Size><StorageClass>${xmlEsc(v.storageClass || 'STANDARD')}</StorageClass></Version>`);
       });
     }
     sendXml(req, res, 200, `<ListVersionsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Name>bucket</Name><Prefix>${xmlEsc(prefix)}</Prefix><IsTruncated>false</IsTruncated>${versions.join('')}${markers.join('')}</ListVersionsResult>`);
@@ -303,7 +303,11 @@ export function createMockS3(opts = {}) {
     const f = matchFault('PutObject', 'PUT', key); if (f) return sendError(req, res, f.status, f.code, f.message);
     const body = await readBody(req);
     const etag = `"${md5hex(body)}"`;
-    const ver = { versionId: b.versioning ? newId() : null, body, metadata: metaFromHeaders(req), contentType: req.headers['content-type'] || 'application/octet-stream', etag, lastModified: nowISO() };
+    // x-amz-storage-class rides along like real S3 (the SDK sends it for
+    // PutObjectCommand({ StorageClass })). Listings echo it, and a GET against an
+    // archived class fails — which is the whole reason archived-object flagging exists.
+    const storageClass = req.headers['x-amz-storage-class'] || 'STANDARD';
+    const ver = { versionId: b.versioning ? newId() : null, body, metadata: metaFromHeaders(req), contentType: req.headers['content-type'] || 'application/octet-stream', etag, lastModified: nowISO(), storageClass };
     putVersion(b, key, ver);
     res.writeHead(200, { ...corsHeaders(req), ETag: etag, ...(ver.versionId ? { 'x-amz-version-id': ver.versionId } : {}) });
     res.end();
@@ -350,6 +354,13 @@ export function createMockS3(opts = {}) {
 
     const o = current(b, key);
     if (!o) return sendError(req, res, 404, 'NoSuchKey', key);
+
+    // Real S3: a GET against GLACIER or DEEP_ARCHIVE fails with 403 InvalidObjectState
+    // until a RestoreObject completes. GLACIER_IR serves reads normally.
+    if (o.storageClass === 'GLACIER' || o.storageClass === 'DEEP_ARCHIVE') {
+      return sendError(req, res, 403, 'InvalidObjectState',
+        "The operation is not valid for the object's storage class");
+    }
 
     // A transfer that spans a change to the object must fail rather than silently splice two
     // versions together. If-Match is how a client asks for that guarantee.

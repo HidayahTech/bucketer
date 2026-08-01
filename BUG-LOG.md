@@ -4,6 +4,93 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-054 — A verified download job could become unreachable on every browser
+
+**Symptom.** Caught before release, by the 2026-08-01 independent postmortem (finding F3;
+also catalog defects 18/37), and reproduced live: verify a completed folder download whose
+check finds missing files, reopen the panel — zero rows. No resume for the failures the
+check itself marked retryable, no way to check again, and no Discard, so the manifest and
+its FAILED items sat in IndexedDB permanently. On Firefox and Safari even a *clean* job
+was unreachable, because the only row that could show it sat behind a Chromium-only
+capability gate. A paused job with both failures and issued files also rendered as two
+rows with two Discards.
+
+**Root cause.** The panel's sections came from two independent filters
+(status ≠ DONE ∧ remaining > 0; issued > 0 ∧ !verifiedAt) whose union was not total and
+whose intersection was not empty. Verification stamped `verifiedAt` (excluding the job
+from re-checking) and left `status` DONE (excluding it from resuming) — the promised
+retry was structurally unreachable. The section carrying Discard was capability-gated.
+
+**Fix.** One total classifier (`src/lib/download-lifecycle.js`): every persisted job maps
+to exactly one of unfinished/sent/settled, every class renders a row, every row carries
+Discard; capability gates may hide an action, never a row. A check that finds failures
+demotes DONE → PAUSED so the classifier lists it as resumable; `verifiedAt` became purely
+informational; verify results persist on the job (`lastVerify`) instead of dying with the
+component; verification errors render (they were previously stored into state no branch
+displayed — F4); end-of-run job writes go through a read-merge-write `updateJob` instead
+of a stale whole-record snapshot (F6). Verification itself became streaming — key-ordered
+item pages, per-name folder lookups, an O(1) `by_job_localname` index count for ambiguity
+— honoring the module family's own bounded-memory rule (F7 / BUG-021).
+
+**Why it wasn't caught earlier.** The feature's entire verification was a green unit and
+component suite; the flow "verify finds problems → user retries them" was never traced
+past its happy path, and no test asked "can the user still see this job afterwards?" The
+reachability question only has meaning across the whole UI, which no per-list test asks.
+
+**Test case.** `test/download-lifecycle.test.js` — the cross-product invariant (every
+count combination classifies; the F3 shape classifies unfinished);
+`test/e2e/browser/download-verify.test.mjs` — the full live flow: check finds problems →
+job resumable on-screen → resume → re-check → settles → discardable; plus the unstubbed
+"discardable without a picker" spec for the Firefox/Safari shape.
+
+---
+
+## BUG-055 — Archived files inflated every count the download promised
+
+**Symptom.** Caught before release (postmortem F5, catalog 17/19). With 12 of 412 files
+archived: the offer button said "Send 400 files (840 GB)" — the count for one set, the
+size for another — and after a clean run the queue row read "Sent 400 of 412 — check your
+downloads" forever, 12 files unaccounted with no explanation in sight.
+
+**Root cause.** `appendManifestPage` accumulated every recorded item into
+`counters.total`/`bytesTotal`, including SKIPPED (archived) rows that can never be
+issued, and both UI surfaces read those counters.
+
+**Fix.** The counters split: `total`/`bytesTotal` remain manifest truth;
+`sendable`/`bytesSendable` (SKIPPED excluded) are what the offer quotes, and the task
+total is the live PENDING count at run start — so a resume of 2 remaining files reads
+"Sent 2 of 2", not "Sent 2 of 3". Legacy manifests self-heal on first listing. The
+archived notice states both the count and the size set aside.
+
+**Test case.** `test/download-manifest.test.js` — "archived items are counted in the
+manifest totals but not the sendable counters"; component tests assert the offer button's
+count and bytes describe the same set; `test/e2e/node/download-archived.test.mjs` runs
+the pipeline against the real mock protocol (which now carries StorageClass). Browser-UI
+e2e of archived flagging remains impossible honestly — the app derives the provider from
+the endpoint, and a localhost mock can never detect as AWS; recorded here per the
+harness-fidelity rule instead of implied by a green lane.
+
+---
+
+## BUG-056 — A user's own "(1)"-suffixed file could silence a missing-download verdict
+
+**Symptom.** Caught before release (postmortem catalog defect 20). If the user's folder
+contained their own, unrelated `report (1).pdf`, a genuinely missing `report.pdf` from
+the job was reported "probably renamed by the browser" — exactly the reassurance that
+sends nobody looking for a file that never arrived.
+
+**Root cause.** The rename heuristic treated ANY collision-suffixed name as evidence for
+its base name, keyed on the name alone.
+
+**Fix.** A collision variant only counts as "probably ours, renamed" when its SIZE also
+matches the expected file; a wrong-size variant is somebody else's file and the verdict
+stays missing (and the item is marked FAILED, so a resume retries it).
+
+**Test case.** `test/download-verify.test.js` — "a collision-suffixed file of the WRONG
+size does not suppress a missing verdict" (and its right-size sibling).
+
+---
+
 ## BUG-052 — The CSP silently blocked every folder download on an http endpoint
 
 **Symptom.** Against any http endpoint — MinIO on a LAN is a first-class supported

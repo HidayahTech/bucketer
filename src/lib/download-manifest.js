@@ -14,13 +14,19 @@
 import { crawlPrefix } from './crawl-prefix.js';
 import { appendManifestPage, ITEM_STATUS } from './download-records.js';
 import { isDirectoryMarker, flatNameForKey, NAMING_MODES } from './download-naming.js';
+import { isArchivedStorageClass } from './storage-class.js';
 
 // enumerateJob(client, job, { onProgress, shouldCancel, maxKeys })
-// Returns { objects, bytes, cancelled, done } — counts, never keys.
+// Returns { objects, bytes, cancelled, done, archived, archivedBytes } — counts, never
+// keys. archivedBytes exists so the offer can quote the size of what will actually be
+// sent (bytes − archivedBytes): quoting the full total next to a reduced file count
+// described one set with the other's size (postmortem catalog defect 17).
 export async function enumerateJob(client, job, { onProgress, shouldCancel, maxKeys } = {}) {
   const mode = job.mode || NAMING_MODES.LEAF;
   let objects = 0;
   let bytes = 0;
+  let archived = 0;
+  let archivedBytes = 0;
 
   const result = await crawlPrefix(client, job.bucket, job.prefix, {
     maxKeys,
@@ -29,16 +35,26 @@ export async function enumerateJob(client, job, { onProgress, shouldCancel, maxK
     onBatch: async (contents, { nextToken }) => {
       // Folder markers are zero-byte keys ending in "/". They represent a directory that
       // may not even exist elsewhere in the listing, and nobody wants them as files.
+      // An archived object is recorded SKIPPED, never PENDING. A GET against GLACIER or
+      // DEEP_ARCHIVE fails until a restore completes, and the browser-managed tier cannot
+      // observe that failure — issuing them would report downloads that never arrive.
+      // The class is already in the listing, so this costs no extra request.
       const items = contents
         .filter(o => !isDirectoryMarker(o.Key))
-        .map(o => ({
-          key:          o.Key,
-          size:         o.Size ?? 0,
-          etag:         o.ETag,
-          lastModified: o.LastModified ? new Date(o.LastModified).getTime() : null,
-          localName:    flatNameForKey(o.Key, mode),
-          status:       ITEM_STATUS.PENDING,
-        }));
+        .map(o => {
+          const isArchived = isArchivedStorageClass(o.StorageClass, job.provider);
+          if (isArchived) { archived += 1; archivedBytes += o.Size ?? 0; }
+          return {
+            key:          o.Key,
+            size:         o.Size ?? 0,
+            etag:         o.ETag,
+            lastModified: o.LastModified ? new Date(o.LastModified).getTime() : null,
+            localName:    flatNameForKey(o.Key, mode),
+            storageClass: o.StorageClass ?? null,
+            status:       isArchived ? ITEM_STATUS.SKIPPED : ITEM_STATUS.PENDING,
+            ...(isArchived ? { skipReason: 'archived' } : {}),
+          };
+        });
 
       objects += items.length;
       for (const it of items) bytes += it.size;
@@ -54,5 +70,5 @@ export async function enumerateJob(client, job, { onProgress, shouldCancel, maxK
     },
   });
 
-  return { objects, bytes, cancelled: result.cancelled, done: !result.cancelled };
+  return { objects, bytes, archived, archivedBytes, cancelled: result.cancelled, done: !result.cancelled };
 }

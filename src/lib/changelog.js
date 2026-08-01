@@ -1,9 +1,20 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.43.2';
+export const CURRENT_VERSION = '1.44.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.44.0",
+    "date": "2026-08-01",
+    "title": "Know which files can't be downloaded, and which ones actually arrived",
+    "changes": [
+      "Files kept in Amazon's Glacier or Deep Archive storage can't be downloaded until you restore them, so a folder download now sets them aside and says so — how many, and how large — instead of queueing downloads that silently fail. The offer button counts and sizes only what will actually be sent. Glacier Instant Retrieval files download normally.",
+      "After a folder download, Bucketer can check your downloads folder (Chrome and Edge) and tell you what actually arrived. Each file is matched by name and size, so a half-finished download is reported as wrong-size rather than counted as complete. Files it finds missing are marked failed and go back in the to-send pile — resume, and only those are sent again. You can check as many times as you like.",
+      "A file the browser quietly renamed to \"name (1).ext\" is only reported as \"probably arrived\" when its size matches too; your own unrelated files with that naming pattern no longer hide a genuinely missing download.",
+      "Every download job you've run now stays visible until you discard it — resumable if work remains, checkable once sent, and always discardable, on every browser. Previously a finished job vanished (or worse, lingered invisibly), and there are tests that fail if any job state can ever become unreachable again."
+    ]
+  },
   {
     "version": "1.43.2",
     "date": "2026-08-01",

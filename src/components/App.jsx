@@ -60,11 +60,13 @@ import { taskStore } from '../lib/task-store.js';
 import { createDeleteTask, createTransferTask, createDownloadTask, engineUpdateToPatch } from '../lib/queue-tasks.js';
 import { DownloadJobPanel } from './DownloadJobPanel.jsx';
 import {
-  saveJob, loadJob, loadAllJobs, deleteJob, countItemsByStatus, resetFailedToPending,
-  ITEM_STATUS, JOB_STATUS,
+  saveJob, loadJob, loadAllJobs, deleteJob, updateJob, countItemsByStatus,
+  eachItemByStatus, resetFailedToPending, ITEM_STATUS, JOB_STATUS,
 } from '../lib/download-records.js';
 import { enumerateJob } from '../lib/download-manifest.js';
 import { runDownloadJob, jobOutcome } from '../lib/download-queue.js';
+import { classifyJob } from '../lib/download-lifecycle.js';
+import { verifyJob } from '../lib/download-verify.js';
 import { issueBrowserDownload } from '../lib/download-issue.js';
 import { probeUrl, blockedMessage } from '../lib/download-preflight.js';
 import { detectCapabilities } from '../lib/browser-capability.js';
@@ -520,36 +522,75 @@ export function App() {
   // never derived from the browser's name — see src/lib/browser-capability.js.
   const browserCapabilities = useMemo(() => detectCapabilities(), []);
 
+  // A run in flight is the task queue's business; its job must not also appear in the
+  // panel's lists (it would offer Resume on a job already running). Ref, not state: the
+  // download API is a stable memo and reads it at call time.
+  const activeDownloadJobs = useRef(new Set());
+
   // Record/enumeration wiring handed to DownloadJobPanel, which stays free of IndexedDB
   // and the SDK. Rebuilt only when the connection changes.
   const downloadApi = useMemo(() => ({
-    listUnfinished: async () => {
+    // Every persisted job of this bucket, classified. ONE list, one classifier — the two
+    // independent filters this replaces could show a job twice or, worse, not at all
+    // (postmortem F3/F6): a job invisible to every list has no Discard, so its manifest
+    // was permanent. classifyJob is total, so every job lands in exactly one section.
+    listJobs: async () => {
       const jobs = await loadAllJobs();
-      const mine = jobs.filter(j => j.bucket === credentials.bucket && j.status !== JOB_STATUS.DONE);
-      // Failed items count as outstanding: a resume retries them, so a job whose only
-      // remaining work is failures must still be offered rather than looking complete.
-      const withRemaining = await Promise.all(mine.map(async j => ({
-        ...j,
-        remaining: await countItemsByStatus(j.id, ITEM_STATUS.PENDING)
-                 + await countItemsByStatus(j.id, ITEM_STATUS.FAILED),
-      })));
-      return withRemaining.filter(j => j.remaining > 0);
+      const mine = jobs.filter(j => j.bucket === credentials.bucket && !activeDownloadJobs.current.has(j.id));
+      return Promise.all(mine.map(async j => {
+        // Jobs enumerated before the sendable counters existed self-heal on first sight:
+        // SKIPPED rows are bounded by the archived count, so this walk is small.
+        let counters = j.counters ?? {};
+        if (counters.sendable == null) {
+          let skipped = 0, skippedBytes = 0;
+          await eachItemByStatus(j.id, ITEM_STATUS.SKIPPED, (it) => { skipped += 1; skippedBytes += it.size || 0; });
+          counters = {
+            ...counters,
+            sendable:      (counters.total ?? 0) - skipped,
+            bytesSendable: (counters.bytesTotal ?? 0) - skippedBytes,
+          };
+          await updateJob(j.id, { counters });
+        }
+        const counts = {
+          pending: await countItemsByStatus(j.id, ITEM_STATUS.PENDING),
+          failed:  await countItemsByStatus(j.id, ITEM_STATUS.FAILED),
+          issued:  await countItemsByStatus(j.id, ITEM_STATUS.ISSUED),
+          done:    await countItemsByStatus(j.id, ITEM_STATUS.DONE),
+        };
+        return { ...j, counters, counts, jobClass: classifyJob(counts) };
+      }));
     },
     startJob: async ({ bucket, prefix, mode }) => {
       const job = {
         id: crypto.randomUUID(),
         bucket, prefix, mode,
+        // Recorded because a manifest outlives the session that built it, and the archived
+        // check at enumeration is provider-specific. Jobs created before this field
+        // existed have none, which correctly flags nothing rather than guessing AWS.
+        provider: credentials.provider || detectProvider(credentials.endpoint),
         status: JOB_STATUS.ENUMERATING,
         enumeration: {},
-        counters: { total: 0, bytesTotal: 0 },
+        counters: { total: 0, bytesTotal: 0, sendable: 0, bytesSendable: 0 },
         createdAt: Date.now(),
       };
       await saveJob(job);
       return job;
     },
+    // The directory handle is obtained in the component, because showDirectoryPicker
+    // needs a user gesture and cannot be called from here. The bucket is re-checked for
+    // the same reason handleDownloadStart re-checks it: a manifest outlives the session
+    // that built it, and a stale list surviving a reconnect would otherwise verify one
+    // bucket's job against another bucket's session.
+    verify: async (jobId, dirHandle) => {
+      const job = await loadJob(jobId);
+      if (!job || job.bucket !== credentials.bucket) {
+        throw new Error('That download was created for a different bucket. Reconnect to it to check it.');
+      }
+      return verifyJob(jobId, dirHandle);
+    },
     enumerate: (job, opts) => enumerateJob(client, job, opts),
     discard: (id) => deleteJob(id),
-  }), [client, credentials.bucket]);
+  }), [client, credentials.bucket, credentials.provider, credentials.endpoint]);
 
   // The panel has already listed the folder and taken the user's confirmation, so this
   // starts issuing straight away. Note it never touches capabilities: presigning is a
@@ -559,7 +600,7 @@ export function App() {
     if (!fresh) return;
 
     // A manifest outlives the session that built it. Nothing today can reach here with a
-    // job from another connection — listUnfinished() filters by bucket, and new jobs take
+    // job from another connection — listJobs() filters by bucket, and new jobs take
     // theirs from the live one — but the two are separate facts stored in separate places,
     // so the match is checked rather than assumed. Without this, a stale job would presign
     // its own recorded bucket using the *current* client, signing for a bucket the user is
@@ -573,11 +614,17 @@ export function App() {
     // previous run could report them, and a resume only picks up PENDING.
     await resetFailedToPending(fresh.id);
 
-    const total = fresh.counters?.total ?? 0;
+    // The task total is what THIS run will send: the live PENDING count, taken after the
+    // failed-reset. Not counters.total — SKIPPED (archived) items are in the manifest but
+    // can never be issued, and a row that ends "Sent 400 of 412" reads as 12 files lost
+    // (postmortem F5). Not counters.sendable either — a resume sends the remainder, and
+    // "Sent 2 of 2" is what a completed 2-file resume looks like, not "Sent 2 of 3".
+    const total = await countItemsByStatus(fresh.id, ITEM_STATUS.PENDING);
     const task = createDownloadTask({ fileCount: total, bucket: fresh.bucket, capturedPrefix: fresh.prefix });
     const id = taskStore.add(task);
     taskStore.update(id, { subPhase: null, total }, true);
-    await saveJob({ ...fresh, status: JOB_STATUS.RUNNING });
+    activeDownloadJobs.current.add(fresh.id);
+    await updateJob(fresh.id, { status: JOB_STATUS.RUNNING });
 
     const presign = (key, filename) => getSignedUrl(
       client,
@@ -607,16 +654,25 @@ export function App() {
         errors,
       }, true);
 
-      // The manifest is only dead weight when nothing failed. Keeping it after a run with
-      // failures is what lets a resume retry just those files instead of re-enumerating and
-      // re-issuing the whole job.
-      if (jobOutcome(result).keep) await saveJob({ ...fresh, status: JOB_STATUS.PAUSED });
-      else await deleteJob(fresh.id);
+      // A manifest is kept whenever the run left something to act on — failures to retry,
+      // a block to resume, or issued files whose arrival can still be verified. A run
+      // that issued cleanly is DONE rather than PAUSED: nothing left to send, only to
+      // check. updateJob, not saveJob({...fresh}): the run-start snapshot is stale by now
+      // and a whole-record write would clobber anything written to the row meanwhile
+      // (postmortem F6).
+      if (jobOutcome(result).keep) {
+        const resumable = result.failed > 0 || result.cancelled || result.blocked;
+        await updateJob(fresh.id, { status: resumable ? JOB_STATUS.PAUSED : JOB_STATUS.DONE });
+      } else {
+        await deleteJob(fresh.id);
+      }
     } catch (err) {
       taskStore.update(id, {
         status: 'done', subPhase: null,
         errors: [{ key: '(unexpected)', message: err.message || String(err) }],
       }, true);
+    } finally {
+      activeDownloadJobs.current.delete(fresh.id);
     }
   }
 

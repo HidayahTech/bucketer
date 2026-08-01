@@ -7,6 +7,13 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.44.0] — 2026-08-01 — Know which files can't be downloaded, and which ones actually arrived
+
+- Files kept in Amazon's Glacier or Deep Archive storage can't be downloaded until you restore them, so a folder download now sets them aside and says so — how many, and how large — instead of queueing downloads that silently fail. The offer button counts and sizes only what will actually be sent. Glacier Instant Retrieval files download normally.
+- After a folder download, Bucketer can check your downloads folder (Chrome and Edge) and tell you what actually arrived. Each file is matched by name and size, so a half-finished download is reported as wrong-size rather than counted as complete. Files it finds missing are marked failed and go back in the to-send pile — resume, and only those are sent again. You can check as many times as you like.
+- A file the browser quietly renamed to "name (1).ext" is only reported as "probably arrived" when its size matches too; your own unrelated files with that naming pattern no longer hide a genuinely missing download.
+- Every download job you've run now stays visible until you discard it — resumable if work remains, checkable once sent, and always discardable, on every browser. Previously a finished job vanished (or worse, lingered invisibly), and there are tests that fail if any job state can ever become unreachable again.
+
 ## [1.43.2] — 2026-08-01 — Folder downloads now actually download, everywhere
 
 - Fixed two serious problems in the folder download shipped in v1.43.0. First: against a plain-http storage endpoint (a MinIO box on your LAN, for example), the page's own security policy silently blocked every download — the app said "Sent N of N" while nothing arrived at all. Second: on any real network, files whose response took longer than a quarter-second could be silently cancelled by the next file being issued; a 40-file test at realistic latency delivered exactly half. Both are fixed and both now have tests that fail if they come back. (BUG-052, BUG-053)

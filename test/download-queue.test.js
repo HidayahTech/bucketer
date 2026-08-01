@@ -178,8 +178,16 @@ describe('runDownloadJob', () => {
 // re-issues the whole job — the worst outcome precisely in the large-job case this feature
 // exists for.
 describe('jobOutcome', () => {
-  test('a clean run has nothing worth keeping', () => {
-    assert.deepEqual(jobOutcome({ cancelled: false, failed: 0 }), { keep: false });
+  test('a run that did nothing at all has nothing worth keeping', () => {
+    assert.deepEqual(jobOutcome({ cancelled: false, failed: 0, issued: 0 }), { keep: false });
+  });
+
+  // A clean run used to be deleted immediately. It is kept so the read-only folder
+  // verification has something to check against — safe to reinstate now because the
+  // lifecycle classifier guarantees every retained job renders a row with Discard
+  // (the first shipping of this retention lacked that guarantee: postmortem F3).
+  test('a clean run keeps its manifest so what it sent can be verified', () => {
+    assert.equal(jobOutcome({ cancelled: false, failed: 0, issued: 412 }).keep, true);
   });
 
   test('a run with failures keeps its manifest so the failures can be retried', () => {

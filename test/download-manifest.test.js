@@ -164,3 +164,76 @@ describe('enumerateJob', () => {
     assert.equal((await loadJob('job-1')).enumeration.done, true);
   });
 });
+
+// StorageClass rides along on every ListObjectsV2 entry, so archived objects are knowable
+// at enumeration for free. They are marked SKIPPED rather than issued: a GET against
+// GLACIER or DEEP_ARCHIVE fails until a restore completes, and this tier cannot observe
+// that failure — it would report thousands of "issued" downloads that never arrive.
+describe('enumerateJob — archived objects', () => {
+  beforeEach(reset);
+
+  const archived = (Key, StorageClass) => ({ ...obj(Key), StorageClass });
+  // The provider is recorded on the job at creation; enumeration reads it from there.
+  const seed = async (provider) => { await saveJob(job({ provider })); return loadJob('job-1'); };
+
+  test('marks GLACIER and DEEP_ARCHIVE objects skipped on AWS, leaving the rest pending', async () => {
+    const client = mockClient([{ contents: [
+      archived('cold.bin', 'GLACIER'),
+      archived('frozen.bin', 'DEEP_ARCHIVE'),
+      archived('warm.bin', 'STANDARD'),
+    ] }]);
+
+    const result = await enumerateJob(client, await seed('aws'), {});
+
+    assert.deepEqual(await keysOf('job-1', ITEM_STATUS.PENDING), ['warm.bin']);
+    assert.deepEqual(await keysOf('job-1', ITEM_STATUS.SKIPPED), ['cold.bin', 'frozen.bin']);
+    assert.equal(result.archived, 2, 'the count is what the panel warns with');
+  });
+
+  test('leaves GLACIER_IR pending: instant retrieval serves a GET normally', async () => {
+    const client = mockClient([{ contents: [archived('ir.bin', 'GLACIER_IR')] }]);
+
+    const result = await enumerateJob(client, await seed('aws'), {});
+
+    assert.deepEqual(await keysOf('job-1', ITEM_STATUS.PENDING), ['ir.bin']);
+    assert.equal(result.archived, 0);
+  });
+
+  test('flags nothing when the job has no recorded provider', async () => {
+    const client = mockClient([{ contents: [archived('cold.bin', 'GLACIER')] }]);
+
+    const result = await enumerateJob(client, await seed(undefined), {});
+
+    assert.deepEqual(await keysOf('job-1', ITEM_STATUS.PENDING), ['cold.bin']);
+    assert.equal(result.archived, 0);
+  });
+
+  test('flags nothing on a non-AWS provider', async () => {
+    const client = mockClient([{ contents: [archived('cold.bin', 'GLACIER')] }]);
+
+    const result = await enumerateJob(client, await seed('b2'), {});
+
+    assert.deepEqual(await keysOf('job-1', ITEM_STATUS.PENDING), ['cold.bin']);
+    assert.equal(result.archived, 0);
+  });
+
+  // Postmortem F5 / catalog defect 19 regression: archived items must not inflate what
+  // the task row and offer promise. total/bytesTotal remain manifest truth (everything
+  // enumerated); sendable/bytesSendable describe only what can actually be issued, and
+  // both UI surfaces read the sendable pair.
+  test('archived items are counted in the manifest totals but not the sendable counters', async () => {
+    const client = mockClient([{ contents: [
+      { ...archived('cold.bin', 'GLACIER'), Size: 100 },
+      { ...archived('warm.bin', 'STANDARD'), Size: 7 },
+    ] }]);
+
+    const result = await enumerateJob(client, await seed('aws'), {});
+    const j = await loadJob('job-1');
+
+    assert.equal(j.counters.total, 2);
+    assert.equal(j.counters.bytesTotal, 107);
+    assert.equal(j.counters.sendable, 1, 'the task row must be able to say "Sent 1 of 1"');
+    assert.equal(j.counters.bytesSendable, 7, 'the offer size must describe the sendable set');
+    assert.equal(result.archivedBytes, 100, 'the enumeration result reports what was set aside');
+  });
+});
