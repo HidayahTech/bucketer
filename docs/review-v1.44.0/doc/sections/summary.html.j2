@@ -2,7 +2,7 @@
 <section>
   <h2>Summary</h2>
 
-  {{ c.warn('SUPERSEDED — 2026-08-01', 'An independent postmortem (docs/postmortem-2026-07-31/independent-analysis-2026-08-01.md) found two critical defects in the v1.43.0 download mechanism this report describes as shipped and verified: the bundle CSP silently blocks all folder downloads on http endpoints, and reassigning the reused frame loses files whose response latency exceeds the issue pacing. The v1.44.0 features described here did not ship; their implementation is parked on wip/v1.44.0-archived-verify pending a lifecycle redesign. Figures and claims in this report are corrected inline where wrong, but the postmortem, not this report, is the authoritative account.') }}
+  {{ c.warn('SUPERSEDED — 2026-08-01', 'An independent postmortem (docs/postmortem-2026-07-31/independent-analysis-2026-08-01.md) found two critical defects in the v1.43.0 download mechanism this report describes as shipped and verified: the bundle CSP silently blocks all folder downloads on http endpoints, and reassigning the reused frame loses files whose response latency exceeds the issue pacing. The v1.44.0 features described here were subsequently redesigned around a download-lifecycle model and committed to the download-manager-stage1 branch as v1.44.0 and v1.44.1; the whole v1.40.0–v1.44.1 download arc remains branch-only — never merged to main, never deployed, production held at v1.39.1 throughout, and no user ran it. Figures and claims in this report are corrected inline where wrong, but the postmortem, not this report, is the authoritative account.') }}
 
   <p class="lede">Bucketer's folder download hands each file to the browser's own download
   manager. That mechanism has no size ceiling, which is why it exists — but it is also blind:
@@ -45,7 +45,7 @@
     </tr>
     <tr>
       <td>5</td>
-      <td><strong>The end-to-end suite had a crash of its own</strong>, failing roughly 55% of
+      <td><strong>The end-to-end suite had a crash of its own</strong>, failing roughly 64% of
           full runs in one lane, with a misleading zero in the failure column.</td>
       <td>Diagnosed to a single instruction in the system C library. Not caused by this work;
           filed with the analysis attached.</td>
@@ -58,5 +58,8 @@
 
   <p><strong>v1.43.0</strong> — findings 1 and 2 — is committed, tagged and pushed.
   <strong>v1.44.0</strong> — findings 3 and 4 — is built and tested but not yet committed.
-  Finding 5 is filed as an issue against the test infrastructure and is not fixed.</p>
+  Finding 5 is filed as an issue against the test infrastructure and is not fixed.
+  <em>(Correction 2026-08-01: v1.44.0 and a follow-up v1.44.1 were subsequently
+  committed and tagged on the <code>download-manager-stage1</code> branch — see the
+  note at the head of this section.)</em></p>
 </section>

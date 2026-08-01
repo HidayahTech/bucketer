@@ -23,7 +23,7 @@ cover:
     - label: "Prepared by"
       value: "{{ org.legal_name }}"
     - label: "Status"
-      value: "{{ report.version }} — v1.43.0 shipped, v1.44.0 ready to commit"
+      value: "{{ report.version }} — v1.43.0–v1.44.1 on the download-manager-stage1 branch; not deployed"
     - label: "Date"
       value: "{{ report.date | longdate }}"
 
