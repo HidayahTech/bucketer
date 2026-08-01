@@ -67,6 +67,7 @@ import { enumerateJob } from '../lib/download-manifest.js';
 import { runDownloadJob, jobOutcome } from '../lib/download-queue.js';
 import { issueBrowserDownload } from '../lib/download-issue.js';
 import { probeUrl, blockedMessage } from '../lib/download-preflight.js';
+import { readFolder, verifyJob } from '../lib/download-verify.js';
 import { detectCapabilities } from '../lib/browser-capability.js';
 import { presignDownloadParams } from '../lib/presign-params.js';
 import { DOWNLOAD_PRESIGN_EXPIRES, DOWNLOAD_ISSUE_DELAY_MS } from '../lib/constants.js';
@@ -539,6 +540,10 @@ export function App() {
       const job = {
         id: crypto.randomUUID(),
         bucket, prefix, mode,
+        // Recorded because a manifest outlives the session that built it, and the archived
+        // check at enumeration is provider-specific. Jobs created before this field existed
+        // have none, which correctly flags nothing rather than guessing AWS.
+        provider: credentials.provider || detectProvider(credentials.endpoint),
         status: JOB_STATUS.ENUMERATING,
         enumeration: {},
         counters: { total: 0, bytesTotal: 0 },
@@ -547,9 +552,35 @@ export function App() {
       await saveJob(job);
       return job;
     },
+    // Jobs that sent files and have never been checked against a folder. This tier cannot
+    // observe whether anything arrived, so until the user verifies, "issued" is all we know.
+    listVerifiable: async () => {
+      const jobs = await loadAllJobs();
+      const mine = jobs.filter(j => j.bucket === credentials.bucket && !j.verifiedAt);
+      const withIssued = await Promise.all(mine.map(async j => ({
+        ...j,
+        issued: await countItemsByStatus(j.id, ITEM_STATUS.ISSUED),
+      })));
+      return withIssued.filter(j => j.issued > 0);
+    },
+    // The directory handle is obtained in the component, because showDirectoryPicker needs
+    // a user gesture and cannot be called from here.
+    //
+    // The bucket is re-checked for the same reason handleDownloadStart re-checks it: a
+    // manifest outlives the session that built it, and the job's bucket and the live
+    // connection are separate facts in separate places. listVerifiable already filters by
+    // bucket, so this is unreachable today — it guards a stale list surviving a reconnect,
+    // which would otherwise mark one bucket's job verified during another's session.
+    verify: async (jobId, dirHandle) => {
+      const job = await loadJob(jobId);
+      if (!job || job.bucket !== credentials.bucket) {
+        throw new Error('That download was created for a different bucket. Reconnect to it to check it.');
+      }
+      return verifyJob(jobId, await readFolder(dirHandle));
+    },
     enumerate: (job, opts) => enumerateJob(client, job, opts),
     discard: (id) => deleteJob(id),
-  }), [client, credentials.bucket]);
+  }), [client, credentials.bucket, credentials.provider, credentials.endpoint]);
 
   // The panel has already listed the folder and taken the user's confirmation, so this
   // starts issuing straight away. Note it never touches capabilities: presigning is a
@@ -607,11 +638,15 @@ export function App() {
         errors,
       }, true);
 
-      // The manifest is only dead weight when nothing failed. Keeping it after a run with
-      // failures is what lets a resume retry just those files instead of re-enumerating and
-      // re-issuing the whole job.
-      if (jobOutcome(result).keep) await saveJob({ ...fresh, status: JOB_STATUS.PAUSED });
-      else await deleteJob(fresh.id);
+      // A manifest is kept whenever the run left something to act on — failures to retry, a
+      // block to resume, or files whose arrival can still be verified. A run that issued
+      // cleanly is DONE rather than PAUSED: there is nothing left to send, only to check.
+      if (jobOutcome(result).keep) {
+        const resumable = result.failed > 0 || result.cancelled || result.blocked;
+        await saveJob({ ...fresh, status: resumable ? JOB_STATUS.PAUSED : JOB_STATUS.DONE });
+      } else {
+        await deleteJob(fresh.id);
+      }
     } catch (err) {
       taskStore.update(id, {
         status: 'done', subPhase: null,

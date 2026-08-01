@@ -313,3 +313,117 @@ describe('DownloadJobPanel', () => {
     m.cleanup();
   });
 });
+
+// Archived objects are recorded SKIPPED at enumeration, so they are counted in the total
+// but will never be issued. Saying "Send 412 files" when 12 of them cannot be sent is a
+// lie the user only discovers by their absence — this tier cannot report their failure.
+describe('DownloadJobPanel — archived objects', () => {
+  const withArchived = (archived) => fakeApi({
+    enumerate: async () => ({ objects: 412, bytes: 840 * 1024 ** 3, archived, done: true, cancelled: false }),
+  });
+
+  test('warns when some objects are archived, naming the count', async () => {
+    const m = mount(<DownloadJobPanel bucket="bkt" prefix="v/" api={withArchived(12)} onStart={NOOP} onClose={NOOP} />);
+    fire(m.query('[data-testid="scan"]'), 'click');
+    await flush();
+
+    const text = m.text();
+    assert.match(text, /12/, 'the archived count must be shown');
+    assert.match(text, /archiv/i, 'the reason must be named, not just a smaller number');
+    m.cleanup();
+  });
+
+  test('offers to send only the objects that can actually be sent', async () => {
+    const m = mount(<DownloadJobPanel bucket="bkt" prefix="v/" api={withArchived(12)} onStart={NOOP} onClose={NOOP} />);
+    fire(m.query('[data-testid="scan"]'), 'click');
+    await flush();
+
+    assert.match(m.query('[data-testid="start"]').textContent, /\b400\b/,
+      'the button must offer 412 - 12 = 400, not the raw total');
+    m.cleanup();
+  });
+
+  test('says nothing about archiving when nothing is archived', async () => {
+    const m = mount(<DownloadJobPanel bucket="bkt" prefix="v/" api={withArchived(0)} onStart={NOOP} onClose={NOOP} />);
+    fire(m.query('[data-testid="scan"]'), 'click');
+    await flush();
+
+    assert.equal(/archiv/i.test(m.text()), false, 'no archived files means no archive warning');
+    assert.match(m.query('[data-testid="start"]').textContent, /\b412\b/);
+    m.cleanup();
+  });
+
+  // Every object archived means there is nothing to send at all.
+  test('does not offer to start when every object is archived', async () => {
+    const m = mount(<DownloadJobPanel bucket="bkt" prefix="v/" api={withArchived(412)} onStart={NOOP} onClose={NOOP} />);
+    fire(m.query('[data-testid="scan"]'), 'click');
+    await flush();
+
+    assert.equal(m.query('[data-testid="start"]'), null, 'nothing sendable means no start button');
+    assert.match(m.text(), /archiv/i);
+    m.cleanup();
+  });
+});
+
+// A job that issued files is kept so its arrival can be checked. Verification reads the
+// folder the user picks — read-only, no requests, no egress — and is the only thing that
+// can turn "we handed this over" into "this actually landed".
+describe('DownloadJobPanel — verifying what arrived', () => {
+  const CAN_PICK = { ...DESKTOP, directoryPicker: true };
+  const verifiable = (over = {}) => fakeApi({
+    listVerifiable: async () => [{ id: 'job-9', prefix: 'videos/', issued: 412 }],
+    ...over,
+  });
+
+  test('offers to verify a job that sent files', async () => {
+    const m = mount(<DownloadJobPanel bucket="bkt" prefix="v/" api={verifiable()} capabilities={CAN_PICK}
+      onStart={NOOP} onClose={NOOP} />);
+    await flush();
+
+    assert.ok(m.query('[data-testid="verify-job-9"]'), 'a verify action must be offered');
+    assert.match(m.text(), /412/);
+    m.cleanup();
+  });
+
+  // showDirectoryPicker is Chromium-only. Offering a button that throws on Firefox and
+  // Safari would be worse than saying nothing.
+  test('offers no verification when the browser has no directory picker', async () => {
+    const m = mount(<DownloadJobPanel bucket="bkt" prefix="v/" api={verifiable()} capabilities={DESKTOP}
+      onStart={NOOP} onClose={NOOP} />);
+    await flush();
+
+    assert.equal(m.query('[data-testid="verify-job-9"]'), null);
+    m.cleanup();
+  });
+
+  test('reports what the folder reading found', async () => {
+    const api = verifiable({ verify: async () => ({ confirmed: 400, missing: 10, mismatched: 2, ambiguous: 0, renamed: 0 }) });
+    global.window.showDirectoryPicker = async () => ({ values: async function* () {} });
+
+    const m = mount(<DownloadJobPanel bucket="bkt" prefix="v/" api={api} capabilities={CAN_PICK}
+      onStart={NOOP} onClose={NOOP} />);
+    await flush();
+    fire(m.query('[data-testid="verify-job-9"]'), 'click');
+    await flush();
+
+    const text = m.text();
+    assert.match(text, /400/, 'the confirmed count must be shown');
+    assert.match(text, /10/, 'the missing count must be shown');
+    m.cleanup();
+  });
+
+  // Cancelling the folder picker throws AbortError. That is a normal user action, not a
+  // failure worth an error banner.
+  test('a cancelled folder picker leaves no error behind', async () => {
+    global.window.showDirectoryPicker = async () => { const e = new Error('abort'); e.name = 'AbortError'; throw e; };
+
+    const m = mount(<DownloadJobPanel bucket="bkt" prefix="v/" api={verifiable()} capabilities={CAN_PICK}
+      onStart={NOOP} onClose={NOOP} />);
+    await flush();
+    fire(m.query('[data-testid="verify-job-9"]'), 'click');
+    await flush();
+
+    assert.equal(/could not|failed|error/i.test(m.text()), false, 'cancelling is not an error');
+    m.cleanup();
+  });
+});

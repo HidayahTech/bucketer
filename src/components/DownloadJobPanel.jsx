@@ -24,11 +24,21 @@ export function DownloadJobPanel({ bucket, prefix = '', api, onStart, onClose, o
                                    capabilities = null }) {
   const [mode, setMode] = useState(NAMING_MODES.LEAF);
   const [phase, setPhase] = useState('options');   // options | listing | ready | error
-  const [counts, setCounts] = useState({ objects: 0, bytes: 0 });
+  const [counts, setCounts] = useState({ objects: 0, bytes: 0, archived: 0 });
   const [job, setJob] = useState(null);
   const [error, setError] = useState(null);
   const [unfinished, setUnfinished] = useState([]);
+  const [verifiable, setVerifiable] = useState([]);
+  const [verifyResults, setVerifyResults] = useState({});
   const scanCancelled = useRef(false);
+
+  // showDirectoryPicker is Chromium-only. Offering a button that throws on Firefox and
+  // Safari is worse than offering nothing, so the whole section is gated on the capability
+  // rather than on a browser name.
+  const canVerify = !!capabilities?.directoryPicker;
+
+  // What the offer may promise: archived objects are in the total but can never be issued.
+  const sendable = Math.max(0, counts.objects - (counts.archived || 0));
 
   const scope = prefix ? `${bucket}/${prefix}` : bucket;
 
@@ -48,9 +58,40 @@ export function DownloadJobPanel({ bucket, prefix = '', api, onStart, onClose, o
     return () => { live = false; };
   }, [api]);
 
+  // Jobs that handed files over and have never been checked against a folder.
+  useEffect(() => {
+    let live = true;
+    api.listVerifiable?.().then(
+      jobs => { if (live) setVerifiable(jobs || []); },
+      () => { /* nothing to verify is not an error */ },
+    );
+    return () => { live = false; };
+  }, [api]);
+
   async function discardUnfinished(id) {
     try { await api.discard(id); } catch { /* best effort */ }
     setUnfinished(list => list.filter(j => j.id !== id));
+    setVerifiable(list => list.filter(j => j.id !== id));
+  }
+
+  // The picker must be opened from the click itself — it needs a user gesture, which is why
+  // verification can never be automatic.
+  async function verify(id) {
+    let dir;
+    try {
+      dir = await window.showDirectoryPicker({ id: 'bucketer-downloads', mode: 'read' });
+    } catch (err) {
+      // Dismissing the picker throws AbortError. That is the user changing their mind, not
+      // a failure, and must not leave an error banner behind.
+      if (err?.name !== 'AbortError') setError(err);
+      return;
+    }
+    try {
+      const summary = await api.verify(id, dir);
+      setVerifyResults(prev => ({ ...prev, [id]: summary }));
+    } catch (err) {
+      setError(err);
+    }
   }
 
   async function scan() {
@@ -71,12 +112,12 @@ export function DownloadJobPanel({ bucket, prefix = '', api, onStart, onClose, o
       if (result.cancelled) {
         try { await api.discard(created.id); } catch { /* best effort */ }
         setJob(null);
-        setCounts({ objects: 0, bytes: 0 });
+        setCounts({ objects: 0, bytes: 0, archived: 0 });
         setPhase('options');
         return;
       }
 
-      setCounts({ objects: result.objects, bytes: result.bytes });
+      setCounts({ objects: result.objects, bytes: result.bytes, archived: result.archived ?? 0 });
       setPhase('ready');
     } catch (err) {
       // An enumeration failure leaves nothing usable behind, so drop the empty job rather
@@ -160,6 +201,41 @@ export function DownloadJobPanel({ bucket, prefix = '', api, onStart, onClose, o
           </div>
         )}
 
+        {/* This tier hands files to the browser and never learns whether they arrived, so a
+            job stays "sent" until the user points at the folder they landed in. Reading it
+            costs nothing — no request, no egress — and is the only way to turn "handed over"
+            into "actually there". */}
+        {phase === 'options' && canVerify && verifiable.length > 0 && (
+          <div class="download-job-unfinished">
+            <p class="download-job-unfinished-title">Sent, but not yet checked</p>
+            {verifiable.map(v => (
+              <div key={v.id} class="download-job-unfinished-row">
+                <span class="download-job-unfinished-scope">
+                  {v.prefix || bucket} — {v.issued.toLocaleString()} files sent
+                </span>
+                {verifyResults[v.id] ? (
+                  <span class="download-job-unfinished-scope" data-testid={`verified-${v.id}`}>
+                    {verifyResults[v.id].confirmed.toLocaleString()} confirmed
+                    {verifyResults[v.id].missing > 0 && `, ${verifyResults[v.id].missing.toLocaleString()} missing`}
+                    {verifyResults[v.id].mismatched > 0 && `, ${verifyResults[v.id].mismatched.toLocaleString()} the wrong size`}
+                    {verifyResults[v.id].renamed > 0 && `, ${verifyResults[v.id].renamed.toLocaleString()} probably renamed by the browser`}
+                    {verifyResults[v.id].ambiguous > 0 && `, ${verifyResults[v.id].ambiguous.toLocaleString()} impossible to tell apart`}
+                  </span>
+                ) : (
+                  <button type="button" class="btn btn-sm" data-testid={`verify-${v.id}`}
+                    onClick={() => verify(v.id)}>
+                    Check my downloads folder
+                  </button>
+                )}
+                <button type="button" class="btn btn-ghost btn-sm" data-testid={`discard-${v.id}`}
+                  onClick={() => discardUnfinished(v.id)}>
+                  Discard
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {phase === 'options' && (
           <>
             <div class="download-job-modes">
@@ -230,14 +306,26 @@ export function DownloadJobPanel({ bucket, prefix = '', api, onStart, onClose, o
               Found <strong>{counts.objects.toLocaleString()}</strong> files,{' '}
               <strong>{formatBytes(counts.bytes)}</strong> in total.
             </p>
+            {/* Archived objects were recorded at enumeration and will never be issued.
+                Counting them in the offer would promise files that cannot arrive, and this
+                tier cannot report their absence — the user would simply never see them. */}
+            {counts.archived > 0 && (
+              <p class="download-job-warning" data-testid="archived-notice">
+                <strong>{counts.archived.toLocaleString()}</strong> of these are archived
+                (Glacier or Deep Archive) and cannot be downloaded until you restore them in
+                AWS. They will be left out.
+              </p>
+            )}
             <p class="download-job-warning">
               Most providers bill for egress — moving this much data out of your bucket may
               cost money. Check your provider's pricing if you are not sure.
             </p>
             <div class="download-job-actions">
-              <button type="button" class="btn btn-sm" data-testid="start" onClick={start}>
-                Send {counts.objects.toLocaleString()} files ({formatBytes(counts.bytes)}) to my browser
-              </button>
+              {sendable > 0 && (
+                <button type="button" class="btn btn-sm" data-testid="start" onClick={start}>
+                  Send {sendable.toLocaleString()} files ({formatBytes(counts.bytes)}) to my browser
+                </button>
+              )}
               {onUseTransferTool && (
                 <button type="button" class="btn btn-ghost btn-sm" data-testid="use-transfer-tool"
                   onClick={onUseTransferTool}>

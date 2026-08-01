@@ -109,14 +109,21 @@ export async function runDownloadJob(job, {
 
 // What to do with the manifest once a run ends.
 //
-// A manifest is dead weight ONLY when every item succeeded. Deleting it after a run with
-// failures throws away the record of which files failed, and re-running then re-enumerates
-// and re-issues the entire job — the worst possible outcome in exactly the large-job case
-// this feature exists for. Keeping it lets a resume retry just the failures.
+// A manifest is dead weight only when the run left nothing worth acting on.
+//
+// Failures must be kept: discarding them throws away the record of WHICH files failed, and
+// re-running then re-enumerates and re-issues the entire job — the worst possible outcome
+// in exactly the large-job case this feature exists for.
 //
 // `blocked` is the subtle one: a job stopped by a job-wide fault has nothing cancelled and
 // nothing failed, so it reads as a clean run. Discarding its manifest would throw away the
 // enumeration of a whole prefix because a credential expired.
-export function jobOutcome({ cancelled = false, failed = 0, blocked = null } = {}) {
-  return (cancelled || failed > 0 || blocked) ? { keep: true } : { keep: false };
+//
+// `issued` is why even a perfectly clean run is kept. This tier cannot observe whether a
+// file arrived, so the manifest is the only record of what was expected — and therefore the
+// only thing the read-only folder verification can check against. Deleting it on success
+// means a user can never find out whether their download actually landed. The manifest goes
+// when they verify or discard it, which is a decision only they can make.
+export function jobOutcome({ cancelled = false, failed = 0, blocked = null, issued = 0 } = {}) {
+  return (cancelled || failed > 0 || blocked || issued > 0) ? { keep: true } : { keep: false };
 }

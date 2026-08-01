@@ -1565,3 +1565,16 @@ describe('package-lock.json tracks package.json', () => {
       `package-lock.json packages[""].version is stale — ${fix}`);
   });
 });
+
+// A download job outlives the session that created it, and the archived-storage-class check
+// at enumeration is provider-specific. If startJob stops recording the provider, nothing
+// throws: isArchivedStorageClass simply flags nothing, and GLACIER objects are issued as
+// though they were downloadable. Silent degradation is why this is asserted structurally.
+describe('App.jsx — a download job records its provider', () => {
+  test('startJob writes a provider onto the job record', () => {
+    const source = src('components/App.jsx');
+    const startJob = source.slice(source.indexOf('startJob:'), source.indexOf('enumerate:'));
+    assert.match(startJob, /provider:/,
+      'startJob must record provider, or enumeration cannot tell an archived object from a normal one');
+  });
+});
