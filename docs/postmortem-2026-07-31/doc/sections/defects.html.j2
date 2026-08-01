@@ -1,0 +1,77 @@
+{% import 'chrome/macros.html.j2' as c %}
+<section>
+  <h2>Defects Introduced</h2>
+
+  <p class="lede">Seven confirmed defects, each introduced by the agent and each found only
+  after the operator asked for a postmortem. None was caught while the work was being done.
+  Two are in code that is already committed and pushed.</p>
+
+  <h3>Already shipped</h3>
+
+  <table class="matrix">
+    <thead><tr><th>Defect</th><th>Consequence</th></tr></thead>
+    <tr>
+      <td><strong>A whole download can be refused because one file is missing.</strong> The
+          pre-flight check classifies a 403 response as a job-wide fault. Amazon returns 403
+          rather than 404 when the caller cannot list the bucket, deliberately, so as not to
+          reveal whether an object exists. In that configuration a single deleted object
+          returns 403.</td>
+      <td>On a real bucket with restrictive permissions, one missing file stops the entire
+          job. The first file is always probed, so a bad first object refuses everything. The
+          classification was tested only against a mock whose responses the agent chose.</td>
+    </tr>
+    <tr>
+      <td><strong>Nothing proves downloads still work.</strong> The fix for the navigation
+          defect was verified against the defect it targeted — the page no longer navigates —
+          and never against the behaviour it had to preserve. No test asserts that bytes
+          arrive.</td>
+      <td>The change is covered by evidence that it does not break the page, and by no
+          evidence that it still performs a download. Earlier manual observation was carried
+          forward without being re-verified.</td>
+    </tr>
+  </table>
+
+  <h3>In the release not yet committed</h3>
+
+  <table class="matrix">
+    <thead><tr><th>Defect</th><th>Consequence</th></tr></thead>
+    <tr>
+      <td><strong>A finished job cannot be deleted on two of the three browser engines.</strong>
+          The list of unfinished jobs excludes completed ones and requires outstanding work; a
+          cleanly finished job satisfies neither. The only other discard control sits inside a
+          panel gated on a folder-picker capability that exists in one engine family.</td>
+      <td>On Firefox and Safari the record of a completed download is retained in browser
+          storage permanently, with no interface anywhere to see or remove it. Unbounded for a
+          job of millions of files.</td>
+    </tr>
+    <tr>
+      <td><strong>A job can never be checked twice.</strong> Verification stamps the job as
+          verified, and the list of verifiable jobs excludes anything stamped.</td>
+      <td>Check the folder, find ten files missing, resume to re-fetch them — and the job can
+          never be checked again. Missing files are marked for retry specifically so they can
+          be retried, and the retry cannot be confirmed.</td>
+    </tr>
+    <tr>
+      <td><strong>The offer's size and its count describe different sets.</strong> Archived
+          objects are subtracted from the file count and not from the byte total.</td>
+      <td>The user is shown a count for the files that will be sent and a size for all of
+          them. The same error is written into stored counters.</td>
+    </tr>
+    <tr>
+      <td><strong>A file the user named themselves can be misread as a browser rename.</strong>
+          A document legitimately called <span class="code">report (1).pdf</span> matches the
+          collision-rename heuristic.</td>
+      <td>A false "probably arrived under another name" verdict. Neither tested nor
+          documented.</td>
+    </tr>
+  </table>
+
+  {{ c.warn('The one least defensible', 'The undeletable-job defect was introduced through a design change the agent recommended, having presented three options and argued for that one. Its cost was described to the operator as "a row the user must dismiss" — without checking whether such a row exists on every browser. It does not, and the code was open at the time.') }}
+
+  <h3>What they have in common</h3>
+
+  <p>Every one of these was discoverable by reading code written hours earlier. None required
+  a tool, a reproduction, or a browser. Nothing prevented the agent from finding them except
+  not looking — and the two most serious arrived in the final three passes, after the work had
+  twice been declared finished.</p>
+</section>

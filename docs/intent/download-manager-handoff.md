@@ -1,9 +1,17 @@
 # Large downloads — handoff
 
 **Written:** 2026-07-31 · **Branch:** `download-manager-stage1` (cut from `vault-phase2`)
-**State:** nine commits, v1.42.1, clean tree, **nothing pushed**
+**State header updated 2026-08-01:** v1.43.0 is committed, tagged and **pushed**
+(`a1cf110`); the v1.44.0 implementation is parked on `wip/v1.44.0-archived-verify`
+(DO NOT SHIP — defects F3–F7). The original header here ("nine commits, v1.42.1, nothing
+pushed") described the 2026-07-31 morning state and went stale the same day.
 
-Start here. Then read `docs/review-download-parity/` (the measurements) and
+**Read `docs/postmortem-2026-07-31/independent-analysis-2026-08-01.md` before acting on
+anything below** — v1.43.0 ships two critical download defects (F1: CSP `frame-src`
+blocks http endpoints; F2: iframe src race loses files at TTFB > 250 ms), and the
+recovery plan supersedes parts of this document's task list.
+
+Then read `docs/review-download-parity/` (the measurements) and
 `docs/superpowers/specs/2026-07-30-large-download-manager-design.md` (the design).
 
 ---

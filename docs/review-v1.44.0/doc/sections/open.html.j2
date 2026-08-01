@@ -1,0 +1,55 @@
+{% import 'chrome/macros.html.j2' as c %}
+<section>
+  <h2>What Remains Open</h2>
+
+  <h3>The library race is diagnosed, not fixed</h3>
+
+  <p>The lane still fails at roughly the measured rate, and will continue to. The candidate fix
+  — a container base carrying a newer C library — is identified, cheap to try, and deliberately
+  left as separate work with its own evidence bar of around six consecutive clean runs. Whether
+  the same fault reaches continuous integration hardware is unknown and worth checking, because
+  those lanes block merges.</p>
+
+  <h3>The download tiers above this one</h3>
+
+  <p>Two of the three planned mechanisms are unbuilt. What ships hands files to the browser's
+  download manager, which is why it has no size ceiling and why it can report so little. A
+  staged mechanism and a managed-folder mechanism would give real progress and real completion,
+  and the measurement work behind them is done — but the transport, the storage seam and the
+  resume behaviour are not.</p>
+
+  {{ c.warn('One decision blocks that design', 'How long a paused job must remain resumable has never been specified, and it is not a detail. One browser family clears site data after seven days without a visit. If sessions are hours apart that is a footnote; if a job may sit for a month it disqualifies that family from the staged mechanism entirely and changes what the interface must say. An earlier draft invented a figure and reasoned from it, which is the failure this note exists to prevent.') }}
+
+  <h3>Questions no amount of automation will answer</h3>
+
+  <table class="matrix">
+    <thead><tr><th>Question</th><th>Why it cannot be settled here</th></tr></thead>
+    <tr>
+      <td>What private-storage export actually costs on the one browser family that cannot be
+          automated.</td>
+      <td>No published source measures it, and the automation framework's stand-in for that
+          engine lacks the storage interface entirely — so the automated runs prove nothing
+          about it. The design's case for that family rests on this number.</td>
+    </tr>
+    <tr>
+      <td>Whether the folder picker is usable on a real phone.</td>
+      <td>It shipped with reported defects — a picker freezing on large folders, saving being
+          overwrite-only. A probe page exists for this; it needs a person and a device.</td>
+    </tr>
+    <tr>
+      <td>Whether the generated transfer-tool commands actually work.</td>
+      <td>They have never been run through the real tool. This is cheap to check and would be
+          an embarrassing thing to discover later.</td>
+    </tr>
+  </table>
+
+  <h3>Verification status of this release</h3>
+
+  <p>The unit and component suites pass in full. The end-to-end matrix passes on every lane
+  that obtains a working browser; the one lane affected by the library race fails at its
+  established rate, with the signature confirmed each time rather than assumed. That
+  distinction — a failure explained and matched against a recorded signature, versus a failure
+  waved away — is the difference this report is trying to hold onto.</p>
+
+  {{ c.note('The standard worth keeping', 'A green suite is not evidence that the thing works. Four defects in this feature reached one. The evidence that held up was always the same shape: change one variable, watch the effect appear and disappear.') }}
+</section>

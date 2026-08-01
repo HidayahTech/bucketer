@@ -1,0 +1,82 @@
+{% import 'chrome/macros.html.j2' as c %}
+<section>
+  <h2>How Each Claim Was Established</h2>
+
+  <p class="lede">Four defects in this feature's development reached a fully green test suite
+  before being caught by running the built artifact. That history sets the standard for what
+  counts as evidence here, and it is higher than "the tests pass".</p>
+
+  <h3>The navigation fix: a matched pair</h3>
+
+  <p>The strongest evidence produced in this work was accidental. An end-to-end test written
+  for the fix was first run against a stale build that predated it — and failed, reporting that
+  the page had navigated to the storage URL. The defect, reproducing verbatim, against the test
+  meant to catch it.</p>
+
+  <p>That was then done deliberately: the pre-fix module restored from version control, the
+  matrix run, the fix restored, the matrix run again — identical lanes, one variable changed.</p>
+
+  <table class="runs">
+    <thead><tr><th>Arm</th><th>Lanes passing</th><th>Navigation events</th><th>Spec executions</th></tr></thead>
+    <tr><td>Pre-fix</td><td>0 of 3</td><td>3</td><td>3</td></tr>
+    <tr><td>Post-fix</td><td>3 of 3</td><td>0</td><td>3</td></tr>
+  </table>
+
+  <p>Three engines, all in one container image so that no engine is special-cased. The failure
+  appears and disappears with the one thing that changed. That is a stronger claim than any
+  number of passing runs, because a passing run is consistent with the test not working at
+  all.</p>
+
+  {{ c.warn('What no unit test can prove here', 'The defect is top-frame navigation, and the browser emulator used for component tests does not implement navigation. It prints a note and continues. No unit or component test can reproduce this class of defect; the component test for the frame says so in its own header, so nobody later mistakes a green run for proof.') }}
+
+  <h3>The structural guard that was tested by breaking it</h3>
+
+  <p>The archived-object check depends on the provider being recorded on the job. If that
+  recording is ever removed, nothing throws — the check simply flags nothing, and archived
+  objects are queued again exactly as before. Silent degradation.</p>
+
+  <p>A structural assertion now guards it. Rather than trusting a test written after the code,
+  the field was temporarily removed to confirm the guard failed, then restored. A test that has
+  never been seen to fail is not yet known to test anything.</p>
+
+  <h3>Where verification stops short</h3>
+
+  <p>The folder check reports four outcomes rather than two, because two would require claiming
+  more than is known.</p>
+
+  <table class="matrix">
+    <thead><tr><th>Outcome</th><th>Basis</th><th>Consequence</th></tr></thead>
+    <tr><td class="verdict">Confirmed</td><td>Name and size both match, and the name is claimed
+        by exactly one file in the job.</td><td>Promoted to done.</td></tr>
+    <tr><td class="verdict">Missing</td><td>Absent, with no collision-renamed variant
+        present.</td><td>Marked failed. <em>(Correction 2026-08-01: the intended resume
+        never happens — the job's status stays DONE and the resume list excludes DONE, so
+        the retry this row promised is unreachable. Postmortem finding F3; fixed in the
+        lifecycle redesign.)</em></td></tr>
+    <tr><td class="verdict">Wrong size</td><td>Present under the right name at the wrong
+        length.</td><td>Marked failed. <em>(Same F3 correction as above.)</em></td></tr>
+    <tr><td class="verdict">Cannot tell</td><td>Two files in the job share a local name, or a
+        collision-renamed variant exists.</td><td><strong>Left alone.</strong> Not confirmed,
+        and deliberately not retried.</td></tr>
+  </table>
+
+  <p>The last row is the load-bearing one. Treating "cannot tell" as "missing" would re-download
+  files already sitting on disk, at the user's expense, to fix a problem that does not exist.</p>
+
+  <h3>Coverage</h3>
+
+  <table class="runs">
+    <thead><tr><th>Layer</th><th>Count</th><th>What it can and cannot show</th></tr></thead>
+    <tr><td>Unit</td><td>1,318</td><td>Logic in isolation. Cannot execute the bundle.</td></tr>
+    <tr><td>Component</td><td>457</td><td>Rendering and interaction. Cannot navigate.</td></tr>
+    <tr><td>End-to-end</td><td>9 browser lanes</td><td>The built bundle in real engines against
+        a live mock service. The only layer where the navigation defect is observable.</td></tr>
+  </table>
+
+  <p><em>Correction 2026-08-01: the end-to-end row must not be read as covering the two
+  v1.44.0 features. Archived-object flagging and folder verification had no browser
+  coverage of any kind — the mock cannot represent storage classes and the picker was never
+  stubbed — and the postmortem further showed the e2e environment could not observe any
+  download at all (its transport is http, which the bundle's CSP blocks for the download
+  frame). Coverage claims in this table are superseded by the postmortem.</em></p>
+</section>

@@ -1,0 +1,12 @@
+/* Document-specific overrides, loaded after the house sheet and the doctype layer. */
+
+/* Evidence tables carry short verdicts against long reasons; a shade tighter than body. */
+table.matrix { font-size: 0.86em; }
+table.matrix td, table.matrix th { padding: 0.25rem 0.4rem; }
+
+/* Run-by-run result tables read as data, so the columns should line up numerically. */
+table.runs { font-size: 0.86em; font-variant-numeric: tabular-nums; }
+table.runs td, table.runs th { padding: 0.25rem 0.5rem; }
+
+/* A verdict word carries the row; let it stand out from the reason beside it. */
+.verdict { font-weight: 600; }

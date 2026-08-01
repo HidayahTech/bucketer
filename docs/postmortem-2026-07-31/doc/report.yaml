@@ -1,0 +1,54 @@
+# Postmortem input for the 2026-07-31 session.
+#
+#   doclab build docs/postmortem-2026-07-31/doc/report.yaml
+#
+# No `product:` — Bucketer is not registered in doclab's org.yaml, and adding one there is a
+# change to shared config rather than this document's business. Same as the other two
+# Bucketer reports.
+doctype: report
+content_dir: docs/postmortem-2026-07-31/doc
+data: [docs/postmortem-2026-07-31/doc/data.yaml]
+css: [docs/postmortem-2026-07-31/doc/doc.css]
+
+title: "{{ report.title }}"
+subtitle: "{{ report.subtitle }}"
+running_title: "{{ report.short_title }}"
+output_name: "{{ report.output_name }}"
+toc: true
+
+cover:
+  meta:
+    - label: "Prepared for"
+      value: "{{ report.audience }}"
+    - label: "Prepared by"
+      value: "{{ org.legal_name }}"
+    - label: "Status"
+      value: "{{ report.version }} — catalog closed, not complete"
+    - label: "Date"
+      value: "{{ report.date | longdate }}"
+
+sections:
+  - id: summary
+    title: "What This Is"
+    tpl: sections/summary.html.j2
+    flow: true
+  - id: discovery
+    title: "The Discovery Record"
+    tpl: sections/discovery.html.j2
+    flow: true
+  - id: defects
+    title: "Defects Introduced"
+    tpl: sections/defects.html.j2
+    flow: true
+  - id: catalog
+    title: "The Full Catalog"
+    tpl: sections/catalog.html.j2
+    flow: true
+  - id: patterns
+    title: "The Patterns Underneath"
+    tpl: sections/patterns.html.j2
+    flow: true
+  - id: next
+    title: "Instructions For The Analysis"
+    tpl: sections/next.html.j2
+    flow: true

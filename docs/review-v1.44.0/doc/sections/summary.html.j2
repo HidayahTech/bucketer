@@ -1,0 +1,62 @@
+{% import 'chrome/macros.html.j2' as c %}
+<section>
+  <h2>Summary</h2>
+
+  {{ c.warn('SUPERSEDED — 2026-08-01', 'An independent postmortem (docs/postmortem-2026-07-31/independent-analysis-2026-08-01.md) found two critical defects in the v1.43.0 download mechanism this report describes as shipped and verified: the bundle CSP silently blocks all folder downloads on http endpoints, and reassigning the reused frame loses files whose response latency exceeds the issue pacing. The v1.44.0 features described here did not ship; their implementation is parked on wip/v1.44.0-archived-verify pending a lifecycle redesign. Figures and claims in this report are corrected inline where wrong, but the postmortem, not this report, is the authoritative account.') }}
+
+  <p class="lede">Bucketer's folder download hands each file to the browser's own download
+  manager. That mechanism has no size ceiling, which is why it exists — but it is also blind:
+  the application can see that it handed a file over, and nothing after that. Two releases
+  closed the gap between what the application reported and what actually happened.</p>
+
+  <h3>The findings</h3>
+
+  <table class="num">
+    <thead><tr><th>#</th><th>Finding</th><th>What follows from it</th></tr></thead>
+    <tr>
+      <td>1</td>
+      <td><strong>A download that failed could destroy the running application.</strong> An
+          error response carries no attachment header, so the browser renders it — and a
+          top-level anchor rendered it over the page. Reproduced in all three engines.</td>
+      <td>Shipped as BUG-050. The URL now loads in one hidden reused frame, which contains
+          both outcomes.</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td><strong>A job-wide fault produced thousands of silent failures.</strong> Expired
+          credentials or a missing CORS rule made every file fail, and every one was reported
+          as issued, because this tier cannot observe a failure.</td>
+      <td>A one-byte range probe now runs before the first file and periodically after, and
+          stops the job with the reason.</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td><strong>Archived objects were queued and could never arrive.</strong> A GET against
+          Glacier or Deep Archive fails until a restore completes.</td>
+      <td>Flagged at enumeration from the listing already in hand, at no request cost, and
+          left out of the offer rather than counted into it.</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td><strong>Nothing could confirm a file arrived.</strong> The terminal state was
+          "issued", permanently.</td>
+      <td>An optional read-only folder check compares name <em>and</em> size, promotes what it
+          confirms, and retries what provably did not arrive.</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td><strong>The end-to-end suite had a crash of its own</strong>, failing roughly 55% of
+          full runs in one lane, with a misleading zero in the failure column.</td>
+      <td>Diagnosed to a single instruction in the system C library. Not caused by this work;
+          filed with the analysis attached.</td>
+    </tr>
+  </table>
+
+  {{ c.note('The shape of the problem', 'Every one of the first four findings is the same defect wearing different clothes: the application claimed to know something it did not. A queue row saying "issued" reads like success. The work was less about adding capability than about narrowing what the application is willing to assert.') }}
+
+  <h3>Status</h3>
+
+  <p><strong>v1.43.0</strong> — findings 1 and 2 — is committed, tagged and pushed.
+  <strong>v1.44.0</strong> — findings 3 and 4 — is built and tested but not yet committed.
+  Finding 5 is filed as an issue against the test infrastructure and is not fixed.</p>
+</section>

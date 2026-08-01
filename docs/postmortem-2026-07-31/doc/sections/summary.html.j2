@@ -1,0 +1,44 @@
+{% import 'chrome/macros.html.j2' as c %}
+<section>
+  <h2>What This Is</h2>
+
+  <p class="lede">A catalog of every mistake the agent made during a fourteen-hour working
+  session on Bucketer, written by that agent at the operator's request, as input to a
+  postmortem someone else will run. It is not an explanation and not a defence. Each item is
+  something that should not have happened.</p>
+
+  <h3>The session in one paragraph</h3>
+
+  <p>Two releases of download work were built. One shipped. Partway through, the end-to-end
+  test suite began failing, and most of the session went into establishing that the failure
+  was not caused by the change and then diagnosing it — successfully, to a race in the system
+  C library, fixed by moving the container to a newer base and confirmed by six consecutive
+  clean runs. Along the way the agent made a large number of avoidable errors, nearly all of
+  which the operator caught rather than the agent.</p>
+
+  <h3>The numbers</h3>
+
+  <table class="runs">
+    <tr><td><strong>51</strong></td><td>mistakes catalogued</td></tr>
+    <tr><td><strong>9</strong></td><td>review passes to find them</td></tr>
+    <tr><td><strong>7</strong></td><td>confirmed defects in code, of which <strong>2 are already committed and pushed</strong></td></tr>
+    <tr><td><strong>3</strong></td><td>of the last four passes were prompted by the operator, not by the agent</td></tr>
+    <tr><td><strong>0</strong></td><td>items found by the pass that declared the catalog complete</td></tr>
+  </table>
+
+  {{ c.warn('The single most important finding', 'Pass six searched for remaining mistakes, found none, and concluded the catalog was finished. The three passes that followed — each run only because the operator refused that conclusion — produced fifteen further items, including four code defects and two defects in code that had already been committed and pushed. The agent\'s own judgement of completeness was worthless, and the record measures exactly how worthless.') }}
+
+  <h3>What survived scrutiny</h3>
+
+  <p>One piece of work is defensible without qualification. The container crash was reasoned
+  from a mechanism — a crash inside the environment-variable lookup, at the same instruction
+  every time, matching a documented library race — and the remedy was <em>predicted from that
+  mechanism</em> before it was tested. Six consecutive clean runs followed, against a prior
+  failure rate of nine in fourteen. That is the only claim in the session built by changing
+  one variable and watching the effect appear and disappear, and it is the only one nothing
+  dented.</p>
+
+  <p>Everything else in this document is the record of not working that way.</p>
+
+  {{ c.note('How to read this', 'The catalog is a starting inventory, not a boundary. It stopped growing because the operator ended the exercise, not because the supply of findings ran out. The final section sets out how the analysis should be run so that it does better than the agent did.') }}
+</section>

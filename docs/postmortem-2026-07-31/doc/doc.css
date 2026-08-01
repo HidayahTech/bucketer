@@ -1,0 +1,14 @@
+/* Document-specific overrides, loaded after the house sheet and the doctype layer. */
+
+/* The catalog tables are long and dense; a shade tighter than body copy keeps a pass on one
+   or two pages instead of three. */
+table.catalog { font-size: 0.82em; }
+table.catalog td, table.catalog th { padding: 0.22rem 0.4rem; vertical-align: top; }
+table.catalog td:first-child { text-align: right; white-space: nowrap; }
+
+/* The discovery record is the argument of the document, so it reads as data. */
+table.runs { font-size: 0.88em; font-variant-numeric: tabular-nums; }
+table.runs td, table.runs th { padding: 0.3rem 0.5rem; }
+
+/* Classification chips inside the catalog. */
+.kind { font-size: 0.82em; font-weight: 600; letter-spacing: 0.02em; white-space: nowrap; }

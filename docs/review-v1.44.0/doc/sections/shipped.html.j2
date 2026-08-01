@@ -1,0 +1,92 @@
+{% import 'chrome/macros.html.j2' as c %}
+<section>
+  <h2>What Shipped</h2>
+
+  <h3>A failing download can no longer navigate the application away</h3>
+
+  <p>A download stays a download only while the response carries
+  <span class="code">Content-Disposition: attachment</span>. An error response does not — a 403
+  or 404 is a small XML body the browser is entitled to render. Clicking an anchor pointed at
+  that URL therefore stopped being a download and became a navigation of whatever frame the
+  anchor lived in, which was the application's own document. The running job died with the
+  page: the queue, its progress and all task state.</p>
+
+  <p>The <span class="code">download</span> attribute could not have prevented it. It applies
+  only to same-origin, <span class="code">blob:</span> and <span class="code">data:</span>
+  URLs, and presigned storage URLs are cross-origin in every engine. An earlier bug record had
+  attributed that to a WebKit quirk; it is specified behaviour everywhere.</p>
+
+  <p>The fix loads the URL in a single hidden frame, reused across the whole job. A real
+  download is still taken over by the download manager; an error renders into a frame nobody
+  sees. The frame is located by id rather than held in a variable, so a wiped document
+  re-creates it instead of issuing into a detached node, and one frame is reused because a job
+  can be tens of thousands of files.</p>
+
+  {{ c.warn('No sandbox attribute', 'A sandboxed frame without allow-downloads blocks downloads outright, and the configuration proven across the three engines was a plain hidden frame. A previous defect in this codebase came from a sandbox value that broke rendering in exactly one engine, which is the precedent for not adding one speculatively.') }}
+
+  <h3>A job-wide fault stops the job and says why</h3>
+
+  <p>Because this tier cannot observe a failure, a job with expired credentials, a missing
+  CORS rule, a skewed clock or a wholesale deny issued every file and reported every one as
+  sent. The user's only signal was that nothing appeared.</p>
+
+  <p>A <span class="code">Range: bytes=0-0</span> request now runs against the exact presigned
+  URL about to be handed over — before the first file, then at intervals sized so a job costs
+  about twenty probes rather than one per file. It is a plain fetch, not an SDK call, because
+  <span class="code">Range</span> is a safelisted request header and therefore costs one round
+  trip with no preflight; going through the SDK would attach headers that are not safelisted
+  and add a preflight to every probe.</p>
+
+  <table class="matrix">
+    <thead><tr><th>Response</th><th>Verdict</th><th>Why</th></tr></thead>
+    <tr><td>206, 200</td><td class="verdict">Readable</td><td>The object serves bytes.</td></tr>
+    <tr><td>416</td><td class="verdict">Readable</td><td>An empty object cannot satisfy byte
+        zero. It is present and fine; a job of empty files must not be blocked by it.</td></tr>
+    <tr><td>403, 401, 400</td><td class="verdict">Stops the job</td><td>Credentials, permission
+        or a signature the service rejects — all job-wide.</td></tr>
+    <tr><td>Network failure</td><td class="verdict">Stops the job</td><td>A missing CORS rule
+        and a dropped connection are indistinguishable by design; the message names both.</td></tr>
+    <tr><td>404</td><td class="verdict">Continues</td><td>One key is gone. The rest are fine.</td></tr>
+    <tr><td>503, 429, 408</td><td class="verdict">Continues</td><td>Transient, and one file's
+        business.</td></tr>
+  </table>
+
+  <p>A job stopped this way keeps its manifest. It has nothing cancelled and nothing failed, so
+  it would otherwise read as a clean run and be discarded — throwing away the enumeration of an
+  entire prefix because a credential expired.</p>
+
+  <h3>Archived objects are named, not queued</h3>
+
+  <p>Storage class arrives on every listing entry, so archived objects are knowable at
+  enumeration for no extra request. Glacier and Deep Archive are recorded as skipped rather
+  than pending, so the queue never issues them, and the offer names the count instead of
+  folding it into the total.</p>
+
+  <p>The exclusions cost more reading than the inclusions. <strong>Glacier Instant
+  Retrieval</strong> serves a GET like any other class, so flagging it would refuse downloads
+  that work. <strong>Intelligent-Tiering</strong> is reported under that one name whatever the
+  internal tier, so the listing genuinely cannot distinguish a readable object from an archived
+  one; flagging all of them refuses working downloads, flagging none lets a few fail visibly
+  and retryably. None are flagged. The check is confined to one provider, because no other has
+  a tier where a plain GET fails and several accept the same class names without the archive
+  semantics.</p>
+
+  <h3>An optional check on what actually arrived</h3>
+
+  <p>The user points at the folder the files landed in. Reading it costs nothing — no request,
+  no egress — and it is the only mechanism that can turn "handed over" into "actually there".</p>
+
+  <p>It compares <strong>name and size</strong>, not name alone. A file called
+  <span class="code">a.txt</span> sitting in a downloads folder is not proof that ours is the
+  one there; it may predate the job entirely. Size is already recorded at enumeration and is
+  exposed read-only, so the stronger claim is free — and a truncated transfer leaves the right
+  name with the wrong size, which name-only checking would report as success.</p>
+
+  {{ c.note('What it refuses to claim', 'Two keys can flatten onto one local name, and the browser silently renames collisions by appending a number. Neither case is attributable to a specific download, so neither is ever confirmed — and, more importantly, neither is ever marked failed. Retrying them would re-download files already on disk and bill the user egress for the privilege. What it does mark failed is what provably did not arrive, which the existing resume path then retries precisely.') }}
+
+  <p>A finished job now stays in the list until the user checks or dismisses it. Previously it
+  disappeared the moment it ended, which left no way to ever find out whether the files landed.
+  The folder picker requires a user gesture and exists in one engine family, so the option is
+  gated on the capability rather than a browser name, and is a button rather than anything
+  automatic.</p>
+</section>

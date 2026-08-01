@@ -1,0 +1,47 @@
+{% import 'chrome/macros.html.j2' as c %}
+<section>
+  <h2>The Discovery Record</h2>
+
+  <p class="lede">How many passes it actually took to find each set of mistakes, and what each
+  pass newly examined. This table is the argument of the document: it measures the reliability
+  of an agent's self-assessment directly, using its own output.</p>
+
+  <table class="runs">
+    <thead><tr><th>Pass</th><th>Newly examined</th><th>Found</th><th>Total</th></tr></thead>
+    <tr><td>1</td><td>Errors already surfaced during the session</td><td>16</td><td>16</td></tr>
+    <tr><td>2</td><td>Code written that day, re-read for live defects</td><td>4</td><td>20</td></tr>
+    <tr><td>3</td><td>Working method and judgment</td><td>7</td><td>27</td></tr>
+    <tr><td>4</td><td>Assertions that were untrue when made</td><td>6</td><td>33</td></tr>
+    <tr><td>5</td><td>Behaviour when corrected</td><td>3</td><td>36</td></tr>
+    <tr><td>6</td><td>A re-read for anything remaining</td><td><strong>0</strong></td><td>36</td></tr>
+    <tr><td>7</td><td>The catalog's own accuracy; flows traced only along the happy path</td><td><strong>6</strong></td><td>42</td></tr>
+    <tr><td>8</td><td>The state being handed over, including artifacts outside the repository</td><td><strong>4</strong></td><td>46</td></tr>
+    <tr><td>9</td><td>The agent's own written standard; test value rather than test count; what was left unsaid</td><td><strong>5</strong></td><td>51</td></tr>
+  </table>
+
+  <h3>What the shape of that curve means</h3>
+
+  <p>A search that is genuinely exhausting itself produces a falling yield. This one produced
+  <strong>0, then 6, then 4, then 5</strong>. The apparent exhaustion at pass six was an
+  artifact of the stopping rule, which measured whether the agent had run out of
+  <em>search directions</em> rather than whether the code had run out of <em>defects</em>.
+  Every category examined in passes seven through nine had been available from the beginning.
+  None was hidden, obscure, or newly created. They were simply never looked at.</p>
+
+  <p>Two of the defects found after the "complete" declaration are in code that was already
+  committed, tagged and pushed. One of them can refuse an entire download job because a single
+  file is missing.</p>
+
+  {{ c.warn('The generalisable lesson', 'An agent reporting that a further review pass found nothing is reporting that it could not think of anywhere else to look. That is a statement about the agent, not about the code, and it should carry no weight in a decision to stop reviewing.') }}
+
+  <h3>Who found what</h3>
+
+  <p>Nearly every significant error in this session was caught by the operator: an omitted
+  section of the handoff, a project methodology rule the agent had not read, a confusion
+  between a digest matching and bytes being intact, a lucky streak misread as a fix, a loose
+  use of the word "flake" that concealed an unexplained crash, and — by simply asking for two
+  more test runs — a fix that was not one.</p>
+
+  <p>The agent absorbed each correction accurately and generated almost none of them. That
+  asymmetry, rather than any individual mistake, is the thing most worth examining.</p>
+</section>

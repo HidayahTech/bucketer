@@ -1,0 +1,67 @@
+{% import 'chrome/macros.html.j2' as c %}
+<section>
+  <h2>Three Wrong Conclusions</h2>
+
+  <p class="lede">Each of these was stated confidently and was wrong. They are recorded because
+  the shape they share is more useful than any of them individually: a convenient explanation,
+  arrived at quickly, that survived because nobody tested it.</p>
+
+  <h3>One — a silent search result read as an absence</h3>
+
+  <p>An early search for two bug records returned nothing, and the conclusion drawn was that
+  the previous session had skipped its own logging discipline. Both records were present — they
+  were the top two entries in the file.</p>
+
+  <p>The search tool had skipped the file entirely. It classifies files containing control
+  bytes as binary and declines to read them, returning the standard "no matches" exit status.
+  Not a warning, not an error: an answer indistinguishable from a genuine absence. The file
+  contained control bytes because the entry describing a defect about control bytes had been
+  written using them.</p>
+
+  {{ c.warn('The compounding part', 'That made the entire bug log unsearchable by the tool any reader would reach for — while project documentation directs readers to consult it first. The fix restored searchability; the lesson is that a tool reporting nothing and a tool declining to look are the same observation.') }}
+
+  <h3>Two — a lucky streak read as a repair</h3>
+
+  <p>After destroying and rebuilding the container image and dependency cache, the suite passed
+  four consecutive times. This was reported as evidence that something had genuinely changed,
+  supported by a probability calculated from the prior failure rate.</p>
+
+  <p>Two further runs failed immediately. The calculation had invented a rate from three
+  observations and assumed independence between runs that visibly come in streaks. At the true
+  rate, four clean runs in a row is uncommon rather than extraordinary — and the number lent
+  false confidence to a conclusion that was simply wrong.</p>
+
+  <p>The same error nearly repeated later: reordering the lanes produced four clean runs and
+  looked like a fix. It was labelled inconclusive that time, and the mechanism found afterwards
+  confirmed it could not have been a fix at all.</p>
+
+  <h3>Three — coverage claimed from incomparable runs</h3>
+
+  <p>Three-engine coverage was reported on the basis of two engines run on the host and one in
+  a container. The project already had a written rule against exactly this — all engines run in
+  one container so that no engine is special-cased — and its own measurement history records
+  mixed execution as a superseded method whose findings were withdrawn.</p>
+
+  <p>The rule was recorded in a measurement report rather than in the project's main
+  instructions, which said only that the container was needed for the one engine that cannot
+  run natively. That is where it now says every engine goes through the container, and why.</p>
+
+  <h3>What these have in common</h3>
+
+  <table class="matrix">
+    <thead><tr><th>Pattern</th><th>Where it appeared</th></tr></thead>
+    <tr><td>A tool's convenient answer accepted without checking what it actually did</td>
+        <td>The silent search; the browser version assumed rather than read.</td></tr>
+    <tr><td>A number computed precisely from an assumption never examined</td>
+        <td>The streak probability; an early measurement that reported a cost 360 times too
+            high by measuring an adjacent operation.</td></tr>
+    <tr><td>A conclusion reached from evidence gathered under different conditions</td>
+        <td>Mixed host and container runs; comparing a run now against failures from an hour
+            earlier, when the fault comes in streaks.</td></tr>
+  </table>
+
+  <p>The corrective that worked in every case was the same: change one variable, hold the rest,
+  and observe the effect appear and disappear. The matched pair for the navigation fix is the
+  only claim in this work that no amount of scepticism has dented, and it is the only one built
+  that way.</p>
+</section>

@@ -1,0 +1,105 @@
+{% import 'chrome/macros.html.j2' as c %}
+<section>
+  <h2>The Crash Underneath the Suite</h2>
+
+  <p class="lede">Partway through verifying this work, the end-to-end matrix began failing.
+  Establishing that it was not caused by the change took longer than the change did — and the
+  answer turned out to be a race in the system C library that has nothing to do with this
+  project at all.</p>
+
+  <h3>What it looked like</h3>
+
+  <p>One lane of nine failed, in 9 of 14 full runs (64% — an earlier draft said "roughly
+  55%" from a partial count; the corrected figure matches the measurement recorded in
+  <span class="code">test/e2e/matrix-helpers.mjs</span>). Each time, a different test was the
+  casualty: six failures produced six different victims, spread across batch delete, folder
+  rename, multipart upload, two mobile layout specs and the download spec added in this work.
+  The browser process died at launch, before any page loaded.</p>
+
+  {{ c.warn('The failure counter reads zero', 'Because the crash killed a suite-level setup hook rather than an assertion, the subtests were reported cancelled rather than failed. Every lane still printed "fail 0" while one of them had failed outright. A summary line was actively misleading, and that cost real time before it was noticed.') }}
+
+  <h3>Reading the crash instead of counting it</h3>
+
+  <p>The crash output had been treated as a boolean — present or absent — for several rounds of
+  experiments. Reading it properly took one look and produced the whole answer.</p>
+
+  <table class="matrix">
+    <thead><tr><th>Evidence</th><th>What it establishes</th></tr></thead>
+    <tr>
+      <td>The fault address resolves inside <span class="code">getenv</span>, 173 bytes into a
+          229-byte symbol — checked against the symbol's declared size, not merely the nearest
+          preceding name.</td>
+      <td>The crash is in the environment lookup, not in browser code.</td>
+    </tr>
+    <tr>
+      <td>Two crashes in different processes with different address-space layouts share
+          identical low twelve bits of the instruction pointer. Address randomisation shifts by
+          whole pages, so those bits are invariant for a given code location.</td>
+      <td><strong>The same instruction, every time.</strong> This rules out random memory
+          corruption and faulty RAM, which scatter.</td>
+    </tr>
+    <tr>
+      <td>Trap 13 — a general protection fault — with no faulting page recorded, and a register
+          holding a value outside the valid address range.</td>
+      <td>A pointer that was never valid was dereferenced. Not a null dereference, not an
+          out-of-memory kill.</td>
+    </tr>
+    <tr>
+      <td>The one visible stack frame lies in the unexported gap immediately after
+          <span class="code">sigaction</span> — the signal return trampoline.</td>
+      <td>The backtrace stops at the signal frame and never reaches the real caller, which is
+          why it looked uninformative rather than being uninformative.</td>
+    </tr>
+  </table>
+
+  <h3>The mechanism</h3>
+
+  <p>In this C library, reading an environment variable is not safe against another thread
+  writing one. Writing reallocates the array of environment pointers; a reader walking that
+  array at the same moment can dereference memory that has just been freed. The upstream
+  description of the defect matches the observed crash exactly, down to the wording: a reader
+  may walk the environment while a writer is reallocating it, producing a segmentation fault
+  when it reaches memory already released. Browsers are heavily multithreaded from very early
+  in startup, which is when this fires.</p>
+
+  <p>That also explains why every remedy attempted failed. Nothing on disk was wrong, so
+  deleting and re-downloading the container image changed nothing. Nothing was exhausted, so
+  the memory and disk checks came back clean. The defect is a timing race inside a process
+  that had not yet loaded a page.</p>
+
+  <h3>What was ruled out, and how</h3>
+
+  <table class="matrix">
+    <thead><tr><th>Hypothesis</th><th>Disproved by</th></tr></thead>
+    <tr><td>Caused by this release</td><td>Unmodified prior code fails identically, in a clean
+        checkout, with a different victim.</td></tr>
+    <tr><td>A defect in one test</td><td>Six failures, six different victims, none related to
+        each other.</td></tr>
+    <tr><td>A corrupt image or dependency cache</td><td>Both destroyed and rebuilt from
+        scratch; the failure returned. The re-fetched image had an identical digest.</td></tr>
+    <tr><td>Memory pressure or an out-of-memory kill</td><td>Zero kernel out-of-memory events;
+        ample free memory and shared memory during the failing window; the signal is a crash,
+        not a kill.</td></tr>
+    <tr><td>Disk or filesystem corruption</td><td>Zero input/output or filesystem errors in the
+        kernel log.</td></tr>
+  </table>
+
+  <h3>The candidate fix — since applied and verified</h3>
+
+  <p><em>Update 2026-08-01: the base switch to noble described below was subsequently made
+  and held up — 16 of 16 clean full-matrix runs with zero segfaults, against the 64% failure
+  rate before it. The paragraphs below record the reasoning as originally written.</em></p>
+
+  <p>The library version in the current container base predates the upstream work that makes
+  environment reads safer in more cases. A newer base ships a version that includes it, at the
+  same tooling version and the same browser builds — a single-variable change, and the image is
+  already present on the machine.</p>
+
+  {{ c.note('Why it is a separate piece of work', 'The upstream change is described as making the read safe in more cases, not all — so it is a mitigation, and a couple of clean runs would not demonstrate anything. At the measured failure rate, roughly six consecutive clean runs would be needed before believing it helped. Switching also touches continuous integration configuration, which a test enforces in lockstep. That belongs in its own change with its own evidence, not folded into a download release.') }}
+
+  <p>One tempting non-fix was rejected outright. Reordering the lanes so this one does not run
+  first measured zero failures in four runs against six in eleven — but lane position cannot
+  cause a race inside a browser process. At most it shifts machine load and moves the timing
+  window. Adopting it would hide the symptom on one machine while leaving the defect live
+  everywhere else, including on continuous integration hardware where these lanes block.</p>
+</section>

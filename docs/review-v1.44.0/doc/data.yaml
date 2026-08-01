@@ -1,0 +1,8 @@
+report:
+  title: "Downloads That Tell You The Truth"
+  subtitle: "What shipped in v1.43.0 and v1.44.0, and the test-suite crash diagnosed underneath it"
+  short_title: "Downloads That Tell You The Truth"
+  output_name: "Bucketer_Download_Truthfulness_Review"
+  audience: "Bucketer maintainers"
+  version: "Session report"
+  date: 2026-07-31

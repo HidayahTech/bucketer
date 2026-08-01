@@ -1,0 +1,8 @@
+report:
+  title: "A Session That Went Wrong"
+  subtitle: "51 mistakes across 9 review passes, and why the last three found the worst of them"
+  short_title: "A Session That Went Wrong"
+  output_name: "Bucketer_Session_Postmortem_2026-07-31"
+  audience: "Bucketer maintainers"
+  version: "Postmortem input"
+  date: 2026-07-31

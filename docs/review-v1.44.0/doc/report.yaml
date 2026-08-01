@@ -1,0 +1,54 @@
+# Session report for the v1.43.0 / v1.44.0 download work.
+#
+#   doclab build docs/review-v1.44.0/doc/report.yaml
+#
+# No `product:` — Bucketer is not registered in doclab's org.yaml, and adding one
+# there is a change to shared config, not this document's business. Same reasoning
+# as docs/review-download-parity/doc/report.yaml.
+doctype: report
+content_dir: docs/review-v1.44.0/doc
+data: [docs/review-v1.44.0/doc/data.yaml]
+css: [docs/review-v1.44.0/doc/doc.css]
+
+title: "{{ report.title }}"
+subtitle: "{{ report.subtitle }}"
+running_title: "{{ report.short_title }}"
+output_name: "{{ report.output_name }}"
+toc: true
+
+cover:
+  meta:
+    - label: "Prepared for"
+      value: "{{ report.audience }}"
+    - label: "Prepared by"
+      value: "{{ org.legal_name }}"
+    - label: "Status"
+      value: "{{ report.version }} — v1.43.0 shipped, v1.44.0 ready to commit"
+    - label: "Date"
+      value: "{{ report.date | longdate }}"
+
+sections:
+  - id: summary
+    title: "Summary"
+    tpl: sections/summary.html.j2
+    flow: true
+  - id: shipped
+    title: "What Shipped"
+    tpl: sections/shipped.html.j2
+    flow: true
+  - id: crash
+    title: "The Crash Underneath the Suite"
+    tpl: sections/crash.html.j2
+    flow: true
+  - id: evidence
+    title: "How Each Claim Was Established"
+    tpl: sections/evidence.html.j2
+    flow: true
+  - id: corrections
+    title: "Three Wrong Conclusions"
+    tpl: sections/corrections.html.j2
+    flow: true
+  - id: open
+    title: "What Remains Open"
+    tpl: sections/open.html.j2
+    flow: true

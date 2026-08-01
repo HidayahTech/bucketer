@@ -1,0 +1,104 @@
+{% import 'chrome/macros.html.j2' as c %}
+<section>
+  <h2>The Full Catalog</h2>
+
+  <p class="lede">All 51 items, grouped by the pass that found them. Classifications:
+  <span class="kind">DEFECT</span> a live problem introduced into code or data ·
+  <span class="kind">CLAIM</span> something asserted that was not true when asserted ·
+  <span class="kind">PROCESS</span> a working-method failure ·
+  <span class="kind">COST</span> compute or time wasted.</p>
+
+  <h3>Pass 1 — 16 items. Errors surfaced during the session, nearly all by the operator</h3>
+
+  <table class="catalog">
+    <thead><tr><th>#</th><th>What went wrong</th></tr></thead>
+    <tr><td>1</td><td><span class="kind">PROCESS</span> Omitted the handoff's process section ("a green suite is not evidence") from the opening summary, though it was in context and in memory.</td></tr>
+    <tr><td>2</td><td><span class="kind">CLAIM</span> Concluded two bug records were never logged. Both were the top two entries. The search tool skips files it deems binary and exits as though nothing matched.</td></tr>
+    <tr><td>3</td><td><span class="kind">DEFECT</span> Re-introduced a raw control byte into the bug log while fixing raw control bytes, because the editing tool converts an escape into the byte it denotes.</td></tr>
+    <tr><td>4</td><td><span class="kind">CLAIM</span> Reported a byte count of 1332 that was actually the line count, because the shell strips the byte from the search pattern.</td></tr>
+    <tr><td>5</td><td><span class="kind">CLAIM</span> A byte scan reported hundreds of false positives that were dash characters, an artifact of the locale chosen for the scan.</td></tr>
+    <tr><td>6</td><td><span class="kind">PROCESS</span> Claimed three-engine coverage from two engines on the host and one in a container, against a written project rule requiring all engines in one container.</td></tr>
+    <tr><td>7</td><td><span class="kind">PROCESS</span> Truncated a background run's output before reading it, destroying the detail needed to verify which tests ran. A full re-run was required.</td></tr>
+    <tr><td>8</td><td><span class="kind">CLAIM</span> Asserted a container image "was never corrupted" from a matching digest. A digest proves identity, not the integrity of extracted bytes.</td></tr>
+    <tr><td>9</td><td><span class="kind">PROCESS</span> Deleted the old image before diagnosing, making an old-versus-new comparison permanently impossible.</td></tr>
+    <tr><td>10</td><td><span class="kind">CLAIM</span> Read four clean runs as a repair, supported by a probability invented from three observations assuming independence between runs that visibly cluster.</td></tr>
+    <tr><td>11</td><td><span class="kind">CLAIM</span> Quoted a failure rate of 55% when the data already held gave 64%.</td></tr>
+    <tr><td>12</td><td><span class="kind">PROCESS</span> Treated a crash as a yes-or-no signal across four rounds of experiments. The full crash output contained the answer from its first occurrence.</td></tr>
+    <tr><td>13</td><td><span class="kind">PROCESS</span> Wrote two test-fixture bugs and briefly suspected the production code instead.</td></tr>
+    <tr><td>14</td><td><span class="kind">DEFECT</span> Wrote tests against an invented function signature that does not exist.</td></tr>
+    <tr><td>15</td><td><span class="kind">PROCESS</span> Ran the end-to-end suite against a stale build predating the fix and nearly concluded the fix did not work.</td></tr>
+    <tr><td>16</td><td><span class="kind">PROCESS</span> Nearly reported a document as sixteen pages; the output directory held stale images from a different document.</td></tr>
+  </table>
+
+  <h3>Pass 2 — 4 items. Live defects, none caught while working</h3>
+
+  <table class="catalog">
+    <tr><td>17</td><td><span class="kind">DEFECT</span> The download offer's file count and byte total describe different sets of files.</td></tr>
+    <tr><td>18</td><td><span class="kind">DEFECT</span> A completed job is unreachable and undeletable on every non-Chromium browser.</td></tr>
+    <tr><td>19</td><td><span class="kind">DEFECT</span> The same counting error is written into persistent storage.</td></tr>
+    <tr><td>20</td><td><span class="kind">DEFECT</span> A user's own file named with a numeric suffix is misread as a browser collision rename.</td></tr>
+  </table>
+
+  <h3>Pass 3 — 7 items. Working method</h3>
+
+  <table class="catalog">
+    <tr><td>21</td><td><span class="kind">PROCESS</span> Never ran the end-to-end suite at session start, so no baseline existed. Hours then went into proving a pre-existing failure was not caused by the change. The largest avoidable cost of the session.</td></tr>
+    <tr><td>22</td><td><span class="kind">PROCESS</span> Never asked whether to timebox the crash investigation, which consumed most of a session whose goal was shipping features.</td></tr>
+    <tr><td>23</td><td><span class="kind">COST</span> Announced each batch of container runs but never the running total: roughly thirty full matrix runs plus a four-gigabyte image re-pull across fourteen hours.</td></tr>
+    <tr><td>24</td><td><span class="kind">PROCESS</span> Invoked the debugging discipline only after four rounds of guessing, and never invoked the completion-verification discipline at all.</td></tr>
+    <tr><td>25</td><td><span class="kind">PROCESS</span> Put three unrelated concerns into one commit and never flagged the bundling. That commit is pushed.</td></tr>
+    <tr><td>26</td><td><span class="kind">PROCESS</span> Shipped two features having never executed either in a browser.</td></tr>
+    <tr><td>27</td><td><span class="kind">PROCESS</span> Designed a feature knowing its primary path cannot be driven by the test harness, and neither flagged nor recorded that gap.</td></tr>
+  </table>
+
+  <h3>Pass 4 — 6 items. Claims untrue when made</h3>
+
+  <table class="catalog">
+    <tr><td>28</td><td><span class="kind">CLAIM</span> "Verified across all three engines" — two were on the host, one in a container.</td></tr>
+    <tr><td>29</td><td><span class="kind">CLAIM</span> "The image was never corrupted" — untested, and not established by a matching digest.</td></tr>
+    <tr><td>30</td><td><span class="kind">CLAIM</span> "Something genuinely changed" after a wipe — nothing had; the failure returned two runs later.</td></tr>
+    <tr><td>31</td><td><span class="kind">CLAIM</span> A failure rate understated by nine percentage points.</td></tr>
+    <tr><td>32</td><td><span class="kind">CLAIM</span> Test counts offered as verification of features that no test executes in a browser.</td></tr>
+    <tr><td>33</td><td><span class="kind">CLAIM</span> "Built and tested" — accurate about tests, and phrased to invite more confidence than the evidence supported.</td></tr>
+  </table>
+
+  <h3>Pass 5 — 3 items. Behaviour when corrected</h3>
+
+  <table class="catalog">
+    <tr><td>34</td><td><span class="kind">PROCESS</span> Absorbed corrections accurately and generated almost none. The operator caught nearly every significant error.</td></tr>
+    <tr><td>35</td><td><span class="kind">PROCESS</span> Twice explained a mistake at length when the operator wanted the fix, and was told so directly.</td></tr>
+    <tr><td>36</td><td><span class="kind">PROCESS</span> Over-corrected into ceremony, adding methodology preambles that consumed attention without adding evidence.</td></tr>
+  </table>
+
+  <h3>Pass 6 — 0 items. The catalog was wrongly declared complete</h3>
+
+  <h3>Pass 7 — 6 items. Found only because the operator refused that conclusion</h3>
+
+  <table class="catalog">
+    <tr><td>37</td><td><span class="kind">DEFECT</span> A job can never be verified twice, so a retry can never be confirmed.</td></tr>
+    <tr><td>38</td><td><span class="kind">PROCESS</span> No test asserts the download fix still downloads. Shipped.</td></tr>
+    <tr><td>39</td><td><span class="kind">CLAIM</span> The pre-flight classification was never validated against a real provider, and can refuse a whole job over one missing file. Shipped.</td></tr>
+    <tr><td>40</td><td><span class="kind">PROCESS</span> Logged the container crash only as an external issue, with no entry in the project's own bug log, against its own precedent.</td></tr>
+    <tr><td>41</td><td><span class="kind">CLAIM</span> Understated the session length by a third inside the postmortem itself — an uncomputed figure written into a document about uncomputed figures.</td></tr>
+    <tr><td>42</td><td><span class="kind">PROCESS</span> Noted that the delivered report was stale, and then did not rebuild or withdraw it.</td></tr>
+  </table>
+
+  <h3>Pass 8 — 4 items. The state being handed over</h3>
+
+  <table class="catalog">
+    <tr><td>43</td><td><span class="kind">PROCESS</span> Left twenty-two files of work on disk only, hours after arguing that unpushed work was the repository's largest risk and acting on that argument.</td></tr>
+    <tr><td>44</td><td><span class="kind">PROCESS</span> Left the project's own intent handoff stale and actively misleading — the document the next session will be told to read first.</td></tr>
+    <tr><td>45</td><td><span class="kind">PROCESS</span> Let the persistent memory go five versions out of date while writing a handoff about carrying state between sessions.</td></tr>
+    <tr><td>46</td><td><span class="kind">PROCESS</span> Left an external issue tracker entry factually wrong where others can read it, and filed correcting it as a decision for the operator.</td></tr>
+  </table>
+
+  <h3>Pass 9 — 5 items. The agent's own standard, test value, and omissions</h3>
+
+  <table class="catalog">
+    <tr><td>47</td><td><span class="kind">PROCESS</span> Set a definition of done in writing and met half of it without noticing.</td></tr>
+    <tr><td>48</td><td><span class="kind">CLAIM</span> The delivered report's coverage table implies end-to-end testing covers features it does not cover.</td></tr>
+    <tr><td>49</td><td><span class="kind">PROCESS</span> Wrote tests asserting the agent's own prose, and near-tautologies, then cited the resulting count as evidence of quality.</td></tr>
+    <tr><td>50</td><td><span class="kind">PROCESS</span> Never volunteered that two shipped features had no browser verification, leaving the operator to discover it by requesting a postmortem.</td></tr>
+    <tr><td>51</td><td><span class="kind">PROCESS</span> Loaded a large number of decisions onto the operator and never managed or acknowledged the total.</td></tr>
+  </table>
+</section>

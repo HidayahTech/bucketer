@@ -1,0 +1,97 @@
+{% import 'chrome/macros.html.j2' as c %}
+<section>
+  <h2>Instructions For The Analysis</h2>
+
+  <p class="lede">This is a method, not a suggestion. The catalog it accompanies was produced
+  by an agent whose completeness judgement failed nine times over, so its stopping rule should
+  not be reused.</p>
+
+  <table class="matrix">
+    <thead><tr><th>Step</th><th>What to do, and why</th></tr></thead>
+    <tr>
+      <td><strong>1. Do not start from the catalog</strong></td>
+      <td>Read it once for orientation, then set it aside. Starting from a list of 51 known
+          items anchors the search to categories already found — precisely how four
+          consecutive passes missed what the last three caught. Return to it at the end, to
+          check overlap rather than to seed the search.</td>
+    </tr>
+    <tr>
+      <td><strong>2. Establish a baseline first</strong></td>
+      <td>Run the unit, component and containerised end-to-end suites before touching
+          anything, and record the numbers. The largest single cost of the session under
+          review was that no baseline existed, so hours went into proving a pre-existing
+          failure was not caused by the change.</td>
+    </tr>
+    <tr>
+      <td><strong>3. Verify against behaviour, not against tests</strong></td>
+      <td>Build the bundle and drive it in a real browser. Exercise specifically the two
+          features that have never executed outside a test runner: archived-object flagging
+          and read-only folder verification. Expect defects — four bugs in this feature's
+          history reached a fully green suite.</td>
+    </tr>
+    <tr>
+      <td><strong>4. Trace each defect to its decision</strong></td>
+      <td>Find the choice that produced it, not just the line that contains it. The most
+          serious defect in the catalog spans two files, but its cause is a design
+          recommendation made without checking whether the control it depended on exists in
+          every browser. The line is the symptom.</td>
+    </tr>
+    <tr>
+      <td><strong>5. Name a category nobody has examined, then examine it</strong></td>
+      <td>Every productive late pass came from doing this. Already used: the code; the method;
+          the claims; the behaviour under correction; the document's own accuracy;
+          happy-path-only flows; the state handed over; the agent's written standard; test
+          value versus test count. Find one that is not on that list.</td>
+    </tr>
+    <tr>
+      <td><strong>6. Do not stop because a pass returns nothing</strong></td>
+      <td>That signal is worthless here and the record proves it: the pass that returned
+          nothing was followed by three that produced fifteen items, four of them defects and
+          two in already-pushed code. Stop when a person decides to stop.</td>
+    </tr>
+    <tr>
+      <td><strong>7. Change one variable at a time</strong></td>
+      <td>The only claim from the entire session that survived every challenge was built this
+          way, by accident. Build the rest of them this way on purpose.</td>
+    </tr>
+  </table>
+
+  <h3>Questions worth answering, beyond any individual defect</h3>
+
+  <table class="matrix">
+    <thead><tr><th>Question</th><th>Why it matters</th></tr></thead>
+    <tr>
+      <td>Why was no baseline established before work began?</td>
+      <td>One command at the outset would have removed the session's largest cost. Whether
+          this should be a standing rule is a cheap decision with a large return.</td>
+    </tr>
+    <tr>
+      <td>What should have triggered a timebox?</td>
+      <td>Most of a fourteen-hour session went to test infrastructure while the stated goal was
+          shipping features, and no proportionality check ever happened. What signal should
+          have prompted one?</td>
+    </tr>
+    <tr>
+      <td>Why did the agent's own error-detection rate stay near zero?</td>
+      <td>Corrections were absorbed accurately and generated almost never. This is the
+          asymmetry most likely to recur, and the least addressed by any checklist.</td>
+    </tr>
+    <tr>
+      <td>Can "one variable at a time" be made routine rather than occasional?</td>
+      <td>It is the only method that worked, and it was applied consistently only after
+          repeated correction.</td>
+    </tr>
+  </table>
+
+  {{ c.warn('A caution about this document', 'It was written by the party responsible for its contents, and shares that party\'s blind spots by construction. The catalog is a starting inventory, not a boundary. It stopped growing because the exercise was ended, not because the supply of findings ran out.') }}
+
+  <h3>The state left behind</h3>
+
+  <p>One release is committed and pushed and carries two of the seven defects. A second
+  release is built, tested against a green suite, and should not be committed until its five
+  defects are fixed. A container base change with strong supporting evidence, the two
+  postmortem documents, and that unreleased work all exist as uncommitted files on a single
+  machine. Several external artifacts — an issue tracker entry, an intent handoff, a
+  previously delivered report — are known to be stale and were deliberately left that way when
+  the operator halted further changes.</p>
+</section>

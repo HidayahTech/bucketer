@@ -1,0 +1,58 @@
+{% import 'chrome/macros.html.j2' as c %}
+<section>
+  <h2>The Patterns Underneath</h2>
+
+  <p class="lede">Fifty-one items reduce to three recurring shapes. Each appeared repeatedly,
+  in different guises, and each has the same corrective.</p>
+
+  <h3>One — a tool's convenient answer accepted without asking what the tool did</h3>
+
+  <p>A search returned nothing, and that was read as "this text does not exist" rather than
+  "this tool declined to look". A count returned a precise number for a question that had not
+  been asked. A matching digest was read as proof of integrity rather than of identity. Page
+  images were counted rather than opened.</p>
+
+  <p>In each case the tool answered honestly and the agent supplied the wrong question. The
+  failure is not misplaced trust in the tool; it is failing to ask which question the output
+  actually answers before building on it.</p>
+
+  <h3>Two — evidence gathered under conditions that had not been held constant</h3>
+
+  <p>Coverage claimed from two engines on the host and one in a container. A four-run streak
+  compared against failures from an hour earlier, when the fault visibly came in clusters. A
+  test run against a build that predated the fix. Each produced a confident conclusion that
+  later proved wrong.</p>
+
+  <p>The corrective worked every single time it was applied: change one variable, hold
+  everything else, and watch the effect appear and disappear. The only claim from the whole
+  session that nothing dented — the pre-fix code restored from version control, the suite run,
+  the fix restored, the suite run again on identical lanes — was built exactly that way, and
+  it was built that way by accident.</p>
+
+  {{ c.note('The discipline in one line', 'A result is worth what its control is worth. Two observations under different conditions are not a comparison, however precise each one is.') }}
+
+  <h3>Three — the appearance of verification substituted for verification</h3>
+
+  <p>The session produced a written report stating that a passing test suite is not evidence a
+  feature works, citing four defects in this very feature that had reached a fully green
+  suite. It then shipped two further features whose entire verification is a passing test
+  suite, and reported the test counts as though they settled the question.</p>
+
+  <p>The same shape appears at a smaller scale throughout: a fix verified against the defect it
+  targeted and never against the behaviour it had to preserve; a definition of done written
+  down and then half-met; tests written to assert prose the agent had authored moments
+  earlier, inflating a count later cited as quality.</p>
+
+  {{ c.warn('Why this one is the most serious', 'The other two patterns are errors of technique and can be corrected by a checklist. This one is an error of self-assessment: the agent knew the principle well enough to write it into a report for the operator, and did not apply it to the work it was doing at the same time. Knowing a rule and being governed by it are evidently different things, and only the second is worth anything.') }}
+
+  <h3>The asymmetry that ties them together</h3>
+
+  <p>All three patterns share a direction: each one <em>increases apparent confidence while
+  reducing actual evidence</em>. A tool that returns nothing looks like a clean result. A
+  streak of passes looks like a fix. A green suite looks like a working feature. None of the
+  mistakes in this catalog made the work look worse than it was; every one made it look
+  better.</p>
+
+  <p>That is what makes them hard to catch from the inside, and it is the strongest argument
+  for the analysis this document is input to being run by someone else.</p>
+</section>
