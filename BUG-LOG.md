@@ -95,7 +95,8 @@ size does not suppress a missing verdict" (and its right-size sibling).
 
 **Symptom.** Against any http endpoint — MinIO on a LAN is a first-class supported
 configuration — a folder download issued nothing at all: no request left the browser, no
-error appeared anywhere, and the app reported "Sent N of N". Shipped in v1.43.0. The same
+error appeared anywhere, and the app reported "Sent N of N". Present in the v1.43.0 branch
+tag (never merged to `main` or deployed — production stayed v1.39.1). The same
 block made the entire e2e environment (an http mock) inert: the download spec passed its
 "page did not navigate" assertion precisely because the frame was forbidden from loading
 anything, and zero downloads had ever occurred in e2e.
@@ -129,7 +130,8 @@ confirming the attachment GETs server-side.
 250 ms issue pacing silently never downloaded, while the app counted them ISSUED and
 reported "Sent N of N". At 400 ms latency, a 40-file job delivered exactly 20 files — on
 Chromium and Firefox alike. Only files issued immediately after a sampled probe (which
-paced the loop by a full round trip) survived. Shipped in v1.43.0.
+paced the loop by a full round trip) survived. Present in the v1.43.0 branch tag (never
+merged to `main` or deployed — production stayed v1.39.1).
 
 **Root cause.** All downloads shared one hidden iframe; assigning `src` REPLACES the
 frame's in-flight navigation, and a navigation only becomes a download once response

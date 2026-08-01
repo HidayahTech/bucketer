@@ -1,5 +1,14 @@
 # Independent postmortem analysis — 2026-08-01
 
+> **⚠️ Scope note (added 2026-08-01, after this document was written).** "Shipped in v1.43.0"
+> and similar phrasing throughout mean **version-tagged and pushed to the
+> `download-manager-stage1` feature branch — never deployed, never merged to `main`.**
+> Production Bucketer is Laravel-Forge-deployed from `main` and stayed **v1.39.1** throughout;
+> no v1.40.0+ download-manager code reached production. **No end user ran any code discussed
+> here — only the developers saw it.** The defects are real in the code and were caught before
+> they could reach `main`; real-world user impact was zero. The original text below is
+> unchanged; this note only corrects the meaning of "shipped". Full record: confidential #56.
+
 **Author:** Claude Fable 5, at the operator's request, in a fresh session.
 **Relationship to the other documents here:** `missteps.md` (the 51-item catalog) and
 `handoff.md` were written by the Claude Opus 5 agent whose work is under review. This

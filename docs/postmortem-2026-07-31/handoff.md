@@ -1,5 +1,14 @@
 # Handoff — postmortem analysis of the 2026-07-31 session
 
+> **⚠️ Scope note (added 2026-08-01, after this document was written).** "Shipped in v1.43.0"
+> and similar phrasing throughout mean **version-tagged and pushed to the
+> `download-manager-stage1` feature branch — never deployed, never merged to `main`.**
+> Production Bucketer is Laravel-Forge-deployed from `main` and stayed **v1.39.1** throughout;
+> no v1.40.0+ download-manager code reached production. **No end user ran any code discussed
+> here — only the developers saw it.** The defects are real in the code and were caught before
+> they could reach `main`; real-world user impact was zero. The original text below is
+> unchanged; this note only corrects the meaning of "shipped". Full record: confidential #56.
+
 ## THE TASK, STATED PLAINLY
 
 **Your priority is to conduct a thorough postmortem of the 2026-07-31 session, based on the

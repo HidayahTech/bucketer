@@ -1,5 +1,14 @@
 # Session missteps — 2026-07-31
 
+> **⚠️ Scope note (added 2026-08-01, after this document was written).** "Shipped in v1.43.0"
+> and similar phrasing throughout mean **version-tagged and pushed to the
+> `download-manager-stage1` feature branch — never deployed, never merged to `main`.**
+> Production Bucketer is Laravel-Forge-deployed from `main` and stayed **v1.39.1** throughout;
+> no v1.40.0+ download-manager code reached production. **No end user ran any code discussed
+> here — only the developers saw it.** The defects are real in the code and were caught before
+> they could reach `main`; real-world user impact was zero. The original text below is
+> unchanged; this note only corrects the meaning of "shipped". Full record: confidential #56.
+
 **Every item in this document is a mistake I made.** Not a difficulty encountered, not an
 environmental problem, not an ambiguity in the request. Each one was avoidable with
 information I already had or could have obtained cheaply, and each one should not have
