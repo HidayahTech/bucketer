@@ -6,6 +6,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createMockS3 } from './mock-s3/server.mjs';
+import { ensureTlsCert } from './tls-cert.mjs';
 import { createS3Client } from '../../src/lib/s3-client.js';
 import { chromium, firefox, webkit, devices } from 'playwright';
 import { test } from 'node:test';
@@ -41,7 +42,9 @@ export function newE2EContext(browser, extra = {}) {
   const dev = e2eDeviceName();
   const profile = dev ? devices[dev] : null;
   if (dev && !profile) throw new Error(`Unknown E2E_DEVICE "${dev}"`);
-  return browser.newContext(applyEngineQuirks(e2eEngineName(), profile, extra));
+  // ignoreHTTPSErrors: the mock's https listener uses a boot-generated self-signed cert
+  // (test/e2e/tls-cert.mjs); trusting it per-context beats installing it in a trust store.
+  return browser.newContext(applyEngineQuirks(e2eEngineName(), profile, { ignoreHTTPSErrors: true, ...extra }));
 }
 
 // Re-export so specs that pin their own device (e.g. issue-3-mobile) get the firefox fix too.
@@ -52,13 +55,19 @@ export { applyEngineQuirks };
 export async function startMock(opts = {}) {
   const mock = createMockS3({ host: '127.0.0.1', ...opts });
   const port = await mock.listen(0);
+  // The https listener exists because the app's CSP treats transports differently
+  // (frame-src) and production endpoints are https — the http-only harness is what let
+  // BUG-052 pass unnoticed. Both stay: http is a supported real-world configuration
+  // (MinIO on a LAN) and the node-layer SDK client keeps using it.
+  const tlsPort = await mock.listenTls(0, ensureTlsCert());
   const endpoint = `http://127.0.0.1:${port}`;
   // For the browser the app detects 127.0.0.1 as a generic provider → virtual-hosted addressing
   // (test-bucket.127.0.0.1 won't resolve). Chromium resolves *.localhost to loopback, so the
   // browser must use a localhost endpoint; the mock (listening on 127.0.0.1) still receives it.
   const browserEndpoint = `http://localhost:${port}`;
+  const httpsBrowserEndpoint = `https://localhost:${tlsPort}`;
   const client = createS3Client({ endpoint, keyId: 'test', secretKey: 'test', provider: 'minio', regionOverride: 'us-east-1' });
-  return { mock, port, endpoint, browserEndpoint, client };
+  return { mock, port, tlsPort, endpoint, browserEndpoint, httpsBrowserEndpoint, client };
 }
 
 // Serve the built app for browser specs. The e2e runner builds to perf/ (gitignored) so the
@@ -87,6 +96,35 @@ export async function connectApp(page, endpoint, bucket = BUCKET) {
   if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
   await page.locator('button[type="submit"]').click();
   await page.locator('[data-testid="file-input"]').waitFor({ state: 'attached', timeout: 15000 });
+}
+
+// Download observation. Playwright fires 'download' when a navigation is taken over by
+// the download manager — including navigations of hidden iframes (verified in the
+// 2026-08-01 postmortem's discriminator experiment). WebKit does not fire it; specs fall
+// back to the mock's request log there. This helper is the presence-assertion side of the
+// harness: an e2e that only asserts an absence ("nothing navigated") passes just as
+// happily when the feature is inert (BUG-052).
+export function collectDownloads(page) {
+  const names = [];
+  page.on('download', (d) => names.push(d.suggestedFilename()));
+  return {
+    names: () => names.slice(),
+    // Resolve once n downloads have been seen, or throw naming the shortfall — the
+    // shortfall count IS the finding, so it belongs in the error message.
+    waitForCount(n, timeoutMs = 30000) {
+      const deadline = Date.now() + timeoutMs;
+      return (async () => {
+        while (names.length < n) {
+          if (Date.now() > deadline) {
+            throw new Error(`expected ${n} downloads, saw ${names.length} after ${timeoutMs}ms: [${names.join(', ')}]`);
+          }
+          await new Promise((r) => setTimeout(r, 200));
+        }
+      })();
+    },
+    // Fixed grace period for stragglers, for arms where the count itself is the assertion.
+    settle(ms = 3000) { return new Promise((r) => setTimeout(r, ms)); },
+  };
 }
 
 export function waitForHttp(url, timeoutMs = 15000) {

@@ -55,6 +55,7 @@ describe('browser e2e — a failing download cannot navigate the app away', () =
   // renders it, and an anchor renders it in the top frame.
   e2eTest('an error response renders into the hidden frame, not the top frame', async () => {
     ctx.mock.configure({ faults: [{ op: 'GetObject', method: 'GET', status: 404, code: 'NoSuchKey', message: 'gone' }] });
+    ctx.mock.requestLog.reset();
     const before = page.url();
 
     await startFolderDownload();
@@ -64,6 +65,15 @@ describe('browser e2e — a failing download cannot navigate the app away', () =
     assert.ok(await page.locator('#app').count() > 0, 'the app root must still be mounted');
     assert.equal(await page.locator('iframe#bucketer-download-frame').count(), 1,
       'one frame is reused; an element per file would be an unbounded DOM leak');
+
+    // Presence assertion: absence claims above are only trustworthy if the run genuinely
+    // reached the mock. The per-file pre-flight probes are signed Range GETs; at least one
+    // must have arrived, or this test proved nothing about a live engine (the postmortem's
+    // lesson: an inert feature satisfies every absence assertion). The download-completion
+    // spec (which lands with the issuance fix) carries the stronger half — that real
+    // downloads occur at all.
+    assert.ok(ctx.mock.requestLog.list().some((r) => r.signed && r.method === 'GET'),
+      'no signed GET ever reached the mock — the engine never actually ran against it');
   });
 
   // The probe is a raw fetch carrying Range, which is CORS-safelisted. Asserting on the DENIED

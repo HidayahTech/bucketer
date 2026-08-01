@@ -12,6 +12,7 @@
 // Auth: SigV4 signatures are ignored — the app is under test, not the signer. Presigned GETs
 // (query-auth) are served by ignoring the query signature.
 import http from 'node:http';
+import https from 'node:https';
 import crypto from 'node:crypto';
 
 const md5hex = (buf) => crypto.createHash('md5').update(buf).digest('hex');
@@ -49,10 +50,33 @@ function readBody(req) {
 
 export function createMockS3(opts = {}) {
   const baseHost  = opts.host ?? '127.0.0.1';
-  const latencyMs = opts.latencyMs ?? 0;
+  const bootLatencyMs = opts.latencyMs ?? 0;
+  let latencyMs   = bootLatencyMs;   // runtime-settable via configure({ latencyMs }) so a
+                                     // matched pair (0 ms vs slow) can share one boot
   const buckets   = new Map(); // name -> { versioning, objects: Map<key, Version[]>, uploads: Map<id,…> }
   let cors        = DEFAULT_CORS();
   let faults      = [];        // [{ op?, method?, keyPrefix?, status, code, message, times }]
+
+  // Request log: the presence-assertion side of the harness. An e2e that asserts only an
+  // absence ("the page did not navigate") passes just as happily when the feature is
+  // inert (BUG-052: the CSP blocked the download frame from loading anything at all), so
+  // specs pair absence assertions with "the request actually arrived here". Ring-bounded;
+  // isNavGet marks a signed object GET with no Range header — a download navigation, as
+  // opposed to the one-byte pre-flight probes.
+  const REQUEST_LOG_CAP = 2000;
+  const requestEntries = [];
+  function logRequest(req) {
+    if (req.url.startsWith('/__admin/')) return;
+    const signed = req.url.includes('X-Amz-Signature');
+    const isNavGet = req.method === 'GET' && signed
+      && !req.url.includes('list-type') && !req.headers.range;
+    requestEntries.push({ method: req.method, path: req.url.split('?')[0], signed, isNavGet });
+    if (requestEntries.length > REQUEST_LOG_CAP) requestEntries.shift();
+  }
+  const requestLog = {
+    list: () => requestEntries.slice(),
+    reset: () => { requestEntries.length = 0; },
+  };
 
   function bkt(name) {
     if (!buckets.has(name)) buckets.set(name, { versioning: false, objects: new Map(), uploads: new Map() });
@@ -72,10 +96,11 @@ export function createMockS3(opts = {}) {
     return ver;
   }
 
-  function reset()        { buckets.clear(); faults = []; cors = DEFAULT_CORS(); }
+  function reset()        { buckets.clear(); faults = []; cors = DEFAULT_CORS(); latencyMs = bootLatencyMs; requestLog.reset(); }
   function configure(cfg) {
     if (cfg.cors)   cors = { ...DEFAULT_CORS(), ...cfg.cors };
     if (cfg.faults) faults = cfg.faults;
+    if (typeof cfg.latencyMs === 'number') latencyMs = cfg.latencyMs;
     if (cfg.bucket && typeof cfg.versioning === 'boolean') bkt(cfg.bucket).versioning = cfg.versioning;
   }
   function matchFault(op, method, key) {
@@ -154,8 +179,9 @@ export function createMockS3(opts = {}) {
     sendXml(req, res, status, `<Error><Code>${xmlEsc(code)}</Code><Message>${xmlEsc(message)}</Message></Error>`);
   }
 
-  const server = http.createServer(async (req, res) => {
+  const handler = async (req, res) => {
     try {
+      logRequest(req);
       if (latencyMs > 0) await new Promise((r) => setTimeout(r, latencyMs));
       const method = req.method;
 
@@ -166,6 +192,8 @@ export function createMockS3(opts = {}) {
         const body = await readBody(req);
         if (req.url === '/__admin/reset') { reset(); res.writeHead(200, corsHeaders(req)); return res.end('{"ok":true}'); }
         if (req.url === '/__admin/config') { configure(body.length ? JSON.parse(body) : {}); res.writeHead(200, corsHeaders(req)); return res.end('{"ok":true}'); }
+        if (req.url === '/__admin/requests' && method === 'GET') { res.writeHead(200, { ...corsHeaders(req), 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ requests: requestLog.list() })); }
+        if (req.url === '/__admin/requests/reset') { requestLog.reset(); res.writeHead(200, corsHeaders(req)); return res.end('{"ok":true}'); }
         res.writeHead(404, corsHeaders(req)); return res.end();
       }
 
@@ -198,7 +226,10 @@ export function createMockS3(opts = {}) {
     } catch (err) {
       sendError(req, res, 500, 'InternalError', err.message);
     }
-  });
+  };
+
+  const server = http.createServer(handler);
+  let tlsServer = null;
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   function listObjectsV2(req, res, b, q) {
@@ -509,9 +540,22 @@ export function createMockS3(opts = {}) {
     server,
     reset,
     configure,
+    requestLog,
     get buckets() { return buckets; },
     listen(port) { return new Promise((resolve) => server.listen(port, baseHost, () => resolve(server.address().port))); },
-    close() { return new Promise((resolve) => server.close(resolve)); },
+    // Same handler over TLS. Exists because the app's CSP treats transports differently
+    // (frame-src) and production endpoints are https — an http-only harness let BUG-052
+    // pass unnoticed. Callers supply { key, cert } (see test/e2e/tls-cert.mjs).
+    listenTls(port, tlsOpts) {
+      tlsServer = https.createServer(tlsOpts, handler);
+      return new Promise((resolve) => tlsServer.listen(port, baseHost, () => resolve(tlsServer.address().port)));
+    },
+    close() {
+      return Promise.all([
+        new Promise((resolve) => server.close(resolve)),
+        tlsServer ? new Promise((resolve) => tlsServer.close(resolve)) : Promise.resolve(),
+      ]);
+    },
   };
 }
 
