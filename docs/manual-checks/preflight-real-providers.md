@@ -11,9 +11,10 @@ a real provider**. A mock cannot honestly test a table whose values the mock cop
 the table's author.
 
 **When to run it.** Before any release that changes `download-preflight.js`'s
-classification (`kindForStatus`) or the engine's blocking rules (`DENIED_BLOCK_STREAK`,
-`isBlocking`), and once against each newly supported provider. Record the results in the
-table below with the date, credentials shape, and observed codes — this file is the log.
+classification (`kindForStatus`) or the engine's blocking rule (`DENIED_BLOCK_STREAK`, and
+the streak logic that consumes it in `runDownloadJob`, `download-queue.js`), and once
+against each newly supported provider. Record the results in the table below with the date,
+credentials shape, and observed codes — this file is the log.
 
 ## The checks
 
@@ -29,9 +30,15 @@ exact shape the engine sends.
    `403` on every key → DENIED streak → job blocks with the credentials message.
 4. **Clock skew.** Presign with system clock offset > 15 min. Expected: `403`
    (RequestTimeTooSkewed surfaces as 403 at the HTTP layer) → streak → block.
-5. **Archived object (AWS).** Probe a GLACIER / DEEP_ARCHIVE object. Record the actual
-   status (`403 InvalidObjectState` expected) — confirms archived objects are per-file
-   failures, not job-wide blocks.
+5. **Archived object (AWS).** The primary path does **not** probe these: `download-manifest.js`
+   reads `StorageClass` from the ListObjectsV2 listing and records GLACIER / DEEP_ARCHIVE
+   objects as `SKIPPED` (`skipReason: 'archived'`) at enumeration, so they never become
+   PENDING and never reach the probe (`storage-class.js`, `isArchivedStorageClass`). What
+   this check measures is the **post-enumeration race**: an object archived *after* the
+   listing but *before* its turn in the queue. Probe such an object and record the actual
+   status (`403 InvalidObjectState` expected). Note that this classifies as DENIED, so a
+   *cluster* of freshly-archived objects would count toward the `DENIED_BLOCK_STREAK` and
+   block the job — it is not an unconditional per-file failure.
 6. **Empty object.** Probe a 0-byte object. Expected: `416` → OK (readable). This is the
    one the table already gets right by design; confirm per provider anyway.
 7. **Missing CORS rule.** Probe from a browser origin the bucket's CORS does not allow.
