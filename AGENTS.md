@@ -20,6 +20,8 @@ Always ask for confirmation before committing or pushing.
 
 A guard test enforces it: `test/source-invariants.test.js` → "package-lock.json tracks package.json" fails if either lock version field diverges, and its message names the command to fix it. It is a test rather than a build invariant deliberately — the lock's version never reaches build output, so it does not belong in the list under **Build Invariants**; the nearest precedent is the `.gitlab-ci.yml` ↔ locked-playwright lockstep test. Both run in the pre-push hook regardless.
 
+**A version-bump commit must also include the rebuilt `dist/index.html` and `src/lib/changelog.js`.** Both are generated but tracked — Forge deploys the committed bundle, and CI's stale-dist guard fails any push whose committed `dist/index.html` differs from a fresh build of the same source. Run `npm run build` after bumping and commit the regenerated files in the bump commit. (The v1.44.2 bump omitted them; pipeline #220 caught it.)
+
 `@anthropic-ai/claude-code` is not a project dependency and must never appear in `package.json`, `package-lock.json`, or any commit. It is installed separately in `.tools/` (gitignored). See **Claude Code Setup** below.
 
 ## Build Invariants

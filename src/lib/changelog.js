@@ -1,9 +1,17 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.44.1';
+export const CURRENT_VERSION = '1.44.2';
 
 export const CHANGELOG = [
+  {
+    "version": "1.44.2",
+    "date": "2026-08-02",
+    "title": "The refresh test stops racing the app's startup",
+    "changes": [
+      "Fixed the remaining intermittently-failing browser test (issue #55): the \"sub-folder appears without a refresh\" spec could drop its file in the instant between the app rendering and its drop handler being wired up, and a drop in that gap silently does nothing — no upload, no new folder, red test. Seen only on the slower WebKit lanes. The spec now waits for a pre-seeded file's row to render, which proves the app is fully ready before dropping. Nothing in the app changed."
+    ]
+  },
   {
     "version": "1.44.1",
     "date": "2026-08-01",
