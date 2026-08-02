@@ -560,10 +560,10 @@ export function App() {
         return { ...j, counters, counts, jobClass: classifyJob(counts) };
       }));
     },
-    startJob: async ({ bucket, prefix, mode }) => {
+    startJob: async ({ bucket, prefix, roots, mode, label }) => {
       const job = {
         id: crypto.randomUUID(),
-        bucket, prefix, mode,
+        bucket, prefix, roots, mode, label: label ?? null,
         // Recorded because a manifest outlives the session that built it, and the archived
         // check at enumeration is provider-specific. Jobs created before this field
         // existed have none, which correctly flags nothing rather than guessing AWS.
@@ -831,7 +831,7 @@ export function App() {
       {downloadOpen && session === 'connected' && (
         <DownloadJobPanel
           bucket={credentials.bucket}
-          prefix={currentPrefix}
+          scope={{ kind: 'folder', prefix: currentPrefix }}
           api={downloadApi}
           capabilities={browserCapabilities}
           onStart={handleDownloadStart}
