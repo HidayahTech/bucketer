@@ -405,3 +405,7 @@ Bucketer **never overwrites**: if an object already exists at the destination, t
 Copyright (C) 2026 HidayahTech, LLC
 
 Licensed under the [GNU Affero General Public License v3.0](LICENSE).
+
+## Verification
+
+Verify with: the pre-push gate (`.githooks/pre-push`, self-installs on `npm install`) + `build.mjs` invariants — see `AGENTS.md` → Verification Gate.
