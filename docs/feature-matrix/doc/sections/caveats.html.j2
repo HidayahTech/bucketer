@@ -1,0 +1,30 @@
+{% import 'chrome/macros.html.j2' as c %}
+<section>
+  <h2>What This Matrix Does Not Prove</h2>
+
+  <p>The project's own rule is that a green matrix must never imply coverage it does not have.
+  These are the boundaries of what is claimed above.</p>
+
+  {{ c.warn('Playwright WebKit is not Safari', 'The "WebKit (Playwright)" column reports no Storage API at all, which is a property of Playwright’s browser fork, not of Safari. Real Safari has OPFS and more. Every Safari row in the target table is documentation, not a measurement — nothing here was run on Apple hardware, which requires safaridriver or a device cloud.') }}
+
+  {{ c.warn('The mobile lanes are emulated, not real devices', 'CI runs a 3-engine by 3-profile matrix: chromium, firefox and webkit, each against desktop, a Pixel 5 profile and an iPhone 13 profile. Those profiles are Playwright viewport and user-agent emulation. They do not reproduce the constraints that actually decide mobile behaviour — JavaScript suspension on backgrounding, page-memory ceilings, and Safari’s seven-day storage eviction. "Shown" in the Mobile advisory column means the warning renders; it is not evidence the underlying download survives a real phone.') }}
+
+  <ul>
+    <li><strong>Detected is not wired.</strong> The Managed-folder and Staged tiers are probed
+    and labelled but are not built as transfer paths. Reading the capability table as a list of
+    working download modes would overstate the app by two-thirds.</li>
+    <li><strong>Some rows vary by provider, not browser.</strong> Hidden-versions behaviour has
+    R2-specific handling, archived detection depends on the provider returning a StorageClass,
+    and multipart-orphan cleanup differs between B2, R2 and AWS. That is a separate axis from the
+    browser one and is not what this matrix measures.</li>
+    <li><strong>Connection capability is a third axis.</strong> The app also has a per-credential
+    capability panel (can this key read, write, delete?). That is about IAM permissions, not the
+    browser, and is deliberately kept out of these tables.</li>
+    <li><strong>This is a snapshot.</strong> Every cell was read from source at commit
+    <code>81ebc5a</code> (v1.44.3, both <code>main</code> and the branch tip) on 2026-08-02. It
+    drifts the moment the code does — in particular, the day a second transfer tier is wired,
+    the "Transfer actually used" column stops being uniform.</li>
+  </ul>
+
+  {{ c.note('If you read one thing off this report', 'Production is v1.44.3 (deployed 2026-08-02) and includes the download manager. It gives every browser the same browser-managed handoff and differentiates by browser in exactly one place — offering folder verification on Chromium. The passphrase vault is deployed as code but deliberately unreachable. Everything else Bucketer does works the same everywhere.') }}
+</section>

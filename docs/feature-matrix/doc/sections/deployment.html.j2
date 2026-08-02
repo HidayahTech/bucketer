@@ -1,0 +1,56 @@
+{% import 'chrome/macros.html.j2' as c %}
+<section>
+  <h2>What Is Deployed Where</h2>
+
+  <p>Bucketer builds to a single self-contained <code>dist/index.html</code>. Production serves
+  that file from a host managed by Laravel Forge, deployed from the <code>main</code> branch.
+  There is no separate staging tier. Since 2026-08-02 there is no unreleased branch state
+  either: <code>download-manager-stage1</code> was fast-forward merged into <code>main</code>
+  and both refs point at the same commit.</p>
+
+  <table class="data">
+    <thead>
+      <tr><th>Environment</th><th>Ref</th><th>Version</th><th>Download manager</th><th>How it gets there</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Production</strong></td>
+        <td><code>main</code></td>
+        <td>v1.44.3 <span style="color:#666">(2026-08-02)</span></td>
+        <td>Present — full arc</td>
+        <td>Laravel Forge deploys the built single file from <code>main</code>. Live version verified after deploy.</td>
+      </tr>
+      <tr>
+        <td><strong>Feature branch</strong></td>
+        <td><code>download-manager-stage1</code></td>
+        <td>v1.44.3 <span style="color:#666">(2026-08-02)</span></td>
+        <td>Same commit as production</td>
+        <td>Merged to <code>main</code> 2026-08-02; retained for history.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>The arc that moved from branch-only to production in that merge — upload, delete, move,
+  rename, sharing, hidden versions, the connection model and provider support were already in
+  production at v1.39.1 and are unchanged — is the following, and only the following:</p>
+
+  <table class="data">
+    <thead><tr><th>Version</th><th>Date</th><th>What it added</th></tr></thead>
+    <tbody>
+      <tr><td>v1.40.0</td><td>2026-07-30</td><td>Transfer-tool (CLI) command handoff for very large jobs.</td></tr>
+      <tr><td>v1.41.0</td><td>2026-07-30</td><td>Whole-folder download with a resume worklist in IndexedDB.</td></tr>
+      <tr><td>v1.41.1</td><td>2026-07-30</td><td>Downloaded files keep their real names (Content-Disposition).</td></tr>
+      <tr><td>v1.42.0</td><td>2026-07-31</td><td>Capability-honest messaging; advisory warning on phones.</td></tr>
+      <tr><td>v1.42.1</td><td>2026-07-31</td><td>A stoppable folder download that remembers what failed.</td></tr>
+      <tr><td>v1.43.0</td><td>2026-07-31</td><td>A failing download no longer navigates the app away (hidden reused frame).</td></tr>
+      <tr><td>v1.43.1</td><td>2026-08-01</td><td>Noble container base — footing for the browser test matrix.</td></tr>
+      <tr><td>v1.43.2</td><td>2026-08-01</td><td>CSP fix so folder downloads work on http endpoints; probe pacing; bounded frame pool.</td></tr>
+      <tr><td>v1.44.0</td><td>2026-08-01</td><td>Archived (Glacier/Deep Archive) objects set aside; optional folder verification.</td></tr>
+      <tr><td>v1.44.1</td><td>2026-08-01</td><td>De-flaked three browser tests on slow runners.</td></tr>
+      <tr><td>v1.44.2</td><td>2026-08-02</td><td>De-flaked the last racing browser test (drop before the app was drop-ready).</td></tr>
+      <tr><td>v1.44.3</td><td>2026-08-02</td><td>Switched off the unfinished credential vault (VAULT_ENABLED=false) pending its redesign.</td></tr>
+    </tbody>
+  </table>
+
+  {{ c.note('Why deployment state is load-bearing in this project', 'A 2026-07-31 postmortem turned on exactly this point: two critical download defects were described as shipped when they were only branch-tagged. This report therefore states deployment as a dated fact, not an implication: the arc above reached production on 2026-08-02 as v1.44.3, after the full 11-job CI matrix passed on that exact commit, and the live instance was verified serving 1.44.3. The vault is the deliberate exception — deployed as code, switched off as a feature.') }}
+</section>

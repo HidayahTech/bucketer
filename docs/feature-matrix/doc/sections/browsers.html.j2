@@ -1,0 +1,62 @@
+{% import 'chrome/macros.html.j2' as c %}
+<section>
+  <h2>Browser Support Matrix</h2>
+
+  <p>Two tables. The first is the raw capability detection — the exact set of APIs
+  <code>detectCapabilities</code> probes, per engine. The second turns that into the outcome
+  for a download job on each browser type and variant. The columns for the first table follow
+  the measured/documented split from the download-parity investigation: three engines were
+  measured, and real Safari is documented separately because the engine Playwright ships as
+  "WebKit" is not Safari.</p>
+
+  <h3>Capability detection (what each engine reports)</h3>
+
+  <table class="matrix">
+    <thead>
+      <tr>
+        <th class="feat">API probed</th>
+        <th>Chromium</th><th>Firefox</th><th>WebKit<br>(Playwright)</th><th>Real Safari<br>(documented)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="feat">Directory picker (<code>showDirectoryPicker</code>)</td><td class="c">Yes</td><td class="c">No</td><td class="c">No</td><td class="c">No</td></tr>
+      <tr><td class="feat">Save-file picker (<code>showSaveFilePicker</code>)</td><td class="c">Yes</td><td class="c">No</td><td class="c">No</td><td class="c">No</td></tr>
+      <tr><td class="feat">Writable files (<code>createWritable</code>)</td><td class="c">Yes</td><td class="c">OPFS only</td><td class="c">No</td><td class="c">Safari 26+</td></tr>
+      <tr><td class="feat">OPFS (<code>storage.getDirectory</code>)</td><td class="c">Yes</td><td class="c">Yes</td><td class="c">No *</td><td class="c">Yes (15.2+)</td></tr>
+      <tr><td class="feat">Storage estimate / persist</td><td class="c">Yes</td><td class="c">Yes</td><td class="c">No *</td><td class="c">Yes</td></tr>
+      <tr><td class="feat">Streaming fetch (<code>response.body</code>)</td><td class="c">Yes</td><td class="c">Yes</td><td class="c">Yes</td><td class="c">Yes</td></tr>
+      <tr><td class="feat">Background Fetch</td><td class="c">Yes</td><td class="c">No</td><td class="c">No</td><td class="c">No</td></tr>
+    </tbody>
+  </table>
+  <p class="legend">* Playwright's WebKit reports no Storage API at all — <code>navigator.storage</code>,
+  <code>FileSystemFileHandle</code> and <code>FileSystemDirectoryHandle</code> are entirely
+  absent. This is a property of Playwright's fork, not of Safari. Real Safari has had OPFS since
+  15.2; only <code>safaridriver</code> on Apple hardware exercises the real browser.</p>
+
+  <h3>What that means for a download job, by target</h3>
+
+  <table class="matrix">
+    <thead>
+      <tr>
+        <th class="feat">Target</th>
+        <th>Best tier<br>detected</th><th>Transfer<br>actually used</th><th>Folder<br>verify</th><th>Mobile<br>advisory</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td class="feat">Chromium desktop</td><td class="c">Managed-folder</td><td class="c">Handoff</td><td class="c">Yes</td><td class="c">—</td></tr>
+      <tr><td class="feat">Chromium Android</td><td class="c">Managed-folder</td><td class="c">Handoff</td><td class="c">Partial</td><td class="c">Shown</td></tr>
+      <tr><td class="feat">Firefox desktop</td><td class="c">Staged</td><td class="c">Handoff</td><td class="c">No</td><td class="c">—</td></tr>
+      <tr><td class="feat">Firefox Android</td><td class="c">Staged</td><td class="c">Handoff</td><td class="c">No</td><td class="c">Shown</td></tr>
+      <tr><td class="feat">Safari desktop</td><td class="c">Handoff †</td><td class="c">Handoff</td><td class="c">No</td><td class="c">—</td></tr>
+      <tr><td class="feat">Safari iOS / iPadOS</td><td class="c">Handoff</td><td class="c">Handoff</td><td class="c">No</td><td class="c">Shown</td></tr>
+    </tbody>
+  </table>
+  <p class="legend">"Best tier detected" is what the browser <em>could</em> do; "Transfer
+  actually used" is what is wired — and it is <strong>Handoff on every target</strong>, because
+  that is the only mechanism built (next section). Folder verify is <em>Partial</em> on Chromium
+  Android because the picker exists but has open launch defects (freezing on large folders).
+  † Playwright WebKit detects only Handoff; real Safari 26+ would detect Staged, but that path
+  is untested on Apple hardware and unwired regardless.</p>
+
+  {{ c.note('The honest one-liner', 'Every browser gets the same download transfer — the browser-managed handoff — and every browser gets the same S3 features. The only implemented behaviour that changes with the browser is whether the read-only folder-verify step is offered (Chromium) and whether a mobile advisory appears. The rest of the matrix is potential, detected and labelled but not yet wired.') }}
+</section>

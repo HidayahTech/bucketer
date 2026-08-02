@@ -1,0 +1,17 @@
+/* Document-specific overrides, loaded after the house sheet and the doctype layer. */
+
+/* Support grids carry short symbols against many columns; a shade tighter than body,
+   and centred so the ticks and crosses line up as a scannable field. */
+table.matrix { font-size: 0.82em; }
+table.matrix th, table.matrix td { padding: 0.28rem 0.4rem; vertical-align: top; }
+table.matrix thead th { text-align: center; }
+table.matrix td.c { text-align: center; white-space: nowrap; }
+/* The first column names the feature and carries the weight of the row. */
+table.matrix td.feat, table.matrix th.feat { text-align: left; font-weight: 600; }
+
+/* Deployment and inventory tables read as data; keep numbers and versions aligned. */
+table.data { font-size: 0.86em; font-variant-numeric: tabular-nums; }
+table.data th, table.data td { padding: 0.25rem 0.5rem; vertical-align: top; }
+
+/* A small legend line under a matrix. */
+.legend { font-size: 0.8em; color: #555; margin-top: 0.35rem; }

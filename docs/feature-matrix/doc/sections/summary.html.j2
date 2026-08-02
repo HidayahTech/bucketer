@@ -1,0 +1,24 @@
+{% import 'chrome/macros.html.j2' as c %}
+<section>
+  <h2>Summary</h2>
+
+  <p class="lede">This is a point-in-time snapshot of what Bucketer actually implements, how
+  each browser stands against those features, and what is running in production. Every row was
+  checked against the source at commit <code>81ebc5a</code>,
+  which is both <code>main</code> and the tip of <code>download-manager-stage1</code> — not
+  against documentation or changelog prose.</p>
+
+  {{ c.warn('The two things most easily misread', 'First: the download-manager arc (v1.40.0 through v1.44.3) was merged to main and deployed to production on 2026-08-02 — an earlier draft of this report predates that and described the arc as branch-only; that is no longer true. Second: production also carries an in-progress passphrase credential vault that is deliberately switched off (VAULT_ENABLED=false, v1.44.3) after its creation flow failed design review — code present, feature unreachable. "Implemented" elsewhere in this report means deployed and reachable.') }}
+
+  <h3>How to read the matrices</h3>
+
+  <p>Most of Bucketer is <strong>browser-agnostic</strong>. Uploading, downloading, deleting,
+  moving, listing, sharing, and connecting to a provider are S3 API calls carried over
+  <code>fetch</code>, and they behave identically in every engine, desktop or mobile. The
+  browser axis earns its place in only a few areas: the download <em>transfer mechanism</em>,
+  the read-only folder <em>verification</em> step, private-storage-backed <em>resume</em>, and
+  the advisory <em>mobile</em> warning. The Feature Inventory lists everything; the Browser
+  Support Matrix zooms in on the handful of rows that actually differ.</p>
+
+  {{ c.note('Two rules the code follows, and this report honours', 'Capability is decided by feature detection, never by parsing a user-agent string — the code asks whether an API exists. And a capability the browser reports is not the same as a mechanism the application has built: the download tiers are detected and labelled per browser, but only one of the three is wired as an actual transfer path. The matrix keeps those two ideas apart on purpose.') }}
+</section>

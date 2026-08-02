@@ -1,0 +1,48 @@
+{% import 'chrome/macros.html.j2' as c %}
+<section>
+  <h2>The Download Subsystem, In Detail</h2>
+
+  <p>The download manager is where the browser axis actually bites, and where "implemented" and
+  "detected" diverge, so it is worth being precise. <code>browser-capability.js</code> defines
+  three transfer mechanisms:</p>
+
+  <table class="data">
+    <thead><tr><th>Mechanism</th><th>What it does</th><th>Ceiling</th><th>Wired?</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Managed folder</strong></td><td>Streams into a folder the user picks (File System Access). Real tree, byte-range resume.</td><td>Disk-bound</td><td><strong>No</strong></td></tr>
+      <tr><td><strong>Staged</strong></td><td>Fetches with streaming, stages in OPFS, hands the finished file to the download manager.</td><td>Storage quota</td><td><strong>No</strong></td></tr>
+      <tr><td><strong>Handoff</strong></td><td>Presigned URL plus Content-Disposition, given to the browser's own download manager.</td><td>None</td><td><strong>Yes</strong></td></tr>
+    </tbody>
+  </table>
+
+  <p>Only <strong>Handoff</strong> is built. <code>DownloadJobPanel.jsx</code> calls
+  <code>selectTier(capabilities, {{ '{' }} prefer: TIERS.HANDOFF {{ '}' }})</code> — it detects and
+  labels the better tier a browser could support, then deliberately uses Handoff anyway, with
+  the source comment "Only the handoff mechanism is built". So the capability table above is a
+  map of <em>potential</em>; the transfer every user gets, in every engine, is the same one.</p>
+
+  <h3>What Handoff has become</h3>
+  <p>The arc did not add a mechanism so much as make the one mechanism trustworthy:</p>
+  <ul>
+    <li><strong>It no longer crashes the app.</strong> A failed download carries no attachment
+    header, so a top-level anchor rendered the error over the page. The URL now loads in one
+    hidden, reused frame that contains both outcomes (v1.43.0).</li>
+    <li><strong>It works on http endpoints.</strong> The bundle CSP silently blocked frame
+    downloads on non-https origins until <code>frame-src</code> was widened (v1.43.2).</li>
+    <li><strong>It knows what it cannot send.</strong> A one-byte range probe runs before the
+    first file and paces the rest; archived (Glacier / Deep Archive) objects are read from the
+    listing and set aside at enumeration, never issued (v1.44.0).</li>
+    <li><strong>It remembers.</strong> The worklist is durable in IndexedDB, so a job survives a
+    reload and resumes — universal across engines.</li>
+  </ul>
+
+  <h3>The one browser-gated affordance: folder verification</h3>
+  <p>Because Handoff cannot observe whether a file arrived, v1.44.0 added an <em>optional</em>
+  read-only check: the user re-picks the download folder, and the app compares name and size,
+  promoting what it confirms and re-queuing what provably did not arrive. This is the single
+  feature gated on a browser API — <code>canVerify = !!capabilities.directoryPicker</code> —
+  so it is offered on Chromium and nowhere else. It is a verification step, not a download
+  path; the picker is opened in read mode.</p>
+
+  {{ c.note('Honesty doctrine', 'Handoff surfaces no percentage, ETA, or transfer rate, because the application genuinely cannot see them once the browser takes the file. On a phone it adds an advisory that downloads are unreliable when the tab is backgrounded. The matrix reflects a deliberate refusal to claim capability the code does not have.') }}
+</section>

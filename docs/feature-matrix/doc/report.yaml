@@ -1,0 +1,54 @@
+# Point-in-time matrix of implemented features, browser support, and deployment state.
+#
+#   doclab build docs/feature-matrix/doc/report.yaml
+#
+# No `product:` — Bucketer is not registered in doclab's org.yaml, and adding one there is a
+# change to shared config, not this document's business. Same reasoning as the other Bucketer
+# reports (docs/review-v1.44.0, docs/review-download-parity).
+doctype: report
+content_dir: docs/feature-matrix/doc
+data: [docs/feature-matrix/doc/data.yaml]
+css: [docs/feature-matrix/doc/doc.css]
+
+title: "{{ report.title }}"
+subtitle: "{{ report.subtitle }}"
+running_title: "{{ report.short_title }}"
+output_name: "{{ report.output_name }}"
+toc: true
+
+cover:
+  meta:
+    - label: "Prepared for"
+      value: "{{ report.audience }}"
+    - label: "Prepared by"
+      value: "{{ org.legal_name }}"
+    - label: "Scope"
+      value: "Production main v1.44.3 — download-manager arc merged and deployed 2026-08-02"
+    - label: "Date"
+      value: "{{ report.date | longdate }}"
+
+sections:
+  - id: summary
+    title: "Summary"
+    tpl: sections/summary.html.j2
+    flow: true
+  - id: deployment
+    title: "What Is Deployed Where"
+    tpl: sections/deployment.html.j2
+    flow: true
+  - id: features
+    title: "Feature Inventory"
+    tpl: sections/features.html.j2
+    flow: true
+  - id: browsers
+    title: "Browser Support Matrix"
+    tpl: sections/browsers.html.j2
+    flow: true
+  - id: downloads
+    title: "The Download Subsystem, In Detail"
+    tpl: sections/downloads.html.j2
+    flow: true
+  - id: caveats
+    title: "What This Matrix Does Not Prove"
+    tpl: sections/caveats.html.j2
+    flow: true

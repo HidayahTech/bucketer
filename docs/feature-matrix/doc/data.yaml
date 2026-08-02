@@ -1,0 +1,8 @@
+report:
+  title: "Feature, Browser & Deployment Matrix"
+  subtitle: "What is implemented, how each browser stands, and what is deployed — a 2026-08-02 snapshot"
+  short_title: "Feature & Deployment Matrix"
+  output_name: "Bucketer_Feature_Browser_Deployment_Matrix"
+  audience: "Bucketer maintainers"
+  version: "Snapshot"
+  date: 2026-08-02

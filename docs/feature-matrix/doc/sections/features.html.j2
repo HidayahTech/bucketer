@@ -1,0 +1,59 @@
+{% import 'chrome/macros.html.j2' as c %}
+<section>
+  <h2>Feature Inventory</h2>
+
+  <p>Every implemented feature, with the browser support it needs and where it is deployed.
+  The <strong>Browser support</strong> column reads <em>All</em> when the feature is a plain
+  S3 API call over <code>fetch</code> that behaves the same in every engine on desktop and
+  mobile; anything else names the constraint. Everything in this table runs in production
+  (v1.44.3, deployed 2026-08-02) except where a row says otherwise; the <strong>In production
+  since</strong> column names the release that introduced the feature.</p>
+
+  <table class="matrix">
+    <thead>
+      <tr><th class="feat">Feature</th><th>Browser support</th><th>In production since</th></tr>
+    </thead>
+    <tbody>
+      <tr><td colspan="3" style="background:#f4ecfb;font-weight:600">Connect &amp; browse</td></tr>
+      <tr><td class="feat">Connect to any S3-compatible bucket</td><td>All</td><td>v1.39.1 or earlier</td></tr>
+      <tr><td class="feat">Provider detection &amp; override (AWS, B2, R2, Wasabi, MinIO, generic)</td><td>All</td><td>v1.39.1 or earlier</td></tr>
+      <tr><td class="feat">Browse, list, sort, prefix navigation</td><td>All</td><td>v1.39.1 or earlier</td></tr>
+      <tr><td class="feat">Connection diagnostics (probe-based verdicts)</td><td>All</td><td>v1.39.1 or earlier</td></tr>
+      <tr><td class="feat">Saved profiles / connection model</td><td>All</td><td>v1.39.1 or earlier</td></tr>
+
+      <tr><td colspan="3" style="background:#f4ecfb;font-weight:600">Upload</td></tr>
+      <tr><td class="feat">Single &amp; multipart upload</td><td>All</td><td>v1.39.1 or earlier</td></tr>
+      <tr><td class="feat">Multipart resume across sessions (IndexedDB)</td><td>All <span style="color:#666">— IndexedDB is universal</span></td><td>v1.39.1 or earlier</td></tr>
+      <tr><td class="feat">Concurrent upload queue</td><td>All</td><td>v1.39.1 or earlier</td></tr>
+
+      <tr><td colspan="3" style="background:#f4ecfb;font-weight:600">Objects &amp; sharing</td></tr>
+      <tr><td class="feat">Single-object download (browser)</td><td>All</td><td>v1.39.1 or earlier</td></tr>
+      <tr><td class="feat">Presigned share links (+ copy with key ID)</td><td>All</td><td>v1.39.1 or earlier</td></tr>
+      <tr><td class="feat">Shared download landing page</td><td>All</td><td>v1.39.1 or earlier</td></tr>
+      <tr><td class="feat">Delete — single, batch, cancellable queue</td><td>All</td><td>v1.39.1 or earlier</td></tr>
+      <tr><td class="feat">Move / copy / rename, including folder rename</td><td>All</td><td>v1.39.1 or earlier</td></tr>
+      <tr><td class="feat">Hidden versions &amp; deleted-file view</td><td>All <span style="color:#666">— some behaviour is R2-specific (provider, not browser)</span></td><td>v1.39.1 or earlier</td></tr>
+      <tr><td class="feat">Duplicate detection (view)</td><td>All</td><td>v1.39.1 or earlier</td></tr>
+
+      <tr><td colspan="3" style="background:#f4ecfb;font-weight:600">App &amp; meta</td></tr>
+      <tr><td class="feat">CORS setup guides (7 providers)</td><td>All</td><td>v1.39.1 or earlier</td></tr>
+      <tr><td class="feat">Credential storage &amp; security posture (sessionStorage secret, per-connection capabilities)</td><td>All</td><td>v1.39.1 or earlier</td></tr>
+      <tr><td class="feat">Passphrase credential vault ("remember this key")</td><td>All <span style="color:#666">— WebCrypto is universal</span></td><td><strong>Gated off</strong> <span style="color:#666">— code deployed, feature unreachable (VAULT_ENABLED=false, v1.44.3) pending its creation-flow redesign</span></td></tr>
+      <tr><td class="feat">Update banner, changelog, about</td><td>All</td><td>v1.39.1 or earlier</td></tr>
+
+      <tr><td colspan="3" style="background:#fdf0e6;font-weight:600">Folder download manager &mdash; in production since 2026-08-02</td></tr>
+      <tr><td class="feat">Transfer-tool (CLI) command handoff</td><td>All</td><td>v1.40.0</td></tr>
+      <tr><td class="feat">Folder / bulk download with resumable worklist</td><td>All <span style="color:#666">— HANDOFF transfer (see below)</span></td><td>v1.41.0</td></tr>
+      <tr><td class="feat">Real filenames on download (Content-Disposition)</td><td>All</td><td>v1.41.1</td></tr>
+      <tr><td class="feat">Capability-honest tier label + mobile advisory</td><td>Adapts per browser</td><td>v1.42.0</td></tr>
+      <tr><td class="feat">Archived (Glacier / Deep Archive) set-aside</td><td>All <span style="color:#666">— from the listing, provider-side</span></td><td>v1.44.0</td></tr>
+      <tr><td class="feat">Folder verification (read-only directory picker)</td><td><strong>Chromium only</strong></td><td>v1.44.0</td></tr>
+    </tbody>
+  </table>
+
+  <p class="legend">Every row is in production at v1.44.3 except the passphrase vault, which is
+  deployed as code but gated off. The orange group is the download-manager arc, merged and
+  deployed 2026-08-02. Only two rows in the whole inventory are genuinely
+  browser-differentiated: the tier label/advisory (which adapts) and folder verification
+  (Chromium only).</p>
+</section>
