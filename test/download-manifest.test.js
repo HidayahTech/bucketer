@@ -37,6 +37,25 @@ const job = (over = {}) => ({
   status: 'enumerating', enumeration: {}, counters: { total: 0, bytesTotal: 0 }, ...over,
 });
 
+// Multi-prefix crawls need pages keyed by (Prefix, token), not token alone.
+function mockClientByPrefix(byPrefix) {
+  const calls = [];
+  return {
+    calls,
+    async send(cmd) {
+      calls.push({ ...cmd.input });
+      const pages = byPrefix[cmd.input.Prefix ?? ''] || [{ contents: [] }];
+      const idx = pages.findIndex(p => (p.token ?? undefined) === cmd.input.ContinuationToken);
+      const page = pages[idx === -1 ? 0 : idx];
+      return { Contents: page.contents, IsTruncated: !!page.next, NextContinuationToken: page.next };
+    },
+  };
+}
+
+const fRoot = (key, size = 10, storageClass = null) =>
+  ({ type: 'file', key, size, etag: `"${key}"`, lastModified: 1700000000000, storageClass });
+const pRoot = (prefix) => ({ type: 'prefix', prefix });
+
 async function reset() {
   for (const j of await loadAllJobs()) await deleteJob(j.id);
 }
@@ -162,6 +181,79 @@ describe('enumerateJob', () => {
 
     assert.deepEqual(await keysOf('job-1'), ['a/x.txt']);
     assert.equal((await loadJob('job-1')).enumeration.done, true);
+  });
+
+  test('file roots enumerate with zero requests', async () => {
+    await saveJob(job({ roots: [fRoot('a.txt', 5), fRoot('b.txt', 7)] }));
+    const client = mockClient([{ token: undefined, contents: [] }]);
+    const result = await enumerateJob(client, await loadJob('job-1'), {});
+    assert.equal(client.calls.length, 0);
+    assert.deepEqual(await keysOf('job-1'), ['a.txt', 'b.txt']);
+    assert.equal(result.objects, 2);
+    assert.equal(result.bytes, 12);
+    assert.equal((await loadJob('job-1')).enumeration.done, true);
+  });
+
+  test('mixed roots: prefixes crawl, files append, counts accumulate across all', async () => {
+    await saveJob(job({ roots: [pRoot('p/'), fRoot('loose.txt', 100)] }));
+    const client = mockClientByPrefix({ 'p/': [{ token: undefined, contents: [obj('p/one', 10), obj('p/two', 20)] }] });
+    const result = await enumerateJob(client, await loadJob('job-1'), {});
+    assert.deepEqual(await keysOf('job-1'), ['loose.txt', 'p/one', 'p/two']);
+    assert.equal(result.objects, 3);
+    assert.equal(result.bytes, 130);
+  });
+
+  test('an archived file root is recorded SKIPPED, never PENDING', async () => {
+    await saveJob(job({ provider: 'aws', roots: [fRoot('cold.bin', 50, 'GLACIER'), fRoot('warm.bin', 5)] }));
+    const result = await enumerateJob(mockClient([{ token: undefined, contents: [] }]), await loadJob('job-1'), {});
+    assert.deepEqual(await keysOf('job-1', ITEM_STATUS.SKIPPED), ['cold.bin']);
+    assert.deepEqual(await keysOf('job-1'), ['warm.bin']);
+    assert.equal(result.archived, 1);
+    assert.equal(result.archivedBytes, 50);
+  });
+
+  test('resumes between roots: a completed root is never re-crawled', async () => {
+    await saveJob(job({
+      roots: [pRoot('done/'), pRoot('todo/')],
+      enumeration: { rootIndex: 1 },   // checkpoint says done/ already committed
+    }));
+    const client = mockClientByPrefix({ 'todo/': [{ token: undefined, contents: [obj('todo/x')] }] });
+    await enumerateJob(client, await loadJob('job-1'), {});
+    assert.ok(client.calls.every(c => c.Prefix === 'todo/'), 'done/ must not be re-listed');
+    assert.deepEqual(await keysOf('job-1'), ['todo/x']);
+  });
+
+  test('resumes mid-prefix within a root using the stored token', async () => {
+    await saveJob(job({
+      roots: [pRoot('p/')],
+      enumeration: { rootIndex: 0, continuationToken: 't2' },
+    }));
+    const client = mockClientByPrefix({
+      'p/': [
+        { token: undefined, contents: [obj('p/page1')], next: 't2' },
+        { token: 't2', contents: [obj('p/page2')] },
+      ],
+    });
+    await enumerateJob(client, await loadJob('job-1'), {});
+    assert.deepEqual(await keysOf('job-1'), ['p/page2']);
+    assert.equal(client.calls[0].ContinuationToken, 't2');
+  });
+
+  test('a legacy prefix-only job still enumerates (read-path shim)', async () => {
+    await saveJob(job({ prefix: 'old/' }));  // no roots field at all
+    const client = mockClientByPrefix({ 'old/': [{ token: undefined, contents: [obj('old/a')] }] });
+    const result = await enumerateJob(client, await loadJob('job-1'), {});
+    assert.deepEqual(await keysOf('job-1'), ['old/a']);
+    assert.equal(result.done, true);
+  });
+
+  test('done commits only with the final root', async () => {
+    await saveJob(job({ roots: [fRoot('a.txt'), pRoot('p/')] }));
+    const client = mockClientByPrefix({ 'p/': [{ token: undefined, contents: [obj('p/x')] }] });
+    await enumerateJob(client, await loadJob('job-1'), {});
+    const j = await loadJob('job-1');
+    assert.equal(j.enumeration.done, true);
+    assert.equal(j.enumeration.rootIndex, 2);
   });
 });
 

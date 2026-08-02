@@ -1,5 +1,5 @@
 // Copyright (C) 2026 HidayahTech, LLC
-// Checkpointed enumeration: turn a bucket prefix into a durable, resumable worklist.
+// Checkpointed enumeration: turn bucket roots into a durable, resumable worklist.
 //
 // See docs/superpowers/specs/2026-07-30-large-download-manager-design.md.
 //
@@ -8,6 +8,12 @@
 // continuation token that follows it (see appendManifestPage's atomicity invariant), so a
 // crash mid-enumeration resumes from the last committed page rather than starting over.
 //
+// A job can have multiple roots (files or prefixes). File roots commit straight from
+// their captured listing data—no request. Prefix roots crawl as before. The checkpoint
+// generalizes to { rootIndex, continuationToken, done }: a crash resumes from the last
+// committed page of root i, and the items+checkpoint single-transaction invariant is
+// unchanged.
+//
 // Memory is bounded: crawlPrefix hands over one page at a time and this module writes it
 // straight through to IndexedDB. Nothing accumulates the key list.
 
@@ -15,60 +21,92 @@ import { crawlPrefix } from './crawl-prefix.js';
 import { appendManifestPage, ITEM_STATUS } from './download-records.js';
 import { isDirectoryMarker, flatNameForKey, NAMING_MODES } from './download-naming.js';
 import { isArchivedStorageClass } from './storage-class.js';
+import { rootsOfJob, ROOT_TYPES } from './download-roots.js';
 
 // enumerateJob(client, job, { onProgress, shouldCancel, maxKeys })
-// Returns { objects, bytes, cancelled, done, archived, archivedBytes } — counts, never
-// keys. archivedBytes exists so the offer can quote the size of what will actually be
-// sent (bytes − archivedBytes): quoting the full total next to a reduced file count
-// described one set with the other's size (postmortem catalog defect 17).
+// Walks the job's roots in order. File roots commit straight from their captured listing
+// data — no request. Prefix roots crawl as before. The checkpoint generalizes to
+// { rootIndex, continuationToken, done }: a crash resumes from the last committed page
+// of root i, and the items+checkpoint single-transaction invariant is unchanged.
 export async function enumerateJob(client, job, { onProgress, shouldCancel, maxKeys } = {}) {
   const mode = job.mode || NAMING_MODES.LEAF;
+  const roots = rootsOfJob(job);
   let objects = 0;
   let bytes = 0;
   let archived = 0;
   let archivedBytes = 0;
 
-  const result = await crawlPrefix(client, job.bucket, job.prefix, {
-    maxKeys,
-    shouldCancel,
-    startToken: job.enumeration?.continuationToken,
-    onBatch: async (contents, { nextToken }) => {
-      // Folder markers are zero-byte keys ending in "/". They represent a directory that
-      // may not even exist elsewhere in the listing, and nobody wants them as files.
-      // An archived object is recorded SKIPPED, never PENDING. A GET against GLACIER or
-      // DEEP_ARCHIVE fails until a restore completes, and the browser-managed tier cannot
-      // observe that failure — issuing them would report downloads that never arrive.
-      // The class is already in the listing, so this costs no extra request.
-      const items = contents
-        .filter(o => !isDirectoryMarker(o.Key))
-        .map(o => {
-          const isArchived = isArchivedStorageClass(o.StorageClass, job.provider);
-          if (isArchived) { archived += 1; archivedBytes += o.Size ?? 0; }
-          return {
-            key:          o.Key,
-            size:         o.Size ?? 0,
-            etag:         o.ETag,
-            lastModified: o.LastModified ? new Date(o.LastModified).getTime() : null,
-            localName:    flatNameForKey(o.Key, mode),
-            storageClass: o.StorageClass ?? null,
-            status:       isArchived ? ITEM_STATUS.SKIPPED : ITEM_STATUS.PENDING,
-            ...(isArchived ? { skipReason: 'archived' } : {}),
-          };
-        });
+  const toItem = (o) => {
+    const isArchived = isArchivedStorageClass(o.StorageClass, job.provider);
+    if (isArchived) { archived += 1; archivedBytes += o.Size ?? 0; }
+    return {
+      key:          o.Key,
+      size:         o.Size ?? 0,
+      etag:         o.ETag,
+      lastModified: o.LastModified ? new Date(o.LastModified).getTime() : null,
+      localName:    flatNameForKey(o.Key, mode),
+      storageClass: o.StorageClass ?? null,
+      status:       isArchived ? ITEM_STATUS.SKIPPED : ITEM_STATUS.PENDING,
+      ...(isArchived ? { skipReason: 'archived' } : {}),
+    };
+  };
 
+  const startIndex = job.enumeration?.rootIndex ?? 0;
+  let i = startIndex;
+  while (i < roots.length) {
+    if (shouldCancel?.()) return { objects, bytes, archived, archivedBytes, cancelled: true, done: false };
+
+    if (roots[i].type === ROOT_TYPES.FILE) {
+      // Consecutive file roots batch into one page; the commit advances rootIndex past
+      // the whole batch atomically. Directory markers cannot be ticked, but the filter
+      // matches the crawl path so both routes into the manifest behave identically.
+      const items = [];
+      let j = i;
+      while (j < roots.length && roots[j].type === ROOT_TYPES.FILE) {
+        const r = roots[j];
+        if (!isDirectoryMarker(r.key)) {
+          items.push(toItem({
+            Key: r.key, Size: r.size, ETag: r.etag,
+            LastModified: r.lastModified != null ? new Date(r.lastModified) : null,
+            StorageClass: r.storageClass,
+          }));
+        }
+        j += 1;
+      }
       objects += items.length;
       for (const it of items) bytes += it.size;
-
-      // Committed even when `items` is empty: a page of nothing but folder markers still
-      // has to advance the token, or a resume would replay it forever.
       await appendManifestPage(job.id, items, {
-        continuationToken: nextToken,
-        ...(nextToken ? {} : { done: true }),
+        rootIndex: j, continuationToken: null,
+        ...(j >= roots.length ? { done: true } : {}),
       });
-
       onProgress?.({ objects, bytes });
-    },
-  });
+      i = j;
+      continue;
+    }
 
-  return { objects, bytes, archived, archivedBytes, cancelled: result.cancelled, done: !result.cancelled };
+    // The stored token belongs to the checkpointed root only.
+    const startToken = i === startIndex ? job.enumeration?.continuationToken : undefined;
+    const rootIdx = i;
+    const result = await crawlPrefix(client, job.bucket, roots[i].prefix, {
+      maxKeys, shouldCancel, startToken,
+      onBatch: async (contents, { nextToken }) => {
+        const items = contents.filter(o => !isDirectoryMarker(o.Key)).map(toItem);
+        objects += items.length;
+        for (const it of items) bytes += it.size;
+        // Committed even when `items` is empty: a page of nothing but folder markers
+        // still has to advance the token, or a resume would replay it forever.
+        await appendManifestPage(job.id, items, nextToken
+          ? { rootIndex: rootIdx, continuationToken: nextToken }
+          : {
+              rootIndex: rootIdx + 1, continuationToken: null,
+              ...(rootIdx + 1 >= roots.length ? { done: true } : {}),
+            });
+        onProgress?.({ objects, bytes });
+      },
+    });
+    if (result.cancelled) return { objects, bytes, archived, archivedBytes, cancelled: true, done: false };
+    i += 1;
+  }
+
+  return { objects, bytes, archived, archivedBytes, cancelled: false, done: true };
 }
