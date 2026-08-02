@@ -18,8 +18,12 @@ before(async () => {
 });
 after(async () => { await browser?.close(); await app?.close(); await ctx?.mock.close(); });
 
-async function freshSession() {
+async function freshSession({ seed } = {}) {
   ctx.mock.reset();
+  // Seed AFTER the reset (which would otherwise wipe it): a pre-existing row is how a spec
+  // proves the initial listing has fully landed — and the app has finished mounting — before
+  // it acts (issue #55). Same anchor technique as part 1 below.
+  if (seed) await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: seed, Body: new TextEncoder().encode('a') }));
   const context = await newE2EContext(browser);
   const page = await newE2EPage(context);
   await page.goto(app.url, { waitUntil: 'domcontentloaded' });
@@ -38,8 +42,17 @@ async function dropFile(page, name, content = 'x') {
 
 describe('issue #4 part 2 — a sub-folder created by an upload appears without a manual refresh', () => {
   e2eTest('dropping a file that creates a sub-folder in the current view shows it immediately', async () => {
-    const { context, page } = await freshSession();
+    // Anchor on a pre-seeded root file: waiting for its row proves the initial listing has
+    // landed AND the app is drop-ready. The drop path is App's
+    // onExternalDrop={(entries) => addFilesRef.current?.(entries)}, and addFilesRef is wired by
+    // the upload subsystem's onMount. connectApp only waits for the Browser to be *attached*,
+    // not for that onMount to have run — so on a slow lane the drop could fire while
+    // addFilesRef.current is still null, and the `?.` silently no-ops it: no upload, no
+    // refetch, and folder-row:newdir never appears (issue #55, both webkit lanes, pipeline
+    // #215). Gating on a rendered row closes that window.
+    const { context, page } = await freshSession({ seed: 'anchor.txt' });
     try {
+      await page.locator('[data-testid="file-row:anchor.txt"]').waitFor({ timeout: 10000 });
       // At root, drop a file whose relativePath creates a new sub-folder "newdir".
       await dropFile(page, 'newdir/x.txt');
       // The new folder must appear in the listing WITHOUT a page reload (the drained prefix is

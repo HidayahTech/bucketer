@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.44.2] — 2026-08-02 — The refresh test stops racing the app's startup
+
+- Fixed the remaining intermittently-failing browser test (issue #55): the "sub-folder appears without a refresh" spec could drop its file in the instant between the app rendering and its drop handler being wired up, and a drop in that gap silently does nothing — no upload, no new folder, red test. Seen only on the slower WebKit lanes. The spec now waits for a pre-seeded file's row to render, which proves the app is fully ready before dropping. Nothing in the app changed.
+
 ## [1.44.1] — 2026-08-01 — Three browser tests stop racing slow machines
 
 - Fixed the three intermittently-failing browser tests that kept turning CI red on slow shared runners (issue #55): the profile-region test now waits for the saved profile's form pre-fill to settle before typing over it, the sort-order test polls for the re-rendered rows instead of reading them mid-update, and the refresh test anchors on a pre-existing file so the initial listing provably landed before the out-of-band change. Nothing in the app changed.
