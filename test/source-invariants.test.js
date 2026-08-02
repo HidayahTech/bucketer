@@ -1578,3 +1578,19 @@ describe('App.jsx — a download job records its provider', () => {
       'startJob must record provider, or enumeration cannot tell an archived object from a normal one');
   });
 });
+
+// ── 2026-08-02: download entry points moved from the sidebar into the browser ─────────
+// The sidebar's "Download this folder…" / "Download with a transfer tool…" block is
+// replaced by three entry points inside Browser.jsx (toolbar, folder-row, batch bar).
+// A regression that reintroduces the sidebar block would duplicate the entry point and
+// contradict the design doc; a regression that drops the toolbar testid would break the
+// e2e specs that target it.
+
+test('the sidebar download entry is gone and lives in the browser toolbar (2026-08-02 relocation)', () => {
+  const app = src('components/App.jsx');
+  assert.ok(!app.includes('handoff-entry'),
+    'App.jsx must not reintroduce the sidebar handoff-entry block; download entry points live in Browser.jsx');
+  const browser = src('components/Browser.jsx');
+  assert.ok(browser.includes('data-testid="open-download-job"'),
+    'the toolbar download button must keep the open-download-job testid the e2e specs use');
+});

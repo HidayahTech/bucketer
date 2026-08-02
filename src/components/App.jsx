@@ -71,6 +71,7 @@ import { issueBrowserDownload } from '../lib/download-issue.js';
 import { probeUrl, blockedMessage } from '../lib/download-preflight.js';
 import { detectCapabilities } from '../lib/browser-capability.js';
 import { presignDownloadParams } from '../lib/presign-params.js';
+import { normalizeRoots, selectionLabel } from '../lib/download-roots.js';
 import { DOWNLOAD_PRESIGN_EXPIRES, DOWNLOAD_ISSUE_DELAY_MS } from '../lib/constants.js';
 import { CapabilityPanel } from './CapabilityPanel.jsx';
 import { SettingsPanel } from './SettingsPanel.jsx';
@@ -137,6 +138,10 @@ export function App() {
   const [logKey, setLogKey] = useState(0);         // incremented to refresh upload log
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { changelogOpen, setChangelogOpen, aboutOpen, setAboutOpen, storageOpen, setStorageOpen, duplicatesOpen, setDuplicatesOpen, handoffOpen, setHandoffOpen, downloadOpen, setDownloadOpen } = useModalStates();
+  // The scope the DownloadJobPanel was opened with (folder or a batch-bar selection),
+  // and the prefix a "Use a transfer tool" handoff should target — see handleDownloadRequest.
+  const [downloadScope, setDownloadScope] = useState(null);
+  const [handoffPrefix, setHandoffPrefix] = useState(null);
   const [liveFormData, setLiveFormData] = useState(credentials);
   const [updateCheckEnabled, setUpdateCheckEnabled] = useState(() => loadUpdateCheckEnabled());
   const [prefetchSizeLimit, setPrefetchSizeLimit] = useState(() => loadPrefetchSizeLimit());
@@ -482,6 +487,20 @@ export function App() {
 
   function handleDeleteRequest({ files, prefixes, capturedPrefix }) {
     setPendingDelete({ files, prefixes, capturedPrefix });
+  }
+
+  function handleDownloadRequest(payload) {
+    if (payload.kind === 'selection') {
+      const count = payload.files.length + payload.prefixes.length;
+      setDownloadScope({
+        kind: 'selection',
+        roots: normalizeRoots(payload),
+        label: selectionLabel(count, credentials.bucket, payload.capturedPrefix),
+      });
+    } else {
+      setDownloadScope({ kind: 'folder', prefix: payload.prefix });
+    }
+    setDownloadOpen(true);
   }
 
   async function handleDeleteConfirm() {
@@ -831,19 +850,25 @@ export function App() {
       {downloadOpen && session === 'connected' && (
         <DownloadJobPanel
           bucket={credentials.bucket}
-          scope={{ kind: 'folder', prefix: currentPrefix }}
+          scope={downloadScope ?? { kind: 'folder', prefix: currentPrefix }}
           api={downloadApi}
           capabilities={browserCapabilities}
           onStart={handleDownloadStart}
-          onClose={() => setDownloadOpen(false)}
-          onUseTransferTool={() => { setDownloadOpen(false); setHandoffOpen(true); }}
+          onClose={() => { setDownloadOpen(false); setDownloadScope(null); }}
+          onUseTransferTool={() => {
+            // Only reachable from folder scope (the panel hides the link otherwise), so the
+            // handoff targets the panel's folder — which may be a subfolder the user never
+            // navigated into.
+            setHandoffPrefix(downloadScope?.kind === 'folder' ? downloadScope.prefix : currentPrefix);
+            setDownloadOpen(false); setDownloadScope(null); setHandoffOpen(true);
+          }}
         />
       )}
       {handoffOpen && (
         <TransferHandoff
           credentials={credentials}
-          currentPrefix={currentPrefix}
-          onClose={() => setHandoffOpen(false)}
+          currentPrefix={handoffPrefix ?? currentPrefix}
+          onClose={() => { setHandoffOpen(false); setHandoffPrefix(null); }}
         />
       )}
       {duplicatesOpen && session === 'connected' && (
@@ -1022,33 +1047,6 @@ export function App() {
               onPrefetchSizeLimitChange={(val) => { savePrefetchSizeLimit(val); setPrefetchSizeLimit(val); }}
             />
             <hr style={{ border: 'none', borderTop: '1px solid var(--border)' }} />
-            <div class="handoff-entry">
-              <button
-                type="button"
-                class="btn btn-ghost btn-sm"
-                data-testid="open-download-job"
-                onClick={() => setDownloadOpen(true)}
-              >
-                Download this folder…
-              </button>
-              <p class="handoff-entry-hint">
-                Queues every file beneath the folder you are viewing and hands them to your
-                browser, remembering what it has already sent so you can stop and resume.
-              </p>
-              <button
-                type="button"
-                class="btn btn-ghost btn-sm"
-                data-testid="open-handoff"
-                onClick={() => setHandoffOpen(true)}
-              >
-                Download with a transfer tool…
-              </button>
-              <p class="handoff-entry-hint">
-                For very large downloads. Generates a ready-to-run rclone or AWS CLI job for the
-                folder you are viewing.
-              </p>
-            </div>
-            <hr style={{ border: 'none', borderTop: '1px solid var(--border)' }} />
             <details class="s3-primer">
               <summary class="s3-primer-summary">About S3 buckets</summary>
               <div class="s3-primer-body">
@@ -1116,6 +1114,7 @@ export function App() {
               onExternalDrop={(entries) => addFilesRef.current?.(entries)}
               onDeleteRequest={handleDeleteRequest}
               onMoveRequest={handleMoveRequest}
+              onDownloadRequest={handleDownloadRequest}
               onMount={(actions) => { browserActionsRef.current = actions; }}
               prefetchSizeLimit={prefetchSizeLimit}
             />
