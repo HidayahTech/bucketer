@@ -1,9 +1,17 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.44.2';
+export const CURRENT_VERSION = '1.44.3';
 
 export const CHANGELOG = [
+  {
+    "version": "1.44.3",
+    "date": "2026-08-02",
+    "title": "An unfinished credential vault is switched off until its redesign",
+    "changes": [
+      "Recent internal builds quietly carried an in-progress \"remember this key\" credential vault (an encrypted, passphrase-protected store) whose setup flow had failed its design review — most seriously, a single typo when choosing the passphrase could lock you out of the entire app, with no way back in short of wiping all saved data. It was never announced in this changelog. Every way to reach it — the post-connect save offer, the unlock screen, and automatic reconnect from a remembered secret — is now switched off behind a single flag (VAULT_ENABLED) until the redesigned flow ships. Tests pin the gated behavior, and the original vault tests re-arm automatically when the flag flips back. Nothing else changed: connecting, saved connections, and profiles work exactly as before."
+    ]
+  },
   {
     "version": "1.44.2",
     "date": "2026-08-02",

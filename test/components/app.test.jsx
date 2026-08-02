@@ -16,7 +16,7 @@ import { App } from '../../src/components/App.jsx';
 import { saveConnectionCapabilities, saveConnectionRecord, findOrCreateCredential, deleteConnectionRecord } from '../../src/lib/connections.js';
 import { deleteAllProfiles } from '../../src/lib/storage.js';
 import { buildShareUrl, readUrlParams } from '../../src/lib/url-params.js';
-import { createVault, rememberSecret, recallSecret, vaultExists, isUnlocked, SS_KEY_VAULT_KEY } from '../../src/lib/vault.js';
+import { createVault, rememberSecret, recallSecret, vaultExists, isUnlocked, SS_KEY_VAULT_KEY, VAULT_ENABLED } from '../../src/lib/vault.js';
 import { VAULT_USERNAME } from '../../src/components/VaultUnlock.jsx';
 
 // jsdom does not implement SubtleCrypto — patch in Node's real WebCrypto, the same
@@ -805,7 +805,7 @@ describe('App — connection share links', () => {
 // autocomplete="current-password" (matching VaultUnlock's passphrase field by
 // design), so that attribute alone cannot tell the two screens apart once both
 // exist in the same file.
-describe('App — vault lock screen (Task 6)', () => {
+describe('App — vault lock screen (Task 6)', { skip: !VAULT_ENABLED && 'vault gated off — see VAULT_ENABLED in src/lib/vault.js' }, () => {
   test('a vault present and locked renders VaultUnlock, not the connect form', async () => {
     clearAppStorage();
     await createVault(PASSPHRASE, window.crypto.subtle, getRandomValues);
@@ -850,7 +850,7 @@ describe('App — vault lock screen (Task 6)', () => {
   });
 });
 
-describe('App — vault-backed auto-connect (Task 6)', () => {
+describe('App — vault-backed auto-connect (Task 6)', { skip: !VAULT_ENABLED && 'vault gated off — see VAULT_ENABLED in src/lib/vault.js' }, () => {
   test('a connection whose secret is remembered auto-connects on mount without the user typing anything', async () => {
     clearAppStorage();
     await createVault(PASSPHRASE, window.crypto.subtle, getRandomValues);
@@ -917,7 +917,7 @@ describe('App — vault-backed auto-connect (Task 6)', () => {
   });
 });
 
-describe('App — post-connect vault offer (Task 6)', () => {
+describe('App — post-connect vault offer (Task 6)', { skip: !VAULT_ENABLED && 'vault gated off — see VAULT_ENABLED in src/lib/vault.js' }, () => {
   test('the offer appears after the first successful connect when no vault exists', () => {
     clearAppStorage();
     const { query, text, cleanup } = mount(h(App, {}));
@@ -1027,6 +1027,72 @@ describe('App — post-connect vault offer (Task 6)', () => {
         if (!recalled) await new Promise(r => setTimeout(r, 10));
       }
       assert.equal(recalled, 'accept-secret', 'the just-typed secret must be remembered under the new credential');
+    } finally { cleanup(); clearAppStorage(); }
+  });
+});
+
+// ── Vault kill switch ─────────────────────────────────────────────────────────────
+// The vault's creation flow failed its design review (2 Critical + 5 Important, all
+// in the post-connect offer's accept flow — docs/superpowers/HANDOFF-2026-07-28-vault-phase2.md).
+// Until the redesign lands, VAULT_ENABLED in src/lib/vault.js gates every
+// user-reachable entry point. These tests pin the gated behavior; the three Task 6
+// suites above skip while the flag is off and re-arm the moment it flips back.
+// The re-wrap and disconnect suites below stay active either way: the record layer
+// keeps honoring a pre-existing vault, it just can't be created, unlocked, or
+// auto-connected from while gated.
+describe('App — vault gated off (VAULT_ENABLED=false)', { skip: VAULT_ENABLED && 'vault is enabled — the Task 6 suites cover these paths' }, () => {
+  test('a vault present and locked still renders the connect form, never the unlock screen', async () => {
+    clearAppStorage();
+    await createVault(PASSPHRASE, window.crypto.subtle, getRandomValues);
+    sessionStorage.removeItem(SS_KEY_VAULT_KEY); // start locked, as a returning user would
+    const { query, cleanup } = mount(h(App, {}));
+    try {
+      assert.ok(query('#cred-endpoint'),
+        'the connect form must render even when a locked vault exists (C1: no lockout while gated)');
+      assert.equal(query('#vault-passphrase'), null,
+        'the unlock screen must be unreachable while the vault is gated off');
+    } finally { cleanup(); clearAppStorage(); }
+  });
+
+  test('a successful connect never shows the vault offer', () => {
+    clearAppStorage();
+    const { query, text, cleanup } = mount(h(App, {}));
+    try {
+      setInput(query('#cred-endpoint'), 'http://127.0.0.1:1');
+      setInput(query('#cred-bucket'), 'gated-bucket');
+      setInput(query('#cred-keyid'), 'AKIDGATED');
+      setInput(query('#cred-secretkey'), 'gated-secret');
+      fire(query('button[type="submit"]'), 'click');
+      assert.ok(!/retype it/i.test(text()),
+        'the post-connect vault offer must not appear while the vault is gated off');
+    } finally { cleanup(); clearAppStorage(); }
+  });
+
+  test('a remembered secret does not auto-connect on mount', async () => {
+    clearAppStorage();
+    await createVault(PASSPHRASE, window.crypto.subtle, getRandomValues);
+    // Same seed as the Task 6 auto-connect test: unlocked vault, remembered secret,
+    // last-used connection selected — the strongest possible auto-connect setup.
+    localStorage.setItem('s3b_connections_migrated', '1');
+    localStorage.setItem('s3b_credentials', JSON.stringify({
+      version: 1,
+      credentials: [{ id: 'credG', label: 'G', endpoint: 'http://127.0.0.1:1', keyId: 'AKIDGATE2', provider: null, regionOverride: '' }],
+    }));
+    localStorage.setItem('s3b_connections', JSON.stringify({
+      version: 2,
+      connections: [{ id: 601, name: 'Gated conn', credentialId: 'credG', bucket: 'gated-bucket-2', capabilities: null }],
+    }));
+    localStorage.setItem('s3b_last_profile_id', '601');
+    await rememberSecret('credG', 'gated-secret-2', window.crypto.subtle);
+
+    const { query, cleanup } = mount(h(App, {}));
+    try {
+      for (let i = 0; i < 30; i++) {
+        await new Promise(r => setTimeout(r, 10));
+        assert.equal(query('[data-testid="app-connected"]'), null,
+          'the app must not auto-connect from the vault while gated off');
+      }
+      assert.ok(query('#cred-endpoint'), 'the ordinary connect form must be what renders');
     } finally { cleanup(); clearAppStorage(); }
   });
 });

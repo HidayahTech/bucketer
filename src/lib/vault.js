@@ -34,6 +34,20 @@
 // This module imports nothing — connections.js imports this one, never the
 // reverse.
 
+// Kill switch. The vault's creation flow (the post-connect offer) failed its
+// design review — 2 Critical + 5 Important, all in the accept flow: a typo at
+// setup locks the user out of the whole app (no escape hatch), and the accepted
+// secret is wrapped under a credential no connection points at. See
+// docs/superpowers/HANDOFF-2026-07-28-vault-phase2.md and the draft redesign in
+// docs/superpowers/specs/2026-07-28-vault-creation-flow-design.md. Until that
+// redesign is approved and implemented, App.jsx gates every user-reachable
+// entry point on this flag: the offer never shows, the lock screen never
+// mounts, auto-connect never fires. The crypto and record layers below stay
+// live (unit-tested, and they keep honoring a pre-existing vault's cascade).
+// Flip to true only as part of the redesign work — the skipped Task 6 suites
+// in test/components/app.test.jsx re-arm automatically when it flips.
+export const VAULT_ENABLED = false;
+
 export const VAULT_VERSION = 1;
 export const PBKDF2_ITERATIONS = 600_000;
 export const CHECK_PLAINTEXT = 'bucketer-vault-check-v1';

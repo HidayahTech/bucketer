@@ -44,7 +44,7 @@ import {
 } from '../lib/connections.js';
 import { readUrlParams, hasUrlParams, buildShareUrl } from '../lib/url-params.js';
 import {
-  vaultExists, isUnlocked, recallSecret, rememberSecret, createVault,
+  vaultExists, isUnlocked, recallSecret, rememberSecret, createVault, VAULT_ENABLED,
 } from '../lib/vault.js';
 import { FileBanner } from './FileBanner.jsx';
 import { CredentialForm } from './CredentialForm.jsx';
@@ -107,7 +107,7 @@ export function App() {
   // Computed once at mount from vault.js's own storage reads — unlike recalling a
   // secret, vaultExists()/isUnlocked() do not depend on connection migration having
   // run yet, so (unlike recallSecret) this is safe inside a useState initializer.
-  const [session, setSession] = useState(() => (vaultExists() && !isUnlocked()) ? 'locked' : 'disconnected');
+  const [session, setSession] = useState(() => (VAULT_ENABLED && vaultExists() && !isUnlocked()) ? 'locked' : 'disconnected');
   // selectedConnectionId must be declared before credentials so the credentials
   // initializer can pre-fill the form from the saved connection on first load.
   const [selectedConnectionId, setSelectedConnectionId] = useState(() => loadLastProfileId());
@@ -229,7 +229,7 @@ export function App() {
       // passphrase — offer only after the app has demonstrated it works). Gated on
       // both conditions so it never re-appears once accepted (vaultExists() becomes
       // true) or dismissed (isVaultOfferDismissed() persists that).
-      if (!vaultExists() && !isVaultOfferDismissed()) setShowVaultOffer(true);
+      if (VAULT_ENABLED && !vaultExists() && !isVaultOfferDismissed()) setShowVaultOffer(true);
     } catch (err) {
       setSession('failed');
       setConnectionError(err);
@@ -246,7 +246,7 @@ export function App() {
   // instead of surfacing an unhandled rejection. Returns whether it connected, so
   // callers can fall back (e.g. to pre-filling the form) when it did not.
   function tryAutoConnectViaVault(connId, extraFields = {}) {
-    if (!connId) return Promise.resolve(false);
+    if (!VAULT_ENABLED || !connId) return Promise.resolve(false);
     const conn = resolveConnection(connId);
     if (!conn) return Promise.resolve(false);
     return recallSecret(conn.credentialId, window.crypto.subtle)

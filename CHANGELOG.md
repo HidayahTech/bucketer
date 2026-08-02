@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.44.3] — 2026-08-02 — An unfinished credential vault is switched off until its redesign
+
+- Recent internal builds quietly carried an in-progress "remember this key" credential vault (an encrypted, passphrase-protected store) whose setup flow had failed its design review — most seriously, a single typo when choosing the passphrase could lock you out of the entire app, with no way back in short of wiping all saved data. It was never announced in this changelog. Every way to reach it — the post-connect save offer, the unlock screen, and automatic reconnect from a remembered secret — is now switched off behind a single flag (`VAULT_ENABLED`) until the redesigned flow ships. Tests pin the gated behavior, and the original vault tests re-arm automatically when the flag flips back. Nothing else changed: connecting, saved connections, and profiles work exactly as before.
+
 ## [1.44.2] — 2026-08-02 — The refresh test stops racing the app's startup
 
 - Fixed the remaining intermittently-failing browser test (issue #55): the "sub-folder appears without a refresh" spec could drop its file in the instant between the app rendering and its drop handler being wired up, and a drop in that gap silently does nothing — no upload, no new folder, red test. Seen only on the slower WebKit lanes. The spec now waits for a pre-seeded file's row to render, which proves the app is fully ready before dropping. Nothing in the app changed.
