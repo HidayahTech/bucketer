@@ -40,7 +40,7 @@ const LABELS = {
 
 // Leave headroom under the reported quota: the estimate is approximate by design, and other
 // site data shares the same allowance.
-const QUOTA_SAFETY = 0.9;
+export const QUOTA_SAFETY = 0.9;
 
 const isFn = v => typeof v === 'function';
 
