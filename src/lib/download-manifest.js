@@ -85,6 +85,13 @@ export async function enumerateJob(client, job, { onProgress, shouldCancel, maxK
     }
 
     // The stored token belongs to the checkpointed root only.
+    //
+    // If this is the trailing root and it's an empty prefix, crawlPrefix's onBatch never
+    // fires, so appendManifestPage below is never called for it — the persisted checkpoint
+    // is left without done:true even though the function's own return value (below) reports
+    // done. Inert today: nothing consumes enumeration.done and re-enumeration is idempotent
+    // via item-id dedup, but a future resume-enumeration feature must not rely on the
+    // persisted flag.
     const startToken = i === startIndex ? job.enumeration?.continuationToken : undefined;
     const rootIdx = i;
     const result = await crawlPrefix(client, job.bucket, roots[i].prefix, {

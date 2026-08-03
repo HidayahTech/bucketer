@@ -36,6 +36,12 @@ export function normalizeRoots({ files = [], prefixes = [] }) {
 
 // Legacy read-path shim: jobs persisted before roots existed carry only a prefix.
 // No migration write — the field is additive.
+//
+// job.roots absent (undefined) means a legacy prefix job — the shim is the intended path.
+// job.roots present but empty ([]) also falls through to prefixRoot(job.prefix ?? ''), i.e.
+// the whole-bucket root — unreachable today because every entry point (toolbar, folder row,
+// selection bar) always supplies at least one root. Do not let a future caller pass an empty
+// selection expecting a no-op; it will enumerate the entire bucket instead.
 export function rootsOfJob(job) {
   if (job.roots?.length) return job.roots;
   return [prefixRoot(job.prefix ?? '')];
