@@ -28,11 +28,18 @@ function downloadSummary(t) {
   const ofText = total != null ? ` of ${total}` : '';
   const errText = t.errors.length > 0 ? ` · ${t.errors.length} failed` : '';
 
-  // ZIP delivery bundles everything into one file, so its progress and outcome read
-  // differently from browser-managed handoff: "zipping" while staging, "handed to your
-  // browser" once the single export download has actually fired.
-  if (t.delivery === 'zip' && t.status === 'done') return 'ZIP handed to your browser';
-  if (t.delivery === 'zip' && t.status === 'running') return `Zipping ${t.current}${ofText}…`;
+  // ZIP delivery bundles everything into one file, so its states cannot borrow the
+  // handoff copy below: nothing is "sent to your browser" until the single export
+  // download actually fires (t.exported) — not while running, not on cancel, and not on
+  // a finished-but-unexported zip (export failed or the save dialog was cancelled,
+  // which is recoverable via "save it again", not a lost job).
+  if (t.delivery === 'zip') {
+    if (t.status === 'running')   return `Zipping ${t.current}${ofText}…`;
+    if (t.status === 'cancelled') return `Stopped while zipping — ${t.current}${ofText}`;
+    if (t.status === 'done' && t.exported) return 'ZIP handed to your browser';
+    if (t.status === 'done' && t.finished) return 'ZIP ready — save it again';
+    if (t.status === 'done') return `Paused — ${t.current}${ofText} zipped, ${t.failed ?? 0} failed`;
+  }
 
   if (t.status === 'cancelled') return `Stopped — sent ${t.current}${ofText} to your browser${errText}`;
   if (t.status === 'done') return `Sent ${t.current}${ofText} to your browser — check your downloads${errText}`;

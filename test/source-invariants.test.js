@@ -1511,6 +1511,48 @@ describe('App.jsx — a download job cannot run against another connection', () 
   });
 });
 
+// Fix A (task-4 review, 2026-08-03): exportZip can itself throw — most plausibly the user
+// cancelling the browser's save dialog — and when it does, the job must land in the
+// recoverable "DONE, no exportedAt" state the design spec (2026-08-03-zip-download-design.md
+// §"Errors") and Task 5's save-zip-again detection expect, never stuck at RUNNING forever.
+// That only holds if the job is marked DONE *before* exportZip is attempted and exportedAt is
+// written only *after* it succeeds — a combined single updateJob would record exportedAt even
+// when export throws, or leave the job at RUNNING if export throws before any updateJob runs.
+// This is source-ordering, invisible to a render test without full OPFS/S3/IndexedDB mocking
+// for handleZipStart's runtime path, so it is asserted structurally like the invariants above.
+describe('App.jsx — handleZipStart marks the job DONE before attempting export, and exportedAt only after (Fix A)', () => {
+  const source = src('components/App.jsx');
+
+  test('updateJob({status: JOB_STATUS.DONE}) precedes exportZip, which precedes updateJob({exportedAt})', () => {
+    const fnStart = source.indexOf('async function handleZipStart');
+    assert.ok(fnStart > -1, 'handleZipStart must exist');
+
+    const fnEnd = source.indexOf('async function handleMoveRequest', fnStart);
+    assert.ok(fnEnd > fnStart, 'handleZipStart must be followed by handleMoveRequest');
+    const fnBody = source.slice(fnStart, fnEnd);
+
+    const doneIdx = fnBody.indexOf('updateJob(fresh.id, { status: JOB_STATUS.DONE }');
+    const exportIdx = fnBody.indexOf('await exportZip(');
+    const exportedAtIdx = fnBody.indexOf('updateJob(fresh.id, { exportedAt: Date.now() }');
+
+    assert.ok(doneIdx > -1, 'handleZipStart must mark the job DONE ahead of export');
+    assert.ok(exportIdx > -1, 'handleZipStart must call exportZip');
+    assert.ok(exportedAtIdx > -1, 'handleZipStart must record exportedAt in its own updateJob call');
+
+    assert.ok(
+      doneIdx < exportIdx,
+      'the job must be marked DONE before exportZip is attempted — otherwise a thrown ' +
+      'exportZip leaves the job stuck at RUNNING forever instead of the recoverable ' +
+      '"DONE, no exportedAt" state'
+    );
+    assert.ok(
+      exportIdx < exportedAtIdx,
+      'exportedAt must be written only after exportZip actually succeeds — folding it into ' +
+      'the same updateJob as status would record exportedAt even when export throws'
+    );
+  });
+});
+
 // BUG-049: Content-Disposition is the ONLY thing that names a cross-origin download, so
 // every "save to disk" call site must build it through the one tested helper rather than
 // hand-rolling a quoted string. And each must use DOWNLOAD_PRESIGN_EXPIRES: the browser

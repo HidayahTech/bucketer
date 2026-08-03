@@ -117,7 +117,7 @@ describe('MasterQueue — download rows', () => {
 });
 
 describe('MasterQueue — zip delivery rows', () => {
-  test('shows byte-backed file progress while zipping', () => {
+  test('while running, shows the cumulative file count zipped so far', () => {
     const store = makeStore();
     addZip(store, { subPhase: null, current: 12, total: 412 });
     const { text, cleanup } = mount(h(MasterQueue, { store }));
@@ -128,11 +128,44 @@ describe('MasterQueue — zip delivery rows', () => {
     cleanup();
   });
 
-  test('a finished zip says it was handed to the browser, not that it was downloaded', () => {
+  test('HONESTY: a cancelled zip says it stopped zipping, never that anything was sent', () => {
     const store = makeStore();
-    addZip(store, { status: 'done', current: 412, total: 412 });
+    addZip(store, { status: 'cancelled', current: 5, total: 412 });
+    const { text, cleanup } = mount(h(MasterQueue, { store }));
+    const body = text();
+    assert.ok(body.includes('Stopped while zipping — 5 of 412'));
+    assert.equal(/sent/i.test(body), false, 'a cancelled zip was never handed to the browser');
+    cleanup();
+  });
+
+  test('an exported zip says it was handed to the browser, not that it was downloaded', () => {
+    const store = makeStore();
+    addZip(store, { status: 'done', current: 412, total: 412, finished: true, exported: true });
     const { text, cleanup } = mount(h(MasterQueue, { store }));
     assert.ok(text().includes('ZIP handed to your browser'));
+    cleanup();
+  });
+
+  test('HONESTY: a finished-but-unexported zip offers to save it again, not a false completion claim', () => {
+    // The save dialog can itself fail or be cancelled by the user after the zip finished
+    // staging (App.jsx marks the job DONE before attempting export, exportedAt only on
+    // success) — the row must offer recovery, not claim the file reached the browser.
+    const store = makeStore();
+    addZip(store, { status: 'done', current: 412, total: 412, finished: true, exported: false });
+    const { text, cleanup } = mount(h(MasterQueue, { store }));
+    const body = text();
+    assert.ok(body.includes('ZIP ready — save it again'));
+    assert.equal(body.includes('ZIP handed to your browser'), false);
+    cleanup();
+  });
+
+  test('HONESTY: a paused zip with per-file failures says it is paused, not that it was sent', () => {
+    const store = makeStore();
+    addZip(store, { status: 'done', current: 8, total: 10, finished: false, failed: 2 });
+    const { text, cleanup } = mount(h(MasterQueue, { store }));
+    const body = text();
+    assert.ok(body.includes('Paused — 8 of 10 zipped, 2 failed'));
+    assert.equal(/sent|handed/i.test(body), false, 'a paused zip was never handed to the browser');
     cleanup();
   });
 });

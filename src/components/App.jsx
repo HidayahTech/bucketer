@@ -742,6 +742,14 @@ export function App() {
         onProgress: ({ done, bytesDone }) => taskStore.update(id, { current: done, bytesDone }, false),
       });
 
+      // result.issued restarts at 0 every run, so on a resumed job it would regress the
+      // displayed count below what onProgress already showed while running (that counts
+      // cumulatively: DONE items from earlier runs plus this run's completions — see
+      // zip-job.js's `completed`, which starts at `done.length`). Query the DONE count
+      // directly so the terminal figure matches what was on screen a moment before,
+      // however many runs it took to get here.
+      const doneCount = await countItemsByStatus(fresh.id, ITEM_STATUS.DONE);
+
       const errors = result.blocked
         ? [{ key: '(job stopped)', message: blockedMessage(result.blocked) }, ...result.errors]
         : result.errors;
@@ -749,21 +757,29 @@ export function App() {
       taskStore.update(id, {
         status:   result.cancelled ? 'cancelled' : 'done',
         subPhase: null,
-        current:  result.issued,
+        current:  doneCount,
+        finished: result.finished,
+        failed:   result.failed,
         errors,
       }, true);
 
       if (result.finished) {
-        // The central directory is written; export the one file this whole run built
-        // toward. updateJob, not saveJob({...fresh}): same stale-snapshot hazard as
-        // handleDownloadStart — fresh is a run-start snapshot, and a whole-record write
-        // would clobber anything written to the row meanwhile.
+        // Mark the job DONE — staging holds a complete, valid zip — before attempting
+        // export. exportZip can itself fail (the save dialog can be cancelled by the
+        // user); if it does, the job must land in the same recoverable "DONE, no
+        // exportedAt" state the design spec and Task 5's save-zip-again detection
+        // expect, never stuck at RUNNING forever. exportedAt is written only once the
+        // export actually succeeds. updateJob, not saveJob({...fresh}): same
+        // stale-snapshot hazard as handleDownloadStart — fresh is a run-start snapshot,
+        // and a whole-record write would clobber anything written to the row meanwhile.
+        await updateJob(fresh.id, { status: JOB_STATUS.DONE });
         const zipName = fresh.zipName || zipFileName(fresh.bucket, fresh.prefix);
         await exportZip(async () => {
           const staging = await openZipStaging(fresh.id, { root });
           return staging.getFile();
         }, zipName);
-        await updateJob(fresh.id, { status: JOB_STATUS.DONE, exportedAt: Date.now() });
+        await updateJob(fresh.id, { exportedAt: Date.now() });
+        taskStore.update(id, { exported: true }, true);
       } else {
         // Not finished — cancelled, job-wide blocked, or per-file failures left to retry.
         // Every one of those leaves something worth resuming, exactly like handoff's
