@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.45.0] — 2026-08-02 — Download where the files are
+
+Download moved out of the sidebar: a toolbar button downloads the folder you are viewing, every folder row can be downloaded without opening it, and ticking files and folders offers Download N in the selection bar. A selection becomes one resumable job through the same pipeline as folder downloads. The transfer-tool option now lives inside the download panel and only for folder scopes.
+
 ## [1.44.3] — 2026-08-02 — An unfinished credential vault is switched off until its redesign
 
 - Recent internal builds quietly carried an in-progress "remember this key" credential vault (an encrypted, passphrase-protected store) whose setup flow had failed its design review — most seriously, a single typo when choosing the passphrase could lock you out of the entire app, with no way back in short of wiping all saved data. It was never announced in this changelog. Every way to reach it — the post-connect save offer, the unlock screen, and automatic reconnect from a remembered secret — is now switched off behind a single flag (`VAULT_ENABLED`) until the redesigned flow ships. Tests pin the gated behavior, and the original vault tests re-arm automatically when the flag flips back. Nothing else changed: connecting, saved connections, and profiles work exactly as before.
