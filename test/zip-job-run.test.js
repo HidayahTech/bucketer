@@ -17,19 +17,32 @@ import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { openZipStaging, discardZipStaging, runZipJob, zipEntryPath } from '../src/lib/zip-job.js';
+import { createZipWriter } from '../src/lib/zip-writer.js';
 import {
   saveJob, loadJob, loadAllJobs, deleteJob, appendManifestPage,
-  countItemsByStatus, eachItemByStatus, resetFailedToPending, ITEM_STATUS,
+  updateItem, countItemsByStatus, eachItemByStatus, resetFailedToPending, ITEM_STATUS,
 } from '../src/lib/download-records.js';
 import { readZip } from './helpers/zip-reader.js';
 
 // Fake OPFS directory: enough surface for openZipStaging — getFileHandle(name,
 // {create}), removeEntry(name); file handles expose createWritable({keepExistingData})
 // and getFile(). Backed by a Uint8Array per file.
+//
+// Extended with armWriteFailure (not part of the brief's original fake) so Finding-1's
+// regression test can inject a real sink/IO failure — distinct from a fetch/body
+// failure — and prove recovery survives it. Once a write() on a given file fails, that
+// stream instance is marked errored and every later call on THE SAME instance (write,
+// truncate, seek, close) also fails, mirroring real WritableStream semantics: a rejected
+// write leaves the stream errored, and close() on an errored stream rejects too.
 function fakeOpfsRoot() {
   const files = new Map();
+  const writeFaults = new Map(); // name -> { afterSuccesses, count }
   return {
     files,
+    // Let `afterSuccesses` writes to `name` succeed, then fail the next one.
+    armWriteFailure(name, afterSuccesses = 0) {
+      writeFaults.set(name, { afterSuccesses, count: 0 });
+    },
     async getFileHandle(name, { create = false } = {}) {
       if (!files.has(name)) {
         if (!create) { const e = new Error('missing'); e.name = 'NotFoundError'; throw e; }
@@ -39,14 +52,25 @@ function fakeOpfsRoot() {
         async createWritable({ keepExistingData = false } = {}) {
           let buf = keepExistingData ? Uint8Array.from(files.get(name)) : new Uint8Array(0);
           let pos = buf.length;
+          let errored = false;
           return {
             async write(u8) {
+              if (errored) throw new Error('write on an already-errored stream');
+              const fault = writeFaults.get(name);
+              if (fault) {
+                if (fault.count === fault.afterSuccesses) {
+                  writeFaults.delete(name);
+                  errored = true;
+                  throw new Error('simulated OPFS write failure');
+                }
+                fault.count += 1;
+              }
               const grown = new Uint8Array(Math.max(buf.length, pos + u8.length));
               grown.set(buf); grown.set(u8, pos); buf = grown; pos += u8.length;
             },
-            async truncate(n) { buf = buf.slice(0, n); pos = Math.min(pos, n); },
-            async seek(n) { pos = n; },
-            async close() { files.set(name, buf); },
+            async truncate(n) { if (errored) throw new Error('truncate on an errored stream'); buf = buf.slice(0, n); pos = Math.min(pos, n); },
+            async seek(n) { if (errored) throw new Error('seek on an errored stream'); pos = n; },
+            async close() { if (errored) throw new Error('close on an errored stream'); files.set(name, buf); },
           };
         },
         async getFile() { const b = files.get(name); return { size: b.length, arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.length) }; },
@@ -364,6 +388,133 @@ describe('runZipJob', () => {
 
     // Best-effort: discarding an already-absent file must not throw.
     await discardZipStaging('zjob-1', { root });
+  });
+
+  // Finding 1 (Task 3 fix review): the mid-entry recovery's `out.close()` was unguarded.
+  // zip-writer's update() mutates crc/size before awaiting the sink write, so a rejected
+  // sink.write() (a real OPFS write failure — quota/IO, not a fetch/body failure) leaves
+  // the stream errored, and close() on an errored stream rejects too. Unguarded, that
+  // would abort recovery mid-catch (never reaching truncate/openAppend/recreate) and
+  // leave `writer`/`cur` wedged — cascading every remaining item to failure via
+  // beginEntry's "previous entry not ended" — and the same unguarded close at
+  // end-of-function would make runZipJob itself reject instead of resolving with its
+  // documented shape.
+  test('7. a mid-entry OPFS write failure (not a fetch failure) recovers cleanly and resolves', async () => {
+    await saveJob(job());
+    await appendManifestPage('zjob-1', [
+      item('videos/m.txt', 'mno-body'),
+      item('videos/n.txt', 'november'),
+    ], {});
+
+    const root = fakeOpfsRoot();
+    const fetchImpl = fetchFake({
+      // Two body chunks so the armed fault lands after m's header write, mid-body —
+      // a real sink failure, not a fetch failure (test 3 already covers that case).
+      'videos/m.txt': [[enc('mno-'), enc('body')]],
+      'videos/n.txt': [[enc('november')]],
+    });
+    // m is processed first (key order) and is the very first item this fresh run
+    // touches, so nothing durable is at risk from the errored stream's close()
+    // discarding its (never-yet-committed) buffered writes. Let 1 write through — m's
+    // local header — then fail the next one: m's first body-chunk write.
+    root.armWriteFailure('bucketer-zip-zjob-1.zip', 1);
+
+    let rejected = false;
+    const result = await runZipJob(await loadJob('zjob-1'), { presign, fetchImpl, root })
+      .catch((e) => { rejected = true; throw e; });
+    assert.equal(rejected, false, 'runZipJob must resolve, not reject, even when close() on the errored stream also fails');
+
+    assert.equal(result.failed, 1);
+    const statuses = await statusesOf('zjob-1');
+    assert.equal(statuses[ITEM_STATUS.FAILED], 1);
+    assert.equal(statuses[ITEM_STATUS.DONE], 1, 'no cascade: only the item that hit the fault failed');
+    let failedItem;
+    await eachItemByStatus('zjob-1', ITEM_STATUS.FAILED, (it) => { failedItem = it; });
+    assert.equal(failedItem.key, 'videos/m.txt');
+    assert.ok(failedItem.error, 'the failure reason must be recorded');
+    let doneItem;
+    await eachItemByStatus('zjob-1', ITEM_STATUS.DONE, (it) => { doneItem = it; });
+    assert.equal(doneItem.key, 'videos/n.txt', 'the item after the fault must be written by the recovered writer, not skipped');
+
+    // Prove "written correctly" (not just "recorded DONE"): retry m and confirm the
+    // final archive parses, with both entries byte-correct.
+    await resetFailedToPending('zjob-1');
+    const result2 = await runZipJob(await loadJob('zjob-1'), { presign, fetchImpl, root });
+    assert.equal(result2.finished, true);
+
+    const staging = await root.getFileHandle('bucketer-zip-zjob-1.zip');
+    const entries = readZip(new Uint8Array(await (await staging.getFile()).arrayBuffer()));
+    assert.deepEqual(entries.map(e => e.name).sort(), ['m.txt', 'n.txt']);
+    const byName = Object.fromEntries(entries.map(e => [e.name, e]));
+    assert.equal(dec(byName['m.txt'].data), 'mno-body');
+    assert.equal(dec(byName['n.txt'].data), 'november');
+  });
+
+  // Finding 2 (Task 3 fix review): the start-of-run defensive promoteIssuedToDone sweep
+  // (zip-job.js, the call right at the top of runZipJob) had zero coverage — every
+  // existing test only ever observed the END-of-run promotion. That start-of-run sweep
+  // is the entire mechanism that makes the residual crash window self-healing: it's what
+  // recovers an item a PRIOR run left at ISSUED because it crashed between
+  // runDownloadJob returning and that run's OWN end-of-run promotion call.
+  test('8. a stray ISSUED item from a crashed prior run is promoted to DONE at the start of the next run', async () => {
+    await saveJob(job());
+    await appendManifestPage('zjob-1', [
+      item('videos/p.txt', 'papa'),
+      item('videos/q.txt', 'quebec'),
+    ], {});
+
+    const root = fakeOpfsRoot();
+    // Simulate the crash: physically write p's entry into the staging file (exactly what
+    // runZipJob's issue() closure does), then leave the item record at ISSUED with the
+    // complete, correct rec — the state runDownloadJob leaves behind right after issue()
+    // resolves, before a crash could reach this run's own end-of-run promotion.
+    const staging = await openZipStaging('zjob-1', { root });
+    const setupOut = await staging.openAppend(0);
+    const setupWriter = createZipWriter({ write: (u8) => setupOut.write(u8) }, { startOffset: 0 });
+    await setupWriter.beginEntry('p.txt', { declaredSize: enc('papa').length, mtime: 1700000000000 });
+    await setupWriter.update(enc('papa'));
+    const rec = await setupWriter.endEntry();
+    await setupOut.close();
+    await updateItem('zjob-1', 'videos/p.txt', { status: ITEM_STATUS.ISSUED, ...rec });
+
+    assert.equal((await statusesOf('zjob-1'))[ITEM_STATUS.ISSUED], 1, 'setup sanity: p really is stranded at ISSUED before the run');
+
+    const fetchImpl = fetchFake({ 'videos/q.txt': [[enc('quebec')]] });
+    const progress = [];
+    const result = await runZipJob(await loadJob('zjob-1'), {
+      presign, fetchImpl, root, onProgress: (p) => progress.push({ ...p }),
+    });
+
+    assert.equal(result.finished, true);
+    const statuses = await statusesOf('zjob-1');
+    assert.equal(statuses[ITEM_STATUS.DONE], 2);
+    assert.equal(statuses[ITEM_STATUS.ISSUED], 0);
+    assert.equal(statuses[ITEM_STATUS.PENDING], 0);
+
+    // Promoted BEFORE resumeAt was computed: q (the only item runDownloadJob actually
+    // touched this run) must resume after p's entry, not overwrite it.
+    let pItem, qItem;
+    await eachItemByStatus('zjob-1', ITEM_STATUS.DONE, (it) => {
+      if (it.key === 'videos/p.txt') pItem = it;
+      if (it.key === 'videos/q.txt') qItem = it;
+    });
+    assert.equal(pItem.zipOffset, 0);
+    assert.equal(qItem.zipOffset, pItem.zipEnd, 'q must resume after p, proving p was counted toward resumeAt');
+
+    // Counted toward bytesDone/completed: the final progress event must include p's
+    // pre-seeded bytes and count it toward "done", even though only q went through
+    // this run's issue() closure.
+    const last = progress[progress.length - 1];
+    assert.equal(last.done, 2, 'p (pre-seeded) plus q must both count toward "done"');
+    assert.equal(last.bytesDone, enc('papa').length + enc('quebec').length);
+
+    // Included in the finished archive's central directory, byte-correct.
+    const file = await staging.getFile();
+    const entries = readZip(new Uint8Array(await file.arrayBuffer()));
+    assert.deepEqual(entries.map(e => e.name).sort(), ['p.txt', 'q.txt']);
+    const byName = Object.fromEntries(entries.map(e => [e.name, e]));
+    assert.equal(dec(byName['p.txt'].data), 'papa');
+    assert.equal(dec(byName['q.txt'].data), 'quebec');
   });
 });
 

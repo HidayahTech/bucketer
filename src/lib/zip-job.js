@@ -164,7 +164,14 @@ export async function runZipJob(job, { presign, probe, fetchImpl = fetch, root, 
       // after an inconsistent write (zip-writer's update() mutates crc/size before the
       // sink write is awaited, so a rejected write leaves the old instance's internal
       // state untrustworthy).
-      await out.close();
+      //
+      // A REAL sink failure (not just a fetch/body failure) can itself have caused
+      // `out`'s underlying stream to error — per Streams semantics, close() on an
+      // errored stream also rejects. That must not block standing up the replacement
+      // stream/writer below, and must not make runZipJob itself reject instead of
+      // resolving with its documented { issued, failed, cancelled, ... } shape: the
+      // old stream is being discarded either way, so a failed close on it is moot.
+      try { await out.close(); } catch { /* already errored; discard */ }
       await staging.truncate(entryStart);
       out = await staging.openAppend(entryStart);
       writer = createZipWriter({ write: (u8) => out.write(u8) }, { startOffset: entryStart });
@@ -191,6 +198,9 @@ export async function runZipJob(job, { presign, probe, fetchImpl = fetch, root, 
     await writer.finish(entries);
     finished = true;
   }
-  await out.close();
+  // Guarded for the same reason as the mid-entry recovery close above: runZipJob must
+  // always resolve with its documented shape, never reject because the final close on
+  // an already-errored stream also rejects.
+  try { await out.close(); } catch { /* best effort; result is already computed */ }
   return { ...result, finished };
 }
