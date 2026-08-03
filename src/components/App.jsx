@@ -768,12 +768,25 @@ export function App() {
 
     await resetFailedToPending(fresh.id);
 
-    const total = await countItemsByStatus(fresh.id, ITEM_STATUS.PENDING);
+    // `current` is cumulative for a zip job — it starts at the prior run's DONE count and
+    // climbs through this run's completions (zip-job.js's `completed`, and the doneCount
+    // read below), because a zip is one file whose displayed progress must never regress
+    // across a resume. `total` has to be on the same cumulative scale: the per-run PENDING
+    // count alone reads as "N of M" with N > M on any resume that already has DONE items
+    // (5 DONE + 3 PENDING would show "Zipping 5 of 3…"). Summing DONE + PENDING here
+    // leaves a fresh run unchanged (DONE is 0) and makes a resume's total cover everything
+    // sendable, prior and current, so current can never exceed it.
+    const doneAtStart = await countItemsByStatus(fresh.id, ITEM_STATUS.DONE);
+    const pending = await countItemsByStatus(fresh.id, ITEM_STATUS.PENDING);
+    const total = doneAtStart + pending;
     const task = createDownloadTask({ fileCount: total, bucket: fresh.bucket, capturedPrefix: fresh.prefix, delivery: 'zip' });
     const id = taskStore.add(task);
     taskStore.update(id, { subPhase: null, total }, true);
     activeDownloadJobs.current.add(fresh.id);
-    await updateJob(fresh.id, { status: JOB_STATUS.RUNNING });
+    // pausedForStorage cleared at run start (not just set on the pause branch below) so a
+    // stale STORAGE marker from an earlier pause cannot survive into a run that ends up
+    // pausing for a different reason, or finishing cleanly.
+    await updateJob(fresh.id, { status: JOB_STATUS.RUNNING, pausedForStorage: false });
 
     const presign = (key, filename) => getSignedUrl(
       client,
@@ -833,7 +846,12 @@ export function App() {
         // Not finished — cancelled, job-wide blocked, or per-file failures left to retry.
         // Every one of those leaves something worth resuming, exactly like handoff's
         // resumable branch, so the manifest and staged bytes are kept rather than discarded.
-        await updateJob(fresh.id, { status: JOB_STATUS.PAUSED });
+        // A STORAGE-kind block (zip-job.js's QuotaExceededError handling) additionally
+        // marks the job so the panel can offer the persist affordance right on its resume
+        // row (spec §2, docs/superpowers/specs/2026-08-03-zip-download-design.md) — false
+        // on every other pause reason, since the marker was already cleared at run start
+        // and must not be left set by an earlier run's storage pause.
+        await updateJob(fresh.id, { status: JOB_STATUS.PAUSED, pausedForStorage: result.blocked?.kind === 'STORAGE' });
       }
     } catch (err) {
       taskStore.update(id, {

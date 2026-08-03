@@ -117,14 +117,34 @@ describe('MasterQueue — download rows', () => {
 });
 
 describe('MasterQueue — zip delivery rows', () => {
-  test('while running, shows the cumulative file count zipped so far', () => {
+  // Exact string, not a loose regex: a loose /zipping/i + separate includes('N')/includes('M')
+  // check would pass even if N and M were transposed or unrelated to each other — which is
+  // exactly the shape of the resume bug this guards (see the next test). The exact string
+  // is the only assertion that actually ties current to total in the rendered order.
+  test('while running, shows the exact "Zipping N of M…" label with the cumulative count', () => {
     const store = makeStore();
     addZip(store, { subPhase: null, current: 12, total: 412 });
     const { text, cleanup } = mount(h(MasterQueue, { store }));
     const body = text();
-    assert.ok(/zipping/i.test(body), 'a zip row must say it is zipping, not sending');
-    assert.ok(body.includes('12'));
-    assert.ok(body.includes('412'));
+    assert.ok(body.includes('Zipping 12 of 412…'));
+    cleanup();
+  });
+
+  // Regression guard for the resume "N of M" bug (BUG-LOG): `current` is cumulative for a
+  // zip job (zip-job.js's `completed` starts at the prior run's DONE count and climbs
+  // through this run's completions), so on a resumed job `total` must be cumulative too
+  // (App.jsx's handleZipStart now sums DONE + PENDING at task-creation time). Before that
+  // fix, `total` was only the per-run PENDING count: a job with 5 DONE + 3 PENDING left
+  // over rendered current climbing 5→8 against total=3 — "Zipping 5 of 3…", N > M. This
+  // models that exact resumed shape (current already past what a fresh 3-item run could
+  // ever show) and asserts the label the fixed total produces, not the broken one.
+  test('REGRESSION: a resumed zip label never shows current exceeding total (N ≤ M)', () => {
+    const store = makeStore();
+    addZip(store, { subPhase: null, current: 5, total: 8 });
+    const { text, cleanup } = mount(h(MasterQueue, { store }));
+    const body = text();
+    assert.ok(body.includes('Zipping 5 of 8…'), 'total must be the cumulative (DONE + PENDING) figure');
+    assert.equal(body.includes('Zipping 5 of 3…'), false, 'total must never be just the per-run PENDING remainder');
     cleanup();
   });
 

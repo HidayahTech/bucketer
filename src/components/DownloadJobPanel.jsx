@@ -190,6 +190,16 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
     catch { /* best effort; keep the previous gate state */ }
   }
 
+  // Same lazy-persist path, but for a job already paused mid-run on a QuotaExceededError
+  // (spec §2) rather than one still in the pre-start ready phase — so there is no local
+  // zipGateState to re-render here; the browser's persistent-storage grant is what
+  // matters, and the user resumes afterward through the row's existing Resume control.
+  async function allowStorageForJob(j) {
+    const jobSendableBytes = j.counters?.bytesSendable ?? j.counters?.bytesTotal ?? 0;
+    try { await api.requestPersist({ sendableBytes: jobSendableBytes }); }
+    catch { /* best effort */ }
+  }
+
   // A zip job that finished (every item DONE) but never got its export written — the
   // recoverable state a failed or cancelled export leaves behind (see App's
   // handleZipStart). Re-exports from the intact OPFS staging.
@@ -261,7 +271,22 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
                       {' '}— last check: {lastVerifySummary(u.lastVerify)}
                     </span>
                   )}
+                  {/* pausedForStorage: this run stopped on a mid-entry QuotaExceededError
+                      (zip-job.js) rather than a per-file failure — the row explains why
+                      and offers the same persist path the pre-start gate uses, so the
+                      user can free up room before hitting Resume. */}
+                  {u.delivery === 'zip' && u.pausedForStorage && (
+                    <span data-testid={`storage-reason-${u.id}`}>
+                      {' '}— ran out of temporary browser storage while building the ZIP.
+                    </span>
+                  )}
                 </span>
+                {u.delivery === 'zip' && u.pausedForStorage && (
+                  <button type="button" class="btn btn-ghost btn-sm" data-testid={`allow-storage-${u.id}`}
+                    onClick={() => allowStorageForJob(u)}>
+                    Allow more storage…
+                  </button>
+                )}
                 <button type="button" class="btn btn-sm" data-testid={`resume-${u.id}`}
                   onClick={() => { onStart(u); onClose(); }}>
                   Resume

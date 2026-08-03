@@ -39,9 +39,11 @@ function fakeOpfsRoot() {
   const writeFaults = new Map(); // name -> { afterSuccesses, count }
   return {
     files,
-    // Let `afterSuccesses` writes to `name` succeed, then fail the next one.
-    armWriteFailure(name, afterSuccesses = 0) {
-      writeFaults.set(name, { afterSuccesses, count: 0 });
+    // Let `afterSuccesses` writes to `name` succeed, then fail the next one. `makeError`
+    // (default: a plain Error, modeling a generic sink/IO failure) lets a caller inject a
+    // specific error shape — e.g. a QuotaExceededError DOMException for Fix #2's test.
+    armWriteFailure(name, afterSuccesses = 0, makeError = () => new Error('simulated OPFS write failure')) {
+      writeFaults.set(name, { afterSuccesses, count: 0, makeError });
     },
     async getFileHandle(name, { create = false } = {}) {
       if (!files.has(name)) {
@@ -61,7 +63,7 @@ function fakeOpfsRoot() {
                 if (fault.count === fault.afterSuccesses) {
                   writeFaults.delete(name);
                   errored = true;
-                  throw new Error('simulated OPFS write failure');
+                  throw fault.makeError();
                 }
                 fault.count += 1;
               }
@@ -515,6 +517,62 @@ describe('runZipJob', () => {
     const byName = Object.fromEntries(entries.map(e => [e.name, e]));
     assert.equal(dec(byName['p.txt'].data), 'papa');
     assert.equal(dec(byName['q.txt'].data), 'quebec');
+  });
+
+  // Fix #2 (spec §2, docs/superpowers/specs/2026-08-03-zip-download-design.md): a mid-entry
+  // QuotaExceededError is job-wide (the browser is out of room for the whole staging file,
+  // not just this entry), so it must PAUSE the job — a STORAGE-kind `blocked`, mirroring
+  // the DENIED-streak/NETWORK job-wide blocks tests 5 and (via download-queue.test.js)
+  // NETWORK already cover — rather than FAIL only the item it interrupted. The existing
+  // mid-entry recovery (truncate to entry start, reopen append, recreate writer — proved by
+  // test 3 for a plain fetch failure) must still run first, so staging is left intact for
+  // the eventual resume regardless of which way the error is rethrown afterward.
+  test('9. a mid-entry QuotaExceededError pauses the job (STORAGE block), not fails the item, and leaves staging intact for a resume', async () => {
+    await saveJob(job());
+    await appendManifestPage('zjob-1', [
+      item('videos/x.txt', 'xray-body'),
+      item('videos/y.txt', 'yankee'),
+    ], {});
+
+    const root = fakeOpfsRoot();
+    const fetchImpl = fetchFake({
+      // Two body chunks so the armed fault lands mid-body (after x's local header write),
+      // not on the header itself — same shape as test 7's real-sink-failure case.
+      'videos/x.txt': [[enc('xray-'), enc('body')]],
+      'videos/y.txt': [[enc('yankee')]],
+    });
+    const quotaError = () => new DOMException('quota exceeded', 'QuotaExceededError');
+    // x is processed first (key order) and is this run's first item, so nothing durable
+    // is at risk from the errored stream's close() discarding its buffered writes. Let 1
+    // write through (x's local header), then fail the next one (x's first body chunk).
+    root.armWriteFailure('bucketer-zip-zjob-1.zip', 1, quotaError);
+
+    const result = await runZipJob(await loadJob('zjob-1'), { presign, fetchImpl, root });
+
+    assert.equal(result.finished, false);
+    assert.notEqual(result.blocked, null, 'a QuotaExceededError must produce a job-wide block, not a per-item failure');
+    assert.equal(result.blocked.kind, 'STORAGE');
+    assert.ok(/storage/i.test(result.blocked.message), 'the block must explain it was a storage problem');
+
+    const statuses = await statusesOf('zjob-1');
+    assert.equal(statuses[ITEM_STATUS.PENDING], 2, 'both items — including the one that hit the fault — stay PENDING, not FAILED');
+    assert.equal(statuses[ITEM_STATUS.FAILED], 0, 'a job-wide block is not this item\'s fault');
+    assert.equal(statuses[ITEM_STATUS.DONE], 0);
+
+    // Staging must not be left corrupt: the failed entry's partial bytes are truncated
+    // away, exactly as the mid-entry recovery does for a plain fetch failure (test 3).
+    const staging = await root.getFileHandle('bucketer-zip-zjob-1.zip');
+    assert.equal((await staging.getFile()).size, 0, 'the failed entry\'s partial bytes must not survive the block');
+
+    // A later run (storage freed) must resume cleanly from that intact, empty staging file.
+    const result2 = await runZipJob(await loadJob('zjob-1'), { presign, fetchImpl, root });
+    assert.equal(result2.finished, true);
+    const finalStatuses = await statusesOf('zjob-1');
+    assert.equal(finalStatuses[ITEM_STATUS.DONE], 2);
+
+    const file = await staging.getFile();
+    const entries = readZip(new Uint8Array(await file.arrayBuffer()));
+    assert.deepEqual(entries.map(e => e.name).sort(), ['x.txt', 'y.txt']);
   });
 });
 

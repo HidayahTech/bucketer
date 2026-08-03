@@ -175,6 +175,19 @@ export async function runZipJob(job, { presign, probe, fetchImpl = fetch, root, 
       await staging.truncate(entryStart);
       out = await staging.openAppend(entryStart);
       writer = createZipWriter({ write: (u8) => out.write(u8) }, { startOffset: entryStart });
+
+      // A QuotaExceededError is not this item's fault — the browser ran out of temporary
+      // storage for the whole staging file, not just this entry — so per the design spec
+      // (§2) it must PAUSE the job (download-queue.js's .jobBlock signal) rather than FAIL
+      // only this one item. The recovery above already ran regardless of which way this
+      // rethrows, so staging is intact either way for the eventual resume. Checked by
+      // `.name` (not `instanceof DOMException`) so a fake/non-DOMException error with the
+      // same name — as a test double might construct — is still recognized.
+      if (err?.name === 'QuotaExceededError') {
+        const blockedErr = new Error('Ran out of temporary browser storage while building the ZIP.');
+        blockedErr.jobBlock = { kind: 'STORAGE', message: blockedErr.message };
+        throw blockedErr;
+      }
       throw err;
     }
   };

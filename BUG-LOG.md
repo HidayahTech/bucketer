@@ -91,6 +91,49 @@ size does not suppress a missing verdict" (and its right-size sibling).
 
 ---
 
+## BUG-057 — A resumed ZIP download's progress label could read "N of M" with N > M
+
+**Symptom.** Found in the final whole-branch review of the ZIP-download feature (not yet
+released). Resume a ZIP job that already had some files staged from an earlier run — e.g.
+5 DONE, 3 PENDING left — and the MasterQueue row read "Zipping 5 of 3…", then "Paused — 8
+of 3 zipped": the "so far" count exceeding the "out of" total on the one row in the app
+whose entire job is to report a count honestly (`docs/intent/master-queue.md`'s reason
+downloads were excluded from the queue in the first place).
+
+**Root cause.** `runZipJob`'s progress is deliberately cumulative — `completed` in
+`src/lib/zip-job.js` starts at the prior run's DONE count and climbs through this run's
+completions, because a ZIP is one file whose displayed progress must never regress across
+a resume (confirmed by reading `onProgress`'s call sites in `zip-job.js` and the terminal
+`doneCount = await countItemsByStatus(..., DONE)` read in `handleZipStart`, App.jsx —
+both cumulative by design). But `total`, set once at task creation in `handleZipStart`
+(`src/components/App.jsx`), was only `countItemsByStatus(..., PENDING)` — the per-run
+remainder, not the cumulative scale `current` is measured on. On a fresh job DONE is 0, so
+the two scales coincide and the bug is invisible; only a resume with prior DONE items
+exposes the mismatch, because that specific case has no e2e coverage (the branch's e2e
+resume arm's first run is not itself a resume — see the harness-fidelity note in this
+entry's PR).
+
+**Fix.** `handleZipStart` now sums `countItemsByStatus(..., DONE) +
+countItemsByStatus(..., PENDING)` and uses that cumulative figure as both the task's
+`fileCount` and `total`. A fresh run is unchanged (DONE is 0, so total still equals the
+sendable count); a resume's total now covers everything sendable — prior and current — so
+`current` can never exceed it.
+
+**Why it wasn't caught earlier.** `test/components/master-queue-download.test.jsx`'s
+running-zip-state test asserted only `/zipping/i` plus separate `body.includes('12')` /
+`body.includes('412')` checks — loose enough to pass even with the two numbers
+transposed, unrelated, or (as here) simply on different scales from each other. No test
+modeled the specific resumed shape (`current` already past what a fresh run's `total`
+could show).
+
+**Test case.** `test/components/master-queue-download.test.jsx` — tightened the running-zip
+test to the exact string `Zipping ${current} of ${total}…`, and added "REGRESSION: a
+resumed zip label never shows current exceeding total (N ≤ M)": a task with
+`current: 5, total: 8` (the post-fix cumulative shape) must render "Zipping 5 of 8…", and
+must NOT render "Zipping 5 of 3…" (the pre-fix per-run-remainder shape).
+
+---
+
 ## BUG-052 — The CSP silently blocked every folder download on an http endpoint
 
 **Symptom.** Against any http endpoint — MinIO on a LAN is a first-class supported

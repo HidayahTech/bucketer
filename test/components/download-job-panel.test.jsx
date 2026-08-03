@@ -741,3 +741,67 @@ describe('DownloadJobPanel — ZIP job rows', () => {
     m.cleanup();
   });
 });
+
+// Fix #2 (spec §2, docs/superpowers/specs/2026-08-03-zip-download-design.md): a mid-job
+// QuotaExceededError PAUSEs a zip job (App.jsx sets pausedForStorage on the job record)
+// rather than failing it file-by-file. This is the row-level half of that flow — the
+// engine/orchestration half is covered by download-queue.test.js and zip-job-run.test.js.
+describe('DownloadJobPanel — ZIP paused-for-storage row', () => {
+  const pausedZipJob = (over = {}) => classified({
+    id: 'zip-quota', prefix: 'videos/', delivery: 'zip', pausedForStorage: true,
+    counters: { total: 10, bytesTotal: 900, sendable: 10, bytesSendable: 900 },
+    counts: { pending: 8, failed: 0, issued: 0, done: 2 },
+    ...over,
+  });
+
+  test('renders the storage explanation and an Allow-storage control', async () => {
+    const api = fakeApi({ listJobs: async () => [pausedZipJob()] });
+    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />);
+    await flush();
+
+    assert.ok(/storage/i.test(m.text()), 'the row must explain the job stopped for storage, not just say "unfinished"');
+    assert.notEqual(m.query('[data-testid="allow-storage-zip-quota"]'), null);
+    m.cleanup();
+  });
+
+  test('clicking Allow more storage calls api.requestPersist', async () => {
+    let persistArgs = null;
+    const api = fakeApi({
+      listJobs: async () => [pausedZipJob()],
+      requestPersist: async (args) => { persistArgs = args; return { state: 'offered', reason: null }; },
+    });
+    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />);
+    await flush();
+
+    fire(m.query('[data-testid="allow-storage-zip-quota"]'), 'click');
+    await flush();
+
+    assert.notEqual(persistArgs, null, 'api.requestPersist must be called');
+    m.cleanup();
+  });
+
+  // The marker, not delivery:'zip' alone, gates this row addition: an ordinary paused zip
+  // (stopped on per-file failures, not a quota block) must not show storage UI it has no
+  // basis for.
+  test('a paused zip job without pausedForStorage shows neither the explanation nor the control', async () => {
+    const api = fakeApi({ listJobs: async () => [pausedZipJob({ pausedForStorage: false, counts: { pending: 0, failed: 8, issued: 0, done: 2 } })] });
+    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />);
+    await flush();
+
+    assert.equal(m.query('[data-testid="allow-storage-zip-quota"]'), null);
+    assert.equal(/storage/i.test(m.text()), false);
+    m.cleanup();
+  });
+
+  // The persist control is an addition, not a replacement — Resume must still work.
+  test('Resume still hands the job to onStart from a storage-paused row', async () => {
+    let handed = null;
+    const api = fakeApi({ listJobs: async () => [pausedZipJob()] });
+    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={j => { handed = j; }} onClose={NOOP} />);
+    await flush();
+
+    fire(m.query('[data-testid="resume-zip-quota"]'), 'click');
+    assert.equal(handed?.id, 'zip-quota');
+    m.cleanup();
+  });
+});
