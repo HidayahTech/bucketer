@@ -61,10 +61,11 @@ export function createTransferTask({ files, prefixes, dest, capturedPrefix, buck
 // honest — a row whose progress the app cannot observe must not render like one whose it can.
 // The vocabulary is shared with browser-capability.js so the panel and the queue cannot
 // drift into describing the same download two different ways.
-export function createDownloadTask({ fileCount, bucket, capturedPrefix, tier = TIERS.HANDOFF }) {
+export function createDownloadTask({ fileCount, bucket, capturedPrefix, tier = TIERS.HANDOFF, delivery }) {
   return {
     kind: 'download',
     tier,
+    delivery,
     status: 'running',
     subPhase: 'enumerating',
     subject: subjectLabel(fileCount, 0),

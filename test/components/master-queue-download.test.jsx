@@ -24,6 +24,12 @@ function addDownload(store, patch = {}) {
   return id;
 }
 
+function addZip(store, patch = {}) {
+  const id = store.add(createDownloadTask({ fileCount: 412, bucket: 'b', capturedPrefix: 'videos/', delivery: 'zip' }));
+  if (Object.keys(patch).length) store.update(id, patch, true);
+  return id;
+}
+
 describe('MasterQueue — download rows', () => {
   test('is labelled browser-managed so it cannot be read as a managed transfer', () => {
     const store = makeStore();
@@ -106,6 +112,27 @@ describe('MasterQueue — download rows', () => {
     });
     const { text, cleanup } = mount(h(MasterQueue, { store }));
     assert.ok(text().includes('AccessDenied'));
+    cleanup();
+  });
+});
+
+describe('MasterQueue — zip delivery rows', () => {
+  test('shows byte-backed file progress while zipping', () => {
+    const store = makeStore();
+    addZip(store, { subPhase: null, current: 12, total: 412 });
+    const { text, cleanup } = mount(h(MasterQueue, { store }));
+    const body = text();
+    assert.ok(/zipping/i.test(body), 'a zip row must say it is zipping, not sending');
+    assert.ok(body.includes('12'));
+    assert.ok(body.includes('412'));
+    cleanup();
+  });
+
+  test('a finished zip says it was handed to the browser, not that it was downloaded', () => {
+    const store = makeStore();
+    addZip(store, { status: 'done', current: 412, total: 412 });
+    const { text, cleanup } = mount(h(MasterQueue, { store }));
+    assert.ok(text().includes('ZIP handed to your browser'));
     cleanup();
   });
 });

@@ -69,6 +69,8 @@ import { classifyJob } from '../lib/download-lifecycle.js';
 import { verifyJob } from '../lib/download-verify.js';
 import { issueBrowserDownload } from '../lib/download-issue.js';
 import { probeUrl, blockedMessage } from '../lib/download-preflight.js';
+import { runZipJob, discardZipStaging, zipFileName, openZipStaging } from '../lib/zip-job.js';
+import { exportZip } from '../lib/zip-export.js';
 import { detectCapabilities } from '../lib/browser-capability.js';
 import { presignDownloadParams } from '../lib/presign-params.js';
 import { normalizeRoots, selectionLabel } from '../lib/download-roots.js';
@@ -608,7 +610,13 @@ export function App() {
       return verifyJob(jobId, dirHandle);
     },
     enumerate: (job, opts) => enumerateJob(client, job, opts),
-    discard: (id) => deleteJob(id),
+    // A zip job's manifest isn't the only thing to clean up — its staged bytes sit in
+    // OPFS under the job's id and outlive the job record otherwise.
+    discard: async (id) => {
+      const j = await loadJob(id);
+      if (j?.delivery === 'zip') await discardZipStaging(id, { root: await navigator.storage.getDirectory() });
+      return deleteJob(id);
+    },
   }), [client, credentials.bucket, credentials.provider, credentials.endpoint]);
 
   // The panel has already listed the folder and taken the user's confirmation, so this
@@ -684,6 +692,83 @@ export function App() {
         await updateJob(fresh.id, { status: resumable ? JOB_STATUS.PAUSED : JOB_STATUS.DONE });
       } else {
         await deleteJob(fresh.id);
+      }
+    } catch (err) {
+      taskStore.update(id, {
+        status: 'done', subPhase: null,
+        errors: [{ key: '(unexpected)', message: err.message || String(err) }],
+      }, true);
+    } finally {
+      activeDownloadJobs.current.delete(fresh.id);
+    }
+  }
+
+  // Same shell as handleDownloadStart — bucket re-check, resetFailedToPending, the
+  // activeDownloadJobs/updateJob discipline all mirror it exactly — but the engine is
+  // runZipJob (byte-accurate progress, one OPFS staging file) instead of runDownloadJob,
+  // and a clean run ends in a single exported download rather than N handed-off ones.
+  async function handleZipStart(job) {
+    const fresh = await loadJob(job.id);
+    if (!fresh) return;
+
+    // See handleDownloadStart: a manifest outlives the session that built it.
+    if (fresh.bucket !== credentials.bucket) {
+      showToast('That download was created for a different bucket. Reconnect to it to continue.');
+      return;
+    }
+
+    await resetFailedToPending(fresh.id);
+
+    const total = await countItemsByStatus(fresh.id, ITEM_STATUS.PENDING);
+    const task = createDownloadTask({ fileCount: total, bucket: fresh.bucket, capturedPrefix: fresh.prefix, delivery: 'zip' });
+    const id = taskStore.add(task);
+    taskStore.update(id, { subPhase: null, total }, true);
+    activeDownloadJobs.current.add(fresh.id);
+    await updateJob(fresh.id, { status: JOB_STATUS.RUNNING });
+
+    const presign = (key, filename) => getSignedUrl(
+      client,
+      new GetObjectCommand(presignDownloadParams({ Bucket: fresh.bucket, Key: key, filename })),
+      { expiresIn: DOWNLOAD_PRESIGN_EXPIRES },
+    );
+
+    try {
+      const root = await navigator.storage.getDirectory();
+      const result = await runZipJob(fresh, {
+        presign,
+        probe: probeUrl,
+        root,
+        shouldCancel: () => taskStore.isCancelRequested(id),
+        onProgress: ({ done, bytesDone }) => taskStore.update(id, { current: done, bytesDone }, false),
+      });
+
+      const errors = result.blocked
+        ? [{ key: '(job stopped)', message: blockedMessage(result.blocked) }, ...result.errors]
+        : result.errors;
+
+      taskStore.update(id, {
+        status:   result.cancelled ? 'cancelled' : 'done',
+        subPhase: null,
+        current:  result.issued,
+        errors,
+      }, true);
+
+      if (result.finished) {
+        // The central directory is written; export the one file this whole run built
+        // toward. updateJob, not saveJob({...fresh}): same stale-snapshot hazard as
+        // handleDownloadStart — fresh is a run-start snapshot, and a whole-record write
+        // would clobber anything written to the row meanwhile.
+        const zipName = fresh.zipName || zipFileName(fresh.bucket, fresh.prefix);
+        await exportZip(async () => {
+          const staging = await openZipStaging(fresh.id, { root });
+          return staging.getFile();
+        }, zipName);
+        await updateJob(fresh.id, { status: JOB_STATUS.DONE, exportedAt: Date.now() });
+      } else {
+        // Not finished — cancelled, job-wide blocked, or per-file failures left to retry.
+        // Every one of those leaves something worth resuming, exactly like handoff's
+        // resumable branch, so the manifest and staged bytes are kept rather than discarded.
+        await updateJob(fresh.id, { status: JOB_STATUS.PAUSED });
       }
     } catch (err) {
       taskStore.update(id, {
@@ -853,7 +938,7 @@ export function App() {
           scope={downloadScope ?? { kind: 'folder', prefix: currentPrefix }}
           api={downloadApi}
           capabilities={browserCapabilities}
-          onStart={handleDownloadStart}
+          onStart={(job) => job.delivery === 'zip' ? handleZipStart(job) : handleDownloadStart(job)}
           onClose={() => { setDownloadOpen(false); setDownloadScope(null); }}
           onUseTransferTool={() => {
             // Only reachable from folder scope (the panel hides the link otherwise), so the

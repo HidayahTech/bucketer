@@ -28,6 +28,12 @@ function downloadSummary(t) {
   const ofText = total != null ? ` of ${total}` : '';
   const errText = t.errors.length > 0 ? ` · ${t.errors.length} failed` : '';
 
+  // ZIP delivery bundles everything into one file, so its progress and outcome read
+  // differently from browser-managed handoff: "zipping" while staging, "handed to your
+  // browser" once the single export download has actually fired.
+  if (t.delivery === 'zip' && t.status === 'done') return 'ZIP handed to your browser';
+  if (t.delivery === 'zip' && t.status === 'running') return `Zipping ${t.current}${ofText}…`;
+
   if (t.status === 'cancelled') return `Stopped — sent ${t.current}${ofText} to your browser${errText}`;
   if (t.status === 'done') return `Sent ${t.current}${ofText} to your browser — check your downloads${errText}`;
   if (t.subPhase === 'enumerating') return 'Listing files to download…';
