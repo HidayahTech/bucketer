@@ -25,7 +25,15 @@ const REPS = parseInt(process.env.REPS || '3', 10);
 const SAMPLE_MS = 40;
 
 const html = readFileSync(new URL('./probe.html', import.meta.url), 'utf8');
-const server = http.createServer((_q, r) => {
+// Served so probe.html can `import()` the real writer under test — the zip-dl mechanism
+// drives this exact module, not a reimplementation of it.
+const zipWriterJs = readFileSync(new URL('../../../src/lib/zip-writer.js', import.meta.url), 'utf8');
+const server = http.createServer((q, r) => {
+  if (q.url.startsWith('/zip-writer.js')) {
+    r.setHeader('Content-Type', 'text/javascript; charset=utf-8');
+    r.end(zipWriterJs);
+    return;
+  }
   r.setHeader('Content-Type', 'text/html; charset=utf-8');
   r.end(html);
 });

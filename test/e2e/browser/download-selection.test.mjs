@@ -65,7 +65,13 @@ describe('browser e2e — selection download', () => {
       await downloads.waitForCount(4, 30000);
     }
     const paths = navGetPaths();
+    // Exact set, not just count: pin down that the four requests are specifically
+    // a.txt/b.txt/sub/c.txt/sub/d.txt, so a scope bug that grabbed the wrong file (same
+    // count) fails.
     assert.equal(paths.size, 4, 'exactly the four selected files must be requested');
+    for (const expected of ['a.txt', 'b.txt', 'sub/c.txt', 'sub/d.txt']) {
+      assert.ok([...paths].some(p => p.includes(expected)), `${expected} must be requested`);
+    }
     assert.ok(![...paths].some(p => p.includes('untouched')), 'the unticked file must never be requested');
   });
 

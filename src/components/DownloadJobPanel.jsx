@@ -40,11 +40,19 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
   const [error, setError] = useState(null);
   const [jobs, setJobs] = useState([]);
   const [verifyError, setVerifyError] = useState(null);
+  const [zipGateState, setZipGateState] = useState(null);
   const scanCancelled = useRef(false);
 
   // showDirectoryPicker is Chromium-only. Offering a button that throws on Firefox and
   // Safari is worse than offering nothing — but only the ACTION is gated, never the row.
   const canVerify = !!capabilities?.directoryPicker;
+
+  // The same three feature checks zipGate() itself gates on. Used only to decide whether
+  // an 'unavailable' gate's reason is a size reason worth showing, or the capability
+  // reason zipGate returns when this browser cannot stage a ZIP at all — the latter is
+  // redundant with simply not offering the button and would nag every non-Chromium user
+  // on every download.
+  const zipCapable = !!(capabilities?.opfs && capabilities?.streamingFetch && capabilities?.writableFiles);
 
   // What the offer may promise: archived objects are in the totals but can never be sent,
   // and the count and the size must describe the same set of files.
@@ -61,6 +69,18 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
   // A job from an earlier session is the reason the manifest is durable at all, so it has
   // to be reachable here — resumable, checkable, or at minimum discardable.
   useEffect(() => { refreshJobs(); }, [api]);
+
+  // The ZIP gate needs the live storage quota and the persist() flag — async I/O that,
+  // per this file's contract, must stay behind api rather than touch navigator.storage
+  // directly. Re-evaluated whenever the ready phase is entered with something sendable;
+  // quota can drift between one job and the next within the same session.
+  useEffect(() => {
+    if (phase !== 'ready' || sendable <= 0 || !api.zipGate) { setZipGateState(null); return; }
+    let alive = true;
+    api.zipGate({ sendableBytes }).then(g => { if (alive) setZipGateState(g); })
+      .catch(() => { if (alive) setZipGateState(null); });
+    return () => { alive = false; };
+  }, [api, phase, sendable, sendableBytes]);
 
   async function refreshJobs() {
     try { setJobs((await api.listJobs?.()) || []); }
@@ -153,6 +173,43 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
     onClose();
   }
 
+  // Same shell as start(), but the job record is patched for zip delivery first — App
+  // sets delivery:'zip' and computes the zip's file name — so onStart's routing
+  // (job.delivery === 'zip' ? handleZipStart : handleDownloadStart) picks the zip engine.
+  async function startZip() {
+    const patched = await api.startZipJob(job);
+    setPhase('started');
+    onStart(patched);
+    onClose();
+  }
+
+  // The lazy-persist path: ask for persistent storage, then re-render from the
+  // re-evaluated gate App hands back (enabling start-zip if it now fits).
+  async function allowStorage() {
+    try { setZipGateState(await api.requestPersist({ sendableBytes })); }
+    catch { /* best effort; keep the previous gate state */ }
+  }
+
+  // Same lazy-persist path, but for a job already paused mid-run on a QuotaExceededError
+  // (spec §2) rather than one still in the pre-start ready phase — so there is no local
+  // zipGateState to re-render here; the browser's persistent-storage grant is what
+  // matters, and the user resumes afterward through the row's existing Resume control.
+  async function allowStorageForJob(j) {
+    const jobSendableBytes = j.counters?.bytesSendable ?? j.counters?.bytesTotal ?? 0;
+    try { await api.requestPersist({ sendableBytes: jobSendableBytes }); }
+    catch { /* best effort */ }
+  }
+
+  // A zip job that finished (every item DONE) but never got its export written — the
+  // recoverable state a failed or cancelled export leaves behind (see App's
+  // handleZipStart). Re-exports from the intact OPFS staging.
+  async function saveZipAgain(id) {
+    try { await api.exportZipAgain(id); } catch { /* best effort */ }
+    await refreshJobs();
+  }
+
+  const zipSuffix = (j) => j.delivery === 'zip' ? ' — ZIP' : '';
+
   function lastVerifySummary(v) {
     const parts = [`${v.confirmed.toLocaleString()} confirmed`];
     if (v.missing > 0) parts.push(`${v.missing.toLocaleString()} missing`);
@@ -204,7 +261,7 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
             {unfinished.map(u => (
               <div key={u.id} class="download-job-unfinished-row">
                 <span class="download-job-unfinished-scope">
-                  {u.label || u.prefix || bucket} — {(u.counts.pending + u.counts.failed).toLocaleString()} of{' '}
+                  {u.label || u.prefix || bucket}{zipSuffix(u)} — {(u.counts.pending + u.counts.failed).toLocaleString()} of{' '}
                   {(u.counters?.sendable ?? u.counters?.total ?? 0).toLocaleString()} still to send
                   {u.counts.issued > 0 && ` (${u.counts.issued.toLocaleString()} already sent)`}
                   {/* A folder check may be what put files back in this pile; the user
@@ -214,7 +271,22 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
                       {' '}— last check: {lastVerifySummary(u.lastVerify)}
                     </span>
                   )}
+                  {/* pausedForStorage: this run stopped on a mid-entry QuotaExceededError
+                      (zip-job.js) rather than a per-file failure — the row explains why
+                      and offers the same persist path the pre-start gate uses, so the
+                      user can free up room before hitting Resume. */}
+                  {u.delivery === 'zip' && u.pausedForStorage && (
+                    <span data-testid={`storage-reason-${u.id}`}>
+                      {' '}— ran out of temporary browser storage while building the ZIP.
+                    </span>
+                  )}
                 </span>
+                {u.delivery === 'zip' && u.pausedForStorage && (
+                  <button type="button" class="btn btn-ghost btn-sm" data-testid={`allow-storage-${u.id}`}
+                    onClick={() => allowStorageForJob(u)}>
+                    Allow more storage…
+                  </button>
+                )}
                 <button type="button" class="btn btn-sm" data-testid={`resume-${u.id}`}
                   onClick={() => { onStart(u); onClose(); }}>
                   Resume
@@ -239,7 +311,7 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
             {sent.map(v => (
               <div key={v.id} class="download-job-unfinished-row">
                 <span class="download-job-unfinished-scope">
-                  {v.label || v.prefix || bucket} — {v.counts.issued.toLocaleString()} files sent
+                  {v.label || v.prefix || bucket}{zipSuffix(v)} — {v.counts.issued.toLocaleString()} files sent
                   {v.lastVerify && (
                     <span data-testid={`verified-${v.id}`}>
                       {' '}— last check: {lastVerifySummary(v.lastVerify)}
@@ -272,8 +344,20 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
             {settled.map(s => (
               <div key={s.id} class="download-job-unfinished-row">
                 <span class="download-job-unfinished-scope">
-                  {s.label || s.prefix || bucket} — all {s.counts.done.toLocaleString()} files confirmed
+                  {s.label || s.prefix || bucket}{zipSuffix(s)} — all {s.counts.done.toLocaleString()} files confirmed
                 </span>
+                {/* A zip job whose items are all DONE but which never got its export
+                    written — exportZip threw, or the save dialog was cancelled — is
+                    recoverable, not lost: the finished bytes are still intact in OPFS
+                    staging. This is the only signal available at the row level; there is
+                    no separate "unexported" job class (postmortem F3/F6: classes must stay
+                    total over item counts, not grow a special case per delivery mode). */}
+                {s.delivery === 'zip' && !s.exportedAt && (
+                  <button type="button" class="btn btn-sm" data-testid="save-zip-again"
+                    onClick={() => saveZipAgain(s.id)}>
+                    Save the ZIP again
+                  </button>
+                )}
                 <button type="button" class="btn btn-ghost btn-sm" data-testid={`discard-${s.id}`}
                   onClick={() => discardJob(s.id)}>
                   Discard
@@ -373,6 +457,15 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
                   Send {sendable.toLocaleString()} files ({formatBytes(sendableBytes)}) to my browser
                 </button>
               )}
+              {/* Gated by zipGateState, which api.zipGate resolves asynchronously on
+                  entering this phase (see the effect above) — null until then, so no zip
+                  button appears before the gate is known. 'unavailable' never renders one. */}
+              {sendable > 0 && zipGateState && zipGateState.state !== 'unavailable' && (
+                <button type="button" class="btn btn-sm" data-testid="start-zip"
+                  disabled={zipGateState.state === 'needs-storage'} onClick={startZip}>
+                  Download as one ZIP ({sendable.toLocaleString()} files, {formatBytes(sendableBytes)})
+                </button>
+              )}
               {showTransferTool && (
                 <button type="button" class="btn btn-ghost btn-sm" data-testid="use-transfer-tool"
                   onClick={onUseTransferTool}>
@@ -380,6 +473,31 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
                 </button>
               )}
             </div>
+            {sendable > 0 && zipGateState?.state === 'offered' && (
+              <p class="download-job-hint">
+                Arrives as a single file with its folder structure intact. Your browser asks
+                once, not N times.
+              </p>
+            )}
+            {sendable > 0 && zipGateState?.state === 'needs-storage' && (
+              <>
+                <p class="download-job-warning" data-testid="zip-gate-reason">{zipGateState.reason}</p>
+                <div class="download-job-actions">
+                  <button type="button" class="btn btn-ghost btn-sm" data-testid="allow-storage"
+                    onClick={allowStorage}>
+                    Allow more storage…
+                  </button>
+                </div>
+              </>
+            )}
+            {/* zipCapable rules out the capability reason ("this browser cannot stage a
+                ZIP"), which would otherwise show on every non-Chromium download — the
+                missing button already says that. What's left, when the gate is still
+                'unavailable' with caps intact, is the size reason: not enough room even
+                once persisted. */}
+            {sendable > 0 && zipGateState?.state === 'unavailable' && zipCapable && zipGateState.reason && (
+              <p class="download-job-note" data-testid="zip-gate-reason">{zipGateState.reason}</p>
+            )}
           </>
         )}
       </div>

@@ -77,6 +77,12 @@ export function blockedMessage(probe) {
       return 'The download could not reach the bucket. This is usually a missing CORS rule on the '
            + 'bucket, but it is also what a dropped network connection looks like — the browser '
            + `does not say which. (${probe.message || 'request failed'})`;
+    // STORAGE is not a probe kind (it never comes from probeUrl) — it is zip-job.js's
+    // job-wide block for a mid-entry QuotaExceededError, carried through download-queue.js's
+    // .jobBlock signal. Named here anyway because this is the one place that turns any
+    // `blocked` value into user-facing text.
+    case 'STORAGE':
+      return probe.message || 'Ran out of temporary browser storage while building the ZIP.';
     default:
       return 'The download was stopped by a problem affecting the whole job.';
   }

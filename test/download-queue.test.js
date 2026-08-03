@@ -73,6 +73,19 @@ describe('runDownloadJob', () => {
     assert.equal(result.issued, 0);
   });
 
+  // The zip orchestration (zip-job.js) needs the full item — size, lastModified, etc. —
+  // to build a zip entry, not just the url/filename the browser-download issue() uses.
+  test('passes the full item to issue as a third argument', async () => {
+    await saveJob(job());
+    await appendManifestPage('job-1', [item('a', { size: 42 })], {});
+    let seenItem;
+    const h = harness({ issue: async (url, filename, it) => { seenItem = it; } });
+    await runDownloadJob(await loadJob('job-1'), h);
+
+    assert.equal(seenItem.key, 'a');
+    assert.equal(seenItem.size, 42);
+  });
+
   test('passes the suggested local name to the browser', async () => {
     await saveJob(job());
     await appendManifestPage('job-1', [item('videos/2024/a.mp4', { localName: 'a.mp4' })], {});
@@ -96,6 +109,34 @@ describe('runDownloadJob', () => {
     assert.equal(result.cancelled, true);
     // The remaining work is still pending, so resuming later picks it up.
     assert.equal(await countItemsByStatus('job-1', ITEM_STATUS.PENDING), 2);
+  });
+
+  // Fix #2 (spec §2, docs/superpowers/specs/2026-08-03-zip-download-design.md): a
+  // QuotaExceededError mid-zip is not this item's fault — it is job-wide, like a NETWORK
+  // probe block — so it must PAUSE the job rather than FAIL the item. zip-job.js signals
+  // this by tagging the rethrown error with `.jobBlock`; this engine has no zip-specific
+  // knowledge, so the contract is generic: ANY error `issue` throws with `.jobBlock` set
+  // stops the run and reports it as `blocked`, leaving the item PENDING. An error without
+  // `.jobBlock` must keep failing only its own item — proved by the untouched second item
+  // below — so this is additive to, not a replacement for, the existing per-item FAILED path.
+  test('an issue error carrying .jobBlock stops the job and leaves the item PENDING, not FAILED', async () => {
+    await saveJob(job());
+    await appendManifestPage('job-1', [item('a'), item('b')], {});
+    const jobBlock = { kind: 'STORAGE', message: 'Ran out of temporary browser storage while building the ZIP.' };
+    const h = harness({
+      issue: async (url, filename, it) => {
+        if (it.key === 'a') { const err = new Error('quota'); err.jobBlock = jobBlock; throw err; }
+      },
+    });
+
+    const result = await runDownloadJob(await loadJob('job-1'), h);
+
+    assert.deepEqual(result.blocked, jobBlock);
+    assert.equal(result.issued, 0);
+    assert.equal(result.failed, 0, 'a job-wide block is not this item\'s fault');
+    assert.equal(await countItemsByStatus('job-1', ITEM_STATUS.PENDING), 2,
+      'the item that hit the block, and everything after it, stay PENDING for the resume');
+    assert.equal(await countItemsByStatus('job-1', ITEM_STATUS.FAILED), 0);
   });
 
   test('a presign failure fails only that item', async () => {

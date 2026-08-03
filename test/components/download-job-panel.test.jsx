@@ -18,6 +18,9 @@ import { JOB_CLASS } from '../../src/lib/download-lifecycle.js';
 const DESKTOP = { directoryPicker: false, opfs: true, streamingFetch: true, likelyMobile: false };
 const MOBILE = { ...DESKTOP, likelyMobile: true };
 const CAN_PICK = { ...DESKTOP, directoryPicker: true };
+// The three checks zipGate() itself gates on (browser-capability.js). DESKTOP already has
+// opfs/streamingFetch; writableFiles is the one flag that turns "capable" on.
+const ZIP_CAPABLE = { ...DESKTOP, writableFiles: true };
 
 const NOOP = () => {};
 
@@ -553,6 +556,252 @@ describe('DownloadJobPanel — the folder check', () => {
     await flush();
 
     assert.equal(m.query('[data-testid="verify-error"]'), null, 'cancelling is not an error');
+    m.cleanup();
+  });
+});
+
+// The ZIP gate: on entering the ready phase, the panel calls api.zipGate({ sendableBytes })
+// and renders one of three offers from the result — never touching navigator.storage or
+// quota estimation itself (that I/O lives entirely behind api, in App).
+describe('DownloadJobPanel — the ZIP gate', () => {
+  // useEffect's own invocation (as opposed to a plain setState update) is scheduled by
+  // Preact via a real requestAnimationFrame/setTimeout(35) race — see preact/hooks — not
+  // via the microtask-scheduled path plain setState calls use. A 0ms flush() reliably
+  // drains microtasks but does not span that real-time gap; the file's existing
+  // long-poll pattern (see "cancelling a listing stops the crawl…" above) is reused here.
+  const flushEffects = () => new Promise(r => setTimeout(r, 60));
+
+  const readyWithGate = async (zipGateImpl, capabilities = ZIP_CAPABLE, apiOver = {}) => {
+    const api = fakeApi({ zipGate: zipGateImpl, ...apiOver });
+    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: 'videos/' }}
+      api={api} onStart={NOOP} onClose={NOOP} capabilities={capabilities} />);
+    fire(m.query('[data-testid="scan"]'), 'click');
+    await flush(); await flushEffects();
+    return m;
+  };
+
+  test("state 'offered': the ZIP button is present and enabled, with the hint line", async () => {
+    const m = await readyWithGate(async () => ({ state: 'offered', reason: null }));
+    const btn = m.query('[data-testid="start-zip"]');
+    assert.notEqual(btn, null);
+    assert.equal(btn.disabled, false);
+    assert.match(btn.textContent, /\b412\b/);
+    assert.ok(/GB|GiB/.test(btn.textContent));
+    assert.ok(/single file/i.test(m.text()), 'the hint must describe the ZIP shape');
+    assert.ok(/asks once, not N times/i.test(m.text()));
+    m.cleanup();
+  });
+
+  // zipGate() itself treats an unreadable quota as optimistic and returns 'offered' —
+  // from the panel's side this is indistinguishable from a known quota that fits, since
+  // api.zipGate only ever hands back the resolved { state, reason }, never the quota.
+  test("state 'offered' via an unreadable (unknown) quota: same offer as a known fit", async () => {
+    const m = await readyWithGate(async () => ({ state: 'offered', reason: null }));
+    const btn = m.query('[data-testid="start-zip"]');
+    assert.notEqual(btn, null);
+    assert.equal(btn.disabled, false);
+    m.cleanup();
+  });
+
+  test("state 'needs-storage': the button is present but disabled, the reason is shown, and Allow storage offered", async () => {
+    const reason = 'Needs about 5.0 GB of temporary browser storage; 2.0 GB available.';
+    const m = await readyWithGate(async () => ({ state: 'needs-storage', reason }));
+    const btn = m.query('[data-testid="start-zip"]');
+    assert.notEqual(btn, null);
+    assert.equal(btn.disabled, true);
+    const reasonEl = m.query('[data-testid="zip-gate-reason"]');
+    assert.notEqual(reasonEl, null);
+    assert.match(reasonEl.textContent, /5\.0 GB/);
+    assert.notEqual(m.query('[data-testid="allow-storage"]'), null);
+    m.cleanup();
+  });
+
+  test("state 'unavailable' (still too big even once persisted): no ZIP button, the size reason shown as a muted line", async () => {
+    const reason = 'Needs about 900.0 GB of temporary browser storage; 5.0 GB available.';
+    const m = await readyWithGate(async () => ({ state: 'unavailable', reason }));
+    assert.equal(m.query('[data-testid="start-zip"]'), null);
+    const reasonEl = m.query('[data-testid="zip-gate-reason"]');
+    assert.notEqual(reasonEl, null);
+    assert.match(reasonEl.textContent, /900\.0 GB/);
+    m.cleanup();
+  });
+
+  // Capability-caused 'unavailable' (this browser has no OPFS/streaming fetch/writable
+  // files) is what a browser lacking the mechanism entirely looks like — the missing
+  // button already says that, so the reason line would just be noise on every download.
+  test("state 'unavailable' from a missing capability: no button, and no reason line either", async () => {
+    const m = await readyWithGate(async () => ({ state: 'unavailable', reason: 'This browser cannot stage a ZIP.' }), DESKTOP);
+    assert.equal(m.query('[data-testid="start-zip"]'), null);
+    assert.equal(m.query('[data-testid="zip-gate-reason"]'), null);
+    m.cleanup();
+  });
+
+  test('without api.zipGate, no ZIP button ever appears (older/fake api stays supported)', async () => {
+    const m = await readyWithGate(undefined);
+    assert.equal(m.query('[data-testid="start-zip"]'), null);
+    m.cleanup();
+  });
+
+  test('starting the ZIP patches the job through api.startZipJob and hands the result to onStart', async () => {
+    let requested = null;
+    let handed = null;
+    const api = fakeApi({
+      zipGate: async () => ({ state: 'offered', reason: null }),
+      startZipJob: async (job) => { requested = job; return { ...job, delivery: 'zip', zipName: 'videos-20260803-0000.zip' }; },
+    });
+    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: 'videos/' }}
+      api={api} onStart={j => { handed = j; }} onClose={NOOP} capabilities={ZIP_CAPABLE} />);
+    fire(m.query('[data-testid="scan"]'), 'click');
+    await flush(); await flushEffects();
+
+    fire(m.query('[data-testid="start-zip"]'), 'click');
+    await flush();
+
+    assert.notEqual(requested, null, 'api.startZipJob must be called with the scanned job');
+    assert.equal(requested.id, 'job-1');
+    assert.notEqual(handed, null);
+    assert.equal(handed.delivery, 'zip', 'onStart must receive the patched job so it routes to the zip engine');
+    assert.equal(handed.zipName, 'videos-20260803-0000.zip');
+    m.cleanup();
+  });
+
+  test('Allow more storage calls api.requestPersist and re-renders enabled once the gate fits', async () => {
+    let persistCalled = false;
+    const api = fakeApi({
+      zipGate: async () => ({ state: 'needs-storage', reason: 'Needs about 5.0 GB of temporary browser storage; 2.0 GB available.' }),
+      requestPersist: async () => { persistCalled = true; return { state: 'offered', reason: null }; },
+    });
+    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: 'videos/' }}
+      api={api} onStart={NOOP} onClose={NOOP} capabilities={ZIP_CAPABLE} />);
+    fire(m.query('[data-testid="scan"]'), 'click');
+    await flush(); await flushEffects();
+    assert.equal(m.query('[data-testid="start-zip"]').disabled, true);
+
+    fire(m.query('[data-testid="allow-storage"]'), 'click');
+    await flush(); await flush();
+
+    assert.equal(persistCalled, true);
+    const btn = m.query('[data-testid="start-zip"]');
+    assert.notEqual(btn, null);
+    assert.equal(btn.disabled, false, 'the gate refit must re-enable the button');
+    m.cleanup();
+  });
+});
+
+// Zip job rows: every section labels a zip job with a — ZIP suffix, and a finished but
+// unexported zip job (all items DONE, no exportedAt — the recoverable state a failed or
+// cancelled export leaves behind) offers to save it again.
+describe('DownloadJobPanel — ZIP job rows', () => {
+  const zipSettledJob = (over = {}) => classified({
+    id: 'zip-1', prefix: 'videos/', jobClass: JOB_CLASS.SETTLED, delivery: 'zip',
+    counts: { pending: 0, failed: 0, issued: 0, done: 412 },
+    ...over,
+  });
+
+  test('a settled zip job label carries the — ZIP suffix', async () => {
+    const api = fakeApi({ listJobs: async () => [zipSettledJob({ exportedAt: 12345 })] });
+    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />);
+    await flush();
+    assert.ok(m.text().includes('videos/ — ZIP'));
+    m.cleanup();
+  });
+
+  test('a finished-unexported zip job offers Save the ZIP again, which calls api.exportZipAgain', async () => {
+    let exported = null;
+    const api = fakeApi({
+      listJobs: async () => [zipSettledJob()],   // no exportedAt: finished, never exported
+      exportZipAgain: async (id) => { exported = id; },
+    });
+    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />);
+    await flush();
+
+    const btn = m.query('[data-testid="save-zip-again"]');
+    assert.notEqual(btn, null);
+    fire(btn, 'click');
+    await flush();
+
+    assert.equal(exported, 'zip-1');
+    m.cleanup();
+  });
+
+  test('an already-exported zip job does not offer Save the ZIP again', async () => {
+    const api = fakeApi({ listJobs: async () => [zipSettledJob({ exportedAt: Date.now() })] });
+    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />);
+    await flush();
+    assert.equal(m.query('[data-testid="save-zip-again"]'), null);
+    m.cleanup();
+  });
+
+  test('a non-zip settled job carries no — ZIP suffix and no Save-again control', async () => {
+    const api = fakeApi({ listJobs: async () => [zipSettledJob({ delivery: undefined, exportedAt: undefined })] });
+    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />);
+    await flush();
+    assert.equal(m.text().includes('— ZIP'), false);
+    assert.equal(m.query('[data-testid="save-zip-again"]'), null);
+    m.cleanup();
+  });
+});
+
+// Fix #2 (spec §2, docs/superpowers/specs/2026-08-03-zip-download-design.md): a mid-job
+// QuotaExceededError PAUSEs a zip job (App.jsx sets pausedForStorage on the job record)
+// rather than failing it file-by-file. This is the row-level half of that flow — the
+// engine/orchestration half is covered by download-queue.test.js and zip-job-run.test.js.
+describe('DownloadJobPanel — ZIP paused-for-storage row', () => {
+  const pausedZipJob = (over = {}) => classified({
+    id: 'zip-quota', prefix: 'videos/', delivery: 'zip', pausedForStorage: true,
+    counters: { total: 10, bytesTotal: 900, sendable: 10, bytesSendable: 900 },
+    counts: { pending: 8, failed: 0, issued: 0, done: 2 },
+    ...over,
+  });
+
+  test('renders the storage explanation and an Allow-storage control', async () => {
+    const api = fakeApi({ listJobs: async () => [pausedZipJob()] });
+    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />);
+    await flush();
+
+    assert.ok(/storage/i.test(m.text()), 'the row must explain the job stopped for storage, not just say "unfinished"');
+    assert.notEqual(m.query('[data-testid="allow-storage-zip-quota"]'), null);
+    m.cleanup();
+  });
+
+  test('clicking Allow more storage calls api.requestPersist', async () => {
+    let persistArgs = null;
+    const api = fakeApi({
+      listJobs: async () => [pausedZipJob()],
+      requestPersist: async (args) => { persistArgs = args; return { state: 'offered', reason: null }; },
+    });
+    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />);
+    await flush();
+
+    fire(m.query('[data-testid="allow-storage-zip-quota"]'), 'click');
+    await flush();
+
+    assert.notEqual(persistArgs, null, 'api.requestPersist must be called');
+    m.cleanup();
+  });
+
+  // The marker, not delivery:'zip' alone, gates this row addition: an ordinary paused zip
+  // (stopped on per-file failures, not a quota block) must not show storage UI it has no
+  // basis for.
+  test('a paused zip job without pausedForStorage shows neither the explanation nor the control', async () => {
+    const api = fakeApi({ listJobs: async () => [pausedZipJob({ pausedForStorage: false, counts: { pending: 0, failed: 8, issued: 0, done: 2 } })] });
+    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />);
+    await flush();
+
+    assert.equal(m.query('[data-testid="allow-storage-zip-quota"]'), null);
+    assert.equal(/storage/i.test(m.text()), false);
+    m.cleanup();
+  });
+
+  // The persist control is an addition, not a replacement — Resume must still work.
+  test('Resume still hands the job to onStart from a storage-paused row', async () => {
+    let handed = null;
+    const api = fakeApi({ listJobs: async () => [pausedZipJob()] });
+    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={j => { handed = j; }} onClose={NOOP} />);
+    await flush();
+
+    fire(m.query('[data-testid="resume-zip-quota"]'), 'click');
+    assert.equal(handed?.id, 'zip-quota');
     m.cleanup();
   });
 });

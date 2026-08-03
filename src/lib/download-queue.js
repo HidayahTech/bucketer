@@ -115,18 +115,25 @@ export async function runDownloadJob(job, {
             await failItem(it, `Could not read this file before sending it (${result.message}).`);
           } else {
             consecutiveDenied = 0;
-            await issue(url, it.localName);
+            await issue(url, it.localName, it);
             await updateItem(job.id, it.key, { status: ITEM_STATUS.ISSUED, issuedAt: Date.now() });
             issued += 1;
             issuedThis = true;
           }
         } else {
-          await issue(url, it.localName);
+          await issue(url, it.localName, it);
           await updateItem(job.id, it.key, { status: ITEM_STATUS.ISSUED, issuedAt: Date.now() });
           issued += 1;
           issuedThis = true;
         }
       } catch (err) {
+        // A job-wide block signal (currently only zip-job.js's QuotaExceededError
+        // handling) mirrors the NETWORK probe block above: the failure is not this
+        // item's fault, so it is left PENDING for a resume rather than marked FAILED,
+        // and the loop stops rather than cascading the same fault onto every remaining
+        // item. Additive: an `issue`/`presign` error with no `.jobBlock` falls through
+        // unchanged to the existing per-item FAILED behavior below.
+        if (err?.jobBlock) return { issued, failed, cancelled: false, errors, blocked: err.jobBlock };
         // One bad key must not stop a job of thousands. The item leaves PENDING either
         // way, so the outer loop always makes progress and cannot spin.
         await failItem(it, err?.message || String(err));

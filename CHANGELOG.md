@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.46.0] — 2026-08-03 — One ZIP, one dialog
+
+Download as one ZIP bundles the folder or selection you chose into a single file with its folder structure intact, so the browser asks once instead of once per file. ZIP jobs stream through the browser's private storage, show real byte progress, stop and resume across sessions, and pause to ask for more storage only when a job needs it — never as a blanket prompt. Where a browser cannot stage one (Safari), the per-file download is offered instead. Firefox and Chromium; the existing per-file delivery is unchanged.
+
 ## [1.45.0] — 2026-08-02 — Download where the files are
 
 Download moved out of the sidebar: a toolbar button downloads the folder you are viewing, every folder row can be downloaded without opening it, and ticking files and folders offers Download N in the selection bar. A selection becomes one resumable job through the same pipeline as folder downloads. The transfer-tool option now lives inside the download panel and only for folder scopes.
