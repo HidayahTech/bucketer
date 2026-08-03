@@ -817,9 +817,6 @@ details[open] .upload-log-summary::before { transform: rotate(90deg); }
 .download-job-unfinished-scope { flex: 1; min-width: 0; color: var(--text-muted); }
 
 /* ── Transfer handoff (large downloads via rclone / AWS CLI) ─────────────── */
-.handoff-entry { display: flex; flex-direction: column; gap: .35rem; padding: .75rem 0; }
-.handoff-entry-hint { margin: 0; font-size: .8125rem; color: var(--text-muted); line-height: 1.4; }
-
 .handoff-dialog {
   max-width: 640px; max-height: 85vh; width: 100%;
   overflow: hidden; display: flex; flex-direction: column; gap: .75rem;

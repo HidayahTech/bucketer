@@ -42,7 +42,7 @@ function formatDate(dateStr) {
 // selectedKeys and selectedPrefixes are Sets for O(1) has() checks per row.
 // Delete operations are owned by App.jsx (via onDeleteRequest) so they survive navigation.
 // cacheRef and abortRef are Refs (not state) to avoid triggering re-renders.
-export function Browser({ client, bucket, provider, credentials, onCapabilityChange, capabilities, onUploadTargetChange, onInitialListFailed, onExternalDrop, onDeleteRequest, onMoveRequest, onMount, prefetchSizeLimit, isFirstMount }) {
+export function Browser({ client, bucket, provider, credentials, onCapabilityChange, capabilities, onUploadTargetChange, onInitialListFailed, onExternalDrop, onDeleteRequest, onMoveRequest, onDownloadRequest, onMount, prefetchSizeLimit, isFirstMount }) {
   const [prefix, setPrefix] = useState(() => {
     if (isFirstMount) {
       return new URLSearchParams(window.location.hash.slice(1)).get('prefix') || '';
@@ -687,6 +687,12 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     return [...selectedKeys].map(k => ({ key: k, size: items.find(o => o.Key === k)?.Size ?? 0 }));
   }
 
+  // Raw listing objects for the ticked files — fileRoot() needs ETag/LastModified/
+  // StorageClass, which selectedFilesWithSize() discards.
+  function selectedFileObjects() {
+    return [...selectedKeys].map(k => items.find(o => o.Key === k)).filter(Boolean);
+  }
+
   function handleMoveHere(dest) {
     const sel = moveSel;
     setMoveSel(null);
@@ -1025,6 +1031,11 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
           <button class="btn btn-ghost btn-sm" data-testid="refresh-listing" onClick={handleRefresh} title="Refresh listing (pull changes uploaded from other devices)" style={{ marginRight: '.25rem' }}>
             ↺ Refresh
           </button>
+          <button class="btn btn-ghost btn-sm" data-testid="open-download-job" style={{ marginRight: '.25rem' }}
+            onClick={() => onDownloadRequest?.({ kind: 'folder', prefix })}
+            title="Download this folder">
+            ⤓ Download
+          </button>
           <button class="btn btn-ghost btn-sm" onClick={openNewFolder} title="Create a new folder">
             + New folder
           </button>
@@ -1057,6 +1068,14 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
           <button
             class="btn btn-ghost btn-sm"
             style={selectedKeys.size === 0 ? { marginLeft: 'auto' } : undefined}
+            onClick={() => onDownloadRequest?.({ kind: 'selection', files: selectedFileObjects(), prefixes: [...selectedPrefixes], capturedPrefix: prefix })}
+            disabled={!canDownload}
+            title={!canDownload ? 'Download not permitted with current credentials' : 'Download the selected files and folders'}
+          >
+            Download {selectedKeys.size + selectedPrefixes.size}
+          </button>
+          <button
+            class="btn btn-ghost btn-sm"
             onClick={() => setMoveSel({ files: selectedFilesWithSize(), prefixes: [...selectedPrefixes] })}
             disabled={!canMove}
             title={!canMove ? 'Move needs both write and delete permissions' : 'Move to another folder'}
@@ -1178,6 +1197,13 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                     <td class="col-file-modified"></td>
                     <td class="col-actions">
                       <span class="row-actions">
+                      <button
+                        class="btn btn-ghost btn-sm"
+                        style={{ marginRight: '.25rem' }}
+                        data-testid={`download-folder:${cp}`}
+                        onClick={e => { e.stopPropagation(); onDownloadRequest?.({ kind: 'folder', prefix: cp }); }}
+                        title="Download this folder"
+                      >⤓</button>
                       <button
                         class="btn btn-ghost btn-sm"
                         style={{ marginRight: '.25rem' }}

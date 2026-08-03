@@ -23,9 +23,16 @@ import { formatBytes } from '../lib/format.js';
 import { NAMING_MODES } from '../lib/download-naming.js';
 import { selectTier, tierLabel, TIERS } from '../lib/browser-capability.js';
 import { JOB_CLASS } from '../lib/download-lifecycle.js';
+import { prefixRoot } from '../lib/download-roots.js';
 
-export function DownloadJobPanel({ bucket, prefix = '', api, onStart, onClose, onUseTransferTool,
+export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTransferTool,
                                    capabilities = null }) {
+  const isFolder = scope.kind === 'folder';
+  const roots = isFolder ? [prefixRoot(scope.prefix || '')] : scope.roots;
+  // The transfer-tool generator is prefix-scoped, so the link renders only when this
+  // panel's scope is exactly one prefix root (spec decision 3).
+  const showTransferTool = !!onUseTransferTool && isFolder;
+
   const [mode, setMode] = useState(NAMING_MODES.LEAF);
   const [phase, setPhase] = useState('options');   // options | listing | ready | error
   const [counts, setCounts] = useState({ objects: 0, bytes: 0, archived: 0, archivedBytes: 0 });
@@ -44,7 +51,7 @@ export function DownloadJobPanel({ bucket, prefix = '', api, onStart, onClose, o
   const sendable = Math.max(0, counts.objects - (counts.archived || 0));
   const sendableBytes = Math.max(0, counts.bytes - (counts.archivedBytes || 0));
 
-  const scope = prefix ? `${bucket}/${prefix}` : bucket;
+  const scopeText = isFolder ? (scope.prefix ? `${bucket}/${scope.prefix}` : bucket) : scope.label;
 
   // Only the handoff mechanism is built, so that is what is named — a browser that could do
   // better is not told about a capability the application does not yet have. When the other
@@ -94,7 +101,7 @@ export function DownloadJobPanel({ bucket, prefix = '', api, onStart, onClose, o
     scanCancelled.current = false;
     let created = null;
     try {
-      created = await api.startJob({ bucket, prefix, mode });
+      created = await api.startJob({ bucket, prefix: isFolder ? (scope.prefix || '') : '', roots, mode, label: isFolder ? null : scope.label });
       setJob(created);
       const result = await api.enumerate(created, {
         onProgress: p => setCounts(c => ({ ...c, ...p })),
@@ -162,7 +169,7 @@ export function DownloadJobPanel({ bucket, prefix = '', api, onStart, onClose, o
   return (
     <Modal onClose={close} class="download-job-dialog">
       <div class="sv-header">
-        <div class="modal-title">Download this folder</div>
+        <div class="modal-title">{isFolder ? 'Download this folder' : 'Download selection'}</div>
         <button type="button" class="btn btn-ghost btn-sm" data-testid="panel-close" onClick={close}>
           Close
         </button>
@@ -170,7 +177,9 @@ export function DownloadJobPanel({ bucket, prefix = '', api, onStart, onClose, o
 
       <div class="download-job-body">
         <p class="download-job-scope">
-          Downloading <code>{scope}</code> and everything beneath it.
+          {isFolder
+            ? <>Downloading <code>{scopeText}</code> and everything beneath it.</>
+            : <>Downloading <code>{scopeText}</code>.</>}
         </p>
 
         <p class="download-job-note" data-testid="tier-notice">
@@ -195,7 +204,7 @@ export function DownloadJobPanel({ bucket, prefix = '', api, onStart, onClose, o
             {unfinished.map(u => (
               <div key={u.id} class="download-job-unfinished-row">
                 <span class="download-job-unfinished-scope">
-                  {u.prefix || bucket} — {(u.counts.pending + u.counts.failed).toLocaleString()} of{' '}
+                  {u.label || u.prefix || bucket} — {(u.counts.pending + u.counts.failed).toLocaleString()} of{' '}
                   {(u.counters?.sendable ?? u.counters?.total ?? 0).toLocaleString()} still to send
                   {u.counts.issued > 0 && ` (${u.counts.issued.toLocaleString()} already sent)`}
                   {/* A folder check may be what put files back in this pile; the user
@@ -230,7 +239,7 @@ export function DownloadJobPanel({ bucket, prefix = '', api, onStart, onClose, o
             {sent.map(v => (
               <div key={v.id} class="download-job-unfinished-row">
                 <span class="download-job-unfinished-scope">
-                  {v.prefix || bucket} — {v.counts.issued.toLocaleString()} files sent
+                  {v.label || v.prefix || bucket} — {v.counts.issued.toLocaleString()} files sent
                   {v.lastVerify && (
                     <span data-testid={`verified-${v.id}`}>
                       {' '}— last check: {lastVerifySummary(v.lastVerify)}
@@ -263,7 +272,7 @@ export function DownloadJobPanel({ bucket, prefix = '', api, onStart, onClose, o
             {settled.map(s => (
               <div key={s.id} class="download-job-unfinished-row">
                 <span class="download-job-unfinished-scope">
-                  {s.prefix || bucket} — all {s.counts.done.toLocaleString()} files confirmed
+                  {s.label || s.prefix || bucket} — all {s.counts.done.toLocaleString()} files confirmed
                 </span>
                 <button type="button" class="btn btn-ghost btn-sm" data-testid={`discard-${s.id}`}
                   onClick={() => discardJob(s.id)}>
@@ -306,7 +315,7 @@ export function DownloadJobPanel({ bucket, prefix = '', api, onStart, onClose, o
               <button type="button" class="btn btn-sm" data-testid="scan" onClick={scan}>
                 Check this folder
               </button>
-              {onUseTransferTool && (
+              {showTransferTool && (
                 <button type="button" class="btn btn-ghost btn-sm" data-testid="use-transfer-tool"
                   onClick={onUseTransferTool}>
                   Use a transfer tool instead
@@ -364,7 +373,7 @@ export function DownloadJobPanel({ bucket, prefix = '', api, onStart, onClose, o
                   Send {sendable.toLocaleString()} files ({formatBytes(sendableBytes)}) to my browser
                 </button>
               )}
-              {onUseTransferTool && (
+              {showTransferTool && (
                 <button type="button" class="btn btn-ghost btn-sm" data-testid="use-transfer-tool"
                   onClick={onUseTransferTool}>
                   Use a transfer tool instead

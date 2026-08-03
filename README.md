@@ -323,9 +323,13 @@ Multipart uploads (≥ 5 MB) save a resume record in IndexedDB. If interrupted:
 
 ### Downloading a folder
 
-**Download this folder…** in the sidebar queues every file beneath the folder you are
-viewing. Bucketer lists the folder first and shows what it found before anything starts,
-so you commit with the real file count and size in front of you.
+Downloads start from the browser pane, not a dedicated screen. The toolbar's
+**⤓ Download** button queues everything beneath the folder you are currently viewing;
+the **⤓** button on any folder row queues that subfolder directly, without navigating
+into it first; and ticking files and folders in the listing and clicking **Download N**
+in the selection bar queues an arbitrary selection as one resumable job. Bucketer lists
+the scope first and shows what it found before anything starts, so you commit with the
+real file count and size in front of you.
 
 Your browser performs the transfers. That makes them reliable, but it also bounds what
 Bucketer can tell you: it knows which files it has handed over, and nothing about their
@@ -351,10 +355,11 @@ size. Downloading *hundreds of gigabytes* is a different problem: at 5 Mbit/s, 1
 18 days of continuous transfer, and no browser tab survives that. Laptop sleep, browser updates,
 and tab discarding all interrupt it.
 
-For transfers at that scale, use a dedicated tool. **Download with a transfer tool…** in the
-sidebar generates a ready-to-run job — an `rclone` remote definition plus the matching
-`rclone copy` command, and an `aws s3 sync` equivalent — scoped to the folder you are viewing.
-Re-running either command resumes where it left off and skips files already downloaded.
+For transfers at that scale, use a dedicated tool. Inside the download panel, folder-scope
+jobs offer **Use a transfer tool instead**, which generates a ready-to-run job — an `rclone`
+remote definition plus the matching `rclone copy` command, and an `aws s3 sync` equivalent —
+scoped to the folder you are viewing. Re-running either command resumes where it left off
+and skips files already downloaded.
 
 The generated config uses a placeholder for your secret key by default. You can choose to include
 the real key, but the config then carries credentials with the same bucket access you have — store
