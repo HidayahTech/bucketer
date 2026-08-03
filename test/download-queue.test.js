@@ -73,6 +73,19 @@ describe('runDownloadJob', () => {
     assert.equal(result.issued, 0);
   });
 
+  // The zip orchestration (zip-job.js) needs the full item — size, lastModified, etc. —
+  // to build a zip entry, not just the url/filename the browser-download issue() uses.
+  test('passes the full item to issue as a third argument', async () => {
+    await saveJob(job());
+    await appendManifestPage('job-1', [item('a', { size: 42 })], {});
+    let seenItem;
+    const h = harness({ issue: async (url, filename, it) => { seenItem = it; } });
+    await runDownloadJob(await loadJob('job-1'), h);
+
+    assert.equal(seenItem.key, 'a');
+    assert.equal(seenItem.size, 42);
+  });
+
   test('passes the suggested local name to the browser', async () => {
     await saveJob(job());
     await appendManifestPage('job-1', [item('videos/2024/a.mp4', { localName: 'a.mp4' })], {});

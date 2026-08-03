@@ -115,13 +115,13 @@ export async function runDownloadJob(job, {
             await failItem(it, `Could not read this file before sending it (${result.message}).`);
           } else {
             consecutiveDenied = 0;
-            await issue(url, it.localName);
+            await issue(url, it.localName, it);
             await updateItem(job.id, it.key, { status: ITEM_STATUS.ISSUED, issuedAt: Date.now() });
             issued += 1;
             issuedThis = true;
           }
         } else {
-          await issue(url, it.localName);
+          await issue(url, it.localName, it);
           await updateItem(job.id, it.key, { status: ITEM_STATUS.ISSUED, issuedAt: Date.now() });
           issued += 1;
           issuedThis = true;
