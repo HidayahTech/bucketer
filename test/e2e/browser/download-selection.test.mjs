@@ -75,12 +75,26 @@ describe('browser e2e — selection download', () => {
     await page.locator('[data-testid="folder-row:sel"]').click();
     await page.locator('[data-testid="file-row:a.txt"]').waitFor({ timeout: 10000 });
     await page.locator('[data-testid="download-folder:sel/sub/"]').click();
+
+    // The click must open the job panel without navigating the listing into sel/sub/ — if
+    // stopPropagation() were ever dropped from the row's download button, the row's own
+    // onClick would also fire, the listing would move into sel/sub/, and this testid
+    // (relative to the new prefix) would no longer exist.
+    await page.locator('[data-testid="folder-row:sub"]').waitFor({ timeout: 5000 });
+
     await page.locator('[data-testid="scan"]').click();
     await page.locator('[data-testid="start"]').waitFor({ timeout: 30000 });
     await page.locator('[data-testid="start"]').click();
     await page.getByText(/Sent 2 of 2/).first().waitFor({ timeout: 60000 });
 
     if (isWebKit()) { await downloads.settle(4000); } else { await downloads.waitForCount(2, 30000); }
-    assert.equal(navGetPaths().size, 2);
+    const paths = navGetPaths();
+    // Identity, not just count: pin down that the two requests are specifically sub/c.txt
+    // and sub/d.txt, so a scope bug that grabbed a.txt/b.txt instead (same count) fails.
+    assert.equal(paths.size, 2, 'exactly the two subfolder files must be requested');
+    assert.ok([...paths].some(p => p.includes('sub/c.txt')), 'sel/sub/c.txt must be requested');
+    assert.ok([...paths].some(p => p.includes('sub/d.txt')), 'sel/sub/d.txt must be requested');
+    assert.ok(![...paths].some(p => p.includes('a.txt') || p.includes('b.txt') || p.includes('untouched')),
+      'the loose files and the untouched file must never be requested');
   });
 });
