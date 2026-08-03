@@ -69,9 +69,9 @@ import { classifyJob } from '../lib/download-lifecycle.js';
 import { verifyJob } from '../lib/download-verify.js';
 import { issueBrowserDownload } from '../lib/download-issue.js';
 import { probeUrl, blockedMessage } from '../lib/download-preflight.js';
-import { runZipJob, discardZipStaging, zipFileName, openZipStaging } from '../lib/zip-job.js';
+import { runZipJob, discardZipStaging, zipFileName, openZipStaging, zipGate } from '../lib/zip-job.js';
 import { exportZip } from '../lib/zip-export.js';
-import { detectCapabilities } from '../lib/browser-capability.js';
+import { detectCapabilities, readStorageQuota } from '../lib/browser-capability.js';
 import { presignDownloadParams } from '../lib/presign-params.js';
 import { normalizeRoots, selectionLabel } from '../lib/download-roots.js';
 import { DOWNLOAD_PRESIGN_EXPIRES, DOWNLOAD_ISSUE_DELAY_MS } from '../lib/constants.js';
@@ -103,6 +103,13 @@ function isVaultOfferDismissed() {
 }
 function dismissVaultOfferPermanently() {
   try { localStorage.setItem(VAULT_OFFER_DISMISSED_KEY, '1'); } catch { /* private mode — offer may reappear next session, acceptable degradation */ }
+}
+
+// navigator.storage.persisted() can itself throw on a browser where storage.estimate
+// exists but the permission surface does not; treated as "not persisted" rather than
+// propagating, since zipGate() only needs a boolean.
+async function zipStoragePersisted() {
+  try { return !!(await navigator.storage?.persisted?.()); } catch { return false; }
 }
 
 // Session states: locked | disconnected | connecting | connected | failed
@@ -617,7 +624,49 @@ export function App() {
       if (j?.delivery === 'zip') await discardZipStaging(id, { root: await navigator.storage.getDirectory() });
       return deleteJob(id);
     },
-  }), [client, credentials.bucket, credentials.provider, credentials.endpoint]);
+    // The gate's async I/O — quota and the persist() flag — is kept here rather than in
+    // the panel, which must stay free of navigator.storage the same way it stays free of
+    // IndexedDB and the SDK. caps are the same browserCapabilities used everywhere else.
+    zipGate: async ({ sendableBytes }) => {
+      const quota = await readStorageQuota();
+      const persisted = await zipStoragePersisted();
+      return zipGate({ caps: browserCapabilities, sendableBytes, quota, persisted });
+    },
+    // The lazy-persist path (design spec): ask for persistent storage, then re-evaluate
+    // the same gate with fresh numbers. persist() can silently fail to grant anything, so
+    // persisted() is re-read rather than assumed — that is what lets a still-too-big job
+    // correctly land back on 'needs-storage' (offer the retry) instead of a wrong,
+    // permanent-looking 'unavailable'.
+    requestPersist: async ({ sendableBytes }) => {
+      try { await navigator.storage?.persist?.(); } catch { /* best effort; re-evaluate regardless */ }
+      const quota = await readStorageQuota();
+      const persisted = await zipStoragePersisted();
+      return zipGate({ caps: browserCapabilities, sendableBytes, quota, persisted });
+    },
+    // Patches the job record for zip delivery and hands back the patched job so the panel
+    // can feed it straight into its existing start-flow (onStart routes delivery:'zip' to
+    // handleZipStart).
+    startZipJob: async (job) => {
+      const patch = { delivery: 'zip', zipName: zipFileName(job.bucket, job.prefix ?? '') };
+      await updateJob(job.id, patch);
+      return { ...job, ...patch };
+    },
+    // Re-export from the intact OPFS staging for a zip job that finished (every item DONE)
+    // but never got its export written — exportZip threw, or the save dialog was
+    // cancelled. The same recoverable "DONE, no exportedAt" state handleZipStart itself
+    // leaves a job in when export fails.
+    exportZipAgain: async (id) => {
+      const j = await loadJob(id);
+      if (!j) return;
+      const root = await navigator.storage.getDirectory();
+      const zipName = j.zipName || zipFileName(j.bucket, j.prefix ?? '');
+      await exportZip(async () => {
+        const staging = await openZipStaging(id, { root });
+        return staging.getFile();
+      }, zipName);
+      await updateJob(id, { exportedAt: Date.now() });
+    },
+  }), [client, credentials.bucket, credentials.provider, credentials.endpoint, browserCapabilities]);
 
   // The panel has already listed the folder and taken the user's confirmation, so this
   // starts issuing straight away. Note it never touches capabilities: presigning is a
