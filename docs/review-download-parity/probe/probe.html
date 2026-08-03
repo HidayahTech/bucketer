@@ -9,7 +9,7 @@
 // measurement depend on what ran before it. This version does exactly one thing so the
 // runner can attribute memory without untangling accumulation.
 //
-//   ?mech=control|opfs|blob|idb&size=<MiB>
+//   ?mech=control|opfs|blob|idb|opfs-dl|blob-dl|zip-dl&size=<MiB>
 
 const MiB = 1024 * 1024;
 const CHUNK = 8 * MiB;
@@ -166,6 +166,33 @@ async function prepareOnly(mark) {
     window.__DLURL = URL.createObjectURL(file);
     return { bytes: file.size };
   }
+  if (MECH === 'zip-dl') {
+    // Drives the REAL zip-writer into REAL OPFS, then exports through the same real-download
+    // path as opfs-dl, so this measures the actual ZIP export path rather than a proxy for it.
+    const { createZipWriter } = await import('/zip-writer.js');
+    const root = await navigator.storage.getDirectory();
+    const fh = await root.getFileHandle('probe.zip', { create: true });
+    mark('write');
+    const ws = await fh.createWritable();
+    const sink = { write: (u8) => ws.write(u8) };
+    const w = createZipWriter(sink);
+    const declaredSize = SIZE * MiB;
+    await w.beginEntry('probe.bin', { declaredSize });
+    let written = 0;
+    while (written < declaredSize) {
+      const remaining = declaredSize - written;
+      const chunk = remaining >= CHUNK ? pattern : pattern.subarray(0, remaining);
+      await w.update(chunk);
+      written += chunk.length;
+    }
+    const rec = await w.endEntry();
+    await w.finish([rec]);
+    await ws.close();
+    mark('/write');
+    const file = await fh.getFile();
+    window.__DLURL = URL.createObjectURL(file);
+    return { bytes: file.size };
+  }
   mark('build');
   const parts = [];
   for (let i = 0; i < nChunks; i++) parts.push(new Blob([pattern]));
@@ -208,8 +235,8 @@ window.__triggerDownload = () => {
     }
     else if (MECH === 'blob') result.detail = await runBlob(mark);
     else if (MECH === 'idb') result.detail = await runIdb(mark);
-    else if (MECH === 'opfs-dl' || MECH === 'blob-dl') {
-      if (MECH === 'opfs-dl' && !result.presence.opfs) throw new Error('OPFS unavailable');
+    else if (MECH === 'opfs-dl' || MECH === 'blob-dl' || MECH === 'zip-dl') {
+      if ((MECH === 'opfs-dl' || MECH === 'zip-dl') && !result.presence.opfs) throw new Error('OPFS unavailable');
       result.detail = await prepareOnly(mark);
       result.awaitingDownload = true;
     }
