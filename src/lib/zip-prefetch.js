@@ -32,7 +32,7 @@ export function createTempStore(root) {
       let size = 0;
       for await (const chunk of chunksIterable) {
         await writable.write(chunk);
-        size += chunk.length;
+        size += chunk.byteLength ?? chunk.length;
       }
       await writable.close();
       created.add(fname);
@@ -45,9 +45,13 @@ export function createTempStore(root) {
         stream() {
           return (async function* () {
             const file = await handle.getFile();
-            const buf = new Uint8Array(await file.arrayBuffer());
-            for (let offset = 0; offset < buf.length; offset += TEMP_CHUNK) {
-              yield buf.slice(offset, offset + TEMP_CHUNK);
+            // Chunked via Blob.slice() so a near-MEDIUM_MAX (64 MiB) file is never held
+            // whole in memory during read-back — only one TEMP_CHUNK (~8 MiB) at a time,
+            // matching D2's "peak memory ≤ N × 4 MiB" invariant (the OPFS temp tier is
+            // exactly the mechanism that keeps medium-file bytes off that budget).
+            for (let offset = 0; offset < file.size; offset += TEMP_CHUNK) {
+              const buf = await file.slice(offset, offset + TEMP_CHUNK).arrayBuffer();
+              yield new Uint8Array(buf);
             }
           })();
         },

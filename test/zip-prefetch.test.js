@@ -8,8 +8,10 @@ import { classifyTier, TINY_MAX, MEDIUM_MAX, CONCURRENCY, createTempStore, TEMP_
 // removeEntry on the root, createWritable({keepExistingData}) / getFile() on the handle.
 function fakeOpfsRoot() {
   const files = new Map();
+  const wholeFileReads = new Map(); // name -> count of getFile().arrayBuffer() (unsliced) calls
   return {
     files,
+    wholeFileReads,
     async getFileHandle(name, { create = false } = {}) {
       if (!files.has(name)) {
         if (!create) { const e = new Error('missing'); e.name = 'NotFoundError'; throw e; }
@@ -29,7 +31,25 @@ function fakeOpfsRoot() {
             async close() { files.set(name, buf); },
           };
         },
-        async getFile() { const b = files.get(name); return { size: b.length, arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.length) }; },
+        async getFile() {
+          const b = files.get(name);
+          return {
+            size: b.length,
+            // Whole-file read — instrumented so a test can assert a chunked reader
+            // never falls back to this (see the "does not materialize the whole file"
+            // assertion below).
+            async arrayBuffer() {
+              wholeFileReads.set(name, (wholeFileReads.get(name) || 0) + 1);
+              return b.buffer.slice(b.byteOffset, b.byteOffset + b.length);
+            },
+            // Blob.slice()-alike: a real chunked reader takes bounded-size slices of
+            // this instead of the whole-file arrayBuffer() above.
+            slice(start, end) {
+              const s = b.slice(start, end);
+              return { arrayBuffer: async () => s.buffer.slice(s.byteOffset, s.byteOffset + s.length) };
+            },
+          };
+        },
       };
     },
     async removeEntry(name) {
@@ -102,6 +122,11 @@ describe('createTempStore', () => {
     let pos = 0;
     for (const c of chunks) { rebuilt.set(c, pos); pos += c.length; }
     assert.deepEqual(rebuilt, original);
+
+    assert.equal(root.wholeFileReads.get('bucketer-tmp-big.bin') || 0, 0,
+      'stream() must read via chunked slice() calls only — a whole-file arrayBuffer() ' +
+      'read would defeat the point of the OPFS temp tier (keeping medium-file bytes off ' +
+      'the in-memory budget)');
   });
 
   test('remove deletes the temp file', async () => {
