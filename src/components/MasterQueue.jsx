@@ -125,9 +125,22 @@ function TaskRow({ task, store, readZipDetail }) {
   const canExpandZip     = isZip && (isRunningZip || (isSettled && hasErrors));
   const canExpandGeneric = !isZip && isSettled && hasErrors;
   const canExpand         = canExpandZip || canExpandGeneric;
-  const expanded           = canExpand && !task.collapsed;
-  const expandedZip        = expanded && isZip;
-  const expandedGeneric    = expanded && !isZip;
+
+  // A running zip's detail panel is opt-in, gated on local component state rather than
+  // task.collapsed: task.collapsed defaults false, and reusing it here would auto-expand
+  // (and auto-poll readZipDetail every second — an O(job-size) IndexedDB walk) for every
+  // running zip the instant it appears, whether or not anyone is looking at it. Once the
+  // job settles, expand reverts to the pre-existing task.collapsed-driven behavior
+  // (auto-expanded by default when there are errors) — unchanged from before this task.
+  const [runningDetailOpen, setRunningDetailOpen] = useState(false);
+  const isOpen    = isRunningZip ? runningDetailOpen : !task.collapsed;
+  const expanded  = canExpand && isOpen;
+  const expandedZip     = expanded && isZip;
+  const expandedGeneric = expanded && !isZip;
+  const toggleOpen = () => {
+    if (isRunningZip) setRunningDetailOpen(o => !o);
+    else store.update(task.id, { collapsed: !task.collapsed }, true);
+  };
 
   const [zipDetail, setZipDetail] = useState(null);
   // Read via a ref so an inline readZipDetail prop identity (App.jsx wraps loadZipDetail
@@ -164,6 +177,9 @@ function TaskRow({ task, store, readZipDetail }) {
   const queuedCount = Math.max(0, (task.total ?? 0) - doneCount - failedCount);
   const doneOverflow = doneCount - doneList.length;
   const activePct = task.active?.size ? Math.round((task.active.bytes / task.active.size) * 100) : 0;
+  // failed items from readZipDetail carry only {key} — the failure reason lives on
+  // task.errors ({key, message}), already on the task, no extra IndexedDB read.
+  const errorMessageByKey = new Map(task.errors.map(e => [e.key, e.message]));
 
   return (
     <div class={`queue-op${expanded ? ' queue-op-expanded' : ''}`}>
@@ -194,8 +210,8 @@ function TaskRow({ task, store, readZipDetail }) {
         {canExpand && (
           <button type="button" class="btn btn-ghost btn-sm" style={{ flexShrink: 0 }}
             data-testid="task-expand-toggle"
-            onClick={() => store.update(task.id, { collapsed: !task.collapsed }, true)}>
-            {task.collapsed ? 'Show details' : 'Hide'}
+            onClick={toggleOpen}>
+            {isOpen ? 'Hide' : 'Show details'}
           </button>
         )}
         {isSettled && (
@@ -229,7 +245,9 @@ function TaskRow({ task, store, readZipDetail }) {
             <div key={d.key} class="queue-op-zip-row queue-op-zip-done">✓ {d.key}  {formatBytes(d.size)}</div>
           ))}
           {failedList.map(f => (
-            <div key={f.key} class="queue-op-zip-row queue-op-zip-failed">✗ {f.key}  failed</div>
+            <div key={f.key} class="queue-op-zip-row queue-op-zip-failed">
+              ✗ {f.key} — {errorMessageByKey.get(f.key) || 'failed'}
+            </div>
           ))}
           <div class="queue-op-zip-row queue-op-zip-footer">
             …and {queuedCount.toLocaleString()} queued{doneOverflow > 0 ? ` · ${doneOverflow.toLocaleString()} more done` : ''}

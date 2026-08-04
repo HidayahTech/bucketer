@@ -260,7 +260,10 @@ describe('MasterQueue — zip progress (byte/speed/ETA parity, active-focused de
     let calledWith = null;
     const readZipDetail = (jobId) => { calledWith = jobId; return Promise.resolve(detail); };
 
-    const { text, cleanup } = mount(h(MasterQueue, { store, readZipDetail }));
+    const { text, query, cleanup } = mount(h(MasterQueue, { store, readZipDetail }));
+    // The running-zip detail is opt-in (Fix 3) — it does not auto-expand or auto-poll, so
+    // the toggle must be clicked before the read fires.
+    fire(query('[data-testid="task-expand-toggle"]'), 'click');
     await new Promise(r => setTimeout(r, 60)); // flush the async readZipDetail read + re-render
 
     assert.equal(calledWith, 'job-1');
@@ -270,9 +273,61 @@ describe('MasterQueue — zip progress (byte/speed/ETA parity, active-focused de
     assert.ok(body.includes('(46%)'), body);
     assert.ok(body.includes(`✓ photos/2024/b.jpg`) && body.includes(formatBytes(6_100_000)), body);
     assert.ok(body.includes(`✓ photos/2024/a.jpg`) && body.includes(formatBytes(8_200_000)), body);
-    assert.ok(body.includes('✗ photos/2024/corrupt.raw') && body.includes('failed'), body);
+    // No matching task.errors entry for this key, so it falls back to the generic reason.
+    assert.ok(body.includes('✗ photos/2024/corrupt.raw — failed'), body);
     // queued = total(4231) - doneCount(11) - failedCount(1) = 4219; overflow = doneCount(11) - done.length(2) = 9
     assert.ok(body.includes('…and 4,219 queued · 9 more done'), body);
+    cleanup();
+  });
+
+  test('a running zip task does not auto-expand the per-file detail or poll readZipDetail until the toggle is clicked (Fix 3)', async () => {
+    const store = makeStore();
+    let callCount = 0;
+    const readZipDetail = () => { callCount++; return Promise.resolve({ done: [], failed: [], doneCount: 0, failedCount: 0 }); };
+    addZip(store, {
+      status: 'running', current: 12, total: 4231, bytesDone: 1.2e9, bytesTotal: 3.4e9, failed: 0,
+      jobId: 'job-3',
+    });
+    const { text, query, cleanup } = mount(h(MasterQueue, { store, readZipDetail }));
+    await new Promise(r => setTimeout(r, 60));
+
+    // The aggregate line + bar always show for a running zip, regardless of expand state.
+    const bodyBefore = text();
+    assert.ok(bodyBefore.includes('Zipping · 12 of 4,231 files'), bodyBefore);
+    assert.notEqual(query('[data-testid="zip-progress-bar"]'), null, 'the bar must still show by default');
+
+    // But the detail panel — and therefore the poll — is opt-in.
+    assert.equal(query('[data-testid="zip-detail"]'), null, 'the detail must not auto-expand');
+    assert.equal(callCount, 0, 'readZipDetail must not be called before the user expands the detail');
+
+    const toggle = query('[data-testid="task-expand-toggle"]');
+    assert.notEqual(toggle, null);
+    assert.ok(toggle.textContent.includes('Show details'), 'closed by default, so the button offers to open it');
+    fire(toggle, 'click');
+    await new Promise(r => setTimeout(r, 60));
+
+    assert.notEqual(query('[data-testid="zip-detail"]'), null, 'expanding must now render the detail');
+    assert.ok(callCount >= 1, 'readZipDetail must be called once the detail is opened');
+    cleanup();
+  });
+
+  test('a settled (paused) zip task with per-key errors shows the failure MESSAGE in the active-focused detail, not just "failed" (Fix 1)', async () => {
+    const store = makeStore();
+    const readZipDetail = () => Promise.resolve({
+      done: [], failed: [{ key: 'a/x.raw' }], doneCount: 0, failedCount: 1,
+    });
+    addZip(store, {
+      status: 'done', current: 8, total: 10, finished: false, failed: 1,
+      jobId: 'job-2',
+      errors: [{ key: 'a/x.raw', message: 'AccessDenied' }],
+    });
+    const { text, cleanup } = mount(h(MasterQueue, { store, readZipDetail }));
+    await new Promise(r => setTimeout(r, 60)); // settled zip+errors auto-expands (unchanged pre-existing behavior)
+
+    const body = text();
+    assert.ok(body.includes('Paused — 8 of 10 zipped, 1 failed'), body);
+    assert.ok(body.includes('✗ a/x.raw — AccessDenied'), body);
+    assert.equal(body.includes('✗ a/x.raw — failed'), false, 'the real message must win over the generic fallback');
     cleanup();
   });
 
