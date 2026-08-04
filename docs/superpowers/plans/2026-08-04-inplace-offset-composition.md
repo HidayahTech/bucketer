@@ -472,8 +472,8 @@ git commit -m "feat: pure positioned-write ZIP assembler core (in-place)"
 **Interfaces:**
 - Consumes: `createAssembler` (Task 3), `computeZipLayout` output (the `layout`).
 - Produces:
-  - Worker protocol. Main→worker: `{type:'init', stagingName, layout, freshKeys}` (freshKeys = keys to (re)write this run; headers are written for all, data only expected for freshKeys), `{type:'chunk', key, buffer}` (buffer transferred), `{type:'entryEnd', key}`, `{type:'finish', records}`, `{type:'abort'}`. Worker→main: `{type:'ready'}`, `{type:'written', key, crc, size}`, `{type:'entryError', key, name, message}`, `{type:'finished', totalBytes}`, `{type:'fatal', name, message}`.
-  - `createAssemblerClient(worker) -> { init(stagingName, layout, freshKeys), writeChunk(key, u8) (transfers), endEntry(key) -> {crc,size}, finish(records) -> {totalBytes}, abort(), onFatal(cb) }` — a promise-based wrapper over the message protocol, so `runInPlaceJob` never touches raw messages. `writeChunk` resolves when posted (fire-and-forward — ordering is per-key via `endEntry`'s await); `endEntry` resolves on the matching `written`/`entryError`.
+  - Worker protocol. Main→worker: `{type:'init', stagingName, layout, freshKeys}` (freshKeys = keys to (re)write this run; headers are written for all, data only expected for freshKeys), `{type:'chunk', key, buffer}` (buffer transferred), `{type:'entryEnd', key}`, `{type:'finish', records}`, `{type:'abort'}`. Worker→main: `{type:'ready'}`, **`{type:'unsupported', reason}`** (createSyncAccessHandle absent IN THE WORKER — the only place it can be detected; see design D8), `{type:'written', key, crc, size}`, `{type:'entryError', key, name, message}`, `{type:'finished', totalBytes}`, `{type:'fatal', name, message}`.
+  - `createAssemblerClient(worker) -> { init(stagingName, layout, freshKeys) -> {supported}, writeChunk(key, u8) (transfers), endEntry(key) -> {crc,size}, finish(records) -> {totalBytes}, abort(), onFatal(cb) }` — a promise-based wrapper over the message protocol, so `runInPlaceJob` never touches raw messages. **`init` resolves `{supported:true}` on `ready` or `{supported:false, reason}` on `unsupported`** (never rejects for unsupported — that is an expected fallback, not an error). `writeChunk` resolves when posted (fire-and-forward — ordering is per-key via `endEntry`'s await); `endEntry` resolves on the matching `written`/`entryError`.
 
 - [ ] **Step 1: Write failing tests for the client using a fake worker.**
 
@@ -501,15 +501,25 @@ function fakeWorker() {
   return { w, emit };
 }
 
-test('client: init resolves on ready; endEntry resolves with written record', async () => {
+test('client: init resolves {supported:true} on ready; endEntry resolves with written record', async () => {
   const { w } = fakeWorker();
   const c = createAssemblerClient(w);
-  await c.init('s.zip', { entries: [] }, ['x']);
+  const initRes = await c.init('s.zip', { entries: [] }, ['x']);
+  assert.deepEqual(initRes, { supported: true });
   c.writeChunk('x', new Uint8Array([1, 2, 3, 4]));
   const rec = await c.endEntry('x');
   assert.deepEqual(rec, { crc: 123, size: 4 });
   const fin = await c.finish([]);
   assert.deepEqual(fin, { totalBytes: 999 });
+});
+
+test('client: init resolves {supported:false} when the worker reports unsupported', async () => {
+  const { w, emit } = fakeWorker();
+  w.postMessage = (msg) => { if (msg.type === 'init') queueMicrotask(() => emit({ type: 'unsupported', reason: 'no createSyncAccessHandle in worker' })); };
+  const c = createAssemblerClient(w);
+  const initRes = await c.init('s.zip', { entries: [] }, []);
+  assert.equal(initRes.supported, false);
+  assert.match(initRes.reason, /createSyncAccessHandle/);
 });
 
 test('client: entryError rejects the matching endEntry', async () => {
@@ -548,7 +558,8 @@ export function createAssemblerClient(worker) {
   let fatalCb = null;
   worker.addEventListener('message', (e) => {
     const m = e.data;
-    if (m.type === 'ready') readyResolve?.(); 
+    if (m.type === 'ready') readyResolve?.({ supported: true });
+    else if (m.type === 'unsupported') readyResolve?.({ supported: false, reason: m.reason });
     else if (m.type === 'written') pendingEnd.get(m.key)?.resolve({ crc: m.crc, size: m.size });
     else if (m.type === 'entryError') pendingEnd.get(m.key)?.reject(Object.assign(new Error(m.message), { name: m.name }));
     else if (m.type === 'finished') finishResolve?.({ totalBytes: m.totalBytes });
@@ -597,8 +608,21 @@ self.onmessage = async (e) => {
   const m = e.data;
   try {
     if (m.type === 'init') {
+      // Worker-scope OPFS may be absent even where the window has it (WebKit exposes
+      // navigator.storage on the window but not in a DedicatedWorker) — report unsupported
+      // so runInPlaceJob falls back to serial, never fatals (design D8, proven by the probe).
+      if (!navigator.storage || typeof navigator.storage.getDirectory !== 'function') {
+        self.postMessage({ type: 'unsupported', reason: 'no OPFS in worker' });
+        return;
+      }
       const root = await navigator.storage.getDirectory();
       const fh = await root.getFileHandle(m.stagingName, { create: true });
+      // The ONLY place createSyncAccessHandle can be detected (worker scope). If absent,
+      // report unsupported so runInPlaceJob falls back to the serial engine (design D8).
+      if (typeof fh.createSyncAccessHandle !== 'function') {
+        self.postMessage({ type: 'unsupported', reason: 'no createSyncAccessHandle in worker' });
+        return;
+      }
       handle = await fh.createSyncAccessHandle();
       asm = createAssembler(syncSink(handle), m.layout);
       await asm.writeHeaders();
@@ -714,8 +738,8 @@ function streamOf(arr) {
 
 Structure (mirror `runZipJob`'s resume/records/cancel/quota, but drive the worker):
 1. Gather ALL non-SKIPPED items in key order via `takeItemsPage` pagination → `allItems`. Build `layout = computeZipLayout(allItems, prefix)`.
-2. Resume guard: open the OPFS staging file; if missing or `size < layout.totalDataEnd` (evicted/short) → reset every DONE item to PENDING (`updateItem` clearing zip fields) and treat as fresh. `freshKeys` = keys currently PENDING.
-3. Spawn the worker via `makeWorker()`; `client = createAssemblerClient(worker)`; `await client.init(stagingName(job.id), layout, freshKeys)`. Wire `client.onFatal` → set `quotaBlocked = { kind:'STORAGE', ... }` if `name==='QuotaExceededError'`, else a generic block; then request cancel.
+2. Resume guard — runs BEFORE the worker inits (the worker's init truncates/creates the file, which would mask an eviction). Only when DONE items exist: `const fh = await root.getFileHandle(stagingName(job.id)).catch(() => null); const size = fh ? (await fh.getFile()).size : 0;` if `size < layout.totalDataEnd` (missing/evicted/short) → reset every DONE item to PENDING (`updateItem` clearing `zipOffset/zipEnd/crc`) and treat as fresh. With **no** DONE items it is a fresh job — skip this entirely (so a unit test passing `root:{}` never touches OPFS). `freshKeys` = keys currently PENDING after the guard.
+3. Spawn the worker via `makeWorker()`; `client = createAssemblerClient(worker)`; `const { supported } = await client.init(stagingName(job.id), layout, freshKeys)`. **If `!supported`** (createSyncAccessHandle absent in this worker — design D8): `worker.terminate()` and `return { unsupported: true }` immediately, before any fetch. `runZipJob` (Task 6) sees this sentinel and runs the serial engine instead — a clean runtime fallback with nothing fetched. Otherwise wire `client.onFatal` → set `quotaBlocked = { kind:'STORAGE', ... }` if `name==='QuotaExceededError'`, else a generic block; then request cancel.
 4. `pendingItems` = PENDING items. Run them through `runPool(pendingItems, processItem, concurrency)`:
    - `processItem(item)`: `noteCancel`; presign; optional `probe` (NETWORK → job-wide block+abort, DENIED streak → block, other non-OK → push failed); `fetch`; read the body reader loop; for each chunk `client.writeChunk(item.key, chunk)` and `bump(chunk.length)` for progress + active tracking; on stream end `const rec = await client.endEntry(item.key)`; `await updateItem(job.id, item.key, { status: DONE, zipOffset: layoutEntry.headerOffset, zipEnd: layoutEntry.entryEnd, crc: rec.crc, size: rec.size, time: layoutEntry.time, date: layoutEntry.date })`; `completed++`; `emitProgress()`. Catch: AbortError under cancel/block → leave untouched; else push `{item, message}` to failed.
    - Reuse the rolling-DENIED and NETWORK-block logic from `zip-prefetch.js` (copy the small breaker; it is ~15 lines). Active-file tracking + progress mirror `zip-prefetch`'s `activeState`/`emitProgress` so the existing progress UI keeps working unchanged.
@@ -739,46 +763,46 @@ git commit -m "feat: runInPlaceJob orchestrator — concurrent fetch → worker 
 ## Task 6: Capability detection + engine selection in `runZipJob`
 
 **Files:**
-- Modify: `src/lib/browser-capability.js` — add `syncAccessHandle`, `webWorker` to `detectCapabilities`; add `inPlaceSupported(caps)`.
-- Modify: `src/lib/zip-job.js` — `runZipJob` selects the engine.
+- Modify: `src/lib/browser-capability.js` — add `webWorker` to `detectCapabilities`; add `inPlaceSupported(caps)`.
+- Modify: `src/lib/zip-job.js` — `runZipJob` selects the engine and handles the runtime-fallback sentinel.
 - Modify: `src/components/App.jsx` — pass a `makeWorker` factory (and the caps) into the zip start path.
-- Test: `test/browser-capability.test.js` (or wherever caps are tested) + `test/components/*` engine-selection coverage; and a `zip-job` selection unit test.
+- Test: `test/browser-capability.test.js` (or wherever caps are tested) + a `zip-job` selection unit test.
+
+**IMPORTANT correction (design D8, proven by the Task 1 fidelity probe): `createSyncAccessHandle` is exposed ONLY in worker global scope and canNOT be feature-detected from the main thread** — `window.FileSystemFileHandle.prototype.createSyncAccessHandle` is `undefined` even on engines that support it in a worker. So there is NO `syncAccessHandle` main-thread capability. Selection is **optimistic**: gate on what IS detectable (`opfs && streamingFetch && webWorker`), then let `runInPlaceJob`'s worker `init` self-report support and fall back at runtime (T5 returns `{ unsupported: true }`).
 
 **Interfaces:**
-- Consumes: `runInPlaceJob` (T5).
-- Produces: `inPlaceSupported(caps) -> boolean` (`caps.opfs && caps.streamingFetch && caps.syncAccessHandle && caps.webWorker`). `runZipJob(job, opts)` gains `makeWorker` + `caps` in `opts`; when `inPlaceSupported(caps) && makeWorker`, it delegates to `runInPlaceJob` (passing everything through); otherwise it runs the existing serial body unchanged.
+- Consumes: `runInPlaceJob` (T5), which may return `{ unsupported: true }` (worker lacks the sync handle → fall back).
+- Produces: `inPlaceSupported(caps) -> boolean` (`caps.opfs && caps.streamingFetch && caps.webWorker` — NO syncAccessHandle term). `selectZipEngine(caps, makeWorker) -> 'inplace' | 'serial'`. `runZipJob(job, opts)` gains `makeWorker` + `caps` in `opts`; when `selectZipEngine === 'inplace'`, it calls `runInPlaceJob` and — if that returns `{ unsupported: true }` — transparently runs the serial body instead; otherwise it runs the serial body directly. All return the same shape, so callers are unchanged.
 
 - [ ] **Step 1: Write failing tests.**
 
 ```javascript
 // in test/browser-capability.test.js (add)
 import { detectCapabilities, inPlaceSupported } from '../src/lib/browser-capability.js';
-test('syncAccessHandle + webWorker feature-detected; inPlaceSupported gates on all four', () => {
+test('webWorker feature-detected; inPlaceSupported gates on opfs+streamingFetch+webWorker', () => {
   const win = {
     navigator: { storage: { getDirectory(){} } },
     Response: { prototype: { body: 1 } },
-    FileSystemFileHandle: { prototype: { createWritable(){}, createSyncAccessHandle(){} } },
+    FileSystemFileHandle: { prototype: { createWritable(){} } },
     Worker: function(){},
   };
   const caps = detectCapabilities(win);
-  assert.equal(caps.syncAccessHandle, true);
   assert.equal(caps.webWorker, true);
   assert.equal(inPlaceSupported(caps), true);
-  assert.equal(inPlaceSupported({ ...caps, syncAccessHandle: false }), false);
+  assert.equal(inPlaceSupported({ ...caps, webWorker: false }), false);
+  assert.equal(inPlaceSupported({ ...caps, opfs: false }), false);
 });
 ```
 
 ```javascript
-// test/zip-job-engine.test.js (new) — runZipJob delegates when supported
+// test/zip-job-engine.test.js (new) — selection helper (worker-scope caps can't be tested on main thread)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-// Use dependency injection: pass a runInPlaceImpl spy via opts, OR assert selection through
-// a small exported selectZipEngine(caps, makeWorker) helper. Prefer the helper for a pure test:
 import { selectZipEngine } from '../src/lib/zip-job.js';
-test('selectZipEngine returns in-place only when supported and a worker factory is given', () => {
-  assert.equal(selectZipEngine({ opfs:1, streamingFetch:1, syncAccessHandle:1, webWorker:1 }, () => ({})), 'inplace');
-  assert.equal(selectZipEngine({ opfs:1, streamingFetch:1, syncAccessHandle:0, webWorker:1 }, () => ({})), 'serial');
-  assert.equal(selectZipEngine({ opfs:1, streamingFetch:1, syncAccessHandle:1, webWorker:1 }, null), 'serial');
+test('selectZipEngine returns in-place only when caps support it AND a worker factory is given', () => {
+  assert.equal(selectZipEngine({ opfs:1, streamingFetch:1, webWorker:1 }, () => ({})), 'inplace');
+  assert.equal(selectZipEngine({ opfs:1, streamingFetch:1, webWorker:0 }, () => ({})), 'serial');
+  assert.equal(selectZipEngine({ opfs:1, streamingFetch:1, webWorker:1 }, null), 'serial');
 });
 ```
 
@@ -786,19 +810,29 @@ test('selectZipEngine returns in-place only when supported and a worker factory 
 
 - [ ] **Step 3: Implement.**
 
-In `browser-capability.js` `detectCapabilities`, add:
+In `browser-capability.js` `detectCapabilities`, add just:
 ```javascript
-    syncAccessHandle: isFn(fileHandleProto?.createSyncAccessHandle),
     webWorker:        typeof win?.Worker === 'function',
 ```
-and export:
+(Do NOT add a `syncAccessHandle` cap — it cannot be detected here and a false value would be misleading.) Then export:
 ```javascript
 export function inPlaceSupported(caps) {
-  return !!(caps?.opfs && caps?.streamingFetch && caps?.syncAccessHandle && caps?.webWorker);
+  return !!(caps?.opfs && caps?.streamingFetch && caps?.webWorker);
 }
 ```
 
-In `zip-job.js`, add `export function selectZipEngine(caps, makeWorker) { return (inPlaceSupported(caps) && makeWorker) ? 'inplace' : 'serial'; }` (import `inPlaceSupported`). At the top of `runZipJob`, if `selectZipEngine(opts.caps, opts.makeWorker) === 'inplace'`, `return runInPlaceJob(job, opts)`. Extract the current serial body into a local `runSerialZipJob(job, opts)` (same code, moved) so both paths are clear. `runInPlaceJob` and the serial body share the same `opts` and return shape, so callers are untouched.
+In `zip-job.js`, add `export function selectZipEngine(caps, makeWorker) { return (inPlaceSupported(caps) && makeWorker) ? 'inplace' : 'serial'; }` (import `inPlaceSupported`). Extract the current serial body into a local `runSerialZipJob(job, opts)` (same code, moved). Then:
+```javascript
+export async function runZipJob(job, opts) {
+  if (selectZipEngine(opts.caps, opts.makeWorker) === 'inplace') {
+    const r = await runInPlaceJob(job, opts);
+    if (!r || !r.unsupported) return r;      // in-place ran (or is running): done
+    // else: worker lacked the sync handle at runtime — fall through to serial (design D8)
+  }
+  return runSerialZipJob(job, opts);
+}
+```
+`runInPlaceJob` and the serial body share the same `opts` and return shape, so callers are untouched. Import `runInPlaceJob` from `./zip-inplace.js` (note: `zip-inplace.js` imports `zipEntryPath`/`stagingName` from `zip-job.js` — keep the import direction one-way by having `zip-job.js` import only `runInPlaceJob`; if a circular-init error appears, move `zipEntryPath`/`stagingName` to a small `zip-naming.js` both import).
 
 In `App.jsx`, where `handleZipStart` calls `runZipJob(...)`, pass `caps` (already detected in the app) and `makeWorker: () => makeAssemblerWorker()` where `makeAssemblerWorker` comes from the build-inlined blob (Task 7 provides `src/lib/assembler-worker-url.js` exporting `makeAssemblerWorker()`); import it. On a browser without support, `makeWorker` is still passed but `inPlaceSupported` is false, so the serial path runs.
 

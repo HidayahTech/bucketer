@@ -126,14 +126,24 @@ No external file, single-file guarantee intact. A build invariant asserts the wo
 present and non-empty in the bundle. Worker bundles `crc32` + the positioned-writer; it imports
 nothing at runtime.
 
-### D8 — Capability gate.
+### D8 — Capability gate. (REVISED 2026-08-04 after the fidelity probe.)
 **Persona: Browser-storage specialist.**
-Add `syncAccessHandle` + `webWorker` capability detection (feature-detect
-`FileSystemFileHandle.prototype.createSyncAccessHandle` existence and `Worker`), *plus* the
-runtime probe result cached per session. The in-place engine is chosen only when detection
-passes AND (optionally) a one-time cheap runtime self-check succeeds; otherwise fall back.
-The existing `zipGate` (opfs/streamingFetch/writableFiles) is unchanged — Phase 2 is a
-sub-choice *inside* the STAGED ZIP path, invisible to the gate and the UI.
+**Correction from the probe:** `createSyncAccessHandle` is exposed **only in worker global
+scope**. `window.FileSystemFileHandle.prototype.createSyncAccessHandle` is `undefined` even on
+Chromium/Firefox/WebKit that fully support it *in a worker*. So it **cannot** be
+synchronously feature-detected from the main thread — the originally-planned
+`isFn(fileHandleProto?.createSyncAccessHandle)` check would be `false` everywhere and in-place
+would never activate.
+**Ruling: optimistic selection + runtime worker fallback.** Main-thread detection gates only
+on what IS detectable there: `inPlaceSupported(caps) = opfs && streamingFetch && webWorker`
+(`webWorker = typeof Worker === 'function'`). When those hold, `runZipJob` optimistically
+chooses in-place; `runInPlaceJob` spawns the worker, whose `init` self-checks
+`createSyncAccessHandle` inside the worker. If it is absent (or `init` errors before any
+fetch), the worker replies `{type:'unsupported'}` and `runInPlaceJob` returns a sentinel that
+makes `runZipJob` fall back to the serial engine — no bytes fetched, no user-visible
+difference. This is more robust than a startup probe (no async caps plumbing) and self-heals
+if a browser removes the API. The existing `zipGate` (opfs/streamingFetch/writableFiles) is
+unchanged — Phase 2 is a sub-choice *inside* the STAGED ZIP path, invisible to gate and UI.
 
 ### D9 — Version bump.
 **Persona: Operator.** New capability, backwards-compatible, no format change, fallback
