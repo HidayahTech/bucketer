@@ -1706,3 +1706,62 @@ describe('App.jsx / queue-tasks.js — zip task carries bytesTotal, active, jobI
     assert.match(appSource, /loadZipDetail/, 'App.jsx must import loadZipDetail to wire it into readZipDetail');
   });
 });
+
+// ── download-concurrency Task 6: handleZipStart passes concurrency through to runZipJob ──
+// runZipJob forwards its `concurrency` option straight to runPrefetch, which otherwise
+// falls back to its own internal CONCURRENCY default. Passing it explicitly from
+// handleZipStart keeps CONCURRENCY a single tunable point (design spec D4/D7) rather than
+// splitting the default between zip-prefetch.js and an implicit caller omission.
+describe('App.jsx — handleZipStart passes concurrency to runZipJob (download-concurrency Task 6)', () => {
+  const appSource = src('components/App.jsx');
+
+  test('App.jsx imports CONCURRENCY from zip-prefetch.js', () => {
+    assert.match(appSource, /import\s*\{[^}]*\bCONCURRENCY\b[^}]*\}\s*from\s*['"]\.\.\/lib\/zip-prefetch\.js['"]/,
+      'App.jsx must import CONCURRENCY from zip-prefetch.js to pass it to runZipJob');
+  });
+
+  test('the runZipJob call inside handleZipStart passes concurrency: CONCURRENCY', () => {
+    const fnStart = appSource.indexOf('async function handleZipStart');
+    assert.ok(fnStart > -1, 'handleZipStart must exist');
+    const fnEnd = appSource.indexOf('async function handleMoveRequest', fnStart);
+    assert.ok(fnEnd > fnStart, 'handleZipStart must be followed by handleMoveRequest');
+    const fnBody = appSource.slice(fnStart, fnEnd);
+
+    const callIdx = fnBody.indexOf('runZipJob(fresh,');
+    assert.ok(callIdx > -1, 'handleZipStart must call runZipJob(fresh, {...})');
+    const callEnd = fnBody.indexOf('});', callIdx);
+    const call = fnBody.slice(callIdx, callEnd > -1 ? callEnd : callIdx + 400);
+    assert.match(call, /concurrency:\s*CONCURRENCY\b/,
+      'handleZipStart must pass concurrency: CONCURRENCY to runZipJob explicitly');
+  });
+});
+
+// ── download-concurrency follow-on: sweep orphaned OPFS prefetch temps at startup ──
+// bucketer-tmp-* files a crashed tab or hard close left behind are never cleaned up by
+// runPrefetch itself — its own cleanup only runs on a normal exit (see zip-prefetch.js's
+// sweepOrphanTemps doc comment). Nothing else ever revisits them, so without a startup
+// sweep they accumulate in OPFS indefinitely. Source-level because the runtime path needs
+// a real/mocked navigator.storage.getDirectory() this file's other App.jsx tests avoid.
+describe('App.jsx — sweeps orphaned OPFS prefetch temps at startup (download-concurrency)', () => {
+  const appSource = src('components/App.jsx');
+
+  test('App.jsx imports sweepOrphanTemps from zip-prefetch.js', () => {
+    assert.match(appSource, /import\s*\{[^}]*\bsweepOrphanTemps\b[^}]*\}\s*from\s*['"]\.\.\/lib\/zip-prefetch\.js['"]/,
+      'App.jsx must import sweepOrphanTemps from zip-prefetch.js');
+  });
+
+  test('the app-init mount effect calls sweepOrphanTemps via navigator.storage.getDirectory()', () => {
+    // Anchor on the existing app-init effect (repairStorageInvariants marks it) — the
+    // brief asks for reuse of an existing app-init effect rather than a new one, and
+    // App.jsx already has one.
+    const anchorIdx = appSource.indexOf('repairStorageInvariants()');
+    assert.ok(anchorIdx > -1, 'the app-init effect (repairStorageInvariants) must exist');
+    const effectStart = appSource.lastIndexOf('useEffect(() => {', anchorIdx);
+    assert.ok(effectStart > -1, 'repairStorageInvariants must be called inside a useEffect');
+    const preamble = appSource.slice(effectStart, anchorIdx);
+    assert.match(preamble, /sweepOrphanTemps/,
+      'the app-init effect must call sweepOrphanTemps to clean up orphaned prefetch temps at startup');
+    assert.match(preamble, /navigator\.storage\?\.getDirectory/,
+      'the sweep must guard on navigator.storage.getDirectory being available before calling it');
+  });
+});

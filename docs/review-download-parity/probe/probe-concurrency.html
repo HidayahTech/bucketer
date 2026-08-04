@@ -1,0 +1,179 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>concurrency probe — single shot</title>
+<body><pre id="out">running…</pre></body>
+<script type="importmap">
+{"imports": {"@aws-sdk/client-s3": "/lib/aws-sdk-stub.js"}}
+</script>
+<script type="module">
+// SINGLE-SHOT probe. One mechanism, one workload, one concurrency, one browser launch —
+// same discipline as probe.html (see its header comment for why).
+//
+//   ?mech=control|prefetch&workload=tiny|mixed&concurrency=1|4&latency=50
+//
+// Drives the REAL src/lib/zip-prefetch.js (served unmodified at /lib/zip-prefetch.js,
+// alongside its real relative-import siblings upload-queue.js, zip-writer.js,
+// download-preflight.js) — not a reimplementation of it. The only stand-in is
+// @aws-sdk/client-s3 (upload-queue.js's ListPartsCommand import, never called by
+// runPrefetch's runPool path), redirected via the import map above to a trivial stub
+// the server hands out — see run-concurrency.mjs.
+import { runPrefetch } from '/lib/zip-prefetch.js';
+
+const q = new URLSearchParams(location.search);
+const MECH = q.get('mech') || 'control';
+const WORKLOAD = q.get('workload') || 'tiny';
+const CONCURRENCY = parseInt(q.get('concurrency') || '1', 10);
+const LATENCY_MS = parseInt(q.get('latency') || '50', 10);
+
+const KiB = 1024, MiB = 1024 * 1024;
+const CHUNK = 128 * 1024; // 128 KiB per simulated network chunk — plausible TCP-sized chunk
+
+const out = document.getElementById('out');
+const log = m => { out.textContent += '\n' + m; };
+
+// 150 tiny files spanning 256 KiB..1024 KiB (the "many-small-files" job the design's win
+// depends on) plus, for the "mixed" workload, 20 medium files spanning 16..32 MiB (routes
+// through zip-prefetch's OPFS temp tier, per classifyTier — TINY_MAX=4 MiB, MEDIUM_MAX=64
+// MiB). Sizes are a deterministic spread, not random, so concurrency=1 and concurrency=4
+// runs see the exact same workload.
+function buildItems(workload) {
+  const items = [];
+  const N_TINY = parseInt(q.get('ntiny') || '150', 10); // investigation knob; see task-8-report.md
+  for (let i = 0; i < N_TINY; i++) {
+    const size = 256 * KiB + ((i * 37) % 12) * 64 * KiB;
+    items.push({ key: `tiny-${i}`, localName: `tiny-${i}.bin`, size });
+  }
+  if (workload === 'mixed') {
+    const N_MEDIUM = parseInt(q.get('nmedium') || '20', 10); // investigation knob
+    for (let i = 0; i < N_MEDIUM; i++) {
+      const size = 16 * MiB + (i % 5) * 4 * MiB;
+      items.push({ key: `medium-${i}`, localName: `medium-${i}.bin`, size });
+    }
+  }
+  return items;
+}
+
+function delay(ms, signal) {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(new DOMException('Aborted', 'AbortError'));
+    const t = setTimeout(resolve, ms);
+    signal?.addEventListener('abort', () => { clearTimeout(t); reject(new DOMException('Aborted', 'AbortError')); }, { once: true });
+  });
+}
+
+// The fake network. `presign` is a no-op (the key IS the url, see below); `fetchImpl`
+// waits ONE injected round trip (models the per-file RTT the concurrency win exists to
+// hide — CRITICAL per the task brief, a zero-latency mock shows no benefit) and then
+// streams the item's declared size back in freshly-allocated (never shared/reused)
+// chunks, so JS memory pressure during the run is real rather than an illusion from many
+// reads aliasing one buffer object.
+function makeFetchImpl(sizeByKey) {
+  return async function fetchImpl(url, opts) {
+    const signal = opts?.signal;
+    await delay(LATENCY_MS, signal);
+    const total = sizeByKey.get(url);
+    let sent = 0;
+    const body = new ReadableStream({
+      pull(controller) {
+        if (signal?.aborted) { controller.error(new DOMException('Aborted', 'AbortError')); return; }
+        if (sent >= total) { controller.close(); return; }
+        const n = Math.min(CHUNK, total - sent);
+        const chunk = new Uint8Array(n).fill(65);
+        sent += n;
+        controller.enqueue(chunk);
+      },
+    });
+    return { ok: true, status: 200, body };
+  };
+}
+
+async function drain(chunks) {
+  for await (const _ of chunks) { /* discard — the point is to exercise real read-back, not to keep bytes */ }
+}
+
+async function runControl() {
+  await new Promise(r => setTimeout(r, 2000));
+  return { note: 'no allocation' };
+}
+
+async function runPrefetchProbe(mark) {
+  const items = buildItems(WORKLOAD);
+  const sizeByKey = new Map(items.map(it => [it.key, it.size]));
+  const fetchImpl = makeFetchImpl(sizeByKey);
+  const presign = async (key) => key; // trivial: the key IS the fake url
+
+  let root = null;
+  if (navigator.storage?.getDirectory) root = await navigator.storage.getDirectory();
+
+  // Poll the standard Storage API for OPFS usage at the same cadence the external
+  // harness samples RSS, so the OPFS peak is measured on the same footing as memory.
+  // (External `ps` cannot see OPFS — those bytes live on disk under the profile
+  // directory, not in the browser process's resident memory — so this in-page poll is
+  // the only way to observe it.)
+  const opfsSamples = [];
+  let opfsTimer = null;
+  const canOpfs = !!(root && navigator.storage?.estimate);
+  const OPFS_POLL_MS = parseInt(q.get('opfspoll') || '50', 10); // investigation knob; see task-8-report.md
+  if (canOpfs) {
+    opfsTimer = setInterval(async () => {
+      try { const e = await navigator.storage.estimate(); opfsSamples.push(Math.round((e.usage || 0) / MiB)); }
+      catch { /* ignore a transient estimate() failure */ }
+    }, OPFS_POLL_MS);
+  }
+  const baseEstimate = canOpfs ? await navigator.storage.estimate() : null;
+  const baseMiB = baseEstimate ? Math.round((baseEstimate.usage || 0) / MiB) : null;
+
+  await new Promise(r => setTimeout(r, 1000)); // let the OPFS baseline settle before starting
+
+  mark('run');
+  const t0 = performance.now();
+  const result = await runPrefetch(items, {
+    fetchImpl,
+    presign,
+    root,
+    concurrency: CONCURRENCY,
+    onReady: async (entry) => { await drain(entry.chunks); },
+  });
+  const wallMs = performance.now() - t0;
+  mark('/run');
+
+  if (opfsTimer) clearInterval(opfsTimer);
+  const opfsPeakMiB = (opfsSamples.length && baseMiB != null)
+    ? Math.max(...opfsSamples, baseMiB) - baseMiB : null;
+
+  return {
+    wallMs,
+    itemCount: items.length,
+    failedCount: result.failed.length,
+    failedSample: result.failed.slice(0, 3).map(f => f.message),
+    denied: result.denied, blocked: result.blocked, cancelled: result.cancelled,
+    opfsPeakMiB, opfsSampleCount: opfsSamples.length,
+  };
+}
+
+(async () => {
+  const marks = [];
+  const mark = label => marks.push({ label, t: Date.now() });
+  const result = {
+    mech: MECH, workload: WORKLOAD, concurrency: CONCURRENCY, latencyMs: LATENCY_MS,
+    ua: navigator.userAgent, marks,
+  };
+
+  window.__READY = true;
+  await new Promise(r => setTimeout(r, 2000)); // settle window so the runner has a stable pre-run baseline
+
+  try {
+    if (MECH === 'control') result.detail = await runControl();
+    else if (MECH === 'prefetch') result.detail = await runPrefetchProbe(mark);
+    else throw new Error('unknown mechanism ' + MECH);
+    result.ok = true;
+  } catch (err) {
+    result.ok = false;
+    result.error = err ? `${err.name}: ${err.message}` : 'rejected with null';
+  }
+
+  await new Promise(r => setTimeout(r, 1000)); // settle window for the runner
+  window.__RESULT = result;
+  log('DONE ' + JSON.stringify(result.ok));
+})().catch(e => { window.__RESULT = { ok: false, fatal: String(e) }; });
+</script>

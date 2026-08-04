@@ -1,7 +1,10 @@
 // Browser e2e: ZIP delivery — the "one dialog instead of N" claim, end to end.
 //
-// See docs/superpowers/specs/2026-08-03-zip-download-design.md and
-// docs/superpowers/plans/2026-08-03-zip-download.md (Task 6). Three arms:
+// See docs/superpowers/specs/2026-08-03-zip-download-design.md,
+// docs/superpowers/plans/2026-08-03-zip-download.md (Task 6), and, for the concurrent
+// engine underneath every arm below, docs/superpowers/specs/2026-08-04-download-concurrency-design.md
+// (runZipJob now stages via zip-prefetch.js's bounded concurrent pool — see zip-job.js's
+// header comment). Four arms:
 //
 //   1. Happy path (chromium/firefox, all devices): a folder of 4 files, one nested,
 //      becomes exactly ONE download event whose bytes parse as a ZIP containing exactly
@@ -18,11 +21,21 @@
 //      when nothing is left PENDING or FAILED). Clearing the fault and clicking the
 //      panel's resume row re-runs the job from its OPFS-persisted offset; the SINGLE
 //      resulting download parses as a complete, byte-valid ZIP with all files intact,
-//      including the one that was truncated the first time.
-//   3. WebKit (all lanes): `start-zip` never renders — zipGate requires OPFS +
+//      including the one that was truncated the first time. This arm doubles as
+//      concurrent-path resume coverage: resume is file-granularity (PENDING items are
+//      re-fetched through the same bounded pool as a fresh run), so nothing about it
+//      changes under concurrency.
+//   3. Many small files (chromium/firefox, desktop): ~12 files (a couple nested one
+//      folder down) — enough that zip-prefetch.js's default CONCURRENCY (4) has more than
+//      one file in flight at once, exercising completion-order writing instead of arm 1's
+//      small fixed set. The observable is UNCHANGED from arm 1: one download, all entries
+//      present with correct bytes/CRCs, folder structure intact. Concurrency must not
+//      change correctness — timing/concurrency itself is NOT asserted here (timing-
+//      sensitive; the design doc's probe measures that separately).
+//   4. WebKit (all lanes): `start-zip` never renders — zipGate requires OPFS +
 //      streamingFetch + writableFiles, which this engine lacks (design doc: "Where
 //      absent (WebKit), the button does not render; handoff remains"). This is a valid
-//      absence claim specifically because presence is proven elsewhere (arms 1–2, on the
+//      absence claim specifically because presence is proven elsewhere (arms 1–3, on the
 //      other two engines) — see harness.mjs's note on absence-only specs.
 //
 // WHY skipRange ON THE INTERRUPTION FAULT. Every file is probed before it is issued (a
@@ -67,14 +80,23 @@ const ZINT = {
   'zint/f3.txt': Buffer.from('third file, must also survive the interruption intact\n'),
 };
 
-// Arm 3: WebKit absence — one file is enough to reach the ready phase.
+// Arm 3: ~12 small files, 10 at the folder root and 2 one level down under sub/ — enough
+// that CONCURRENCY (4, zip-prefetch.js) has more than one file in flight at once. Every
+// body is a distinct length/pattern (mkBinary keyed by index) so a bug that wrote the
+// right COUNT of entries but mixed up which bytes went with which name would still fail.
+const ZMANY = Object.fromEntries([
+  ...Array.from({ length: 10 }, (_, i) => [`zmany/f${String(i + 1).padStart(2, '0')}.txt`, mkBinary(40 + i * 11, i + 3)]),
+  ...Array.from({ length: 2 }, (_, i) => [`zmany/sub/n${String(i + 1).padStart(2, '0')}.txt`, mkBinary(60 + i * 17, i + 31)]),
+]);
+
+// Arm 4: WebKit absence — one file is enough to reach the ready phase.
 const ZWK = { 'zwk/only.txt': Buffer.from('webkit must not offer a zip button\n') };
 
 before(async () => {
   ctx = await startMock();
   app = await startAppServer();
   browser = await launchBrowser();
-  for (const [key, body] of [...Object.entries(ZSEL), ...Object.entries(ZINT), ...Object.entries(ZWK)]) {
+  for (const [key, body] of [...Object.entries(ZSEL), ...Object.entries(ZINT), ...Object.entries(ZMANY), ...Object.entries(ZWK)]) {
     await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: key, Body: body }));
   }
 });
@@ -205,6 +227,32 @@ describe('browser e2e — zip download', () => {
     const expected = Object.fromEntries(Object.entries(ZINT).map(([k, v]) => [k.slice('zint/'.length), v]));
     assertZipMatches(entries, expected);
   }, { skipOn: { webkit: 'start-zip does not render on WebKit — see the WebKit-absence arm below' } });
+
+  e2eTest('a many-file zip (concurrent prefetch) still contains exactly the expected files, byte-for-byte', async () => {
+    await page.goto(app.url, { waitUntil: 'domcontentloaded' });
+    await connectApp(page, ctx.httpsBrowserEndpoint);
+    await page.locator('[data-testid="folder-row:zmany"]').click();
+    await page.locator('[data-testid="file-row:f01.txt"]').waitFor({ timeout: 10000 });
+    await openPanel(page);
+    await page.locator('[data-testid="scan"]').click();
+    await page.locator('[data-testid="start-zip"]').waitFor({ timeout: 15000 });
+    await page.locator('[data-testid="start-zip"]').click();
+
+    await downloads.waitForCount(1, 30000);
+    // Same presence-AND-absence shape as the happy-path arm: concurrency must collapse
+    // back to exactly one export, not one per completed prefetch worker.
+    await downloads.settle(3000);
+    assert.equal(downloads.list().length, 1, 'exactly one zip download must fire, never one per prefetched file');
+
+    const filePath = await downloads.list()[0].path();
+    const bytes = new Uint8Array(readFileSync(filePath));
+    const entries = readZip(bytes); // throws on any structural defect (bad EOCD/CD/local headers)
+
+    const expected = Object.fromEntries(Object.entries(ZMANY).map(([k, v]) => [k.slice('zmany/'.length), v]));
+    assertZipMatches(entries, expected);
+  }, { skipOn: {
+    webkit: 'start-zip does not render on WebKit — see the WebKit-absence arm below',
+  } });
 
   e2eTest('WebKit offers the handoff button but never the zip button', async () => {
     await page.goto(app.url, { waitUntil: 'domcontentloaded' });

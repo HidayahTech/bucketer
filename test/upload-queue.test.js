@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { UploadQueue, uploadPartsWithPool } from '../src/lib/upload-queue.js';
+import { UploadQueue, uploadPartsWithPool, runPool } from '../src/lib/upload-queue.js';
 
 // Helper: a task that resolves after `ms` milliseconds
 function delayed(ms, value) {
@@ -155,6 +155,32 @@ describe('uploadPartsWithPool', () => {
       uploadPartsWithPool([1], async () => { throw new Error('part failed'); }, 1),
       { message: 'part failed' }
     );
+  });
+});
+
+// ── runPool ────────────────────────────────────────────────────────────────
+// The generic N-workers-pulling-from-a-shared-queue primitive uploadPartsWithPool now
+// delegates to. Also consumed by zip-prefetch.js's runPrefetch (bounded fetch pool).
+describe('runPool', () => {
+  test('respects concurrency limit — peak in-flight equals concurrency', async () => {
+    let inFlight = 0;
+    let peakInFlight = 0;
+
+    await runPool([1, 2, 3, 4, 5, 6, 7, 8], async () => {
+      inFlight++;
+      peakInFlight = Math.max(peakInFlight, inFlight);
+      await new Promise(resolve => setTimeout(resolve, 5));
+      inFlight--;
+    }, 3);
+
+    assert.ok(peakInFlight > 1, `pool must run more than 1 item at a time (was serial: peak=${peakInFlight})`);
+    assert.ok(peakInFlight <= 3, `pool must not exceed concurrency=3 (peak=${peakInFlight})`);
+  });
+
+  test('processes every item exactly once, arbitrary item type', async () => {
+    const seen = [];
+    await runPool(['a', 'b', 'c'], async (item) => { seen.push(item); }, 2);
+    assert.deepEqual(seen.sort(), ['a', 'b', 'c']);
   });
 });
 

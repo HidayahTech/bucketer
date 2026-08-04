@@ -1,12 +1,17 @@
 // Copyright (C) 2026 HidayahTech, LLC
-// ZIP delivery: entry naming, the quota gate, and (below, Task 3) job orchestration.
+// ZIP delivery: entry naming, the quota gate, and (below) job orchestration.
 //
-// See docs/superpowers/specs/2026-08-03-zip-download-design.md.
+// See docs/superpowers/specs/2026-08-03-zip-download-design.md and, for the concurrent
+// engine below, docs/superpowers/specs/2026-08-04-download-concurrency-design.md (D7):
+// a bounded prefetch pool (zip-prefetch.js's runPrefetch) feeds a single serial writer,
+// replacing the old strictly-sequential runDownloadJob loop for the ZIP path only — the
+// handoff (per-file browser download) tier still uses runDownloadJob, unchanged.
 
 import { sanitizeSegment } from './download-naming.js';
 import { QUOTA_SAFETY } from './browser-capability.js';
 import { createZipWriter } from './zip-writer.js';
-import { runDownloadJob } from './download-queue.js';
+import { runPrefetch, CONCURRENCY, MEDIUM_MAX } from './zip-prefetch.js';
+import { PROBE_KIND } from './download-preflight.js';
 import { updateItem, eachItemByStatus, countItemsByStatus, ITEM_STATUS } from './download-records.js';
 
 // Keys keep their real folder structure inside the zip — that is the point of the format.
@@ -28,21 +33,30 @@ export function zipFileName(bucket, capturedPrefix = '', now = new Date()) {
 // The gate, in the spec's order: capability, then fit, then the lazy-persist path.
 // Unknown quota is optimistic per selectTier's philosophy — a quota failure is catchable
 // at runtime, refusing up front denies the mechanism to browsers that will not say.
+//
+// The fit check reserves CONCURRENCY*MEDIUM_MAX on top of sendableBytes (D4): up to
+// CONCURRENCY prefetch workers can each have a medium-tier item buffered in an OPFS temp
+// file at once, on top of the staging zip itself, so the raw sendable total understates
+// worst-case peak usage without this headroom. When denied, the reason text reports the
+// full amount actually required (sendableBytes + reserve) — reporting sendableBytes alone
+// would read as self-contradictory (e.g. "needs 0.1 GB; 0.3 GB available" while still
+// being denied) since the reserve is what actually tipped the job over the line.
 export function zipGate({ caps, sendableBytes, quota, persisted }) {
   if (!caps?.opfs || !caps?.streamingFetch || !caps?.writableFiles) {
     return { state: 'unavailable', reason: 'This browser cannot stage a ZIP.' };
   }
   if (quota?.quotaBytes == null) return { state: 'offered', reason: null };
   const free = Math.max(0, quota.quotaBytes - (quota.usageBytes ?? 0));
-  if (sendableBytes <= free * QUOTA_SAFETY) return { state: 'offered', reason: null };
+  const reserve = CONCURRENCY * MEDIUM_MAX;
+  if (sendableBytes + reserve <= free * QUOTA_SAFETY) return { state: 'offered', reason: null };
   const gb = (n) => (n / 1e9).toFixed(1);
-  const reason = `Needs about ${gb(sendableBytes)} GB of temporary browser storage; ${gb(free)} GB available.`;
+  const reason = `Needs about ${gb(sendableBytes + reserve)} GB of temporary browser storage (including headroom for concurrent downloads); ${gb(free)} GB available.`;
   return persisted ? { state: 'unavailable', reason } : { state: 'needs-storage', reason };
 }
 
-// Job orchestration: stage a zip into OPFS via runDownloadJob's engine, resuming at
-// file granularity from persisted entry records and finishing only once nothing is
-// left PENDING or FAILED.
+// Job orchestration: stage a zip into OPFS via runPrefetch's bounded concurrent fetch
+// pool feeding this module's own serial writer, resuming at file granularity from
+// persisted entry records and finishing only once nothing is left PENDING or FAILED.
 //
 // Note on entry names: zipEntryPath(key, prefix) returns '' when key === prefix (a
 // zero-name entry). That can only happen for a folder-marker key (one ending in '/', or
@@ -79,24 +93,16 @@ export async function discardZipStaging(jobId, { root }) {
   try { await root.removeEntry(stagingName(jobId)); } catch { /* best effort */ }
 }
 
-// ADAPTATION (from the design's assumed shape): runDownloadJob writes
-// ITEM_STATUS.ISSUED unconditionally right after `issue()` resolves (download-queue.js
-// — both the probed and unprobed branches), regardless of what `issue()` itself wrote to
-// the item. Confirmed by the existing suite: download-queue.test.js's "marks issued
-// items so a resume does not re-issue them" asserts the post-run status IS ISSUED, not
-// whatever a caller wrote. So the injected `issue` in runZipJob records only the zip
-// entry metadata (no status field — writing DONE there would just be clobbered a moment
-// later); promoteIssuedToDone is what actually advances the status, once every item this
-// run touched is known. For a zip job "issued" and "done" are the same fact regardless:
-// issue() only resolves once the entry's local header, streamed bytes, and data
-// descriptor are fully written and the item's zip metadata is persisted.
-//
-// Called twice per run: once defensively at the very start, in case an earlier run was
-// interrupted between runDownloadJob returning and ITS end-of-run call to this same
-// function — otherwise those items would be stuck at ISSUED forever (not PENDING, so
-// never resumed; not DONE, so never counted toward resumeAt or the central directory) —
-// and once after runDownloadJob returns, for this run's own completions, before
-// resume/finish logic reads DONE as ground truth.
+// LEGACY RECOVERY: nothing in the current engine ever writes ITEM_STATUS.ISSUED any
+// more — onReady (below) persists DONE directly, in one step, once an entry's local
+// header, streamed bytes, and data descriptor are fully written and the item's zip
+// metadata is saved. This sweep only exists to recover a job whose staging/records
+// predate that change, or a genuine crash between an old build's `issue()` (which used
+// to write ISSUED right after runDownloadJob's issue() resolved, and only promoted it to
+// DONE at the end of that run) and its own end-of-run promotion — otherwise such an item
+// would be stuck at ISSUED forever (not PENDING, so never resumed; not DONE, so never
+// counted toward resumeAt or the central directory). Called once, defensively, at the
+// very start of every run, before resumeAt is computed.
 async function promoteIssuedToDone(jobId) {
   const items = [];
   await eachItemByStatus(jobId, ITEM_STATUS.ISSUED, (it) => { items.push(it); });
@@ -105,7 +111,15 @@ async function promoteIssuedToDone(jobId) {
   }
 }
 
-export async function runZipJob(job, { presign, probe, fetchImpl = fetch, root, onProgress, shouldCancel = () => false }) {
+// Cap on the returned error SAMPLE only — mirrors download-queue.js's own
+// DEFAULT_MAX_ERRORS. Every failed item is still marked FAILED regardless of the cap;
+// only how many land in the `errors` array returned to the caller is bounded, so a job
+// with thousands of denials doesn't grow that array without limit.
+const MAX_ERROR_SAMPLE = 50;
+
+export async function runZipJob(job, {
+  presign, probe, fetchImpl = fetch, root, concurrency, onProgress, shouldCancel = () => false,
+}) {
   const prefix = job.prefix ?? '';
   await promoteIssuedToDone(job.id);
 
@@ -128,46 +142,53 @@ export async function runZipJob(job, { presign, probe, fetchImpl = fetch, root, 
   let out = await staging.openAppend(resumeAt);
   let writer = createZipWriter({ write: (u8) => out.write(u8) }, { startOffset: resumeAt });
 
-  let bytesDone = done.reduce((n, it) => n + (it.size || 0), 0);
-  let completed = done.length;
+  const priorCompleted = done.length;
+  const priorBytes = done.reduce((n, it) => n + (it.size || 0), 0);
+  let completed = priorCompleted;
 
-  // The injected issue: fetch, stream through the writer, record the entry's zip
-  // metadata. See the ADAPTATION note above for why no status field is written here.
-  const issue = async (url, _localName, item) => {
+  // Everything this run will prefetch. App.jsx's handleZipStart (like handleDownloadStart)
+  // calls resetFailedToPending before every run, so PENDING is the complete resume set —
+  // the same contract the old runDownloadJob-based engine relied on.
+  const pendingItems = [];
+  await eachItemByStatus(job.id, ITEM_STATUS.PENDING, (it) => { pendingItems.push(it); });
+
+  let quotaBlocked = null; // set by onReady below on a mid-entry QuotaExceededError
+  let liveActive = [];     // mirrors runPrefetch's own in-flight `active` list
+  let liveBytes = 0;       // mirrors runPrefetch's own `bytesDone` (this run's live total)
+
+  const emitProgress = (activeOverride) => {
+    onProgress?.({ done: completed, bytesDone: priorBytes + liveBytes, active: activeOverride ?? liveActive });
+  };
+
+  // The serial writer runPrefetch drains ready entries into, one at a time — it
+  // guarantees onReady is never called concurrently with itself (zip-prefetch.js's
+  // single-slot lock), so `writer`/`out` are safely reassigned here with no locking of
+  // our own. `entry.chunks` is always an async iterable of Uint8Array regardless of which
+  // tier runPrefetch chose (memory buffer / OPFS temp file / live solo body), so the same
+  // loop streams all three through the existing writer identically.
+  const onReady = async (entry) => {
+    const item = entry.item;
     const entryStart = writer.offset;
-    let inFlightBytes = 0;
     try {
       await writer.beginEntry(zipEntryPath(item.key, prefix), {
         mtime: item.lastModified, declaredSize: item.size ?? 0,
       });
-      const res = await fetchImpl(url);
-      if (!res.ok || !res.body) throw new Error(`fetch failed (${res.status})`);
-      const reader = res.body.getReader();
-      for (;;) {
-        const { done: eof, value } = await reader.read();
-        if (eof) break;
-        await writer.update(value);
-        inFlightBytes += value.length;
-        // A fresh { key, size, bytes } object per emission — never the same object
-        // mutated and re-passed — so a consumer that buffers raw payloads doesn't see
-        // later chunks retroactively rewrite an earlier one's `active`.
-        onProgress?.({ done: completed, bytesDone: bytesDone + inFlightBytes,
-          active: { key: item.key, size: item.size ?? 0, bytes: inFlightBytes } });
-      }
+      for await (const chunk of entry.chunks) await writer.update(chunk);
+      // The writer computes its own CRC in update() — entry.crc (runPrefetch's
+      // pre-computed CRC, memory/temp tiers only) is redundant here and left unused.
       const rec = await writer.endEntry();
-      await updateItem(job.id, item.key, { ...rec });
-      completed += 1; bytesDone += rec.size;
-      onProgress?.({ done: completed, bytesDone, active: null });
+      await updateItem(job.id, item.key, { status: ITEM_STATUS.DONE, ...rec });
+      completed += 1;
+      emitProgress();
     } catch (err) {
       // Mid-entry failure: the writer is left wedged (a local header and maybe some
       // streamed bytes with no data descriptor — or, on endEntry's declared-size
       // mismatch, cur already cleared but the bad bytes already flushed). Never reuse
       // it: truncate the staging file back to this entry's start, reopen the append
-      // stream there, and build a brand new writer before rethrowing so
-      // runDownloadJob records the item FAILED and the writer is never touched again
-      // after an inconsistent write (zip-writer's update() mutates crc/size before the
-      // sink write is awaited, so a rejected write leaves the old instance's internal
-      // state untrustworthy).
+      // stream there, and build a brand new writer before deciding how to report the
+      // error, so an inconsistent writer (zip-writer's update() mutates crc/size before
+      // the sink write is awaited, so a rejected write leaves the old instance's internal
+      // state untrustworthy) never leaks into the next onReady call.
       //
       // A REAL sink failure (not just a fetch/body failure) can itself have caused
       // `out`'s underlying stream to error — per Streams semantics, close() on an
@@ -182,40 +203,62 @@ export async function runZipJob(job, { presign, probe, fetchImpl = fetch, root, 
 
       // A QuotaExceededError is not this item's fault — the browser ran out of temporary
       // storage for the whole staging file, not just this entry — so per the design spec
-      // (§2) it must PAUSE the job (download-queue.js's .jobBlock signal) rather than FAIL
-      // only this one item. The recovery above already ran regardless of which way this
-      // rethrows, so staging is intact either way for the eventual resume. Checked by
-      // `.name` (not `instanceof DOMException`) so a fake/non-DOMException error with the
-      // same name — as a test double might construct — is still recognized.
+      // (§2) it must PAUSE the job rather than FAIL only this one item. runPrefetch has no
+      // built-in notion of a job-wide block raised from inside onReady (that signal only
+      // exists on the ZIP path, not in zip-prefetch.js's generic contract), so it is
+      // handled entirely here: swallow the error (the item is left untouched — neither
+      // DONE nor FAILED — for a resume to re-fetch), remember the STORAGE block, and let
+      // the `shouldCancel` wrapper below ask runPrefetch to stop — which aborts every
+      // other in-flight fetch and halts new intake, the same job-wide stop a NETWORK
+      // probe result gets. The recovery above already ran regardless, so staging is intact
+      // either way for the eventual resume. Checked by `.name` (not `instanceof
+      // DOMException`) so a fake/non-DOMException error with the same name — as a test
+      // double might construct — is still recognized.
       if (err?.name === 'QuotaExceededError') {
-        const blockedErr = new Error('Ran out of temporary browser storage while building the ZIP.');
-        blockedErr.jobBlock = { kind: 'STORAGE', message: blockedErr.message };
-        throw blockedErr;
+        quotaBlocked = { kind: 'STORAGE', message: 'Ran out of temporary browser storage while building the ZIP.' };
+        return;
       }
-      throw err;
+      throw err; // per-item failure: runPrefetch records it in `failed`, mapped below.
     }
   };
 
-  const result = await runDownloadJob(job, { presign, probe, issue, shouldCancel,
-    onProgress: () => {} /* byte progress comes from the issue closure */ });
+  const prefetchResult = await runPrefetch(pendingItems, {
+    fetchImpl, presign, probe, root, concurrency,
+    onReady,
+    onProgress: (p) => { liveActive = p.active; liveBytes = p.bytesDone; emitProgress(p.active); },
+    shouldCancel: () => quotaBlocked !== null || shouldCancel(),
+  });
 
-  // Nothing streams once runDownloadJob has returned. Emit unconditionally so the run's
-  // final payload always carries active: null — otherwise, if the LAST item processed
-  // failed mid-stream (its issue() rethrew from the catch block without emitting), the
-  // run's last emitted payload would still be the mid-stream one for that item, a
-  // phantom "still downloading" indicator for a file that is no longer in flight.
-  // Harmlessly redundant on a clean run (the last endEntry already emitted null).
-  onProgress?.({ done: completed, bytesDone, active: null });
+  // A STORAGE pause always wins: it is a real error caught above, not an inference from
+  // runPrefetch's own cancel bookkeeping (which onReady drove itself, purely to get
+  // runPrefetch to stop) — so it is reported as a block, never as the cancelled path.
+  const cancelled = quotaBlocked ? false : prefetchResult.cancelled;
+  const blocked = quotaBlocked
+    || prefetchResult.blocked
+    || (prefetchResult.denied
+      ? { kind: PROBE_KIND.DENIED, status: null, message: 'Too many files in a row were denied.' }
+      : null);
 
-  // Promote this run's completions (see ADAPTATION note) before resume/finish logic
-  // reads DONE as ground truth.
-  await promoteIssuedToDone(job.id);
+  // Per-file failures (any tier): mark FAILED and accumulate a capped error sample —
+  // mirrors download-queue.js's failItem/DEFAULT_MAX_ERRORS.
+  const errors = [];
+  for (const { item, message } of prefetchResult.failed) {
+    await updateItem(job.id, item.key, { status: ITEM_STATUS.FAILED, error: message });
+    if (errors.length < MAX_ERROR_SAMPLE) errors.push({ key: item.key, message });
+  }
+
+  // Nothing streams once runPrefetch has returned. Emit unconditionally so the run's
+  // final payload always carries an empty active list — otherwise, if the run stopped
+  // mid-stream (cancel, a block, or the last item failing mid-body), the last-emitted
+  // payload could still show a file as active, a phantom "still downloading" indicator
+  // for a file that is no longer in flight. Harmlessly redundant on a clean run.
+  emitProgress([]);
 
   // 2. Finish only when nothing remains to send.
   const pending = await countItemsByStatus(job.id, ITEM_STATUS.PENDING);
   const failed = await countItemsByStatus(job.id, ITEM_STATUS.FAILED);
   let finished = false;
-  if (!result.cancelled && !result.blocked && pending === 0 && failed === 0) {
+  if (!cancelled && !blocked && pending === 0 && failed === 0) {
     const entries = [];
     await eachItemByStatus(job.id, ITEM_STATUS.DONE, (it) => {
       entries.push({ path: zipEntryPath(it.key, prefix), zipOffset: it.zipOffset, zipEnd: it.zipEnd, size: it.size, crc: it.crc, time: it.time, date: it.date });
@@ -227,5 +270,5 @@ export async function runZipJob(job, { presign, probe, fetchImpl = fetch, root, 
   // always resolve with its documented shape, never reject because the final close on
   // an already-errored stream also rejects.
   try { await out.close(); } catch { /* best effort; result is already computed */ }
-  return { ...result, finished };
+  return { issued: completed - priorCompleted, failed, cancelled, errors, blocked, finished };
 }
