@@ -13,3 +13,58 @@ export function classifyTier(size) {
   if (n <= MEDIUM_MAX) return 'temp';
   return 'solo';
 }
+
+// OPFS temp store for medium-tier prefetch buffers: an item too big to hold in memory
+// but small enough to stage on disk gets buffered into one of these files while its
+// slot in the write order waits, then streamed back out (in TEMP_CHUNK pieces, so the
+// consumer never holds the whole buffer at once) once it's its turn.
+export const TEMP_CHUNK = 8 * 1024 * 1024; // 8 MiB
+
+export function createTempStore(root) {
+  const created = new Set();
+  const tempName = (name) => `bucketer-tmp-${name}`;
+
+  return {
+    async put(name, chunksIterable) {
+      const fname = tempName(name);
+      const handle = await root.getFileHandle(fname, { create: true });
+      const writable = await handle.createWritable();
+      let size = 0;
+      for await (const chunk of chunksIterable) {
+        await writable.write(chunk);
+        size += chunk.length;
+      }
+      await writable.close();
+      created.add(fname);
+      return { size };
+    },
+
+    async open(name) {
+      const handle = await root.getFileHandle(tempName(name));
+      return {
+        stream() {
+          return (async function* () {
+            const file = await handle.getFile();
+            const buf = new Uint8Array(await file.arrayBuffer());
+            for (let offset = 0; offset < buf.length; offset += TEMP_CHUNK) {
+              yield buf.slice(offset, offset + TEMP_CHUNK);
+            }
+          })();
+        },
+      };
+    },
+
+    async remove(name) {
+      const fname = tempName(name);
+      try { await root.removeEntry(fname); } catch { /* best effort */ }
+      created.delete(fname);
+    },
+
+    async removeAll() {
+      for (const fname of created) {
+        try { await root.removeEntry(fname); } catch { /* best effort */ }
+      }
+      created.clear();
+    },
+  };
+}
