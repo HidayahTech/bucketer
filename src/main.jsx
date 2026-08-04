@@ -8,6 +8,12 @@ import { DownloadPage } from './components/DownloadPage.jsx';
 import { readShareLink } from './lib/share-url.js';
 import { loadThemePref } from './lib/storage.js';
 import { applyThemeToRoot } from './lib/theme.js';
+// Task 7: keeps assembler-worker-url.js in the app's module graph so build.mjs's
+// worker-inlining plugin fires and the build invariant can verify it. Task 6 will
+// wire makeAssemblerWorker() into the actual zip-in-place call site (App.jsx); this
+// reference is a placeholder for that and can be removed once Task 6 lands its own.
+import { workerInlined } from './lib/assembler-worker-url.js';
+void workerInlined();
 
 // Reflect the saved theme preference on <html> before the first render so there
 // is no flash of the wrong theme. 'system' leaves the attribute unset, letting

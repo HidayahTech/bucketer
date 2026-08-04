@@ -122,6 +122,32 @@ const changelogJs = [
 writeFileSync('src/lib/changelog.js', changelogJs, 'utf8');
 console.log(`  ✓ Generated src/lib/changelog.js from CHANGELOG.md (${changelog.length} entries, v${appVersion})`);
 
+// ── Bundle the zip-assembler worker to a standalone IIFE string ─────────────
+// The worker must ship as part of the single-file bundle (no external asset
+// fetch), so it is bundled separately here and inlined via a Blob URL by
+// assembler-worker-url.js (its '__WORKER_SRC__' placeholder is substituted
+// below, by the inlineWorker plugin, before the main app bundle runs).
+const workerBuild = await esbuild.build({
+  entryPoints: ['src/worker/zip-assembler.worker.js'],
+  bundle: true,
+  format: 'iife',
+  write: false,
+  minify: mode.minify,
+  sourcemap: false,
+  target: 'es2020',
+});
+const workerSrc = workerBuild.outputFiles[0].text;
+
+const inlineWorker = {
+  name: 'inline-worker',
+  setup(b) {
+    b.onLoad({ filter: /assembler-worker-url\.js$/ }, async (args) => {
+      const src = readFileSync(args.path, 'utf8').replace("'__WORKER_SRC__'", JSON.stringify(workerSrc));
+      return { contents: src, loader: 'js' };
+    });
+  },
+};
+
 // ── Bundle with esbuild (picks up the freshly generated changelog.js) ────────
 const result = await esbuild.build({
   entryPoints: ['src/main.jsx'],
@@ -136,6 +162,7 @@ const result = await esbuild.build({
   define: {
     'process.env.NODE_ENV': JSON.stringify(mode.nodeEnv),
   },
+  plugins: [inlineWorker],
   logLevel: 'info',
 });
 
@@ -197,6 +224,17 @@ if (mode.invariants) {
       `investigate before raising the tripwire.`
     );
     invariantFailed = true;
+  }
+
+  // Assembler worker inlined: createSyncAccessHandle only appears in the
+  // worker's own source (src/worker/zip-assembler.worker.js), so its presence
+  // in the final bundle proves the Blob-URL inlining (assembler-worker-url.js)
+  // actually ran rather than leaving the '__WORKER_SRC__' placeholder in place.
+  if (!out.includes('createSyncAccessHandle')) {
+    console.error('INVARIANT: assembler worker source missing from bundle');
+    invariantFailed = true;
+  } else {
+    console.log('  ✓ assembler worker source inlined into bundle');
   }
 
   // No source map comment leakage: esbuild should not embed sourceMappingURL

@@ -207,6 +207,22 @@ describe('Build output — Referrer-Policy for privacy (#12)', () => {
   });
 });
 
+describe('Build output — assembler worker inlined as Blob URL (Task 7)', () => {
+  // The zip-assembler worker (src/worker/zip-assembler.worker.js) must ship as
+  // part of the single-file bundle rather than as an external asset. build.mjs
+  // bundles it separately and substitutes its source into
+  // assembler-worker-url.js's '__WORKER_SRC__' placeholder via an esbuild
+  // plugin. createSyncAccessHandle only appears in the worker's own source, so
+  // its presence proves the substitution actually ran.
+  test('worker source is inlined into the single-file bundle', () => {
+    assert.ok(jsBundle.includes('createSyncAccessHandle'), 'worker source must be inlined');
+  });
+
+  test('placeholder is replaced at build, not shipped literally', () => {
+    assert.ok(!html.includes('__WORKER_SRC__'), 'placeholder must be replaced at build');
+  });
+});
+
 describe('Build output — changelog wrapped bullets (#50)', () => {
   // #50: parseChangelog in build.mjs only captured lines starting with "- ",
   // silently dropping a wrapped bullet's indented continuation lines. Every
