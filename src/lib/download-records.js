@@ -248,6 +248,33 @@ export async function takeItemsByStatus(jobId, status, limit) {
   return out;
 }
 
+// Capped, best-effort read of a zip job's file detail for the progress view. "Most
+// recent" for DONE items = highest zipEnd — a byte offset into the zip that only grows
+// as entries are written (zip-writer.js), so the item with the highest zipEnd is the one
+// that finished last. Every DONE item produced by a zip job carries one. If none of the
+// job's DONE items do (no caller today, but the field isn't enforced), sorting by an
+// absent value is meaningless, so this falls back to the cursor's own iteration order and
+// returns its tail as the closest available proxy for "most recently added".
+// Not O(1) in job size — it walks every DONE/FAILED item to sort and to count — but zip
+// jobs are the only caller and this is read once per detail-view expand, not per poll.
+export async function loadZipDetail(jobId, { doneCap = 20, failedCap = 20 } = {}) {
+  const doneItems = [];
+  await eachItemByStatus(jobId, ITEM_STATUS.DONE, (it) => { doneItems.push(it); });
+  const cappedDone = doneItems.some(it => it.zipEnd != null)
+    ? [...doneItems].sort((a, b) => (b.zipEnd ?? 0) - (a.zipEnd ?? 0)).slice(0, doneCap)
+    : doneItems.slice(-doneCap);
+
+  const failedItems = [];
+  await eachItemByStatus(jobId, ITEM_STATUS.FAILED, (it) => { failedItems.push(it); });
+
+  return {
+    done:        cappedDone.map(it => ({ key: it.key, size: it.size })),
+    failed:      failedItems.slice(0, failedCap).map(it => ({ key: it.key })),
+    doneCount:   doneItems.length,
+    failedCount: failedItems.length,
+  };
+}
+
 export async function eachItemByStatus(jobId, status, fn) {
   const db = await openDB();
   const tx = db.transaction(DL_ITEM_STORE, 'readonly');
