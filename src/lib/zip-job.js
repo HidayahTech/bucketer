@@ -8,11 +8,12 @@
 // handoff (per-file browser download) tier still uses runDownloadJob, unchanged.
 
 import { sanitizeSegment } from './download-naming.js';
-import { QUOTA_SAFETY } from './browser-capability.js';
+import { QUOTA_SAFETY, inPlaceSupported } from './browser-capability.js';
 import { createZipWriter } from './zip-writer.js';
 import { runPrefetch, CONCURRENCY, MEDIUM_MAX } from './zip-prefetch.js';
 import { PROBE_KIND } from './download-preflight.js';
 import { updateItem, eachItemByStatus, countItemsByStatus, ITEM_STATUS } from './download-records.js';
+import { runInPlaceJob } from './zip-inplace.js';
 
 // Keys keep their real folder structure inside the zip — that is the point of the format.
 // Relative to the scope's captured prefix; a key outside it (possible in a selection with
@@ -117,7 +118,24 @@ async function promoteIssuedToDone(jobId) {
 // with thousands of denials doesn't grow that array without limit.
 const MAX_ERROR_SAMPLE = 50;
 
-export async function runZipJob(job, {
+// Optimistic gate (D8): opfs+streamingFetch+webWorker are the only main-thread-detectable
+// prerequisites for the in-place engine. `createSyncAccessHandle` itself lives in worker
+// scope only and cannot be checked here — the worker self-reports at runtime instead, and
+// runZipJob falls back to the serial engine if it can't.
+export function selectZipEngine(caps, makeWorker) {
+  return (inPlaceSupported(caps) && makeWorker) ? 'inplace' : 'serial';
+}
+
+export async function runZipJob(job, opts) {
+  if (selectZipEngine(opts.caps, opts.makeWorker) === 'inplace') {
+    const r = await runInPlaceJob(job, opts);
+    if (!r || !r.unsupported) return r; // in-place ran: done
+    // else: worker lacked the sync handle at runtime — fall through to serial (design D8)
+  }
+  return runSerialZipJob(job, opts);
+}
+
+async function runSerialZipJob(job, {
   presign, probe, fetchImpl = fetch, root, concurrency, onProgress, shouldCancel = () => false,
 }) {
   const prefix = job.prefix ?? '';
