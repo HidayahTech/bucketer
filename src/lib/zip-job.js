@@ -136,10 +136,6 @@ export async function runZipJob(job, { presign, probe, fetchImpl = fetch, root, 
   const issue = async (url, _localName, item) => {
     const entryStart = writer.offset;
     let inFlightBytes = 0;
-    // The file currently streaming, for the UI's "active file" display. Local to this
-    // call (one issue() invocation per item, run sequentially — see download-queue.js),
-    // so no cross-item leakage; cleared to null once the entry is done.
-    let active = { key: item.key, size: item.size ?? 0, bytes: 0 };
     try {
       await writer.beginEntry(zipEntryPath(item.key, prefix), {
         mtime: item.lastModified, declaredSize: item.size ?? 0,
@@ -152,13 +148,15 @@ export async function runZipJob(job, { presign, probe, fetchImpl = fetch, root, 
         if (eof) break;
         await writer.update(value);
         inFlightBytes += value.length;
-        active.bytes = inFlightBytes;
-        onProgress?.({ done: completed, bytesDone: bytesDone + inFlightBytes, active });
+        // A fresh { key, size, bytes } object per emission — never the same object
+        // mutated and re-passed — so a consumer that buffers raw payloads doesn't see
+        // later chunks retroactively rewrite an earlier one's `active`.
+        onProgress?.({ done: completed, bytesDone: bytesDone + inFlightBytes,
+          active: { key: item.key, size: item.size ?? 0, bytes: inFlightBytes } });
       }
       const rec = await writer.endEntry();
       await updateItem(job.id, item.key, { ...rec });
       completed += 1; bytesDone += rec.size;
-      active = null;
       onProgress?.({ done: completed, bytesDone, active: null });
     } catch (err) {
       // Mid-entry failure: the writer is left wedged (a local header and maybe some
@@ -200,6 +198,14 @@ export async function runZipJob(job, { presign, probe, fetchImpl = fetch, root, 
 
   const result = await runDownloadJob(job, { presign, probe, issue, shouldCancel,
     onProgress: () => {} /* byte progress comes from the issue closure */ });
+
+  // Nothing streams once runDownloadJob has returned. Emit unconditionally so the run's
+  // final payload always carries active: null — otherwise, if the LAST item processed
+  // failed mid-stream (its issue() rethrew from the catch block without emitting), the
+  // run's last emitted payload would still be the mid-stream one for that item, a
+  // phantom "still downloading" indicator for a file that is no longer in flight.
+  // Harmlessly redundant on a clean run (the last endEntry already emitted null).
+  onProgress?.({ done: completed, bytesDone, active: null });
 
   // Promote this run's completions (see ADAPTATION note) before resume/finish logic
   // reads DONE as ground truth.
