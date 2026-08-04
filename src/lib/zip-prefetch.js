@@ -355,21 +355,38 @@ export async function runPrefetch(items, {
   return { failed, denied, blocked, cancelled };
 }
 
+// bucketer-tmp-* names reset per run (tempSeq starts at 0 in runPrefetch), so a second tab
+// running its own ZIP job at the same time commonly produces the exact same names as the
+// first — there is no per-tab ownership signal to tell a live temp from an orphaned one by
+// name alone. A RUNNING-job check doesn't help either: a crashed tab leaves a phantom
+// RUNNING job record that would block the sweep forever. Age is the only signal that works
+// unattended: the serial writer in a live run consumes a medium-tier temp within seconds of
+// it being written (see runPrefetch's onReady/withWriterLock), so a temp is only ever old if
+// nothing is actively finishing it — i.e. it is orphaned, not merely mid-flight in another
+// tab. An orphan that narrowly misses one sweep (younger than the threshold) is simply swept
+// on a later app load once it ages past it, which still bounds long-run accumulation, the
+// actual goal.
+export const SWEEP_MIN_AGE_MS = 30 * 60 * 1000; // 30 minutes
+
 // Cross-session orphan sweep. runPrefetch's own finally (above) removes every temp it
 // created on every exit path it can observe — but a tab close or crash skips that finally
 // entirely, and nothing tracks temp names across page loads (tempStore's `created` set is
-// in-memory, per-run). Anything named bucketer-tmp-* found on OPFS when this runs is
-// therefore orphaned by definition: a temp file only has meaning during an active
-// runPrefetch, and no runPrefetch is active at app startup. Never touches bucketer-zip-*
-// staging files — those are tied to job records and live/die with the job via
-// discardZipStaging, not this sweep. Best-effort throughout: called fire-and-forget at
-// startup (App.jsx), so neither a missing OPFS API, a keys() failure, nor a single
-// removeEntry failure may throw out of here.
-export async function sweepOrphanTemps(root) {
+// in-memory, per-run). Anything named bucketer-tmp-* found on OPFS AND older than maxAgeMs
+// is therefore orphaned: see the age-guard rationale above for why age (not just the name)
+// is what decides. Never touches bucketer-zip-* staging files — those are tied to job
+// records and live/die with the job via discardZipStaging, not this sweep. Best-effort
+// throughout, per-entry and overall: called fire-and-forget at startup (App.jsx), so a
+// missing OPFS API, a keys() failure, a getFile() failure on one entry, or a single
+// removeEntry failure may never throw out of here or stop the rest of the sweep.
+export async function sweepOrphanTemps(root, { now = () => Date.now(), maxAgeMs = SWEEP_MIN_AGE_MS } = {}) {
   try {
     for await (const name of root.keys()) {
       if (!name.startsWith('bucketer-tmp-')) continue;
-      try { await root.removeEntry(name); } catch { /* best effort */ }
+      try {
+        const handle = await root.getFileHandle(name);
+        const file = await handle.getFile();
+        if (now() - file.lastModified >= maxAgeMs) await root.removeEntry(name);
+      } catch { /* best effort — this entry only */ }
     }
   } catch { /* best effort — OPFS unsupported, keys() unavailable, etc. */ }
 }

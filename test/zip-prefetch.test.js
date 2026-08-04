@@ -1,21 +1,29 @@
 // Copyright (C) 2026 HidayahTech, LLC
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyTier, TINY_MAX, MEDIUM_MAX, CONCURRENCY, createTempStore, TEMP_CHUNK, sweepOrphanTemps } from '../src/lib/zip-prefetch.js';
+import { classifyTier, TINY_MAX, MEDIUM_MAX, CONCURRENCY, createTempStore, TEMP_CHUNK, sweepOrphanTemps, SWEEP_MIN_AGE_MS } from '../src/lib/zip-prefetch.js';
 
 // Trimmed copy of the fake OPFS root from test/zip-job-run.test.js (write-fault
 // injection dropped — this file's tests don't need it). Same shape: getFileHandle /
 // removeEntry on the root, createWritable({keepExistingData}) / getFile() on the handle.
 function fakeOpfsRoot() {
   const files = new Map();
+  // name -> File.lastModified. Separate from `files` (which holds raw content) so
+  // pre-existing tests that seed/read `files` directly for content are unaffected; a test
+  // that cares about age (the sweepOrphanTemps tests) sets this directly, and
+  // getFileHandle/createWritable().close() stamp "now" here for everything else the same
+  // way a real OPFS write would.
+  const lastModified = new Map();
   const wholeFileReads = new Map(); // name -> count of getFile().arrayBuffer() (unsliced) calls
   return {
     files,
+    lastModified,
     wholeFileReads,
     async getFileHandle(name, { create = false } = {}) {
       if (!files.has(name)) {
         if (!create) { const e = new Error('missing'); e.name = 'NotFoundError'; throw e; }
         files.set(name, new Uint8Array(0));
+        if (!lastModified.has(name)) lastModified.set(name, Date.now());
       }
       return {
         async createWritable({ keepExistingData = false } = {}) {
@@ -28,13 +36,14 @@ function fakeOpfsRoot() {
             },
             async truncate(n) { buf = buf.slice(0, n); pos = Math.min(pos, n); },
             async seek(n) { pos = n; },
-            async close() { files.set(name, buf); },
+            async close() { files.set(name, buf); lastModified.set(name, Date.now()); },
           };
         },
         async getFile() {
           const b = files.get(name);
           return {
             size: b.length,
+            lastModified: lastModified.get(name) ?? Date.now(),
             // Whole-file read — instrumented so a test can assert a chunked reader
             // never falls back to this (see the "does not materialize the whole file"
             // assertion below).
@@ -55,6 +64,7 @@ function fakeOpfsRoot() {
     async removeEntry(name) {
       if (!files.has(name)) { const e = new Error('missing'); e.name = 'NotFoundError'; throw e; }
       files.delete(name);
+      lastModified.delete(name);
     },
     // Real FileSystemDirectoryHandle.keys() returns an async iterable of entry names —
     // mirrored here (sync generator; `for await` accepts a sync iterable just as well)
@@ -175,38 +185,48 @@ describe('createTempStore', () => {
 });
 
 describe('sweepOrphanTemps', () => {
-  test('deletes every bucketer-tmp-* entry, leaves staging zips and unrelated files alone', async () => {
+  const FIXED_NOW = 1_000_000_000_000; // arbitrary fixed instant; deterministic, no real timers
+  const OLD = FIXED_NOW - SWEEP_MIN_AGE_MS - 1; // just past the threshold: orphaned
+  const RECENT = FIXED_NOW - 5_000; // 5s old: a temp a live writer would still be draining
+
+  test('deletes an old bucketer-tmp-* entry, but spares a recent one (multi-tab safety) — leaves staging zips and unrelated files alone either way', async () => {
     const root = fakeOpfsRoot();
-    // Two orphaned prefetch temps (e.g. left behind by a crashed tab, from two different
-    // runs — tempSeq restarts at 0 each run, so colliding names across runs are expected
-    // and exactly what this sweep exists to clean up).
+    // An orphan left behind by a crashed tab: old enough that no live run could still be
+    // holding it (a live temp is consumed within seconds — see runPrefetch's writer lock).
     root.files.set('bucketer-tmp-p0', new Uint8Array(0));
+    root.lastModified.set('bucketer-tmp-p0', OLD);
+    // A LIVE temp from another tab's in-progress run. Same name shape (tempSeq restarts
+    // at 0 per run, so 'p1' from tab B can collide with a name tab A already used) — age
+    // is the only signal that tells these apart, which is exactly what this test proves.
     root.files.set('bucketer-tmp-p1', new Uint8Array(0));
+    root.lastModified.set('bucketer-tmp-p1', RECENT);
     // A staging zip tied to a live job record — must survive; it is cleaned up via
     // discardZipStaging/job lifecycle, never by this sweep.
     root.files.set('bucketer-zip-job1.zip', new Uint8Array(0));
     // Something this feature never wrote at all.
     root.files.set('unrelated-file.txt', new Uint8Array(0));
 
-    await sweepOrphanTemps(root);
+    await sweepOrphanTemps(root, { now: () => FIXED_NOW });
 
     assert.deepEqual(
       [...root.files.keys()].sort(),
-      ['bucketer-zip-job1.zip', 'unrelated-file.txt'],
+      ['bucketer-tmp-p1', 'bucketer-zip-job1.zip', 'unrelated-file.txt'],
     );
   });
 
   test('best-effort: a single removeEntry failure does not abort the rest of the sweep', async () => {
     const root = fakeOpfsRoot();
     root.files.set('bucketer-tmp-a', new Uint8Array(0));
+    root.lastModified.set('bucketer-tmp-a', OLD);
     root.files.set('bucketer-tmp-b', new Uint8Array(0));
+    root.lastModified.set('bucketer-tmp-b', OLD);
     const realRemove = root.removeEntry.bind(root);
     root.removeEntry = async (name) => {
       if (name === 'bucketer-tmp-a') throw new Error('simulated OPFS failure');
       return realRemove(name);
     };
 
-    await assert.doesNotReject(sweepOrphanTemps(root));
+    await assert.doesNotReject(sweepOrphanTemps(root, { now: () => FIXED_NOW }));
 
     // The failing entry is left behind (best-effort, not retried), but the sweep still
     // reached and removed the other one rather than aborting on the first error.
@@ -216,6 +236,6 @@ describe('sweepOrphanTemps', () => {
 
   test('best-effort: a root with no keys() (OPFS directory enumeration unsupported) does not throw', async () => {
     const root = { async removeEntry() {} }; // no keys() at all
-    await assert.doesNotReject(sweepOrphanTemps(root));
+    await assert.doesNotReject(sweepOrphanTemps(root, { now: () => FIXED_NOW }));
   });
 });
