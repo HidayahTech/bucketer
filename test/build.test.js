@@ -218,6 +218,20 @@ describe('Build output — assembler worker inlined as Blob URL (Task 7)', () =>
     assert.ok(jsBundle.includes('createSyncAccessHandle'), 'worker source must be inlined');
   });
 
+  // BUG-001-class guard: build.mjs's substitution must use a function replacer
+  // (not a plain string), or minified JS containing $&/$`/$'/$1-$9 sequences
+  // would corrupt the injected worker source. A second, unrelated string
+  // literal from deep in the worker's message protocol — one that a
+  // truncated/corrupted splice would be unlikely to reproduce by accident —
+  // round-tripping intact is evidence the whole source, not just a lucky
+  // prefix, survived substitution.
+  test('a second, unrelated worker string literal also round-trips intact', () => {
+    assert.ok(
+      jsBundle.includes('no createSyncAccessHandle in worker'),
+      'a distinct worker-source string literal must survive inlining unmodified (BUG-001 class)'
+    );
+  });
+
   test('placeholder is replaced at build, not shipped literally', () => {
     assert.ok(!html.includes('__WORKER_SRC__'), 'placeholder must be replaced at build');
   });

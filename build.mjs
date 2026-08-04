@@ -142,7 +142,7 @@ const inlineWorker = {
   name: 'inline-worker',
   setup(b) {
     b.onLoad({ filter: /assembler-worker-url\.js$/ }, async (args) => {
-      const src = readFileSync(args.path, 'utf8').replace("'__WORKER_SRC__'", JSON.stringify(workerSrc));
+      const src = readFileSync(args.path, 'utf8').replace("'__WORKER_SRC__'", () => JSON.stringify(workerSrc));
       return { contents: src, loader: 'js' };
     });
   },
