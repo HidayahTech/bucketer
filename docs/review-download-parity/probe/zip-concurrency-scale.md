@@ -261,6 +261,17 @@ against each other and touch the design's stated scope:
 Per the task brief: reporting the numbers and stopping here rather than committing a
 "premise holds" conclusion the data does not support for the memory/OPFS half of D6.
 
+## Operator decision (2026-08-04)
+
+Presented with these options, the operator chose to **ship the 3-tier design as-is and
+document the Firefox process-memory growth as a known limitation** (rather than drop the
+medium/OPFS-temp tier, delay for a Gecko-side investigation, or lower `MEDIUM_MAX`). The
+wall-clock speedup is the primary goal and it is delivered in both engines; OPFS *disk* usage
+is correctly bounded; Chromium process memory is bounded. The Firefox medium-tier RSS growth
+is recorded in the design spec's "Known limitations" section and left as a tracked follow-up
+(a targeted Gecko OPFS-release probe, or an opt-out of the medium tier on Firefox) — not
+blocking the v1.48.0 release.
+
 ## Files
 
 - `docs/review-download-parity/probe/probe-concurrency.html` — the probe page (new).

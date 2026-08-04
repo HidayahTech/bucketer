@@ -131,6 +131,22 @@ API, exclusive per file, worker-only); per-slot CRC/descriptor handling; and —
 a **cross-browser OPFS positioned-write fidelity probe** before relying on it. Higher effort
 and risk; deferred to Phase 2.
 
+## Known limitations (measured 2026-08-04, operator-accepted)
+
+The throughput probe (`docs/review-download-parity/probe/zip-concurrency-scale.md`) confirmed
+the concurrency win (≈3.97× on many-small-files; 1.9–2.68× mixed) and that OPFS **disk** usage
+stays bounded (≤ N×MEDIUM_MAX). It also found a **Firefox-specific process-memory** growth:
+the medium (OPFS-temp) tier's write→read-back→delete cycle leaves ≈48 MiB of Firefox process
+RSS un-reclaimed **per medium (4–64 MiB) file processed**, independent of concurrency (it
+reproduces at concurrency=1). OPFS's own on-disk usage stays flat, so the buffering algorithm
+is correct — this is Gecko's OPFS implementation not releasing process memory promptly, not a
+design defect. Extrapolated, a Firefox job of ~200 medium files could exhaust tab memory.
+
+**Operator decision (2026-08-04): ship the 3-tier design as-is and document this**, rather
+than drop the medium tier or delay for a Gecko-side investigation. Chromium is unaffected
+(process memory bounded). A future improvement (a Gecko OPFS-release investigation, or making
+the medium tier opt-out on Firefox) is tracked as a follow-up, not blocking this release.
+
 ## Out of scope (this phase)
 
 - In-place offset composition (Phase 2, above).
