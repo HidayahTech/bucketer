@@ -3,6 +3,8 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { zipEntryPath, zipFileName, zipGate } from '../src/lib/zip-job.js';
+import { CONCURRENCY, MEDIUM_MAX } from '../src/lib/zip-prefetch.js';
+import { QUOTA_SAFETY } from '../src/lib/browser-capability.js';
 
 const CAPS = { opfs: true, streamingFetch: true, writableFiles: true };
 
@@ -34,7 +36,9 @@ describe('zipFileName', () => {
 describe('zipGate', () => {
   const quota = (free) => ({ quotaBytes: free + 100, usageBytes: 100 });
   test('offered when capabilities present and the job fits', () => {
-    assert.equal(zipGate({ caps: CAPS, sendableBytes: 10, quota: quota(1000), persisted: false }).state, 'offered');
+    // free = 1 GB: comfortably covers both the tiny sendableBytes and the
+    // CONCURRENCY*MEDIUM_MAX reserve (~256 MiB by default).
+    assert.equal(zipGate({ caps: CAPS, sendableBytes: 10, quota: quota(1e9), persisted: false }).state, 'offered');
   });
   test('unavailable without OPFS capability', () => {
     const g = zipGate({ caps: { ...CAPS, opfs: false }, sendableBytes: 10, quota: quota(1000), persisted: false });
@@ -53,6 +57,38 @@ describe('zipGate', () => {
     assert.notEqual(zipGate({ caps: CAPS, sendableBytes: 95, quota: quota(100), persisted: false }).state, 'offered');
   });
   test('unknown quota is optimistic', () => {
+    assert.equal(zipGate({ caps: CAPS, sendableBytes: 1e15, quota: null, persisted: false }).state, 'offered');
+  });
+
+  describe('reserves CONCURRENCY*MEDIUM_MAX headroom for in-flight prefetch temps', () => {
+    // free*QUOTA_SAFETY set exactly halfway between sendableBytes and
+    // sendableBytes+reserve: sendableBytes alone fits comfortably, but adding the
+    // reserve tips it just over the usable line.
+    const reserve = CONCURRENCY * MEDIUM_MAX;
+    const sendableBytes = 1_000_000;
+    const usable = sendableBytes + reserve / 2;
+    const free = usable / QUOTA_SAFETY;
+
+    test('sanity: sendableBytes alone would fit the raw headroom', () => {
+      assert.ok(sendableBytes <= free * QUOTA_SAFETY);
+    });
+    test('sanity: sendableBytes + reserve exceeds the raw headroom', () => {
+      assert.ok(sendableBytes + reserve > free * QUOTA_SAFETY);
+    });
+
+    test('needs-storage (not offered) when persist has not been granted', () => {
+      const g = zipGate({ caps: CAPS, sendableBytes, quota: quota(free), persisted: false });
+      assert.equal(g.state, 'needs-storage');
+    });
+    test('unavailable (not offered) when persist is already granted', () => {
+      const g = zipGate({ caps: CAPS, sendableBytes, quota: quota(free), persisted: true });
+      assert.equal(g.state, 'unavailable');
+    });
+  });
+
+  test('unknown quota still optimistic even though a reserve now applies', () => {
+    // The reserve only matters once free space is known; the unknown-quota path returns
+    // before free is ever computed, so it must stay unaffected.
     assert.equal(zipGate({ caps: CAPS, sendableBytes: 1e15, quota: null, persisted: false }).state, 'offered');
   });
 });

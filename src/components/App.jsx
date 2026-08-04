@@ -71,6 +71,7 @@ import { issueBrowserDownload } from '../lib/download-issue.js';
 import { probeUrl, blockedMessage } from '../lib/download-preflight.js';
 import { runZipJob, discardZipStaging, zipFileName, openZipStaging, zipGate } from '../lib/zip-job.js';
 import { exportZip } from '../lib/zip-export.js';
+import { CONCURRENCY } from '../lib/zip-prefetch.js';
 import { detectCapabilities, readStorageQuota } from '../lib/browser-capability.js';
 import { presignDownloadParams } from '../lib/presign-params.js';
 import { normalizeRoots, selectionLabel } from '../lib/download-roots.js';
@@ -808,6 +809,7 @@ export function App() {
         presign,
         probe: probeUrl,
         root,
+        concurrency: CONCURRENCY,
         shouldCancel: () => taskStore.isCancelRequested(id),
         onProgress: ({ done, bytesDone, active }) => taskStore.update(id, { current: done, bytesDone, active }, false),
       });

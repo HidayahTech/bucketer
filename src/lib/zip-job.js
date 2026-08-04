@@ -10,7 +10,7 @@
 import { sanitizeSegment } from './download-naming.js';
 import { QUOTA_SAFETY } from './browser-capability.js';
 import { createZipWriter } from './zip-writer.js';
-import { runPrefetch } from './zip-prefetch.js';
+import { runPrefetch, CONCURRENCY, MEDIUM_MAX } from './zip-prefetch.js';
 import { PROBE_KIND } from './download-preflight.js';
 import { updateItem, eachItemByStatus, countItemsByStatus, ITEM_STATUS } from './download-records.js';
 
@@ -33,13 +33,20 @@ export function zipFileName(bucket, capturedPrefix = '', now = new Date()) {
 // The gate, in the spec's order: capability, then fit, then the lazy-persist path.
 // Unknown quota is optimistic per selectTier's philosophy — a quota failure is catchable
 // at runtime, refusing up front denies the mechanism to browsers that will not say.
+//
+// The fit check reserves CONCURRENCY*MEDIUM_MAX on top of sendableBytes (D4): up to
+// CONCURRENCY prefetch workers can each have a medium-tier item buffered in an OPFS temp
+// file at once, on top of the staging zip itself, so the raw sendable total understates
+// worst-case peak usage without this headroom. The reason text keeps reporting the honest
+// sendable size — the reserve is internal headroom, not a number the user asked about.
 export function zipGate({ caps, sendableBytes, quota, persisted }) {
   if (!caps?.opfs || !caps?.streamingFetch || !caps?.writableFiles) {
     return { state: 'unavailable', reason: 'This browser cannot stage a ZIP.' };
   }
   if (quota?.quotaBytes == null) return { state: 'offered', reason: null };
   const free = Math.max(0, quota.quotaBytes - (quota.usageBytes ?? 0));
-  if (sendableBytes <= free * QUOTA_SAFETY) return { state: 'offered', reason: null };
+  const reserve = CONCURRENCY * MEDIUM_MAX;
+  if (sendableBytes + reserve <= free * QUOTA_SAFETY) return { state: 'offered', reason: null };
   const gb = (n) => (n / 1e9).toFixed(1);
   const reason = `Needs about ${gb(sendableBytes)} GB of temporary browser storage; ${gb(free)} GB available.`;
   return persisted ? { state: 'unavailable', reason } : { state: 'needs-storage', reason };

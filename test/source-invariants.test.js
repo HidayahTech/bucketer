@@ -1706,3 +1706,32 @@ describe('App.jsx / queue-tasks.js — zip task carries bytesTotal, active, jobI
     assert.match(appSource, /loadZipDetail/, 'App.jsx must import loadZipDetail to wire it into readZipDetail');
   });
 });
+
+// ── download-concurrency Task 6: handleZipStart passes concurrency through to runZipJob ──
+// runZipJob forwards its `concurrency` option straight to runPrefetch, which otherwise
+// falls back to its own internal CONCURRENCY default. Passing it explicitly from
+// handleZipStart keeps CONCURRENCY a single tunable point (design spec D4/D7) rather than
+// splitting the default between zip-prefetch.js and an implicit caller omission.
+describe('App.jsx — handleZipStart passes concurrency to runZipJob (download-concurrency Task 6)', () => {
+  const appSource = src('components/App.jsx');
+
+  test('App.jsx imports CONCURRENCY from zip-prefetch.js', () => {
+    assert.match(appSource, /import\s*\{[^}]*\bCONCURRENCY\b[^}]*\}\s*from\s*['"]\.\.\/lib\/zip-prefetch\.js['"]/,
+      'App.jsx must import CONCURRENCY from zip-prefetch.js to pass it to runZipJob');
+  });
+
+  test('the runZipJob call inside handleZipStart passes concurrency: CONCURRENCY', () => {
+    const fnStart = appSource.indexOf('async function handleZipStart');
+    assert.ok(fnStart > -1, 'handleZipStart must exist');
+    const fnEnd = appSource.indexOf('async function handleMoveRequest', fnStart);
+    assert.ok(fnEnd > fnStart, 'handleZipStart must be followed by handleMoveRequest');
+    const fnBody = appSource.slice(fnStart, fnEnd);
+
+    const callIdx = fnBody.indexOf('runZipJob(fresh,');
+    assert.ok(callIdx > -1, 'handleZipStart must call runZipJob(fresh, {...})');
+    const callEnd = fnBody.indexOf('});', callIdx);
+    const call = fnBody.slice(callIdx, callEnd > -1 ? callEnd : callIdx + 400);
+    assert.match(call, /concurrency:\s*CONCURRENCY\b/,
+      'handleZipStart must pass concurrency: CONCURRENCY to runZipJob explicitly');
+  });
+});
