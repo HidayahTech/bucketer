@@ -7,10 +7,11 @@
 // Finished rows persist until dismissed (a delete result is evidence — it must
 // not vanish on a timer); "Dismiss all finished" appears at ≥2 settled rows.
 // Controls talk to the store directly — App only creates tasks and runs engines.
-import { useState, useEffect } from 'preact/hooks';
-import { leafName } from '../lib/format.js';
+import { useState, useEffect, useRef } from 'preact/hooks';
+import { leafName, formatBytes, formatSpeed, formatEta } from '../lib/format.js';
 import { taskStore } from '../lib/task-store.js';
 import { tierLabel, TIERS } from '../lib/browser-capability.js';
+import { useRate } from '../hooks/useRate.js';
 
 const VERBS = {
   delete: { active: 'Deleting', done: 'Deleted' },
@@ -34,7 +35,17 @@ function downloadSummary(t) {
   // a finished-but-unexported zip (export failed or the save dialog was cancelled,
   // which is recoverable via "save it again", not a lost job).
   if (t.delivery === 'zip') {
-    if (t.status === 'running')   return `Zipping ${t.current}${ofText}…`;
+    if (t.status === 'running') {
+      // Byte-accurate progress (bytesTotal) unlocks the enriched "N of M files" line;
+      // without it (older job, or a zero-byte selection) fall back to the plain count-only
+      // line this row has always shown — never divide by a zero/missing bytesTotal.
+      if (t.bytesTotal) {
+        const failedZipText = t.failed > 0 ? ` · ${t.failed} failed` : '';
+        const totalZipText = total != null ? ` of ${total.toLocaleString()}` : '';
+        return `Zipping · ${t.current.toLocaleString()}${totalZipText} files${failedZipText}`;
+      }
+      return `Zipping ${t.current}${ofText}…`;
+    }
     if (t.status === 'cancelled') return `Stopped while zipping — ${t.current}${ofText}`;
     if (t.status === 'done' && t.exported) return 'ZIP handed to your browser';
     if (t.status === 'done' && t.finished) return 'ZIP ready — save it again';
@@ -66,7 +77,7 @@ function taskSummary(t) {
   return `${verbs.active} ${t.subject}${progressText}${skippedText}${failedText}`;
 }
 
-export function MasterQueue({ store = taskStore }) {
+export function MasterQueue({ store = taskStore, readZipDetail }) {
   const [tasks, setTasks] = useState(store.get());
   useEffect(() => store.subscribe(setTasks), [store]);
   if (tasks.length === 0) return null;
@@ -82,16 +93,77 @@ export function MasterQueue({ store = taskStore }) {
           </button>
         </div>
       )}
-      {tasks.map(t => <TaskRow key={t.id} task={t} store={store} />)}
+      {tasks.map(t => <TaskRow key={t.id} task={t} store={store} readZipDetail={readZipDetail} />)}
     </div>
   );
 }
 
-function TaskRow({ task, store }) {
+function TaskRow({ task, store, readZipDetail }) {
   const isSettled = task.status !== 'running';
   const failed    = task.errors.filter(e => !e.skipped).length;
   const hasErrors = task.errors.length > 0;
-  const expanded  = isSettled && hasErrors && !task.collapsed;
+  const isZip        = task.delivery === 'zip';
+  const isRunningZip = isZip && task.status === 'running';
+
+  // useRate no-ops (no interval) whenever its `active` arg is false, so it is cheap to
+  // call unconditionally for every task row rather than conditionally per delivery kind
+  // (conditional hooks would break across a task whose delivery/kind never actually
+  // changes, but there is no reason to risk it for a call this cheap).
+  const speed = useRate(isZip ? (task.bytesDone ?? 0) : 0, isRunningZip);
+
+  const bytesDone  = task.bytesDone ?? 0;
+  const bytesTotal = task.bytesTotal ?? 0;
+  // The byte line + bar render only while actually streaming, and only once the job
+  // knows its sendable bytes — never divide by a zero/missing bytesTotal.
+  const showZipProgress = isRunningZip && !!task.bytesTotal;
+  const barPct = showZipProgress ? Math.min(100, Math.max(0, (bytesDone / bytesTotal) * 100)) : 0;
+  const eta = showZipProgress && speed > 0 ? (bytesTotal - bytesDone) / speed : null;
+
+  // Zip tasks get the new active-focused detail (running, or settled with per-key
+  // errors); every other task kind keeps the pre-existing settled+errors-only error list,
+  // untouched.
+  const canExpandZip     = isZip && (isRunningZip || (isSettled && hasErrors));
+  const canExpandGeneric = !isZip && isSettled && hasErrors;
+  const canExpand         = canExpandZip || canExpandGeneric;
+  const expanded           = canExpand && !task.collapsed;
+  const expandedZip        = expanded && isZip;
+  const expandedGeneric    = expanded && !isZip;
+
+  const [zipDetail, setZipDetail] = useState(null);
+  // Read via a ref so an inline readZipDetail prop identity (App.jsx wraps loadZipDetail
+  // in a fresh arrow function each render) never itself triggers a re-read — only
+  // expandedZip/jobId/isRunningZip transitions do.
+  const readZipDetailRef = useRef(readZipDetail);
+  readZipDetailRef.current = readZipDetail;
+
+  // Read the per-file detail once when the panel opens, then re-read on a ~1s throttle
+  // while it stays open and the job is still running — never on every task.current tick
+  // (a fast many-small-file job would otherwise re-read on every completion, and each
+  // read walks the whole job — see loadZipDetail). One extra read fires the moment the
+  // job leaves 'running' while the panel is still expanded (isRunningZip flips, so this
+  // effect re-runs once more before settling into "no interval"), so a panel left open
+  // across the settle transition shows the final state rather than one up to a second old.
+  useEffect(() => {
+    if (!expandedZip || !task.jobId) return undefined;
+    let cancelled = false;
+    const read = () => {
+      const fn = readZipDetailRef.current;
+      if (!fn) return;
+      fn(task.jobId).then(d => { if (!cancelled) setZipDetail(d); });
+    };
+    read();
+    if (!isRunningZip) return () => { cancelled = true; };
+    const h = setInterval(read, 1000);
+    return () => { cancelled = true; clearInterval(h); };
+  }, [expandedZip, isRunningZip, task.jobId]);
+
+  const doneList    = zipDetail?.done ?? [];
+  const failedList  = zipDetail?.failed ?? [];
+  const doneCount   = zipDetail?.doneCount ?? 0;
+  const failedCount = zipDetail?.failedCount ?? 0;
+  const queuedCount = Math.max(0, (task.total ?? 0) - doneCount - failedCount);
+  const doneOverflow = doneCount - doneList.length;
+  const activePct = task.active?.size ? Math.round((task.active.bytes / task.active.size) * 100) : 0;
 
   return (
     <div class={`queue-op${expanded ? ' queue-op-expanded' : ''}`}>
@@ -119,8 +191,9 @@ function TaskRow({ task, store }) {
             {task.cancelRequested ? 'Cancelling…' : 'Cancel'}
           </button>
         )}
-        {isSettled && hasErrors && (
+        {canExpand && (
           <button type="button" class="btn btn-ghost btn-sm" style={{ flexShrink: 0 }}
+            data-testid="task-expand-toggle"
             onClick={() => store.update(task.id, { collapsed: !task.collapsed }, true)}>
             {task.collapsed ? 'Show details' : 'Hide'}
           </button>
@@ -132,7 +205,39 @@ function TaskRow({ task, store }) {
           </button>
         )}
       </div>
-      {expanded && (
+
+      {showZipProgress && (
+        <div class="queue-op-progress">
+          <div class="progress-bar-wrap">
+            <div class="progress-bar" data-testid="zip-progress-bar" style={{ width: `${barPct.toFixed(2)}%` }} />
+          </div>
+          <div class="queue-op-bytes">
+            {formatBytes(bytesDone)} of {formatBytes(bytesTotal)}
+            {speed > 0 && ` · ${formatSpeed(speed)} · ETA ${formatEta(eta)}`}
+          </div>
+        </div>
+      )}
+
+      {expandedZip && (
+        <div class="queue-op-zip-detail" data-testid="zip-detail">
+          {task.active && (
+            <div class="queue-op-zip-row queue-op-zip-active">
+              ▶ {task.active.key}  {formatBytes(task.active.bytes)} / {formatBytes(task.active.size)}  ({activePct}%)
+            </div>
+          )}
+          {doneList.map(d => (
+            <div key={d.key} class="queue-op-zip-row queue-op-zip-done">✓ {d.key}  {formatBytes(d.size)}</div>
+          ))}
+          {failedList.map(f => (
+            <div key={f.key} class="queue-op-zip-row queue-op-zip-failed">✗ {f.key}  failed</div>
+          ))}
+          <div class="queue-op-zip-row queue-op-zip-footer">
+            …and {queuedCount.toLocaleString()} queued{doneOverflow > 0 ? ` · ${doneOverflow.toLocaleString()} more done` : ''}
+          </div>
+        </div>
+      )}
+
+      {expandedGeneric && (
         <div class="queue-op-errors">
           {task.errors.slice(0, 10).map((e, i) => (
             <div key={i} class="queue-op-error-row">
