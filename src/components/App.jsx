@@ -61,7 +61,7 @@ import { createDeleteTask, createTransferTask, createDownloadTask, engineUpdateT
 import { DownloadJobPanel } from './DownloadJobPanel.jsx';
 import {
   saveJob, loadJob, loadAllJobs, deleteJob, updateJob, countItemsByStatus,
-  eachItemByStatus, resetFailedToPending, ITEM_STATUS, JOB_STATUS,
+  eachItemByStatus, resetFailedToPending, ITEM_STATUS, JOB_STATUS, loadZipDetail,
 } from '../lib/download-records.js';
 import { enumerateJob } from '../lib/download-manifest.js';
 import { runDownloadJob, jobOutcome } from '../lib/download-queue.js';
@@ -779,7 +779,15 @@ export function App() {
     const doneAtStart = await countItemsByStatus(fresh.id, ITEM_STATUS.DONE);
     const pending = await countItemsByStatus(fresh.id, ITEM_STATUS.PENDING);
     const total = doneAtStart + pending;
-    const task = createDownloadTask({ fileCount: total, bucket: fresh.bucket, capturedPrefix: fresh.prefix, delivery: 'zip' });
+    // Static for the run, like total above: the sendable-bytes figure the job already
+    // tracks (download-records.js's appendManifestPage), read the same way
+    // DownloadJobPanel's allowStorageForJob reads it — bytesSendable falling back to
+    // bytesTotal for a job enumerated before the sendable counters existed.
+    const bytesTotal = fresh.counters?.bytesSendable ?? fresh.counters?.bytesTotal ?? 0;
+    const task = createDownloadTask({
+      fileCount: total, bucket: fresh.bucket, capturedPrefix: fresh.prefix, delivery: 'zip',
+      jobId: fresh.id, bytesTotal,
+    });
     const id = taskStore.add(task);
     taskStore.update(id, { subPhase: null, total }, true);
     activeDownloadJobs.current.add(fresh.id);
@@ -801,7 +809,7 @@ export function App() {
         probe: probeUrl,
         root,
         shouldCancel: () => taskStore.isCancelRequested(id),
-        onProgress: ({ done, bytesDone }) => taskStore.update(id, { current: done, bytesDone }, false),
+        onProgress: ({ done, bytesDone, active }) => taskStore.update(id, { current: done, bytesDone, active }, false),
       });
 
       // result.issued restarts at 0 every run, so on a resumed job it would regress the
@@ -1262,7 +1270,9 @@ export function App() {
               onMount={({ addFiles }) => { addFilesRef.current = addFiles; }}
             />
 
-            <MasterQueue />
+            <MasterQueue
+              readZipDetail={(jobId) => loadZipDetail(jobId).catch(() => ({ done: [], failed: [], doneCount: 0, failedCount: 0 }))}
+            />
 
             <UploadLog refreshKey={logKey} />
 

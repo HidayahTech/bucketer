@@ -1,7 +1,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  subjectLabel, createDeleteTask, createTransferTask, engineUpdateToPatch,
+  subjectLabel, createDeleteTask, createTransferTask, createDownloadTask, engineUpdateToPatch,
 } from '../src/lib/queue-tasks.js';
 
 describe('subjectLabel', () => {
@@ -56,6 +56,23 @@ describe('createTransferTask — rename', () => {
   test('move/copy tasks are unchanged', () => {
     assert.equal(createTransferTask({ files: ['a'], prefixes: [], dest: 'd/', capturedPrefix: '', bucket: 'b', mode: 'move' }).kind, 'move');
     assert.equal(createTransferTask({ files: ['a'], prefixes: [], dest: 'd/', capturedPrefix: '', bucket: 'b', mode: 'copy' }).kind, 'copy');
+  });
+});
+
+describe('createDownloadTask', () => {
+  test('stores jobId and bytesTotal when provided', () => {
+    const t = createDownloadTask({
+      fileCount: 5, bucket: 'bkt', capturedPrefix: 'x/', delivery: 'zip',
+      jobId: 'job-1', bytesTotal: 4096,
+    });
+    assert.equal(t.jobId, 'job-1');
+    assert.equal(t.bytesTotal, 4096);
+  });
+
+  test('omitting jobId/bytesTotal yields undefined (additive, legacy tasks unaffected)', () => {
+    const t = createDownloadTask({ fileCount: 5, bucket: 'bkt', capturedPrefix: 'x/' });
+    assert.equal(t.jobId, undefined);
+    assert.equal(t.bytesTotal, undefined);
   });
 });
 
