@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.47.0] — 2026-08-04 — Watch the ZIP fill
+
+A running ZIP download now shows real progress — bytes done and total, transfer speed, and time remaining, with a progress bar — instead of just "Zipping…". Expand it to see the file downloading right now, the files already added, any that failed with the reason, and how many remain. It matches how uploads report progress. The per-file browser download is unchanged.
+
 ## [1.46.0] — 2026-08-03 — One ZIP, one dialog
 
 Download as one ZIP bundles the folder or selection you chose into a single file with its folder structure intact, so the browser asks once instead of once per file. ZIP jobs stream through the browser's private storage, show real byte progress, stop and resume across sessions, and pause to ask for more storage only when a job needs it — never as a blanket prompt. Where a browser cannot stage one (Safari), the per-file download is offered instead. Firefox and Chromium; the existing per-file delivery is unchanged.
