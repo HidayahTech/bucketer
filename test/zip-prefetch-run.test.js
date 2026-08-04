@@ -467,4 +467,58 @@ describe('runPrefetch', () => {
     assert.deepEqual(result.failed, [], 'a NETWORK block must not be recorded as per-item failures');
     assert.deepEqual(probeCalls, ['n1'], 'the job must stop at the first NETWORK result and never probe the remaining items');
   });
+
+  // ── 9. (Temp-file leak fix) an aborted mid-write temp-tier item orphans no OPFS file ──
+  // Reported leak: the "cut off by our own abort" catch branch never removed the item's
+  // temp file (only the genuine-failure and happy-path branches did), and
+  // tempStore.removeAll() was never called anywhere in runPrefetch — so a temp-tier item
+  // aborted mid-tempStore.put() (cancel / NETWORK-block / a caller's quota-STORAGE pause
+  // via shouldCancel) orphaned a bucketer-tmp-p<N> file on OPFS forever.
+  test('9. an item aborted mid-write to its OPFS temp file leaves no orphaned bucketer-tmp-* file', async () => {
+    const fastItem = { key: 'fast.txt', size: 4 };               // memory tier, completes first
+    const midItem = { key: 'mid.bin', size: 5 * 1024 * 1024 };    // temp tier
+
+    // Deliberately never resolved — the only way this settles is via the AbortSignal
+    // firing (raceWithAbort's own upfront `signal.aborted` check makes this safe
+    // regardless of exactly when the abort happens relative to this read call).
+    const neverResolves = deferred();
+
+    const fetchImpl = async (url, { signal } = {}) => {
+      const key = new URL(url).searchParams.get('key');
+      if (key === 'fast.txt') return { ok: true, status: 200, body: fastBody([enc('fast')]) };
+      // mid.bin: the first read delivers a real chunk immediately (so tempStore.put has
+      // genuinely started writing, one real write already landed on the fake root), and
+      // every read after that hangs until the AbortSignal fires — i.e. genuinely
+      // mid-write when abortAllInFlight() cuts it off, not merely "not yet started".
+      let reads = 0;
+      return {
+        ok: true, status: 200,
+        body: {
+          getReader() {
+            return {
+              async read() {
+                reads += 1;
+                if (reads === 1) return { done: false, value: new Uint8Array(1024) };
+                await raceWithAbort(neverResolves.promise, signal);
+                return { done: true, value: undefined };
+              },
+            };
+          },
+        },
+      };
+    };
+
+    const root = fakeOpfsRoot();
+    let completions = 0;
+    const onReady = async () => { completions += 1; };
+    const shouldCancel = () => completions >= 1;
+
+    const result = await runPrefetch([fastItem, midItem], {
+      fetchImpl, presign, root, concurrency: 2, onReady, shouldCancel,
+    });
+
+    assert.equal(result.cancelled, true);
+    const leftoverTemps = [...root.files.keys()].filter((k) => k.startsWith('bucketer-tmp-'));
+    assert.deepEqual(leftoverTemps, [], 'no bucketer-tmp-* file may survive an item aborted mid-write');
+  });
 });

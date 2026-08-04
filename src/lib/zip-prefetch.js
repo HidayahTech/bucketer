@@ -32,6 +32,11 @@ export function createTempStore(root) {
     async put(name, chunksIterable) {
       const fname = tempName(name);
       const handle = await root.getFileHandle(fname, { create: true });
+      // Tracked as soon as the file exists on disk, not only after a successful write —
+      // a chunksIterable that throws/aborts mid-write (e.g. runPrefetch's temp-tier
+      // fetch getting cut off by a cancel-triggered AbortError) still leaves this file
+      // behind, and removeAll()'s safety-net sweep can only find what's in this set.
+      created.add(fname);
       const writable = await handle.createWritable();
       let size = 0;
       for await (const chunk of chunksIterable) {
@@ -39,7 +44,6 @@ export function createTempStore(root) {
         size += chunk.byteLength ?? chunk.length;
       }
       await writable.close();
-      created.add(fname);
       return { size };
     },
 
@@ -320,6 +324,10 @@ export async function runPrefetch(items, {
       if ((cancelled || blocked) && err?.name === 'AbortError') {
         // Cut off by our own cancel- or NETWORK-block-triggered abort: not this item's
         // fault. Leave it untouched (neither done nor failed) for a resume to re-fetch.
+        // A temp-tier item can be mid-tempStore.put() when this fires, leaving a
+        // partial bucketer-tmp-* file on OPFS — remove it immediately rather than
+        // relying solely on the end-of-run removeAll() safety net below.
+        if (tempName) await tempStore.remove(tempName).catch(() => {});
       } else {
         failed.push({ item, message: err?.message || String(err) });
         if (tempName) await tempStore.remove(tempName).catch(() => {});
@@ -331,7 +339,18 @@ export async function runPrefetch(items, {
     }
   }
 
-  await runPool(items, processItem, concurrency);
+  try {
+    await runPool(items, processItem, concurrency);
+  } finally {
+    // Safety-net sweep, on every exit path (done/failed/denied/blocked/cancelled): every
+    // happy-path and genuine-failure temp is already individually removed above and so
+    // no longer in the store's created-set — this only clears whatever an abort path
+    // left behind (now trackable regardless of write outcome, per the fix to
+    // createTempStore.put's created.add(fname) above). Especially important on the
+    // quota-STORAGE pause path (via a caller's shouldCancel): pausing because storage is
+    // low must never itself orphan bytes.
+    await tempStore.removeAll();
+  }
 
   return { failed, denied, blocked, cancelled };
 }
