@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.48.0] — 2026-08-04 — Download in parallel
+
+ZIP downloads now fetch several files at once instead of one at a time, so a folder of many small files finishes much faster. Small files buffer in memory, medium files in the browser's private storage, and large files stream one at a time; the archive is assembled the same way, and resume, progress, and the single save dialog are unchanged. The expanded progress detail now shows the files downloading right now, not just one. On Firefox, an archive of very many medium-to-large files can use significant memory.
+
 ## [1.47.0] — 2026-08-04 — Watch the ZIP fill
 
 A running ZIP download now shows real progress — bytes done and total, transfer speed, and time remaining, with a progress bar — instead of just "Zipping…". Expand it to see the file downloading right now, the files already added, any that failed with the reason, and how many remain. It matches how uploads report progress. The per-file browser download is unchanged.
