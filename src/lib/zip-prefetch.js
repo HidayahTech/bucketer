@@ -84,7 +84,7 @@ const DENIED_BLOCK_STREAK = 3;
 
 // runPrefetch(items, { fetchImpl, presign, probe, root, concurrency, onReady, onProgress,
 //                       shouldCancel })
-//   -> { failed: [{item, message}], denied, cancelled }
+//   -> { failed: [{item, message}], denied, blocked, cancelled }
 //
 // Up to `concurrency` fetch workers pull items off a shared queue (via runPool,
 // upload-queue.js's generalized N-worker pool) and race each other over the network.
@@ -93,6 +93,17 @@ const DENIED_BLOCK_STREAK = 3;
 // order (fastest fetch first), not manifest order. A worker always awaits `onReady`
 // before taking its next item, which is what bounds the number of fetched-but-unwritten
 // buffers to ~concurrency (natural backpressure; no separate semaphore needed).
+//
+// The cancel check inside that lock (not just before enqueuing the call) matters: a
+// worker can finish fetching and queue its onReady call before `cancelled` flips, but
+// the queued closure only actually runs once it reaches the front of the writer chain —
+// by which point cancellation may already be observed. Skipping onReady there (rather
+// than only gating new intake) is what stops a write-after-cancel.
+//
+// A NETWORK probe result (CORS/offline) blocks the whole job immediately — mirroring
+// download-queue.js's sequential engine — rather than failing items one by one: it sets
+// `blocked` to the first such probe result, stops new intake, and aborts in-flight
+// fetches. It is never recorded in `failed`.
 //
 // Tiering (classifyTier): memory buffers accumulate in an array of chunks and compute
 // their CRC as they stream; temp buffers stream straight into an OPFS temp file
@@ -122,6 +133,7 @@ export async function runPrefetch(items, {
 
   const failed = [];
   let denied = false;
+  let blocked = null;
   let cancelled = false;
   let consecutiveDenied = 0;
   let stopIntake = false;
@@ -187,6 +199,19 @@ export async function runPrefetch(items, {
 
       if (probe) {
         const result = await probe(url);
+        if (result.kind === PROBE_KIND.NETWORK) {
+          // Job-wide, immediately: CORS/offline can't be fixed by moving to the next
+          // item. Mirrors download-queue.js's sequential engine, which blocks on the
+          // first NETWORK result rather than accumulating per-item failures. Not pushed
+          // to `failed` — only the first NETWORK result is recorded as `blocked`, but
+          // every NETWORK result (first or not) is excluded from `failed`.
+          if (!blocked) {
+            blocked = result;
+            stopIntake = true;
+            abortAllInFlight();
+          }
+          return;
+        }
         if (result.kind !== PROBE_KIND.OK) {
           if (result.kind === PROBE_KIND.DENIED) {
             consecutiveDenied += 1;
@@ -268,14 +293,33 @@ export async function runPrefetch(items, {
         };
       }
 
-      await withWriterLock(() => onReady(entry));
+      // Guarded INSIDE the lock (see the top-of-function note): `cancelled` is checked
+      // at the moment this closure actually reaches the front of the writer chain, not
+      // just before it was enqueued.
+      const wrote = await withWriterLock(async () => {
+        if (cancelled) return false;
+        await onReady(entry);
+        return true;
+      });
 
-      consecutiveDenied = 0;
+      if (!wrote) {
+        // Skipped for cancel: discard rather than write. For solo specifically, its
+        // generator (and the activeState cleanup in its own `finally`) never got a
+        // chance to start, since nothing ever iterated it — clean up here instead.
+        activeState.delete(item.key);
+        emitProgress();
+      }
+      // Either the writer just finished draining the temp file (wrote===true), or the
+      // write was skipped and the buffer is being discarded (wrote===false) — in both
+      // cases the temp file's job is done and it must not be left behind.
+      if (tempName) await tempStore.remove(tempName).catch(() => {});
+
+      if (wrote) consecutiveDenied = 0;
       noteCancelIfRequested();
     } catch (err) {
-      if (cancelled && err?.name === 'AbortError') {
-        // Cut off by our own cancel-triggered abort: not this item's fault. Leave it
-        // untouched (neither done nor failed) for a resume to re-fetch.
+      if ((cancelled || blocked) && err?.name === 'AbortError') {
+        // Cut off by our own cancel- or NETWORK-block-triggered abort: not this item's
+        // fault. Leave it untouched (neither done nor failed) for a resume to re-fetch.
       } else {
         failed.push({ item, message: err?.message || String(err) });
         if (tempName) await tempStore.remove(tempName).catch(() => {});
@@ -289,5 +333,5 @@ export async function runPrefetch(items, {
 
   await runPool(items, processItem, concurrency);
 
-  return { failed, denied, cancelled };
+  return { failed, denied, blocked, cancelled };
 }

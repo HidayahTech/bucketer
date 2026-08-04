@@ -191,7 +191,7 @@ describe('runPrefetch', () => {
     }
 
     const result = await resultPromise;
-    assert.deepEqual(result, { failed: [], denied: false, cancelled: false });
+    assert.deepEqual(result, { failed: [], denied: false, blocked: null, cancelled: false });
     assert.deepEqual(order, sequence, 'onReady must fire in completion order, not manifest order');
 
     for (let i = 1; i < progress.length; i++) {
@@ -228,6 +228,16 @@ describe('runPrefetch', () => {
     };
 
     const root = fakeOpfsRoot();
+    // Spy on temp-file creation so we can positively prove the temp tier really used
+    // OPFS for medium.bin, even though (per Fix 3) a successful run now cleans the temp
+    // file up afterward — root.files alone can no longer show it existed.
+    const tempFilesCreated = [];
+    const realGetFileHandle = root.getFileHandle.bind(root);
+    root.getFileHandle = async (name, opts) => {
+      if (opts?.create && name.startsWith('bucketer-tmp-')) tempFilesCreated.push(name);
+      return realGetFileHandle(name, opts);
+    };
+
     const received = [];
     const onReady = async (entry) => {
       // Drain chunks so temp-store's put has actually run to completion for the temp
@@ -239,7 +249,7 @@ describe('runPrefetch', () => {
 
     const result = await runPrefetch(items, { fetchImpl, presign, root, concurrency: 3, onReady });
 
-    assert.deepEqual(result, { failed: [], denied: false, cancelled: false });
+    assert.deepEqual(result, { failed: [], denied: false, blocked: null, cancelled: false });
     assert.equal(received.length, 3);
     const byKey = Object.fromEntries(received.map((r) => [r.key, r]));
 
@@ -257,11 +267,13 @@ describe('runPrefetch', () => {
     // Memory item never touched the temp store at all: no bucketer-tmp-tiny.txt file.
     assert.equal(root.files.has('bucketer-tmp-tiny.txt'), false);
     // Medium item really did use an OPFS temp file (proves the temp tier, not memory,
-    // handled it). runPrefetch does not delete a SUCCESSFUL temp buffer itself — the
-    // caller's writer (Task 4) owns that, since only it knows when it has truly finished
-    // copying the bytes into the ZIP; deletion-on-failure (test 4) is the only cleanup
-    // that is runPrefetch's own responsibility.
-    assert.ok(root.files.has('bucketer-tmp-p0'), 'the temp tier must have created an OPFS temp file for medium.bin');
+    // handled it) — caught by the getFileHandle spy above, since the file itself is
+    // gone by the time the run resolves.
+    assert.deepEqual(tempFilesCreated, ['bucketer-tmp-p0'], 'the temp tier must have created an OPFS temp file for medium.bin');
+    // Fix 3: a SUCCESSFUL temp buffer is removed once the writer has finished draining
+    // it (right after withWriterLock resolves) — no leftover bucketer-tmp-* files after
+    // a clean run.
+    assert.equal(root.files.has('bucketer-tmp-p0'), false, 'a successfully-written temp buffer must be cleaned up, not left behind');
   });
 
   // ── 3. Backpressure ──────────────────────────────────────────────────────────
@@ -289,7 +301,7 @@ describe('runPrefetch', () => {
 
     const result = await runPrefetch(items, { fetchImpl, presign, root: fakeOpfsRoot(), concurrency: CONCURRENCY, onReady });
 
-    assert.deepEqual(result, { failed: [], denied: false, cancelled: false });
+    assert.deepEqual(result, { failed: [], denied: false, blocked: null, cancelled: false });
     assert.equal(order.length, 6);
     assert.ok(maxHeld > 1, `must show real overlap between fetch and write (maxHeld=${maxHeld})`);
     assert.ok(maxHeld <= CONCURRENCY + 1, `held buffers must stay bounded near concurrency=${CONCURRENCY} (maxHeld=${maxHeld})`);
@@ -322,6 +334,7 @@ describe('runPrefetch', () => {
     const result = await runPrefetch(items, { fetchImpl, presign, root, concurrency: 3, onReady });
 
     assert.equal(result.denied, false);
+    assert.equal(result.blocked, null);
     assert.equal(result.cancelled, false);
     assert.equal(result.failed.length, 1);
     assert.equal(result.failed[0].item.key, 'b.bin');
@@ -329,11 +342,14 @@ describe('runPrefetch', () => {
 
     assert.deepEqual(order.sort(), ['a.txt', 'c.bin'], 'the other two items must still complete via onReady');
 
-    // No leftover temp file for the failed item (or any item — c.bin's temp file must
-    // also have been cleaned up after being drained by onReady/tempStore.open().stream()
-    // reading it back, since the file itself isn't removed by draining — only assert
-    // the FAILED item's temp is gone; that's the cleanup this test is about).
-    assert.equal(root.files.has('bucketer-tmp-b.bin') , false, 'b.bin\'s partial temp buffer must be discarded, not left behind');
+    // No leftover temp file for ANY item: b.bin's (the failed item) partial temp buffer
+    // must be discarded, and c.bin's (the succeeded item) temp buffer must also have
+    // been cleaned up after a successful write (Fix 3). Checking real temp names here
+    // rather than a specific guessed name — temp files are named 'bucketer-tmp-p<seq>',
+    // not 'bucketer-tmp-<key>', so asserting on the item's own key would be vacuous
+    // (always true, proves nothing).
+    const leftoverTemps = [...root.files.keys()].filter((k) => k.startsWith('bucketer-tmp-'));
+    assert.deepEqual(leftoverTemps, [], 'no temp buffer — failed or succeeded — may survive the run');
   });
 
   // ── 5. Rolling DENIED breaker ─────────────────────────────────────────────────
@@ -348,6 +364,7 @@ describe('runPrefetch', () => {
     const result = await runPrefetch(items, { fetchImpl, presign, probe, root: fakeOpfsRoot(), concurrency: 4, onReady });
 
     assert.equal(result.denied, true, 'denied must trip after 3 consecutive DENIED probes');
+    assert.equal(result.blocked, null, 'a DENIED streak is not a NETWORK block');
     assert.equal(onReadyCalls, 0, 'no item ever reached onReady');
     assert.ok(result.failed.length >= 3, 'at least the 3 items that tripped the breaker must be recorded as failed');
     for (const f of result.failed) assert.ok(f.message, 'each failure must carry a message');
@@ -386,8 +403,68 @@ describe('runPrefetch', () => {
     assert.equal(order.length, 2, 'no onReady call may happen after cancellation is observed');
     assert.deepEqual(order.sort(), ['i1', 'i4'].sort());
     assert.equal(result.denied, false);
+    assert.equal(result.blocked, null, 'plain cancellation is not a NETWORK block');
     // i2/i3 were aborted mid-fetch (their gates never resolved) rather than counted as
     // ordinary failures — they simply never completed, left for a resume to re-fetch.
     assert.deepEqual(result.failed, []);
+  });
+
+  // ── 7. (Fix 1 — Critical) onReady must not run once cancel is observed ────────────
+  // Repro shape: concurrency 3, three items whose fetches all finish in the same close
+  // burst (no gating needed — plain fast bodies), so their onReady calls all get queued
+  // into the writer chain close together. shouldCancel flips true once 2 writes have
+  // completed. Before the fix, the 3rd item's onReady call was already queued in the
+  // writer chain BEFORE cancellation was noticed (only checked before enqueuing, never
+  // inside the lock) and ran anyway — a write-after-cancel. The fix checks `cancelled`
+  // at the moment each queued closure actually reaches the front of the chain.
+  test('7. onReady must not run for an item that finished fetching around the cancel boundary', async () => {
+    const items = ['x', 'y', 'z'].map((key) => ({ key, size: 4 }));
+    const fetchImpl = async (url) => {
+      const key = new URL(url).searchParams.get('key');
+      return { ok: true, status: 200, body: fastBody([enc(key)]) };
+    };
+
+    const order = [];
+    let completions = 0;
+    const onReady = async (entry) => {
+      order.push(entry.item.key);
+      completions++;
+    };
+    const shouldCancel = () => completions >= 2;
+
+    const result = await runPrefetch(items, {
+      fetchImpl, presign, root: fakeOpfsRoot(), concurrency: 3, onReady, shouldCancel,
+    });
+
+    assert.equal(result.cancelled, true);
+    assert.equal(order.length, 2,
+      'no onReady call may happen once cancellation has been observed, even for an item ' +
+      'whose fetch had already finished and was already queued for the writer');
+  });
+
+  // ── 8. (Fix 2 — Important) NETWORK blocks the whole job, not per-item ─────────────
+  test('8. a NETWORK probe result on the first item blocks the whole job immediately and stops further intake', async () => {
+    const items = ['n1', 'n2', 'n3'].map((key) => ({ key, size: 4 }));
+    const probeCalls = [];
+    const probe = async (url) => {
+      const key = new URL(url).searchParams.get('key');
+      probeCalls.push(key);
+      return { kind: 'network', status: null, message: 'offline' };
+    };
+    const fetchImpl = async () => { throw new Error('must not be called — NETWORK should have short-circuited before any fetch'); };
+    let onReadyCalls = 0;
+    const onReady = async () => { onReadyCalls++; };
+
+    // concurrency:1 — a single worker processes items strictly in order, so this proves
+    // the job actually STOPS (n2/n3 are never even probed), not just that n1 is blocked.
+    const result = await runPrefetch(items, { fetchImpl, presign, probe, root: fakeOpfsRoot(), concurrency: 1, onReady });
+
+    assert.notEqual(result.blocked, null);
+    assert.equal(result.blocked.kind, 'network');
+    assert.equal(result.denied, false);
+    assert.equal(result.cancelled, false);
+    assert.equal(onReadyCalls, 0);
+    assert.deepEqual(result.failed, [], 'a NETWORK block must not be recorded as per-item failures');
+    assert.deepEqual(probeCalls, ['n1'], 'the job must stop at the first NETWORK result and never probe the remaining items');
   });
 });
