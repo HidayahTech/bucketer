@@ -273,6 +273,92 @@ test('a worker reporting unsupported returns {unsupported:true} immediately, bef
   assert.equal(await countItemsByStatus('j4', ITEM_STATUS.PENDING), 1, 'items are left untouched for runZipJob to pick up');
 });
 
+// A fake worker whose 'chunk' handler, for one designated key, emits a 'fatal' message
+// (QuotaExceededError) instead of actually writing — simulating a synchronous OPFS
+// SyncAccessHandle write throwing mid-entry. Every other message type behaves like the
+// other fakes above (real createAssembler over an in-memory sink).
+function quotaFatalWorker(triggerKey) {
+  let asm = null, buf = new Uint8Array(0);
+  const listeners = [];
+  const emit = (data) => { for (const fn of listeners) fn({ data }); };
+  const sink = {
+    write(u8, at) { if (at + u8.length > buf.length) { const n = new Uint8Array(at + u8.length); n.set(buf); buf = n; } buf.set(u8, at); },
+    truncate(n) { const nb = new Uint8Array(n); nb.set(buf.subarray(0, Math.min(n, buf.length))); buf = nb; },
+    flush() {},
+  };
+  return {
+    addEventListener(_e, fn) { listeners.push(fn); },
+    terminate() {},
+    async postMessage(m) {
+      if (m.type === 'init') { asm = createAssembler(sink, m.layout); await asm.writeHeaders(); emit({ type: 'ready' }); }
+      else if (m.type === 'chunk') {
+        if (m.key === triggerKey) { emit({ type: 'fatal', name: 'QuotaExceededError', message: 'quota exceeded' }); return; }
+        await asm.writeChunk(m.key, new Uint8Array(m.buffer));
+      } else if (m.type === 'entryEnd') {
+        try { const r = await asm.endEntry(m.key); emit({ type: 'written', key: m.key, crc: r.crc, size: r.size }); }
+        catch (err) { emit({ type: 'entryError', key: m.key, name: err.name, message: err.message }); }
+      } else if (m.type === 'finish') {
+        const r = await asm.finish(m.records);
+        emit({ type: 'finished', totalBytes: r.totalBytes });
+      }
+    },
+  };
+}
+
+// A two-chunk body whose reader checks the real AbortSignal runInPlaceJob's processItem
+// constructs — so once the fatal (above) triggers abortAllInFlight(), the very next read()
+// call rejects with a real AbortError, exactly like a real aborted fetch's body stream.
+function abortAwareTwoChunkBody(chunk1, chunk2, signal) {
+  let step = 0;
+  return {
+    getReader() {
+      return {
+        async read() {
+          if (signal?.aborted) { const e = new Error('aborted'); e.name = 'AbortError'; throw e; }
+          if (step === 0) { step = 1; return { done: false, value: chunk1 }; }
+          if (step === 1) { step = 2; return { done: false, value: chunk2 }; }
+          return { done: true, value: undefined };
+        },
+      };
+    },
+  };
+}
+
+test('a QuotaExceededError fatal from the worker pauses the job (STORAGE block), not a per-item failure, and leaves in-flight items PENDING', async () => {
+  const job = { id: 'j6', prefix: 'p/', status: 'running', counters: {} };
+  await saveJob(job);
+  await appendManifestPage('j6', [
+    { key: 'p/a.txt', size: 3, lastModified: 0, status: ITEM_STATUS.PENDING },
+    { key: 'p/b.txt', size: 5, lastModified: 0, status: ITEM_STATUS.PENDING },
+  ], { done: true });
+
+  // concurrency:1 pins processing to key order (a, then b) so the fatal — triggered on a's
+  // first chunk — is observed before b is ever picked up, making "b is left untouched, never
+  // fetched" deterministic rather than a race.
+  const res = await runInPlaceJob(job, {
+    presign: presignQ, probe: null,
+    fetchImpl: async (url, { signal } = {}) => {
+      const key = new URL(url).searchParams.get('key');
+      if (key === 'p/a.txt') {
+        return { ok: true, status: 200, body: abortAwareTwoChunkBody(new Uint8Array([65, 66]), new Uint8Array([67]), signal) };
+      }
+      return { ok: true, status: 200, body: streamOf([1, 2, 3, 4, 5]) };
+    },
+    root: {}, concurrency: 1,
+    makeWorker: () => quotaFatalWorker('p/a.txt'),
+    onProgress: () => {},
+  });
+
+  assert.equal(res.finished, false);
+  assert.equal(res.cancelled, false, 'a worker-fatal pause is reported as blocked, never as cancelled');
+  assert.notEqual(res.blocked, null);
+  assert.equal(res.blocked.kind, 'STORAGE');
+
+  assert.equal(await countItemsByStatus('j6', ITEM_STATUS.PENDING), 2, 'both items are left PENDING for a resume, not FAILED');
+  assert.equal(await countItemsByStatus('j6', ITEM_STATUS.FAILED), 0, "a worker fatal is job-wide, not any item's fault");
+  assert.equal(await countItemsByStatus('j6', ITEM_STATUS.DONE), 0);
+});
+
 // Sanity: computeZipLayout is what runInPlaceJob's records are built from — confirms the
 // import above is exercised indirectly (the orchestrator never invents its own offsets).
 test('layout entries drive the persisted zipOffset/zipEnd exactly', async () => {

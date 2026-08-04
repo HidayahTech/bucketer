@@ -180,6 +180,13 @@ export async function runInPlaceJob(job, {
           throw new Error(`fetch failed (${res?.status ?? 'no response'})`);
         }
 
+        // client.writeChunk is fire-and-forget: it transfers the chunk's ArrayBuffer to the
+        // worker (assembler-client.js), so main-thread memory is freed immediately rather
+        // than accumulating behind an awaited response. Worker-side queue depth under N
+        // concurrent fast streams is, in practice, bounded by network arrival rate versus
+        // the synchronous OPFS SyncAccessHandle write rate, not by anything enforced here —
+        // if Task 9's memory probe shows unbounded growth, a credit/ack window is the
+        // follow-up (noted as YAGNI in the design doc unless measurement says otherwise).
         const reader = res.body.getReader();
         for (;;) {
           const { done, value } = await reader.read();
@@ -242,9 +249,19 @@ export async function runInPlaceJob(job, {
     const pending = await countItemsByStatus(job.id, ITEM_STATUS.PENDING);
     const failedCount = await countItemsByStatus(job.id, ITEM_STATUS.FAILED);
     let finished = false;
+    let doneByKey = null;
     if (!cancelled && !blocked && pending === 0 && failedCount === 0) {
-      const doneByKey = new Map();
+      doneByKey = new Map();
       await eachItemByStatus(job.id, ITEM_STATUS.DONE, (it) => { doneByKey.set(it.key, it); });
+    }
+    // Defensive: `pending===0 && failedCount===0` only proves no item is PENDING or FAILED —
+    // a legacy ITEM_STATUS.ISSUED record (the two engines share job records, and only
+    // SKIPPED is filtered out of the layout) still occupies a layout slot without ever
+    // reaching DONE. Finishing on that would read `undefined` out of doneByKey and throw.
+    // Never call client.finish unless every layout entry actually has a DONE record; if the
+    // guard trips, `finished` stays false — a resume (after resetFailedToPending) resolves it.
+    const canFinish = doneByKey !== null && layout.entries.every((e) => doneByKey.has(e.key));
+    if (canFinish) {
       const records = layout.entries.map((e) => {
         const d = doneByKey.get(e.key);
         return { path: e.path, zipOffset: e.headerOffset, size: d.size, crc: d.crc, time: e.time, date: e.date };
