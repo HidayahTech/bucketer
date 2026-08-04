@@ -574,6 +574,91 @@ describe('runZipJob', () => {
     const entries = readZip(new Uint8Array(await file.arrayBuffer()));
     assert.deepEqual(entries.map(e => e.name).sort(), ['x.txt', 'y.txt']);
   });
+
+  test('10. onProgress reports the active file while streaming and null between/after', async () => {
+    await saveJob(job());
+    await appendManifestPage('zjob-1', [
+      item('videos/a.txt', 'alpha'),
+      item('videos/b.txt', 'bravo-body'),
+    ], {});
+
+    const root = fakeOpfsRoot();
+    // Multi-chunk bodies so at least one mid-stream onProgress call (0 < bytes < size)
+    // is observable per item, not just the final one where bytes === size.
+    const fetchImpl = fetchFake({
+      'videos/a.txt': [[enc('al'), enc('pha')]],
+      'videos/b.txt': [[enc('bravo-'), enc('body')]],
+    });
+
+    const payloads = [];
+    const result = await runZipJob(await loadJob('zjob-1'), {
+      presign, fetchImpl, root, onProgress: (p) => payloads.push({ ...p, active: p.active ? { ...p.active } : null }),
+    });
+    assert.equal(result.finished, true);
+
+    const activePayloads = payloads.filter(p => p.active);
+    assert.ok(activePayloads.length > 0, 'saw an active file while streaming');
+    assert.ok(activePayloads.every(p => p.active.bytes > 0 && p.active.bytes <= p.active.size),
+      'active.bytes is always positive and never exceeds active.size');
+    assert.ok(activePayloads.some(p => p.active.key === 'videos/a.txt' && p.active.size === enc('alpha').length),
+      'a.txt was reported active with its real key and size');
+    assert.ok(activePayloads.some(p => p.active.key === 'videos/b.txt' && p.active.size === enc('bravo-body').length),
+      'b.txt was reported active with its real key and size');
+
+    // Cleared to null right after each entry finishes (not just at the very end).
+    const nullActiveCount = payloads.filter(p => p.active === null).length;
+    assert.ok(nullActiveCount >= 2, 'active is cleared to null after each of the two entries completes');
+
+    assert.equal(payloads[payloads.length - 1].active, null, 'active cleared at the end of the run');
+
+    for (let i = 1; i < payloads.length; i++) {
+      assert.ok(payloads[i].bytesDone >= payloads[i - 1].bytesDone, 'bytesDone must never regress');
+    }
+    const total = enc('alpha').length + enc('bravo-body').length;
+    assert.equal(payloads[payloads.length - 1].bytesDone, total);
+  });
+
+  // Review fix 1: if the LAST item processed in a run fails mid-stream (after already
+  // streaming >=1 chunk), the mid-stream onProgress call for it left `active` non-null,
+  // and the mid-entry catch rethrows without emitting — so without a final emission after
+  // runDownloadJob resolves, the run's last-observed payload would still show that failed
+  // file as "active", a phantom "still downloading" indicator.
+  test('11. onProgress\'s final payload has active === null even when the last item fails mid-stream', async () => {
+    await saveJob(job());
+    await appendManifestPage('zjob-1', [
+      item('videos/a.txt', 'alpha'),
+      item('videos/b.txt', 'bravo-body'),
+    ], {});
+
+    const root = fakeOpfsRoot();
+    const fetchImpl = fetchFake({
+      'videos/a.txt': [[enc('alpha')]],
+      // b (the last item, key order) streams one chunk then its body dies — no retry
+      // attempt is configured, so it stays FAILED for the duration of this run.
+      'videos/b.txt': [[enc('brav'), new Error('stream reset')]],
+    });
+
+    const payloads = [];
+    const result = await runZipJob(await loadJob('zjob-1'), {
+      presign, fetchImpl, root,
+      onProgress: (p) => payloads.push({ ...p, active: p.active ? { ...p.active } : null }),
+    });
+
+    assert.equal(result.finished, false);
+    assert.equal(result.failed, 1);
+
+    const statuses = await statusesOf('zjob-1');
+    assert.equal(statuses[ITEM_STATUS.DONE], 1, 'a.txt still completed normally');
+    assert.equal(statuses[ITEM_STATUS.FAILED], 1, 'b.txt (the failing last item) is FAILED');
+    let failedItem;
+    await eachItemByStatus('zjob-1', ITEM_STATUS.FAILED, (it) => { failedItem = it; });
+    assert.equal(failedItem.key, 'videos/b.txt');
+
+    assert.ok(payloads.some(p => p.active && p.active.key === 'videos/b.txt'),
+      'b.txt was reported active for its one streamed chunk before it failed');
+    assert.equal(payloads[payloads.length - 1].active, null,
+      'the run\'s final payload must not carry a phantom active file for the failed last item');
+  });
 });
 
 // Sanity: the entry paths produced during a run are exactly what zipEntryPath computes

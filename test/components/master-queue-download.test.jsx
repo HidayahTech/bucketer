@@ -15,6 +15,7 @@ import { mount, fire } from '../helpers/render.js';
 import { MasterQueue } from '../../src/components/MasterQueue.jsx';
 import { createTaskStore } from '../../src/lib/task-store.js';
 import { createDownloadTask } from '../../src/lib/queue-tasks.js';
+import { formatBytes } from '../../src/lib/format.js';
 
 const makeStore = () => createTaskStore(fn => setTimeout(fn, 0), clearTimeout);
 
@@ -186,6 +187,167 @@ describe('MasterQueue — zip delivery rows', () => {
     const body = text();
     assert.ok(body.includes('Paused — 8 of 10 zipped, 2 failed'));
     assert.equal(/sent|handed/i.test(body), false, 'a paused zip was never handed to the browser');
+    cleanup();
+  });
+});
+
+describe('MasterQueue — zip progress (byte/speed/ETA parity, active-focused detail)', () => {
+  test('a running zip task with bytesTotal renders the enriched files/byte lines and a progress bar at ~35%', () => {
+    const store = makeStore();
+    addZip(store, {
+      status: 'running', current: 12, total: 4231,
+      bytesDone: 1.2e9, bytesTotal: 3.4e9, failed: 1,
+    });
+    const { text, query, cleanup } = mount(h(MasterQueue, { store }));
+    const body = text();
+
+    assert.ok(body.includes('Zipping · 12 of 4,231 files · 1 failed'), body);
+    assert.ok(body.includes(`${formatBytes(1.2e9)} of ${formatBytes(3.4e9)}`), body);
+
+    const bar = query('[data-testid="zip-progress-bar"]');
+    assert.notEqual(bar, null, 'a progress bar element must render');
+    const widthMatch = /width:\s*([\d.]+)%/.exec(bar.getAttribute('style') || '');
+    assert.notEqual(widthMatch, null, 'the bar must set a width style');
+    const pct = parseFloat(widthMatch[1]);
+    assert.ok(Math.abs(pct - (1.2e9 / 3.4e9) * 100) < 1, `expected ~35%, got ${pct}%`);
+    cleanup();
+  });
+
+  test('speed/ETA are absent on a fresh task (no rate sampled yet)', () => {
+    const store = makeStore();
+    addZip(store, {
+      status: 'running', current: 1, total: 4231,
+      bytesDone: 1000, bytesTotal: 3.4e9, failed: 0,
+    });
+    const { text, cleanup } = mount(h(MasterQueue, { store }));
+    const body = text();
+    assert.equal(/\/s\b/.test(body), false, 'no speed until the rate tracker has samples');
+    assert.equal(/\bETA\b/.test(body), false, 'no ETA until the rate tracker has samples');
+    cleanup();
+  });
+
+  test('bytesTotal falsy/zero falls back to the plain count-only "Zipping N of M…" line — no byte line, no bar', () => {
+    const store = makeStore();
+    addZip(store, { status: 'running', current: 5, total: 8 });
+    const { text, query, cleanup } = mount(h(MasterQueue, { store }));
+    const body = text();
+    assert.ok(body.includes('Zipping 5 of 8…'));
+    assert.equal(query('[data-testid="zip-progress-bar"]'), null, 'no bar without bytesTotal');
+    cleanup();
+  });
+
+  test('the expand toggle is present while a zip task is running (today only settled+errors offers it)', () => {
+    const store = makeStore();
+    addZip(store, { status: 'running', current: 12, total: 4231, jobId: 'job-1' });
+    const { query, cleanup } = mount(h(MasterQueue, { store }));
+    assert.notEqual(query('[data-testid="task-expand-toggle"]'), null);
+    cleanup();
+  });
+
+  test('expanding a running zip task reads the per-file detail and renders active/done/failed rows plus the queued/overflow footer', async () => {
+    const store = makeStore();
+    addZip(store, {
+      status: 'running', current: 12, total: 4231, bytesDone: 1.2e9, bytesTotal: 3.4e9, failed: 1,
+      jobId: 'job-1',
+      active: { key: 'photos/2024/trip-4k.mov', bytes: 412 * 1024 * 1024, size: 900 * 1024 * 1024 },
+    });
+    const detail = {
+      done: [{ key: 'photos/2024/b.jpg', size: 6_100_000 }, { key: 'photos/2024/a.jpg', size: 8_200_000 }],
+      failed: [{ key: 'photos/2024/corrupt.raw' }],
+      doneCount: 11,
+      failedCount: 1,
+    };
+    let calledWith = null;
+    const readZipDetail = (jobId) => { calledWith = jobId; return Promise.resolve(detail); };
+
+    const { text, query, cleanup } = mount(h(MasterQueue, { store, readZipDetail }));
+    // The running-zip detail is opt-in (Fix 3) — it does not auto-expand or auto-poll, so
+    // the toggle must be clicked before the read fires.
+    fire(query('[data-testid="task-expand-toggle"]'), 'click');
+    await new Promise(r => setTimeout(r, 60)); // flush the async readZipDetail read + re-render
+
+    assert.equal(calledWith, 'job-1');
+    const body = text();
+    assert.ok(body.includes(`▶ photos/2024/trip-4k.mov`), body);
+    assert.ok(body.includes(`${formatBytes(412 * 1024 * 1024)} / ${formatBytes(900 * 1024 * 1024)}`), body);
+    assert.ok(body.includes('(46%)'), body);
+    assert.ok(body.includes(`✓ photos/2024/b.jpg`) && body.includes(formatBytes(6_100_000)), body);
+    assert.ok(body.includes(`✓ photos/2024/a.jpg`) && body.includes(formatBytes(8_200_000)), body);
+    // No matching task.errors entry for this key, so it falls back to the generic reason.
+    assert.ok(body.includes('✗ photos/2024/corrupt.raw — failed'), body);
+    // queued = total(4231) - doneCount(11) - failedCount(1) = 4219; overflow = doneCount(11) - done.length(2) = 9
+    assert.ok(body.includes('…and 4,219 queued · 9 more done'), body);
+    cleanup();
+  });
+
+  test('a running zip task does not auto-expand the per-file detail or poll readZipDetail until the toggle is clicked (Fix 3)', async () => {
+    const store = makeStore();
+    let callCount = 0;
+    const readZipDetail = () => { callCount++; return Promise.resolve({ done: [], failed: [], doneCount: 0, failedCount: 0 }); };
+    addZip(store, {
+      status: 'running', current: 12, total: 4231, bytesDone: 1.2e9, bytesTotal: 3.4e9, failed: 0,
+      jobId: 'job-3',
+    });
+    const { text, query, cleanup } = mount(h(MasterQueue, { store, readZipDetail }));
+    await new Promise(r => setTimeout(r, 60));
+
+    // The aggregate line + bar always show for a running zip, regardless of expand state.
+    const bodyBefore = text();
+    assert.ok(bodyBefore.includes('Zipping · 12 of 4,231 files'), bodyBefore);
+    assert.notEqual(query('[data-testid="zip-progress-bar"]'), null, 'the bar must still show by default');
+
+    // But the detail panel — and therefore the poll — is opt-in.
+    assert.equal(query('[data-testid="zip-detail"]'), null, 'the detail must not auto-expand');
+    assert.equal(callCount, 0, 'readZipDetail must not be called before the user expands the detail');
+
+    const toggle = query('[data-testid="task-expand-toggle"]');
+    assert.notEqual(toggle, null);
+    assert.ok(toggle.textContent.includes('Show details'), 'closed by default, so the button offers to open it');
+    fire(toggle, 'click');
+    await new Promise(r => setTimeout(r, 60));
+
+    assert.notEqual(query('[data-testid="zip-detail"]'), null, 'expanding must now render the detail');
+    assert.ok(callCount >= 1, 'readZipDetail must be called once the detail is opened');
+    cleanup();
+  });
+
+  test('a settled (paused) zip task with per-key errors shows the failure MESSAGE in the active-focused detail, not just "failed" (Fix 1)', async () => {
+    const store = makeStore();
+    const readZipDetail = () => Promise.resolve({
+      done: [], failed: [{ key: 'a/x.raw' }], doneCount: 0, failedCount: 1,
+    });
+    addZip(store, {
+      status: 'done', current: 8, total: 10, finished: false, failed: 1,
+      jobId: 'job-2',
+      errors: [{ key: 'a/x.raw', message: 'AccessDenied' }],
+    });
+    const { text, cleanup } = mount(h(MasterQueue, { store, readZipDetail }));
+    await new Promise(r => setTimeout(r, 60)); // settled zip+errors auto-expands (unchanged pre-existing behavior)
+
+    const body = text();
+    assert.ok(body.includes('Paused — 8 of 10 zipped, 1 failed'), body);
+    assert.ok(body.includes('✗ a/x.raw — AccessDenied'), body);
+    assert.equal(body.includes('✗ a/x.raw — failed'), false, 'the real message must win over the generic fallback');
+    cleanup();
+  });
+
+  test('REGRESSION: a non-zip (handoff) running task is unchanged by the zip progress work', () => {
+    const store = makeStore();
+    addDownload(store, { subPhase: null, current: 12, total: 412 });
+    const { text, query, cleanup } = mount(h(MasterQueue, { store }));
+    const body = text();
+    assert.equal(query('[data-testid="zip-progress-bar"]'), null);
+    assert.equal(query('[data-testid="task-expand-toggle"]'), null);
+    assert.equal(/\d+\s*%/.test(body), false, 'still no percentage for a handoff download');
+    cleanup();
+  });
+
+  test('REGRESSION: a delivery:zip PAUSED task still shows the honest "Paused — N of M zipped, K failed" label', () => {
+    const store = makeStore();
+    addZip(store, { status: 'done', current: 8, total: 10, finished: false, failed: 2 });
+    const { text, cleanup } = mount(h(MasterQueue, { store }));
+    const body = text();
+    assert.ok(body.includes('Paused — 8 of 10 zipped, 2 failed'));
     cleanup();
   });
 });

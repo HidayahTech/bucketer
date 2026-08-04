@@ -148,12 +148,16 @@ export async function runZipJob(job, { presign, probe, fetchImpl = fetch, root, 
         if (eof) break;
         await writer.update(value);
         inFlightBytes += value.length;
-        onProgress?.({ done: completed, bytesDone: bytesDone + inFlightBytes });
+        // A fresh { key, size, bytes } object per emission — never the same object
+        // mutated and re-passed — so a consumer that buffers raw payloads doesn't see
+        // later chunks retroactively rewrite an earlier one's `active`.
+        onProgress?.({ done: completed, bytesDone: bytesDone + inFlightBytes,
+          active: { key: item.key, size: item.size ?? 0, bytes: inFlightBytes } });
       }
       const rec = await writer.endEntry();
       await updateItem(job.id, item.key, { ...rec });
       completed += 1; bytesDone += rec.size;
-      onProgress?.({ done: completed, bytesDone });
+      onProgress?.({ done: completed, bytesDone, active: null });
     } catch (err) {
       // Mid-entry failure: the writer is left wedged (a local header and maybe some
       // streamed bytes with no data descriptor — or, on endEntry's declared-size
@@ -194,6 +198,14 @@ export async function runZipJob(job, { presign, probe, fetchImpl = fetch, root, 
 
   const result = await runDownloadJob(job, { presign, probe, issue, shouldCancel,
     onProgress: () => {} /* byte progress comes from the issue closure */ });
+
+  // Nothing streams once runDownloadJob has returned. Emit unconditionally so the run's
+  // final payload always carries active: null — otherwise, if the LAST item processed
+  // failed mid-stream (its issue() rethrew from the catch block without emitting), the
+  // run's last emitted payload would still be the mid-stream one for that item, a
+  // phantom "still downloading" indicator for a file that is no longer in flight.
+  // Harmlessly redundant on a clean run (the last endEntry already emitted null).
+  onProgress?.({ done: completed, bytesDone, active: null });
 
   // Promote this run's completions (see ADAPTATION note) before resume/finish logic
   // reads DONE as ground truth.

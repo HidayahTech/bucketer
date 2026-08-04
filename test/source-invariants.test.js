@@ -1636,3 +1636,73 @@ test('the sidebar download entry is gone and lives in the browser toolbar (2026-
   assert.ok(browser.includes('data-testid="open-download-job"'),
     'the toolbar download button must keep the open-download-job testid the e2e specs use');
 });
+
+// ── zip-download-progress Task 4: bytesTotal, active, jobId threaded onto the zip task ──
+// runZipJob's onProgress (Task 2) now emits { done, bytesDone, active }, and loadZipDetail
+// (Task 3) can read per-file done/failed detail keyed by jobId. None of that is reachable
+// from the task-store row or MasterQueue unless handleZipStart forwards it: a static
+// bytesTotal at task creation, the per-chunk active file, and the jobId that lets
+// MasterQueue ask for detail at all. Source-level because the runtime path needs
+// OPFS/S3/IndexedDB mocking handleZipStart already gets exempted from elsewhere in this file.
+describe('App.jsx / queue-tasks.js — zip task carries bytesTotal, active, jobId (Task 4)', () => {
+  const appSource = src('components/App.jsx');
+  const queueTasksSource = src('lib/queue-tasks.js');
+
+  function zipStartBody() {
+    const fnStart = appSource.indexOf('async function handleZipStart');
+    assert.ok(fnStart > -1, 'handleZipStart must exist');
+    const fnEnd = appSource.indexOf('async function handleMoveRequest', fnStart);
+    assert.ok(fnEnd > fnStart, 'handleZipStart must be followed by handleMoveRequest');
+    return appSource.slice(fnStart, fnEnd);
+  }
+
+  test('createDownloadTask accepts and stores jobId and bytesTotal', () => {
+    const fnStart = queueTasksSource.indexOf('export function createDownloadTask');
+    assert.ok(fnStart > -1, 'createDownloadTask must exist');
+    const fnEnd = queueTasksSource.indexOf('\n}', fnStart);
+    const fnBody = queueTasksSource.slice(fnStart, fnEnd);
+    assert.match(fnBody, /\bjobId\b/, 'createDownloadTask must accept and return jobId');
+    assert.match(fnBody, /\bbytesTotal\b/, 'createDownloadTask must accept and return bytesTotal');
+  });
+
+  test('handleZipStart sets bytesTotal on the task from the job\'s sendable-bytes counter', () => {
+    const body = zipStartBody();
+    assert.match(body, /bytesTotal/, 'handleZipStart must compute/pass bytesTotal');
+    assert.match(body, /counters\?\.bytesSendable/,
+      'bytesTotal must be sourced from the job\'s counters.bytesSendable (falling back sensibly), ' +
+      'the same job-row counters DownloadJobPanel already reads for sendable bytes');
+  });
+
+  test('handleZipStart tags the task with jobId', () => {
+    const body = zipStartBody();
+    assert.match(body, /jobId:\s*fresh\.id/,
+      'handleZipStart must tag the created task with jobId: fresh.id so MasterQueue can key detail reads to it');
+  });
+
+  test('handleZipStart\'s onProgress forwards active alongside current and bytesDone', () => {
+    const body = zipStartBody();
+    const onProgressIdx = body.indexOf('onProgress:');
+    assert.ok(onProgressIdx > -1, 'handleZipStart must pass onProgress to runZipJob');
+    const onProgressLine = body.slice(onProgressIdx, body.indexOf('\n', onProgressIdx));
+    assert.match(onProgressLine, /\bactive\b/,
+      'onProgress must destructure and forward active, not just done/bytesDone');
+    assert.match(onProgressLine, /taskStore\.update\(id,\s*\{[^}]*active[^}]*\}/,
+      'the taskStore.update patch inside onProgress must include active');
+  });
+
+  test('<MasterQueue> is passed a readZipDetail prop wired to loadZipDetail with a .catch fallback', () => {
+    const idx = appSource.indexOf('<MasterQueue');
+    assert.ok(idx > -1, '<MasterQueue> must be rendered');
+    const tagEnd = appSource.indexOf('/>', idx);
+    const tag = appSource.slice(idx, tagEnd > -1 ? tagEnd : idx + 400);
+    assert.match(tag, /readZipDetail\s*=/, '<MasterQueue> must receive a readZipDetail prop');
+    assert.match(tag, /loadZipDetail/, 'readZipDetail must be wired to loadZipDetail');
+    assert.match(tag, /\.catch\(/,
+      'readZipDetail must catch a loadZipDetail rejection so a read failure degrades gracefully ' +
+      'instead of crashing the queue UI (Task 3 review ruling)');
+  });
+
+  test('App.jsx imports loadZipDetail from download-records.js', () => {
+    assert.match(appSource, /loadZipDetail/, 'App.jsx must import loadZipDetail to wire it into readZipDetail');
+  });
+});

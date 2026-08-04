@@ -418,6 +418,23 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 .queue-op-error-msg  { color: var(--text-danger); flex-shrink: 0; }
 .queue-op-error-skip { color: var(--text-muted); flex-shrink: 0; }
 .queue-op-error-more { color: var(--text-muted); font-style: italic; }
+.queue-op-progress { margin-top: .4rem; }
+.queue-op-bytes { color: var(--text-muted); font-size: .75rem; margin-top: .3rem; }
+.queue-op-zip-detail {
+  margin-top: .4rem;
+  border-top: 1px solid var(--border);
+  padding-top: .4rem;
+  display: flex;
+  flex-direction: column;
+  gap: .2rem;
+  font-size: .78rem;
+  font-family: var(--mono);
+}
+.queue-op-zip-row { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.queue-op-zip-active { color: var(--accent); }
+.queue-op-zip-done   { color: var(--text-success); }
+.queue-op-zip-failed { color: var(--text-danger); }
+.queue-op-zip-footer { color: var(--text-muted); font-style: italic; }
 .delete-confirm-prefixes {
   display: flex;
   flex-direction: column;
