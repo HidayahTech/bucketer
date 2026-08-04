@@ -262,7 +262,11 @@ describe('runZipJob', () => {
       'videos/c.txt': [[enc('charlie!!')]],
     });
 
-    const result1 = await runZipJob(await loadJob('zjob-1'), { presign, fetchImpl, root });
+    // concurrency: 1 pins processing to strict key order (a, b, c) so the offset-reuse
+    // assertions below (which entry lands where) are deterministic — the fixture's whole
+    // point is to prove the mid-entry recovery reuses b's vacated offset, which requires
+    // knowing the exact order entries were attempted in.
+    const result1 = await runZipJob(await loadJob('zjob-1'), { presign, fetchImpl, root, concurrency: 1 });
     assert.equal(result1.finished, false);
     assert.equal(result1.failed, 1);
 
@@ -421,8 +425,10 @@ describe('runZipJob', () => {
     // local header — then fail the next one: m's first body-chunk write.
     root.armWriteFailure('bucketer-zip-zjob-1.zip', 1);
 
+    // concurrency: 1 guarantees m is written first (key order) so the armed fault lands
+    // on m's write, not n's — the scenario this test is built around.
     let rejected = false;
-    const result = await runZipJob(await loadJob('zjob-1'), { presign, fetchImpl, root })
+    const result = await runZipJob(await loadJob('zjob-1'), { presign, fetchImpl, root, concurrency: 1 })
       .catch((e) => { rejected = true; throw e; });
     assert.equal(rejected, false, 'runZipJob must resolve, not reject, even when close() on the errored stream also fails');
 
@@ -547,7 +553,9 @@ describe('runZipJob', () => {
     // write through (x's local header), then fail the next one (x's first body chunk).
     root.armWriteFailure('bucketer-zip-zjob-1.zip', 1, quotaError);
 
-    const result = await runZipJob(await loadJob('zjob-1'), { presign, fetchImpl, root });
+    // concurrency: 1 guarantees x is written first (key order) so the armed fault lands
+    // on x's write, not y's — the scenario this test is built around.
+    const result = await runZipJob(await loadJob('zjob-1'), { presign, fetchImpl, root, concurrency: 1 });
 
     assert.equal(result.finished, false);
     assert.notEqual(result.blocked, null, 'a QuotaExceededError must produce a job-wide block, not a per-item failure');
@@ -575,7 +583,10 @@ describe('runZipJob', () => {
     assert.deepEqual(entries.map(e => e.name).sort(), ['x.txt', 'y.txt']);
   });
 
-  test('10. onProgress reports the active file while streaming and null between/after', async () => {
+  // D5: `active` is now a LIST (0..N entries), one per currently-downloading file,
+  // sourced straight from runPrefetch's own in-flight set — see test 12 below for the
+  // dedicated proof that it can hold more than one entry at once (real overlap).
+  test('10. onProgress reports the active list while streaming and an empty list between/after', async () => {
     await saveJob(job());
     await appendManifestPage('zjob-1', [
       item('videos/a.txt', 'alpha'),
@@ -592,24 +603,33 @@ describe('runZipJob', () => {
 
     const payloads = [];
     const result = await runZipJob(await loadJob('zjob-1'), {
-      presign, fetchImpl, root, onProgress: (p) => payloads.push({ ...p, active: p.active ? { ...p.active } : null }),
+      presign, fetchImpl, root,
+      onProgress: (p) => payloads.push({ ...p, active: p.active.map((a) => ({ ...a })) }),
     });
     assert.equal(result.finished, true);
 
-    const activePayloads = payloads.filter(p => p.active);
-    assert.ok(activePayloads.length > 0, 'saw an active file while streaming');
-    assert.ok(activePayloads.every(p => p.active.bytes > 0 && p.active.bytes <= p.active.size),
-      'active.bytes is always positive and never exceeds active.size');
-    assert.ok(activePayloads.some(p => p.active.key === 'videos/a.txt' && p.active.size === enc('alpha').length),
+    assert.ok(payloads.every(p => Array.isArray(p.active)), 'active is always an array');
+
+    const activeEntries = payloads.flatMap(p => p.active);
+    assert.ok(activeEntries.length > 0, 'saw an active file while streaming');
+    // bytes starts at 0 the instant a fetch is taken (before its first chunk arrives —
+    // runPrefetch reports the file as active from the moment it starts, not just once
+    // bytes are flowing), so only an upper bound is guaranteed here; some mid-stream
+    // reading (0 < bytes < size) for at least one entry is asserted separately below.
+    assert.ok(activeEntries.every(a => a.bytes >= 0 && a.bytes <= a.size),
+      'active.bytes never exceeds active.size');
+    assert.ok(activeEntries.some(a => a.bytes > 0 && a.bytes < a.size),
+      'at least one payload caught a file mid-stream (0 < bytes < size)');
+    assert.ok(activeEntries.some(a => a.key === 'videos/a.txt' && a.size === enc('alpha').length),
       'a.txt was reported active with its real key and size');
-    assert.ok(activePayloads.some(p => p.active.key === 'videos/b.txt' && p.active.size === enc('bravo-body').length),
+    assert.ok(activeEntries.some(a => a.key === 'videos/b.txt' && a.size === enc('bravo-body').length),
       'b.txt was reported active with its real key and size');
 
-    // Cleared to null right after each entry finishes (not just at the very end).
-    const nullActiveCount = payloads.filter(p => p.active === null).length;
-    assert.ok(nullActiveCount >= 2, 'active is cleared to null after each of the two entries completes');
+    // Cleared to an empty list right after each entry finishes (not just at the very end).
+    const emptyActiveCount = payloads.filter(p => p.active.length === 0).length;
+    assert.ok(emptyActiveCount >= 2, 'active is cleared to [] after each of the two entries completes');
 
-    assert.equal(payloads[payloads.length - 1].active, null, 'active cleared at the end of the run');
+    assert.deepEqual(payloads[payloads.length - 1].active, [], 'active cleared at the end of the run');
 
     for (let i = 1; i < payloads.length; i++) {
       assert.ok(payloads[i].bytesDone >= payloads[i - 1].bytesDone, 'bytesDone must never regress');
@@ -618,12 +638,13 @@ describe('runZipJob', () => {
     assert.equal(payloads[payloads.length - 1].bytesDone, total);
   });
 
-  // Review fix 1: if the LAST item processed in a run fails mid-stream (after already
-  // streaming >=1 chunk), the mid-stream onProgress call for it left `active` non-null,
-  // and the mid-entry catch rethrows without emitting — so without a final emission after
-  // runDownloadJob resolves, the run's last-observed payload would still show that failed
-  // file as "active", a phantom "still downloading" indicator.
-  test('11. onProgress\'s final payload has active === null even when the last item fails mid-stream', async () => {
+  // Review fix 1 (carried over from the sequential engine): if an item fails mid-stream
+  // (after already streaming >=1 chunk), the mid-stream onProgress call for it left it in
+  // the active list, and the failure path never itself emits a clearing update — so
+  // without a final unconditional emission after runPrefetch resolves, the run's
+  // last-observed payload could still show that failed file as active, a phantom "still
+  // downloading" indicator.
+  test('11. onProgress\'s final payload has an empty active list even when an item fails mid-stream', async () => {
     await saveJob(job());
     await appendManifestPage('zjob-1', [
       item('videos/a.txt', 'alpha'),
@@ -633,15 +654,15 @@ describe('runZipJob', () => {
     const root = fakeOpfsRoot();
     const fetchImpl = fetchFake({
       'videos/a.txt': [[enc('alpha')]],
-      // b (the last item, key order) streams one chunk then its body dies — no retry
-      // attempt is configured, so it stays FAILED for the duration of this run.
+      // b streams one chunk then its body dies — no retry attempt is configured, so it
+      // stays FAILED for the duration of this run.
       'videos/b.txt': [[enc('brav'), new Error('stream reset')]],
     });
 
     const payloads = [];
     const result = await runZipJob(await loadJob('zjob-1'), {
       presign, fetchImpl, root,
-      onProgress: (p) => payloads.push({ ...p, active: p.active ? { ...p.active } : null }),
+      onProgress: (p) => payloads.push({ ...p, active: p.active.map((a) => ({ ...a })) }),
     });
 
     assert.equal(result.finished, false);
@@ -649,15 +670,105 @@ describe('runZipJob', () => {
 
     const statuses = await statusesOf('zjob-1');
     assert.equal(statuses[ITEM_STATUS.DONE], 1, 'a.txt still completed normally');
-    assert.equal(statuses[ITEM_STATUS.FAILED], 1, 'b.txt (the failing last item) is FAILED');
+    assert.equal(statuses[ITEM_STATUS.FAILED], 1, 'b.txt (the failing item) is FAILED');
     let failedItem;
     await eachItemByStatus('zjob-1', ITEM_STATUS.FAILED, (it) => { failedItem = it; });
     assert.equal(failedItem.key, 'videos/b.txt');
 
-    assert.ok(payloads.some(p => p.active && p.active.key === 'videos/b.txt'),
+    assert.ok(payloads.some(p => p.active.some(a => a.key === 'videos/b.txt')),
       'b.txt was reported active for its one streamed chunk before it failed');
-    assert.equal(payloads[payloads.length - 1].active, null,
-      'the run\'s final payload must not carry a phantom active file for the failed last item');
+    assert.deepEqual(payloads[payloads.length - 1].active, [],
+      'the run\'s final payload must not carry a phantom active file for the failed item');
+  });
+
+  // New for the concurrent engine (D1/D3/D5): a job whose items actually overlap in
+  // flight — proven both structurally (a byte-valid zip with correct, independently
+  // cross-checked CRCs for every entry — readZip verifies each entry's CRC against a
+  // table-free reference implementation) and observably (onProgress's active list holds
+  // more than one entry at some point during the run, not just sequentially one at a time).
+  test('12. a multi-item job downloads concurrently: byte-valid zip, correct CRCs, and the active list shows real overlap', async () => {
+    await saveJob(job());
+    await appendManifestPage('zjob-1', [
+      item('videos/a.txt', 'alpha-one'),
+      item('videos/b.txt', 'bravo-two'),
+      item('videos/c.txt', 'charlie-three'),
+      item('videos/d.txt', 'delta-four'),
+    ], {});
+
+    const root = fakeOpfsRoot();
+    const fetchImpl = fetchFake({
+      'videos/a.txt': [[enc('alpha-one')]],
+      'videos/b.txt': [[enc('bravo-two')]],
+      'videos/c.txt': [[enc('charlie-three')]],
+      'videos/d.txt': [[enc('delta-four')]],
+    });
+
+    const progress = [];
+    const result = await runZipJob(await loadJob('zjob-1'), {
+      presign, fetchImpl, root,
+      onProgress: (p) => progress.push({ ...p, active: p.active.map((a) => ({ ...a })) }),
+    });
+
+    assert.equal(result.finished, true);
+    assert.equal(result.cancelled, false);
+    assert.equal(result.blocked, null);
+
+    assert.ok(progress.some(p => p.active.length > 1),
+      'onProgress must show more than one file actively downloading at some point (real overlap) — the whole point of the prefetch pool over the old one-at-a-time loop');
+
+    const staging = await root.getFileHandle('bucketer-zip-zjob-1.zip');
+    const entries = readZip(new Uint8Array(await (await staging.getFile()).arrayBuffer()));
+    assert.deepEqual(entries.map(e => e.name).sort(), ['a.txt', 'b.txt', 'c.txt', 'd.txt']);
+    const byName = Object.fromEntries(entries.map(e => [e.name, e]));
+    // readZip already independently cross-checks each entry's CRC (a table-free bitwise
+    // CRC-32 against the central directory's recorded value) before returning — decoding
+    // the correct plaintext back out proves both content and CRC are right.
+    assert.equal(dec(byName['a.txt'].data), 'alpha-one');
+    assert.equal(dec(byName['b.txt'].data), 'bravo-two');
+    assert.equal(dec(byName['c.txt'].data), 'charlie-three');
+    assert.equal(dec(byName['d.txt'].data), 'delta-four');
+  });
+
+  // New for the concurrent engine (D4): a NETWORK probe result must stop the whole job
+  // immediately, mirroring the sequential engine's behavior (and test 5's DENIED-streak
+  // case) — never fail the manifest's remaining items one by one. Since runZipJob no
+  // longer calls runDownloadJob at all, this needs its own proof on the ZIP path;
+  // download-queue.test.js's NETWORK coverage no longer exercises it.
+  test('13. a NETWORK probe blocks the whole job immediately, not item-by-item', async () => {
+    await saveJob(job());
+    await appendManifestPage('zjob-1', [
+      item('videos/a.txt', 'alpha'),
+      item('videos/b.txt', 'bravo-body'),
+      item('videos/c.txt', 'charlie!!'),
+    ], {});
+
+    const root = fakeOpfsRoot();
+    const fetchImpl = fetchFake({
+      'videos/a.txt': [[enc('alpha')]],
+      'videos/b.txt': [[enc('bravo-body')]],
+      'videos/c.txt': [[enc('charlie!!')]],
+    });
+    const probeCalls = [];
+    const probe = async (url) => {
+      probeCalls.push(new URL(url).searchParams.get('key'));
+      return { kind: 'network', status: null, message: 'offline' };
+    };
+
+    // concurrency: 1 makes "stops at the first item, never reaches the rest" observable
+    // and deterministic (probeCalls would otherwise legitimately include more than one
+    // key, since several workers probe concurrently before any of them notices the block).
+    const result = await runZipJob(await loadJob('zjob-1'), {
+      presign, fetchImpl, root, probe, concurrency: 1,
+    });
+
+    assert.notEqual(result.blocked, null);
+    assert.equal(result.blocked.kind, 'network');
+    assert.equal(result.finished, false);
+
+    const statuses = await statusesOf('zjob-1');
+    assert.equal(statuses[ITEM_STATUS.FAILED], 0, 'a NETWORK block must not be recorded as per-item failures');
+    assert.equal(statuses[ITEM_STATUS.PENDING], 3, 'no item is individually touched — the whole job stops at once');
+    assert.deepEqual(probeCalls, ['videos/a.txt'], 'the job must stop at the first NETWORK result and never probe the remaining items');
   });
 });
 
