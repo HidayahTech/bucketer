@@ -1735,3 +1735,33 @@ describe('App.jsx — handleZipStart passes concurrency to runZipJob (download-c
       'handleZipStart must pass concurrency: CONCURRENCY to runZipJob explicitly');
   });
 });
+
+// ── download-concurrency follow-on: sweep orphaned OPFS prefetch temps at startup ──
+// bucketer-tmp-* files a crashed tab or hard close left behind are never cleaned up by
+// runPrefetch itself — its own cleanup only runs on a normal exit (see zip-prefetch.js's
+// sweepOrphanTemps doc comment). Nothing else ever revisits them, so without a startup
+// sweep they accumulate in OPFS indefinitely. Source-level because the runtime path needs
+// a real/mocked navigator.storage.getDirectory() this file's other App.jsx tests avoid.
+describe('App.jsx — sweeps orphaned OPFS prefetch temps at startup (download-concurrency)', () => {
+  const appSource = src('components/App.jsx');
+
+  test('App.jsx imports sweepOrphanTemps from zip-prefetch.js', () => {
+    assert.match(appSource, /import\s*\{[^}]*\bsweepOrphanTemps\b[^}]*\}\s*from\s*['"]\.\.\/lib\/zip-prefetch\.js['"]/,
+      'App.jsx must import sweepOrphanTemps from zip-prefetch.js');
+  });
+
+  test('the app-init mount effect calls sweepOrphanTemps via navigator.storage.getDirectory()', () => {
+    // Anchor on the existing app-init effect (repairStorageInvariants marks it) — the
+    // brief asks for reuse of an existing app-init effect rather than a new one, and
+    // App.jsx already has one.
+    const anchorIdx = appSource.indexOf('repairStorageInvariants()');
+    assert.ok(anchorIdx > -1, 'the app-init effect (repairStorageInvariants) must exist');
+    const effectStart = appSource.lastIndexOf('useEffect(() => {', anchorIdx);
+    assert.ok(effectStart > -1, 'repairStorageInvariants must be called inside a useEffect');
+    const preamble = appSource.slice(effectStart, anchorIdx);
+    assert.match(preamble, /sweepOrphanTemps/,
+      'the app-init effect must call sweepOrphanTemps to clean up orphaned prefetch temps at startup');
+    assert.match(preamble, /navigator\.storage\?\.getDirectory/,
+      'the sweep must guard on navigator.storage.getDirectory being available before calling it');
+  });
+});

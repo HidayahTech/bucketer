@@ -354,3 +354,22 @@ export async function runPrefetch(items, {
 
   return { failed, denied, blocked, cancelled };
 }
+
+// Cross-session orphan sweep. runPrefetch's own finally (above) removes every temp it
+// created on every exit path it can observe — but a tab close or crash skips that finally
+// entirely, and nothing tracks temp names across page loads (tempStore's `created` set is
+// in-memory, per-run). Anything named bucketer-tmp-* found on OPFS when this runs is
+// therefore orphaned by definition: a temp file only has meaning during an active
+// runPrefetch, and no runPrefetch is active at app startup. Never touches bucketer-zip-*
+// staging files — those are tied to job records and live/die with the job via
+// discardZipStaging, not this sweep. Best-effort throughout: called fire-and-forget at
+// startup (App.jsx), so neither a missing OPFS API, a keys() failure, nor a single
+// removeEntry failure may throw out of here.
+export async function sweepOrphanTemps(root) {
+  try {
+    for await (const name of root.keys()) {
+      if (!name.startsWith('bucketer-tmp-')) continue;
+      try { await root.removeEntry(name); } catch { /* best effort */ }
+    }
+  } catch { /* best effort — OPFS unsupported, keys() unavailable, etc. */ }
+}

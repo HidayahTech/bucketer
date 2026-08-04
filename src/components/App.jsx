@@ -71,7 +71,7 @@ import { issueBrowserDownload } from '../lib/download-issue.js';
 import { probeUrl, blockedMessage } from '../lib/download-preflight.js';
 import { runZipJob, discardZipStaging, zipFileName, openZipStaging, zipGate } from '../lib/zip-job.js';
 import { exportZip } from '../lib/zip-export.js';
-import { CONCURRENCY } from '../lib/zip-prefetch.js';
+import { CONCURRENCY, sweepOrphanTemps } from '../lib/zip-prefetch.js';
 import { detectCapabilities, readStorageQuota } from '../lib/browser-capability.js';
 import { presignDownloadParams } from '../lib/presign-params.js';
 import { normalizeRoots, selectionLabel } from '../lib/download-roots.js';
@@ -420,6 +420,15 @@ export function App() {
   // from the URL override stored values (secret key never comes from URL).
   // Migration runs first so the profile list is populated before state reads it.
   useEffect(() => {
+    // Fire-and-forget: bucketer-tmp-* prefetch temps left behind by a crashed tab or a
+    // hard close (runPrefetch's own cleanup only runs on a normal exit — see
+    // zip-prefetch.js's sweepOrphanTemps) accumulate in OPFS across sessions with nothing
+    // else to sweep them. Never awaited and never allowed to throw into this effect —
+    // OPFS availability itself is not guaranteed, and this must not delay or block
+    // startup either way.
+    if (navigator.storage?.getDirectory) {
+      navigator.storage.getDirectory().then(root => sweepOrphanTemps(root)).catch(() => {});
+    }
     repairStorageInvariants();
     // Restores the pre-branch migration chain: a user who last opened Bucketer
     // before profiles shipped (~v1.15.0) still has only bare flat credential keys,

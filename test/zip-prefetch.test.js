@@ -1,7 +1,7 @@
 // Copyright (C) 2026 HidayahTech, LLC
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyTier, TINY_MAX, MEDIUM_MAX, CONCURRENCY, createTempStore, TEMP_CHUNK } from '../src/lib/zip-prefetch.js';
+import { classifyTier, TINY_MAX, MEDIUM_MAX, CONCURRENCY, createTempStore, TEMP_CHUNK, sweepOrphanTemps } from '../src/lib/zip-prefetch.js';
 
 // Trimmed copy of the fake OPFS root from test/zip-job-run.test.js (write-fault
 // injection dropped — this file's tests don't need it). Same shape: getFileHandle /
@@ -55,6 +55,13 @@ function fakeOpfsRoot() {
     async removeEntry(name) {
       if (!files.has(name)) { const e = new Error('missing'); e.name = 'NotFoundError'; throw e; }
       files.delete(name);
+    },
+    // Real FileSystemDirectoryHandle.keys() returns an async iterable of entry names —
+    // mirrored here (sync generator; `for await` accepts a sync iterable just as well)
+    // for sweepOrphanTemps, which is the only caller in this file that needs directory
+    // enumeration rather than a single named lookup.
+    *keys() {
+      yield* files.keys();
     },
   };
 }
@@ -164,5 +171,51 @@ describe('createTempStore', () => {
     assert.equal(root.files.has('bucketer-tmp-two.txt'), false);
     assert.equal(new TextDecoder().decode(root.files.get('unrelated.zip')), 'keep-me');
     assert.equal(new TextDecoder().decode(root.files.get('bucketer-tmp-stale.bin')), 'not-mine');
+  });
+});
+
+describe('sweepOrphanTemps', () => {
+  test('deletes every bucketer-tmp-* entry, leaves staging zips and unrelated files alone', async () => {
+    const root = fakeOpfsRoot();
+    // Two orphaned prefetch temps (e.g. left behind by a crashed tab, from two different
+    // runs — tempSeq restarts at 0 each run, so colliding names across runs are expected
+    // and exactly what this sweep exists to clean up).
+    root.files.set('bucketer-tmp-p0', new Uint8Array(0));
+    root.files.set('bucketer-tmp-p1', new Uint8Array(0));
+    // A staging zip tied to a live job record — must survive; it is cleaned up via
+    // discardZipStaging/job lifecycle, never by this sweep.
+    root.files.set('bucketer-zip-job1.zip', new Uint8Array(0));
+    // Something this feature never wrote at all.
+    root.files.set('unrelated-file.txt', new Uint8Array(0));
+
+    await sweepOrphanTemps(root);
+
+    assert.deepEqual(
+      [...root.files.keys()].sort(),
+      ['bucketer-zip-job1.zip', 'unrelated-file.txt'],
+    );
+  });
+
+  test('best-effort: a single removeEntry failure does not abort the rest of the sweep', async () => {
+    const root = fakeOpfsRoot();
+    root.files.set('bucketer-tmp-a', new Uint8Array(0));
+    root.files.set('bucketer-tmp-b', new Uint8Array(0));
+    const realRemove = root.removeEntry.bind(root);
+    root.removeEntry = async (name) => {
+      if (name === 'bucketer-tmp-a') throw new Error('simulated OPFS failure');
+      return realRemove(name);
+    };
+
+    await assert.doesNotReject(sweepOrphanTemps(root));
+
+    // The failing entry is left behind (best-effort, not retried), but the sweep still
+    // reached and removed the other one rather than aborting on the first error.
+    assert.equal(root.files.has('bucketer-tmp-a'), true);
+    assert.equal(root.files.has('bucketer-tmp-b'), false);
+  });
+
+  test('best-effort: a root with no keys() (OPFS directory enumeration unsupported) does not throw', async () => {
+    const root = { async removeEntry() {} }; // no keys() at all
+    await assert.doesNotReject(sweepOrphanTemps(root));
   });
 });
