@@ -1,0 +1,534 @@
+{
+  "config": {
+    "MECHS": [
+      "control",
+      "prefetch"
+    ],
+    "WORKLOADS": [
+      "tiny",
+      "mixed"
+    ],
+    "CONCS": [
+      1,
+      4
+    ],
+    "ENGINES": [
+      "chromium",
+      "firefox"
+    ],
+    "REPS": 3,
+    "LATENCY_MS": 50,
+    "SAMPLE_MS": 40,
+    "SCALE_NMEDIUMS": [
+      4,
+      20,
+      40
+    ]
+  },
+  "runs": [
+    {
+      "engine": "chromium",
+      "mech": "prefetch",
+      "workload": "mixed",
+      "concurrency": 1,
+      "nmedium": 4,
+      "ntiny": 0,
+      "rep": 1,
+      "ok": true,
+      "spans": {
+        "run": {
+          "preMiB": 502,
+          "peakDeltaMiB": 64,
+          "ms": 1115
+        }
+      },
+      "detail": {
+        "wallMs": 1114.5,
+        "itemCount": 4,
+        "failedCount": 0,
+        "failedSample": [],
+        "denied": false,
+        "blocked": null,
+        "cancelled": false,
+        "opfsPeakMiB": 28,
+        "opfsSampleCount": 42
+      }
+    },
+    {
+      "engine": "chromium",
+      "mech": "prefetch",
+      "workload": "mixed",
+      "concurrency": 1,
+      "nmedium": 4,
+      "ntiny": 0,
+      "rep": 2,
+      "ok": true,
+      "spans": {
+        "run": {
+          "preMiB": 504,
+          "peakDeltaMiB": 62,
+          "ms": 1100
+        }
+      },
+      "detail": {
+        "wallMs": 1100.699999988079,
+        "itemCount": 4,
+        "failedCount": 0,
+        "failedSample": [],
+        "denied": false,
+        "blocked": null,
+        "cancelled": false,
+        "opfsPeakMiB": 28,
+        "opfsSampleCount": 42
+      }
+    },
+    {
+      "engine": "chromium",
+      "mech": "prefetch",
+      "workload": "mixed",
+      "concurrency": 1,
+      "nmedium": 4,
+      "ntiny": 0,
+      "rep": 3,
+      "ok": true,
+      "spans": {
+        "run": {
+          "preMiB": 504,
+          "peakDeltaMiB": 62,
+          "ms": 1104
+        }
+      },
+      "detail": {
+        "wallMs": 1103.9000000059605,
+        "itemCount": 4,
+        "failedCount": 0,
+        "failedSample": [],
+        "denied": false,
+        "blocked": null,
+        "cancelled": false,
+        "opfsPeakMiB": 28,
+        "opfsSampleCount": 42
+      }
+    },
+    {
+      "engine": "chromium",
+      "mech": "prefetch",
+      "workload": "mixed",
+      "concurrency": 1,
+      "nmedium": 20,
+      "ntiny": 0,
+      "rep": 1,
+      "ok": true,
+      "spans": {
+        "run": {
+          "preMiB": 502,
+          "peakDeltaMiB": 91,
+          "ms": 6041
+        }
+      },
+      "detail": {
+        "wallMs": 6041.699999988079,
+        "itemCount": 20,
+        "failedCount": 0,
+        "failedSample": [],
+        "denied": false,
+        "blocked": null,
+        "cancelled": false,
+        "opfsPeakMiB": 32,
+        "opfsSampleCount": 141
+      }
+    },
+    {
+      "engine": "chromium",
+      "mech": "prefetch",
+      "workload": "mixed",
+      "concurrency": 1,
+      "nmedium": 20,
+      "ntiny": 0,
+      "rep": 2,
+      "ok": true,
+      "spans": {
+        "run": {
+          "preMiB": 504,
+          "peakDeltaMiB": 95,
+          "ms": 6122
+        }
+      },
+      "detail": {
+        "wallMs": 6121.100000008941,
+        "itemCount": 20,
+        "failedCount": 0,
+        "failedSample": [],
+        "denied": false,
+        "blocked": null,
+        "cancelled": false,
+        "opfsPeakMiB": 32,
+        "opfsSampleCount": 142
+      }
+    },
+    {
+      "engine": "chromium",
+      "mech": "prefetch",
+      "workload": "mixed",
+      "concurrency": 1,
+      "nmedium": 20,
+      "ntiny": 0,
+      "rep": 3,
+      "ok": true,
+      "spans": {
+        "run": {
+          "preMiB": 501,
+          "peakDeltaMiB": 98,
+          "ms": 6107
+        }
+      },
+      "detail": {
+        "wallMs": 6106.70000000298,
+        "itemCount": 20,
+        "failedCount": 0,
+        "failedSample": [],
+        "denied": false,
+        "blocked": null,
+        "cancelled": false,
+        "opfsPeakMiB": 32,
+        "opfsSampleCount": 142
+      }
+    },
+    {
+      "engine": "chromium",
+      "mech": "prefetch",
+      "workload": "mixed",
+      "concurrency": 1,
+      "nmedium": 40,
+      "ntiny": 0,
+      "rep": 1,
+      "ok": true,
+      "spans": {
+        "run": {
+          "preMiB": 504,
+          "peakDeltaMiB": 106,
+          "ms": 12346
+        }
+      },
+      "detail": {
+        "wallMs": 12345.79999999702,
+        "itemCount": 40,
+        "failedCount": 0,
+        "failedSample": [],
+        "denied": false,
+        "blocked": null,
+        "cancelled": false,
+        "opfsPeakMiB": 32,
+        "opfsSampleCount": 267
+      }
+    },
+    {
+      "engine": "chromium",
+      "mech": "prefetch",
+      "workload": "mixed",
+      "concurrency": 1,
+      "nmedium": 40,
+      "ntiny": 0,
+      "rep": 2,
+      "ok": true,
+      "spans": {
+        "run": {
+          "preMiB": 504,
+          "peakDeltaMiB": 102,
+          "ms": 12354
+        }
+      },
+      "detail": {
+        "wallMs": 12354,
+        "itemCount": 40,
+        "failedCount": 0,
+        "failedSample": [],
+        "denied": false,
+        "blocked": null,
+        "cancelled": false,
+        "opfsPeakMiB": 32,
+        "opfsSampleCount": 267
+      }
+    },
+    {
+      "engine": "chromium",
+      "mech": "prefetch",
+      "workload": "mixed",
+      "concurrency": 1,
+      "nmedium": 40,
+      "ntiny": 0,
+      "rep": 3,
+      "ok": true,
+      "spans": {
+        "run": {
+          "preMiB": 499,
+          "peakDeltaMiB": 104,
+          "ms": 12092
+        }
+      },
+      "detail": {
+        "wallMs": 12092.59999999404,
+        "itemCount": 40,
+        "failedCount": 0,
+        "failedSample": [],
+        "denied": false,
+        "blocked": null,
+        "cancelled": false,
+        "opfsPeakMiB": 32,
+        "opfsSampleCount": 262
+      }
+    },
+    {
+      "engine": "firefox",
+      "mech": "prefetch",
+      "workload": "mixed",
+      "concurrency": 1,
+      "nmedium": 4,
+      "ntiny": 0,
+      "rep": 1,
+      "ok": true,
+      "spans": {
+        "run": {
+          "preMiB": 811,
+          "peakDeltaMiB": 188,
+          "ms": 2124
+        }
+      },
+      "detail": {
+        "wallMs": 2124,
+        "itemCount": 4,
+        "failedCount": 0,
+        "failedSample": [],
+        "denied": false,
+        "blocked": null,
+        "cancelled": false,
+        "opfsPeakMiB": 28,
+        "opfsSampleCount": 62
+      }
+    },
+    {
+      "engine": "firefox",
+      "mech": "prefetch",
+      "workload": "mixed",
+      "concurrency": 1,
+      "nmedium": 4,
+      "ntiny": 0,
+      "rep": 2,
+      "ok": true,
+      "spans": {
+        "run": {
+          "preMiB": 796,
+          "peakDeltaMiB": 189,
+          "ms": 2124
+        }
+      },
+      "detail": {
+        "wallMs": 2124,
+        "itemCount": 4,
+        "failedCount": 0,
+        "failedSample": [],
+        "denied": false,
+        "blocked": null,
+        "cancelled": false,
+        "opfsPeakMiB": 28,
+        "opfsSampleCount": 62
+      }
+    },
+    {
+      "engine": "firefox",
+      "mech": "prefetch",
+      "workload": "mixed",
+      "concurrency": 1,
+      "nmedium": 4,
+      "ntiny": 0,
+      "rep": 3,
+      "ok": true,
+      "spans": {
+        "run": {
+          "preMiB": 794,
+          "peakDeltaMiB": 188,
+          "ms": 2113
+        }
+      },
+      "detail": {
+        "wallMs": 2112,
+        "itemCount": 4,
+        "failedCount": 0,
+        "failedSample": [],
+        "denied": false,
+        "blocked": null,
+        "cancelled": false,
+        "opfsPeakMiB": 28,
+        "opfsSampleCount": 61
+      }
+    },
+    {
+      "engine": "firefox",
+      "mech": "prefetch",
+      "workload": "mixed",
+      "concurrency": 1,
+      "nmedium": 20,
+      "ntiny": 0,
+      "rep": 1,
+      "ok": true,
+      "spans": {
+        "run": {
+          "preMiB": 793,
+          "peakDeltaMiB": 966,
+          "ms": 11165
+        }
+      },
+      "detail": {
+        "wallMs": 11165,
+        "itemCount": 20,
+        "failedCount": 0,
+        "failedSample": [],
+        "denied": false,
+        "blocked": null,
+        "cancelled": false,
+        "opfsPeakMiB": 32,
+        "opfsSampleCount": 241
+      }
+    },
+    {
+      "engine": "firefox",
+      "mech": "prefetch",
+      "workload": "mixed",
+      "concurrency": 1,
+      "nmedium": 20,
+      "ntiny": 0,
+      "rep": 2,
+      "ok": true,
+      "spans": {
+        "run": {
+          "preMiB": 812,
+          "peakDeltaMiB": 963,
+          "ms": 11003
+        }
+      },
+      "detail": {
+        "wallMs": 11003,
+        "itemCount": 20,
+        "failedCount": 0,
+        "failedSample": [],
+        "denied": false,
+        "blocked": null,
+        "cancelled": false,
+        "opfsPeakMiB": 32,
+        "opfsSampleCount": 238
+      }
+    },
+    {
+      "engine": "firefox",
+      "mech": "prefetch",
+      "workload": "mixed",
+      "concurrency": 1,
+      "nmedium": 20,
+      "ntiny": 0,
+      "rep": 3,
+      "ok": true,
+      "spans": {
+        "run": {
+          "preMiB": 816,
+          "peakDeltaMiB": 963,
+          "ms": 11037
+        }
+      },
+      "detail": {
+        "wallMs": 11038,
+        "itemCount": 20,
+        "failedCount": 0,
+        "failedSample": [],
+        "denied": false,
+        "blocked": null,
+        "cancelled": false,
+        "opfsPeakMiB": 32,
+        "opfsSampleCount": 238
+      }
+    },
+    {
+      "engine": "firefox",
+      "mech": "prefetch",
+      "workload": "mixed",
+      "concurrency": 1,
+      "nmedium": 40,
+      "ntiny": 0,
+      "rep": 1,
+      "ok": true,
+      "spans": {
+        "run": {
+          "preMiB": 795,
+          "peakDeltaMiB": 1933,
+          "ms": 22083
+        }
+      },
+      "detail": {
+        "wallMs": 22083,
+        "itemCount": 40,
+        "failedCount": 0,
+        "failedSample": [],
+        "denied": false,
+        "blocked": null,
+        "cancelled": false,
+        "opfsPeakMiB": 32,
+        "opfsSampleCount": 458
+      }
+    },
+    {
+      "engine": "firefox",
+      "mech": "prefetch",
+      "workload": "mixed",
+      "concurrency": 1,
+      "nmedium": 40,
+      "ntiny": 0,
+      "rep": 2,
+      "ok": true,
+      "spans": {
+        "run": {
+          "preMiB": 809,
+          "peakDeltaMiB": 1934,
+          "ms": 21850
+        }
+      },
+      "detail": {
+        "wallMs": 21850,
+        "itemCount": 40,
+        "failedCount": 0,
+        "failedSample": [],
+        "denied": false,
+        "blocked": null,
+        "cancelled": false,
+        "opfsPeakMiB": 32,
+        "opfsSampleCount": 453
+      }
+    },
+    {
+      "engine": "firefox",
+      "mech": "prefetch",
+      "workload": "mixed",
+      "concurrency": 1,
+      "nmedium": 40,
+      "ntiny": 0,
+      "rep": 3,
+      "ok": true,
+      "spans": {
+        "run": {
+          "preMiB": 791,
+          "peakDeltaMiB": 1936,
+          "ms": 21734
+        }
+      },
+      "detail": {
+        "wallMs": 21734,
+        "itemCount": 40,
+        "failedCount": 0,
+        "failedSample": [],
+        "denied": false,
+        "blocked": null,
+        "cancelled": false,
+        "opfsPeakMiB": 32,
+        "opfsSampleCount": 450
+      }
+    }
+  ]
+}
