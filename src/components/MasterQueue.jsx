@@ -176,7 +176,11 @@ function TaskRow({ task, store, readZipDetail }) {
   const failedCount = zipDetail?.failedCount ?? 0;
   const queuedCount = Math.max(0, (task.total ?? 0) - doneCount - failedCount);
   const doneOverflow = doneCount - doneList.length;
-  const activePct = task.active?.size ? Math.round((task.active.bytes / task.active.size) * 100) : 0;
+  // task.active is an array of the currently-downloading files (0..N entries). Guard
+  // against a legacy/stray single-object value (wrap it) or an absent value (empty) — an
+  // empty array is truthy in JS, so `task.active && ...` alone would still render a broken
+  // row with no entries; mapping over this list instead renders zero rows for zero entries.
+  const activeList = Array.isArray(task.active) ? task.active : (task.active ? [task.active] : []);
   // failed items from readZipDetail carry only {key} — the failure reason lives on
   // task.errors ({key, message}), already on the task, no extra IndexedDB read.
   const errorMessageByKey = new Map(task.errors.map(e => [e.key, e.message]));
@@ -236,11 +240,14 @@ function TaskRow({ task, store, readZipDetail }) {
 
       {expandedZip && (
         <div class="queue-op-zip-detail" data-testid="zip-detail">
-          {task.active && (
-            <div class="queue-op-zip-row queue-op-zip-active">
-              ▶ {task.active.key}  {formatBytes(task.active.bytes)} / {formatBytes(task.active.size)}  ({activePct}%)
-            </div>
-          )}
+          {activeList.map(a => {
+            const pct = a.size ? Math.round((a.bytes / a.size) * 100) : 0;
+            return (
+              <div key={a.key} class="queue-op-zip-row queue-op-zip-active">
+                ▶ {a.key}  {formatBytes(a.bytes)} / {formatBytes(a.size)}  ({pct}%)
+              </div>
+            );
+          })}
           {doneList.map(d => (
             <div key={d.key} class="queue-op-zip-row queue-op-zip-done">✓ {d.key}  {formatBytes(d.size)}</div>
           ))}

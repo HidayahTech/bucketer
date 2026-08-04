@@ -249,7 +249,7 @@ describe('MasterQueue — zip progress (byte/speed/ETA parity, active-focused de
     addZip(store, {
       status: 'running', current: 12, total: 4231, bytesDone: 1.2e9, bytesTotal: 3.4e9, failed: 1,
       jobId: 'job-1',
-      active: { key: 'photos/2024/trip-4k.mov', bytes: 412 * 1024 * 1024, size: 900 * 1024 * 1024 },
+      active: [{ key: 'photos/2024/trip-4k.mov', bytes: 412 * 1024 * 1024, size: 900 * 1024 * 1024 }],
     });
     const detail = {
       done: [{ key: 'photos/2024/b.jpg', size: 6_100_000 }, { key: 'photos/2024/a.jpg', size: 8_200_000 }],
@@ -278,6 +278,91 @@ describe('MasterQueue — zip progress (byte/speed/ETA parity, active-focused de
     // queued = total(4231) - doneCount(11) - failedCount(1) = 4219; overflow = doneCount(11) - done.length(2) = 9
     assert.ok(body.includes('…and 4,219 queued · 9 more done'), body);
     cleanup();
+  });
+
+  test('a running zip task with N concurrent downloads renders one ▶ row per in-flight file, each with its own key/bytes/pct (Task 5)', async () => {
+    const store = makeStore();
+    addZip(store, {
+      status: 'running', current: 12, total: 4231, bytesDone: 1.2e9, bytesTotal: 3.4e9, failed: 1,
+      jobId: 'job-multi',
+      active: [
+        { key: 'a.mov', size: 900, bytes: 180 },
+        { key: 'b.mov', size: 210, bytes: 64 },
+        { key: 'c.raw', size: 48, bytes: 12 },
+      ],
+    });
+    const detail = {
+      done: [{ key: 'photos/2024/b.jpg', size: 6_100_000 }],
+      failed: [{ key: 'photos/2024/corrupt.raw' }],
+      doneCount: 11,
+      failedCount: 1,
+    };
+    const readZipDetail = () => Promise.resolve(detail);
+
+    const { text, query, queryAll, cleanup } = mount(h(MasterQueue, { store, readZipDetail }));
+    try {
+      fire(query('[data-testid="task-expand-toggle"]'), 'click');
+      await new Promise(r => setTimeout(r, 60));
+
+      const body = text();
+      assert.equal(queryAll('.queue-op-zip-active').length, 3, 'one ▶ row per in-flight file');
+      assert.ok(body.includes('▶ a.mov') && body.includes(`${formatBytes(180)} / ${formatBytes(900)}`) && body.includes('(20%)'), body);
+      assert.ok(body.includes('▶ b.mov') && body.includes(`${formatBytes(64)} / ${formatBytes(210)}`) && body.includes('(30%)'), body);
+      assert.ok(body.includes('▶ c.raw') && body.includes(`${formatBytes(12)} / ${formatBytes(48)}`) && body.includes('(25%)'), body);
+
+      // The aggregate line + bar + done/failed/queued detail are unchanged by the active-list work.
+      assert.ok(body.includes('Zipping · 12 of 4,231 files · 1 failed'), body);
+      assert.notEqual(query('[data-testid="zip-progress-bar"]'), null);
+      assert.ok(body.includes('✓ photos/2024/b.jpg') && body.includes(formatBytes(6_100_000)), body);
+      assert.ok(body.includes('✗ photos/2024/corrupt.raw — failed'), body);
+    } finally {
+      // A running-zip detail keeps a 1s poll interval alive while expanded (see MasterQueue's
+      // read effect) — cleanup() must run even when an assertion above throws, or the
+      // dangling interval keeps this test's node --test worker alive past the run (RED
+      // assertion failures were seen to hang the whole file otherwise).
+      cleanup();
+    }
+  });
+
+  test('REGRESSION: active: [] renders NO ▶ rows — an empty array is truthy, so a naive `task.active &&` guard breaks this', async () => {
+    const store = makeStore();
+    addZip(store, {
+      status: 'running', current: 12, total: 4231, bytesDone: 1.2e9, bytesTotal: 3.4e9, failed: 0,
+      jobId: 'job-empty',
+      active: [],
+    });
+    const readZipDetail = () => Promise.resolve({ done: [], failed: [], doneCount: 0, failedCount: 0 });
+    const { text, query, queryAll, cleanup } = mount(h(MasterQueue, { store, readZipDetail }));
+    try {
+      fire(query('[data-testid="task-expand-toggle"]'), 'click');
+      await new Promise(r => setTimeout(r, 60));
+
+      assert.equal(queryAll('.queue-op-zip-active').length, 0, 'no active rows when nothing is in flight');
+      const body = text();
+      assert.equal(/undefined/.test(body), false, body);
+      assert.equal(/NaN/.test(body), false, body);
+      assert.equal(/▶/.test(body), false, 'no ▶ marker at all when active is empty');
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('active absent/null renders NO ▶ rows', async () => {
+    const store = makeStore();
+    addZip(store, {
+      status: 'running', current: 12, total: 4231, bytesDone: 1.2e9, bytesTotal: 3.4e9, failed: 0,
+      jobId: 'job-none',
+    });
+    const readZipDetail = () => Promise.resolve({ done: [], failed: [], doneCount: 0, failedCount: 0 });
+    const { query, queryAll, cleanup } = mount(h(MasterQueue, { store, readZipDetail }));
+    try {
+      fire(query('[data-testid="task-expand-toggle"]'), 'click');
+      await new Promise(r => setTimeout(r, 60));
+
+      assert.equal(queryAll('.queue-op-zip-active').length, 0, 'no active rows when task.active is absent');
+    } finally {
+      cleanup();
+    }
   });
 
   test('a running zip task does not auto-expand the per-file detail or poll readZipDetail until the toggle is clicked (Fix 3)', async () => {
