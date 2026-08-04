@@ -162,6 +162,36 @@ function assertZipMatches(entries, expected) {
 
 describe('browser e2e — zip download', () => {
   e2eTest('one zip download contains exactly the selected files, byte-for-byte, folder structure intact', async () => {
+    // ── Engine-identity observable: prove the IN-PLACE engine ran, not just that a valid
+    // zip came out. On Chromium/Firefox the zip path now runs through the in-place engine
+    // (a Web Worker doing positioned OPFS writes, per the 2026-08-04 offset-composition
+    // design); the serial engine it replaced instantiates no Worker at all. So "at least one
+    // `new Worker` was constructed before the download completed" is a valid presence proof
+    // for "in-place ran" — a silent regression back to serial, or a worker that fails to
+    // spin up and the code silently falling back, would both zero out this counter while the
+    // byte-level assertions below could still pass (a correct zip can, in principle, come out
+    // of either engine). This is the PRESENCE half; assertZipMatches below remains the
+    // CORRECTNESS half — neither subsumes the other.
+    //
+    // Installed on the CONTEXT (not evaluate()) and BEFORE page.goto(): addInitScript runs
+    // the wrapper before any of the navigated document's own scripts, so the app bundle's
+    // `import { makeAssemblerWorker }` / `new Worker(blobURL)` (assembler-worker-url.js) sees
+    // the wrapped constructor, not the original. Registering it here — after `page` already
+    // exists (created in beforeEach) but before this test's own `page.goto` — still lands
+    // ahead of that navigation: addInitScript scripts apply to a context's pages "whenever a
+    // page is created ... or is navigated" (verified locally against this Playwright version
+    // before relying on it here). WebKit is excluded (skipOn below): it has no zip button at
+    // all (arm 4), so there is nothing to instrument there.
+    await context.addInitScript(() => {
+      window.__zipWorkerCount = 0;
+      const OrigWorker = window.Worker;
+      if (OrigWorker) {
+        window.Worker = class extends OrigWorker {
+          constructor(...args) { super(...args); window.__zipWorkerCount++; }
+        };
+      }
+    });
+
     await page.goto(app.url, { waitUntil: 'domcontentloaded' });
     await connectApp(page, ctx.httpsBrowserEndpoint);
     await page.locator('[data-testid="folder-row:zsel"]').click();
@@ -184,6 +214,12 @@ describe('browser e2e — zip download', () => {
 
     const expected = Object.fromEntries(Object.entries(ZSEL).map(([k, v]) => [k.slice('zsel/'.length), v]));
     assertZipMatches(entries, expected);
+
+    // Fail loudly if the counter never landed (wrong insertion point) rather than skipping
+    // the check — the whole point is that this fails if in-place didn't run.
+    const workerCount = await page.evaluate(() => window.__zipWorkerCount);
+    assert.ok(Number.isInteger(workerCount), 'window.__zipWorkerCount must be defined — the init script did not land before app JS ran');
+    assert.ok(workerCount >= 1, `expected the in-place engine to construct at least one assembler Worker, saw ${workerCount}`);
   }, { skipOn: { webkit: 'start-zip does not render on WebKit — see the WebKit-absence arm below' } });
 
   e2eTest('a per-file failure pauses the zip; resuming finishes it as one complete download', async (t) => {
@@ -195,6 +231,22 @@ describe('browser e2e — zip download', () => {
     // The probe (a 1-byte Range GET) must survive so the failure stays scoped to f2.bin
     // instead of blocking the whole job — see the file-header comment.
     ctx.mock.configure({ faults: [{ op: 'GetObject', keyPrefix: 'zint/f2.bin', killAtByte: 1500, skipRange: true }] });
+
+    // Same engine-identity observable as the happy-path arm above (see its comment for the
+    // full rationale): the in-place engine's assembler Worker must be created not just on
+    // the first run, but again on the resumed run — resume re-enters the same zip-job code
+    // path (file-granularity, per the header comment), so a regression that broke in-place
+    // specifically on resume (e.g. a fallback that only triggers on retry) would still be
+    // caught. Installed on the context before this test's page.goto, ahead of the app bundle.
+    await context.addInitScript(() => {
+      window.__zipWorkerCount = 0;
+      const OrigWorker = window.Worker;
+      if (OrigWorker) {
+        window.Worker = class extends OrigWorker {
+          constructor(...args) { super(...args); window.__zipWorkerCount++; }
+        };
+      }
+    });
 
     await page.goto(app.url, { waitUntil: 'domcontentloaded' });
     await connectApp(page, ctx.httpsBrowserEndpoint);
@@ -226,6 +278,11 @@ describe('browser e2e — zip download', () => {
 
     const expected = Object.fromEntries(Object.entries(ZINT).map(([k, v]) => [k.slice('zint/'.length), v]));
     assertZipMatches(entries, expected);
+
+    // Fail loudly if the counter never landed, same as the happy-path arm.
+    const workerCount = await page.evaluate(() => window.__zipWorkerCount);
+    assert.ok(Number.isInteger(workerCount), 'window.__zipWorkerCount must be defined — the init script did not land before app JS ran');
+    assert.ok(workerCount >= 1, `expected the in-place engine to construct at least one assembler Worker across the first run + resume, saw ${workerCount}`);
   }, { skipOn: { webkit: 'start-zip does not render on WebKit — see the WebKit-absence arm below' } });
 
   e2eTest('a many-file zip (concurrent prefetch) still contains exactly the expected files, byte-for-byte', async () => {
