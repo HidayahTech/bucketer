@@ -58,13 +58,14 @@ class ByteBuilder {
   }
 }
 
-// Local header layout never depends on ZIP64 — sizes/crc are always deferred to the
-// data descriptor (bit 3), so the header itself is always 30 bytes + name bytes.
-export function localHeaderBytes(path, { time, date }) {
+// Local header size never depends on ZIP64 — sizes/crc are always deferred to the data
+// descriptor (bit 3), so the header is always 30 bytes + name bytes. The version-needed
+// field's VALUE does still flag zip64 (45 vs 20), matching the original beginEntry.
+export function localHeaderBytes(path, { time, date, zip64 = false }) {
   const nameBytes = new TextEncoder().encode(path);
   const b = new ByteBuilder();
   b.u32(SIG_LOCAL);
-  b.u16(20);                       // version needed (local layout never needs 45)
+  b.u16(zip64 ? 45 : 20);          // version needed
   b.u16(FLAGS);
   b.u16(0);                        // method: store
   b.u16(time); b.u16(date);
@@ -144,7 +145,7 @@ export function createZipWriter(sink, { zip64Limit = 0xFFFFFFFF, maxEntries = 0x
       const zip64 = declaredSize >= zip64Limit;
       const { time, date } = dosDateTime(mtime);
       cur = { path, zipOffset: offset, declaredSize, zip64, crc: 0, size: 0, time, date };
-      await write(localHeaderBytes(path, { time, date }));
+      await write(localHeaderBytes(path, { time, date, zip64 }));
     },
 
     async update(chunk) {

@@ -9,6 +9,16 @@ test('localHeaderBytes: 30 + name length, independent of size', () => {
   assert.equal(new DataView(b.buffer).getUint32(0, true), 0x04034b50); // SIG_LOCAL
 });
 
+test('localHeaderBytes: length fixed at 30 + name regardless of zip64; version-needed flags it', () => {
+  const nonZip64 = localHeaderBytes('a/b.txt', { time: 0, date: 0x21, zip64: false });
+  const zip64 = localHeaderBytes('a/b.txt', { time: 0, date: 0x21, zip64: true });
+  const nameLen = new TextEncoder().encode('a/b.txt').length;
+  assert.equal(nonZip64.length, 30 + nameLen);
+  assert.equal(zip64.length, 30 + nameLen);
+  assert.equal(new DataView(nonZip64.buffer).getUint16(4, true), 20); // version needed
+  assert.equal(new DataView(zip64.buffer).getUint16(4, true), 45);    // version needed
+});
+
 test('dataDescriptorBytes: 16 non-zip64, 24 zip64', () => {
   assert.equal(dataDescriptorBytes({ crc: 1, size: 10, zip64: false }).length, 16);
   assert.equal(dataDescriptorBytes({ crc: 1, size: 10, zip64: true }).length, 24);

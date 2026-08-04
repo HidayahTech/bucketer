@@ -12,9 +12,9 @@ export function computeZipLayout(items, prefix = '', { zip64Limit = 0xFFFFFFFF, 
   for (const it of items) {
     const path = zipEntryPath(it.key, prefix);
     const { time, date } = dosDateTime(it.lastModified);
-    const headerBytes = localHeaderBytes(path, { time, date }).length;
     const declaredSize = it.size || 0;
     const zip64 = declaredSize >= zip64Limit;
+    const headerBytes = localHeaderBytes(path, { time, date, zip64 }).length;
     const descriptorBytes = zip64 ? 24 : 16;
     const headerOffset = offset;
     const dataOffset = headerOffset + headerBytes;
