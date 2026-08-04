@@ -136,6 +136,10 @@ export async function runZipJob(job, { presign, probe, fetchImpl = fetch, root, 
   const issue = async (url, _localName, item) => {
     const entryStart = writer.offset;
     let inFlightBytes = 0;
+    // The file currently streaming, for the UI's "active file" display. Local to this
+    // call (one issue() invocation per item, run sequentially — see download-queue.js),
+    // so no cross-item leakage; cleared to null once the entry is done.
+    let active = { key: item.key, size: item.size ?? 0, bytes: 0 };
     try {
       await writer.beginEntry(zipEntryPath(item.key, prefix), {
         mtime: item.lastModified, declaredSize: item.size ?? 0,
@@ -148,12 +152,14 @@ export async function runZipJob(job, { presign, probe, fetchImpl = fetch, root, 
         if (eof) break;
         await writer.update(value);
         inFlightBytes += value.length;
-        onProgress?.({ done: completed, bytesDone: bytesDone + inFlightBytes });
+        active.bytes = inFlightBytes;
+        onProgress?.({ done: completed, bytesDone: bytesDone + inFlightBytes, active });
       }
       const rec = await writer.endEntry();
       await updateItem(job.id, item.key, { ...rec });
       completed += 1; bytesDone += rec.size;
-      onProgress?.({ done: completed, bytesDone });
+      active = null;
+      onProgress?.({ done: completed, bytesDone, active: null });
     } catch (err) {
       // Mid-entry failure: the writer is left wedged (a local header and maybe some
       // streamed bytes with no data descriptor — or, on endEntry's declared-size
