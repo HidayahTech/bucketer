@@ -13,11 +13,7 @@ import { PROBE_KIND } from './download-preflight.js';
 import {
   takeItemsPage, updateItem, countItemsByStatus, eachItemByStatus, ITEM_STATUS,
 } from './download-records.js';
-
-// Duplicated from zip-job.js (not exported there) — both must name the exact same staging
-// file for a given job id, since the two engines share OPFS staging by design (D8's runtime
-// fallback resumes the SAME file the in-place engine was writing).
-const stagingName = (jobId) => `bucketer-zip-${jobId}.zip`;
+import { stagingName } from './zip-naming.js';
 
 // Mirrors zip-job.js's own constant of the same name — see its comment for why only the
 // returned SAMPLE is capped, not how many items are actually marked FAILED.

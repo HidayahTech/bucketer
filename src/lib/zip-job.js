@@ -7,29 +7,17 @@
 // replacing the old strictly-sequential runDownloadJob loop for the ZIP path only — the
 // handoff (per-file browser download) tier still uses runDownloadJob, unchanged.
 
-import { sanitizeSegment } from './download-naming.js';
 import { QUOTA_SAFETY, inPlaceSupported } from './browser-capability.js';
 import { createZipWriter } from './zip-writer.js';
 import { runPrefetch, CONCURRENCY, MEDIUM_MAX } from './zip-prefetch.js';
 import { PROBE_KIND } from './download-preflight.js';
 import { updateItem, eachItemByStatus, countItemsByStatus, ITEM_STATUS } from './download-records.js';
 import { runInPlaceJob } from './zip-inplace.js';
+import { zipEntryPath, zipFileName, stagingName } from './zip-naming.js';
 
-// Keys keep their real folder structure inside the zip — that is the point of the format.
-// Relative to the scope's captured prefix; a key outside it (possible in a selection with
-// mixed roots) keeps its full path rather than escaping upward.
-export function zipEntryPath(key, capturedPrefix = '') {
-  const rel = capturedPrefix && key.startsWith(capturedPrefix) ? key.slice(capturedPrefix.length) : key;
-  return rel.split('/').filter(Boolean).map(sanitizeSegment).join('/');
-}
-
-export function zipFileName(bucket, capturedPrefix = '', now = new Date()) {
-  const segs = capturedPrefix.split('/').filter(Boolean);
-  const base = sanitizeSegment(segs.length ? segs[segs.length - 1] : bucket);
-  const p = (n) => String(n).padStart(2, '0');
-  const stamp = `${now.getFullYear()}${p(now.getMonth() + 1)}${p(now.getDate())}-${p(now.getHours())}${p(now.getMinutes())}`;
-  return `${base}-${stamp}.zip`;
-}
+// Re-exported for existing importers (App.jsx, test/zip-job.test.js, test/zip-job-run.test.js)
+// — the definitions now live in zip-naming.js, see its header comment for why.
+export { zipEntryPath, zipFileName };
 
 // The gate, in the spec's order: capability, then fit, then the lazy-persist path.
 // Unknown quota is optimistic per selectTier's philosophy — a quota failure is catchable
@@ -68,8 +56,6 @@ export function zipGate({ caps, sendableBytes, quota, persisted }) {
 // prefix is itself always '' or slash-terminated, key === prefix is only reachable for a
 // key that ends in '/' (or is '', which is never a real object key), so this case cannot
 // occur among a zip job's items and no extra filtering is added here.
-
-const stagingName = (jobId) => `bucketer-zip-${jobId}.zip`;
 
 export async function openZipStaging(jobId, { root }) {
   const handle = await root.getFileHandle(stagingName(jobId), { create: true });

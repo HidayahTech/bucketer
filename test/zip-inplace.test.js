@@ -16,6 +16,7 @@ import {
 import { computeZipLayout } from '../src/lib/zip-layout.js';
 import { createAssembler } from '../src/lib/zip-assemble.js';
 import { runInPlaceJob } from '../src/lib/zip-inplace.js';
+import { runZipJob } from '../src/lib/zip-job.js';
 import { readZip } from './helpers/zip-reader.js';
 
 // A fake worker that runs the REAL assembler over an in-memory sink, so the orchestrator's
@@ -380,4 +381,123 @@ test('layout entries drive the persisted zipOffset/zipEnd exactly', async () => 
 
   const entries = readZip(captured.bytes);
   assert.equal(entries[0].lho, expectedLayout.entries[0].headerOffset);
+});
+
+// --- zip-job.js's runZipJob dispatcher (Task 6's selectZipEngine branch) --------------------
+//
+// Everything above drives runInPlaceJob directly. These two tests instead drive runZipJob
+// itself, so the dispatch logic added in zip-job.js (in-place when selected, fall through to
+// runSerialZipJob on {unsupported:true}) is actually exercised by a test, not just inferred
+// from selectZipEngine's pure-function unit test (test/zip-job-engine.test.js).
+
+// A real fake OPFS root — getFileHandle(name, {create}), removeEntry(name); file handles
+// expose createWritable({keepExistingData}) and getFile() — the same shape
+// test/zip-job-run.test.js's fakeOpfsRoot uses to drive the serial engine (runSerialZipJob)
+// for real, so the fallback test below proves an actual, valid resumed/finished ZIP, not just
+// a non-throw.
+function fakeOpfsRoot() {
+  const files = new Map();
+  return {
+    async getFileHandle(name, { create = false } = {}) {
+      if (!files.has(name)) {
+        if (!create) { const e = new Error('missing'); e.name = 'NotFoundError'; throw e; }
+        files.set(name, new Uint8Array(0));
+      }
+      return {
+        async createWritable({ keepExistingData = false } = {}) {
+          let buf = keepExistingData ? Uint8Array.from(files.get(name)) : new Uint8Array(0);
+          let pos = buf.length;
+          return {
+            async write(u8) {
+              const grown = new Uint8Array(Math.max(buf.length, pos + u8.length));
+              grown.set(buf); grown.set(u8, pos); buf = grown; pos += u8.length;
+            },
+            async truncate(n) { buf = buf.slice(0, n); pos = Math.min(pos, n); },
+            async seek(n) { pos = n; },
+            async close() { files.set(name, buf); },
+          };
+        },
+        async getFile() { const b = files.get(name); return { size: b.length, arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.length) }; },
+      };
+    },
+    async removeEntry(name) { files.delete(name); },
+  };
+}
+
+test('runZipJob: caps support in-place but the worker reports unsupported -> falls through to the serial engine and still finishes a valid zip', async () => {
+  const job = { id: 'j7', prefix: 'p/', status: 'running', counters: {} };
+  await saveJob(job);
+  await appendManifestPage('j7', [
+    { key: 'p/a.txt', size: 3, lastModified: 0, status: ITEM_STATUS.PENDING },
+    { key: 'p/b.txt', size: 5, lastModified: 0, status: ITEM_STATUS.PENDING },
+  ], { done: true });
+
+  let terminated = false;
+  const unsupportedWorker = () => {
+    const listeners = [];
+    const emit = (data) => { for (const fn of listeners) fn({ data }); };
+    return {
+      addEventListener(_e, fn) { listeners.push(fn); },
+      terminate() { terminated = true; },
+      postMessage(m) {
+        if (m.type === 'init') queueMicrotask(() => emit({ type: 'unsupported', reason: 'no createSyncAccessHandle in worker' }));
+      },
+    };
+  };
+
+  const root = fakeOpfsRoot();
+  const fetchImpl = fetchFakeWithAttempts({
+    'p/a.txt': [[new Uint8Array([65, 66, 67])]],
+    'p/b.txt': [[new Uint8Array([1, 2, 3, 4, 5])]],
+  });
+
+  const res = await runZipJob(job, {
+    presign: presignQ, probe: null, fetchImpl, root, concurrency: 2,
+    caps: { opfs: 1, streamingFetch: 1, webWorker: 1 }, // inPlaceSupported(caps) === true
+    makeWorker: unsupportedWorker,
+    onProgress: () => {},
+  });
+
+  assert.equal(terminated, true, 'the in-place worker is still terminated on the fallback path');
+  assert.equal(res.finished, true);
+  assert.equal(res.cancelled, false);
+  assert.equal(res.blocked, null);
+  assert.equal(await countItemsByStatus('j7', ITEM_STATUS.DONE), 2);
+
+  // Independent witness: the serial engine actually wrote a valid zip to the fake OPFS root
+  // (the in-place engine never touches `root` for staging — it writes through the worker).
+  const staging = await root.getFileHandle('bucketer-zip-j7.zip');
+  const file = await staging.getFile();
+  const entries = readZip(new Uint8Array(await file.arrayBuffer()));
+  assert.deepEqual(entries.map((e) => e.name).sort(), ['a.txt', 'b.txt']);
+});
+
+test('runZipJob: caps support in-place and the worker succeeds -> uses the in-place engine, never touching the serial root', async () => {
+  const job = { id: 'j8', prefix: 'p/', status: 'running', counters: {} };
+  await saveJob(job);
+  await appendManifestPage('j8', [
+    { key: 'p/a.txt', size: 3, lastModified: 0, status: ITEM_STATUS.PENDING },
+    { key: 'p/b.txt', size: 5, lastModified: 0, status: ITEM_STATUS.PENDING },
+  ], { done: true });
+
+  const bodies = { 'p/a.txt': [65, 66, 67], 'p/b.txt': [1, 2, 3, 4, 5] };
+  const captured = {};
+  const res = await runZipJob(job, {
+    presign: async (key) => `https://x/${key}`,
+    probe: null,
+    fetchImpl: async (url) => ({ ok: true, body: streamOf(bodies[url.split('/x/')[1]]) }),
+    // A bare object with no getFileHandle: if the dispatcher fell through to the serial
+    // engine, openZipStaging's `root.getFileHandle(...)` would throw a TypeError. Reaching
+    // `finished: true` below is only possible via the in-place engine, which never calls it.
+    root: {}, concurrency: 2,
+    caps: { opfs: 1, streamingFetch: 1, webWorker: 1 },
+    makeWorker: () => inMemoryWorker(captured),
+    onProgress: () => {},
+  });
+
+  assert.equal(res.finished, true);
+  assert.equal(await countItemsByStatus('j8', ITEM_STATUS.DONE), 2);
+  assert.ok(captured.bytes && captured.bytes.length > 0, 'bytes arrived through the in-memory assembler sink');
+  const entries = readZip(captured.bytes);
+  assert.deepEqual(entries.map((e) => e.name).sort(), ['a.txt', 'b.txt']);
 });
