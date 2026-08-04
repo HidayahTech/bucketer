@@ -37,8 +37,10 @@ export function zipFileName(bucket, capturedPrefix = '', now = new Date()) {
 // The fit check reserves CONCURRENCY*MEDIUM_MAX on top of sendableBytes (D4): up to
 // CONCURRENCY prefetch workers can each have a medium-tier item buffered in an OPFS temp
 // file at once, on top of the staging zip itself, so the raw sendable total understates
-// worst-case peak usage without this headroom. The reason text keeps reporting the honest
-// sendable size — the reserve is internal headroom, not a number the user asked about.
+// worst-case peak usage without this headroom. When denied, the reason text reports the
+// full amount actually required (sendableBytes + reserve) — reporting sendableBytes alone
+// would read as self-contradictory (e.g. "needs 0.1 GB; 0.3 GB available" while still
+// being denied) since the reserve is what actually tipped the job over the line.
 export function zipGate({ caps, sendableBytes, quota, persisted }) {
   if (!caps?.opfs || !caps?.streamingFetch || !caps?.writableFiles) {
     return { state: 'unavailable', reason: 'This browser cannot stage a ZIP.' };
@@ -48,7 +50,7 @@ export function zipGate({ caps, sendableBytes, quota, persisted }) {
   const reserve = CONCURRENCY * MEDIUM_MAX;
   if (sendableBytes + reserve <= free * QUOTA_SAFETY) return { state: 'offered', reason: null };
   const gb = (n) => (n / 1e9).toFixed(1);
-  const reason = `Needs about ${gb(sendableBytes)} GB of temporary browser storage; ${gb(free)} GB available.`;
+  const reason = `Needs about ${gb(sendableBytes + reserve)} GB of temporary browser storage (including headroom for concurrent downloads); ${gb(free)} GB available.`;
   return persisted ? { state: 'unavailable', reason } : { state: 'needs-storage', reason };
 }
 
@@ -143,7 +145,6 @@ export async function runZipJob(job, {
   const priorCompleted = done.length;
   const priorBytes = done.reduce((n, it) => n + (it.size || 0), 0);
   let completed = priorCompleted;
-  let bytesDone = priorBytes;
 
   // Everything this run will prefetch. App.jsx's handleZipStart (like handleDownloadStart)
   // calls resetFailedToPending before every run, so PENDING is the complete resume set —
@@ -177,7 +178,7 @@ export async function runZipJob(job, {
       // pre-computed CRC, memory/temp tiers only) is redundant here and left unused.
       const rec = await writer.endEntry();
       await updateItem(job.id, item.key, { status: ITEM_STATUS.DONE, ...rec });
-      completed += 1; bytesDone += rec.size;
+      completed += 1;
       emitProgress();
     } catch (err) {
       // Mid-entry failure: the writer is left wedged (a local header and maybe some

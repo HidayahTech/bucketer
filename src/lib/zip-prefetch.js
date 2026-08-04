@@ -14,6 +14,9 @@ export const MEDIUM_MAX = 64 * 1024 * 1024; // <= this: buffer in an OPFS temp f
 export function classifyTier(size) {
   const n = size || 0;
   if (n <= TINY_MAX) return 'memory';
+  // NOTE: the OPFS temp tier grows Firefox process memory (~48 MiB/medium file, not
+  // reclaimed) — a Gecko OPFS quirk, not the algorithm; operator-accepted + documented.
+  // See GitLab #59 and the design spec's "Known limitations".
   if (n <= MEDIUM_MAX) return 'temp';
   return 'solo';
 }

@@ -79,6 +79,13 @@ describe('zipGate', () => {
     test('needs-storage (not offered) when persist has not been granted', () => {
       const g = zipGate({ caps: CAPS, sendableBytes, quota: quota(free), persisted: false });
       assert.equal(g.state, 'needs-storage');
+      // The reason must report the honest total actually required (sendableBytes +
+      // reserve) — reporting sendableBytes alone would read as self-contradictory here,
+      // since sendableBytes by itself comfortably fits and only the reserve denies it.
+      const gbFmt = (n) => (n / 1e9).toFixed(1);
+      assert.match(g.reason, /concurrent/);
+      const [, reported] = g.reason.match(/Needs about ([\d.]+) GB/);
+      assert.equal(reported, gbFmt(sendableBytes + reserve));
     });
     test('unavailable (not offered) when persist is already granted', () => {
       const g = zipGate({ caps: CAPS, sendableBytes, quota: quota(free), persisted: true });
