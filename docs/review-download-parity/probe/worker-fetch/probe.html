@@ -15,10 +15,10 @@
 //
 //   &n=8&mb=8&chunk=131072&latency=0&concurrency=4
 //
-// Bytes are synthetic (freshly-allocated per chunk, never reused) so the experiment measures
-// the transfer variable, not real-network buffering. Both mechanisms write a byte-identical
-// ZIP layout (computeZipLayout) to OPFS, so the only difference is where bytes are generated
-// and whether they cross the thread boundary. The external runner samples process-tree RSS.
+// Both mechanisms use a REAL fetch() against the runner's /blob endpoint (streamed bytes), so
+// the only difference is WHERE the fetch happens and whether the response bytes cross the
+// thread boundary. Both write a byte-identical ZIP layout (computeZipLayout) to OPFS. The
+// external runner samples process-tree RSS across the marked 'run' span.
 import { computeZipLayout } from '/src/lib/zip-layout.js';
 import { createAssemblerClient } from '/src/lib/assembler-client.js';
 
@@ -40,16 +40,6 @@ function buildItems() {
   return items;
 }
 
-async function* genChunks(size, chunkBytes, latencyMs) {
-  if (latencyMs) await new Promise((r) => setTimeout(r, latencyMs));
-  let sent = 0;
-  while (sent < size) {
-    const n = Math.min(chunkBytes, size - sent);
-    sent += n;
-    yield new Uint8Array(n).fill(65);
-  }
-}
-
 async function runPool(items, fn, concurrency) {
   let i = 0;
   const next = async () => { while (i < items.length) { const it = items[i++]; await fn(it); } };
@@ -68,9 +58,9 @@ async function runTransfer(layout) {
   const done = new Map();
   const t0 = performance.now();
   await runPool(layout.entries.map((e) => e.key), async (key) => {
-    for await (const chunk of genChunks(byKey.get(key).declaredSize, CHUNK, LATENCY)) {
-      await client.writeChunk(key, chunk);
-    }
+    const resp = await fetch(`/blob?bytes=${byKey.get(key).declaredSize}`);
+    const reader = resp.body.getReader();
+    for (;;) { const { done: d, value } = await reader.read(); if (d) break; await client.writeChunk(key, value); }
     done.set(key, await client.endEntry(key));
   }, CONCURRENCY);
   const records = layout.entries.map((e) => ({

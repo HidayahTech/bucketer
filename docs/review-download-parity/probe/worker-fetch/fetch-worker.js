@@ -17,18 +17,6 @@ function syncSink(sync) {
   };
 }
 
-// Synthetic "fetch": freshly-allocated chunks (never reused/shared, so JS memory pressure is
-// real), optional per-file latency to model an RTT.
-async function* genChunks(size, chunkBytes, latencyMs) {
-  if (latencyMs) await new Promise((r) => setTimeout(r, latencyMs));
-  let sent = 0;
-  while (sent < size) {
-    const n = Math.min(chunkBytes, size - sent);
-    sent += n;
-    yield new Uint8Array(n).fill(65);
-  }
-}
-
 // Minimal N-worker concurrency pool (mirrors upload-queue.js's runPool shape).
 async function runPool(items, fn, concurrency) {
   let i = 0;
@@ -55,10 +43,10 @@ self.onmessage = async (e) => {
 
     const t0 = performance.now();
     await runPool(m.items, async (it) => {
-      const size = byKey.get(it.key).declaredSize;
-      for await (const chunk of genChunks(size, m.chunkBytes, m.latencyMs)) {
-        await asm.writeChunk(it.key, chunk);
-      }
+      // Real fetch INSIDE the worker — the response body's bytes never cross a thread.
+      const resp = await fetch(`/blob?bytes=${byKey.get(it.key).declaredSize}`);
+      const reader = resp.body.getReader();
+      for (;;) { const { done: d, value } = await reader.read(); if (d) break; await asm.writeChunk(it.key, value); }
       const rec = await asm.endEntry(it.key);
       done.set(it.key, rec);
     }, m.concurrency);

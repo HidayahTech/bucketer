@@ -28,6 +28,25 @@ const server = http.createServer((req, res) => {
   const send = (body, type = 'text/javascript; charset=utf-8') => { res.setHeader('Content-Type', type); res.end(body); };
   if (path === '/' || path === '/probe.html') return send(probeHtml, 'text/html; charset=utf-8');
   if (path === '/fetch-worker.js') return send(fetchWorker);
+  // Real byte source: stream `?bytes=N` bytes so both mechanisms use a genuine fetch()
+  // response body (not a synthetic in-page stream). Streamed in 128 KiB chunks so the
+  // server never holds the whole response in memory.
+  if (path === '/blob') {
+    const total = parseInt(new URLSearchParams(req.url.split('?')[1] || '').get('bytes') || '0', 10);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Length', String(total));
+    const CH = 128 * 1024; const buf = Buffer.alloc(CH, 65);
+    let sent = 0;
+    const pump = () => {
+      while (sent < total) {
+        const n = Math.min(CH, total - sent);
+        sent += n;
+        if (!res.write(n === CH ? buf : buf.subarray(0, n))) { res.once('drain', pump); return; }
+      }
+      res.end();
+    };
+    return pump();
+  }
   if (path.startsWith('/src/')) {
     // Resolve and confirm the target stays inside <repo>/src before reading — a `..`-laden
     // path must never escape the source tree, even though this server is 127.0.0.1-only and

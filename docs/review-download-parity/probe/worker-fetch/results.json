@@ -6,7 +6,8 @@
     "REPS": 1,
     "MEDIUM_MB": 8,
     "MECHS": [
-      "transfer"
+      "transfer",
+      "workerfetch"
     ]
   },
   "cells": [
@@ -15,9 +16,18 @@
       "n": 2,
       "rep": 1,
       "ok": true,
-      "wallMs": 168,
-      "preMiB": 745,
-      "peakDeltaMiB": 39
+      "wallMs": 180,
+      "preMiB": 746,
+      "peakDeltaMiB": 85
+    },
+    {
+      "mech": "workerfetch",
+      "n": 2,
+      "rep": 1,
+      "ok": true,
+      "wallMs": 217,
+      "preMiB": 746,
+      "peakDeltaMiB": 74
     }
   ],
   "slopes": {
@@ -26,7 +36,16 @@
       "points": [
         {
           "x": 2,
-          "y": 39
+          "y": 85
+        }
+      ]
+    },
+    "workerfetch": {
+      "slopeMiBPerFile": null,
+      "points": [
+        {
+          "x": 2,
+          "y": 74
         }
       ]
     }
