@@ -63,3 +63,53 @@ peak gap — because the peak is not queue-dominated. Clean 2-rep numbers (8 MiB
 Conclusion: in-place is a reliable ~2× throughput win with a modest, reproducible Firefox
 peak-memory regression that only bites pathological many-medium-file Firefox jobs (which
 already hit #59 on serial). Not a #59 fix.
+
+## Root-cause update — web research (2026-08-05)
+
+The "Gecko OPFS quirk" framing above is superseded by a better-sourced explanation. Bugzilla
+has NO bug describing OPFS positioned-writes leaking process memory per file — but two open/
+known **ArrayBuffer-to-worker** GC issues map cleanly onto what we measured:
+
+- **[Bug 1407691 — "Run away memory use sending ArrayBuffers to workers"](https://bugzilla.mozilla.org/show_bug.cgi?id=1407691) — STILL OPEN.**
+  Repeatedly `postMessage`-ing ArrayBuffers into a worker makes memory climb until the worker
+  is *terminated* (or memory is manually minimized), because **workers only GC when idle** and
+  a continuous transfer flood never lets the worker idle. This is exactly the in-place engine
+  (N concurrent fetches transferring chunk buffers into the always-busy assembler worker) and
+  is the most likely cause of in-place's **~10 MiB/file higher peak vs serial** — NOT anything
+  intrinsic to OPFS positioned writes. (The earlier "structural two-process design" note was
+  too vague.)
+- **[Bug 1651612](https://bugzilla.mozilla.org/show_bug.cgi?id=1651612) — RESOLVED FIXED (Firefox 80)**: the single-buffer version (needed 2 GC cycles).
+  The flood case (1407691) was split off and stays open.
+- The **shared** per-file retained growth (both engines) is better explained by Firefox's
+  general deferred ArrayBuffer GC during busy work (fetched response buffers not reclaimed
+  until idle/blur/CPU-drop) — [Bug 1540101](https://bugzilla.mozilla.org/show_bug.cgi?id=1540101), [Bug 1037358](https://bugzilla.mozilla.org/show_bug.cgi?id=1037358). Not OPFS-specific.
+
+So this is an **ArrayBuffer/worker GC story, not an OPFS story.** #59 stays open, but the
+mechanism is now understood. Documented mitigations (from 1407691): terminate the worker at
+job end (we already do — hence retained < peak); **transfer buffers back out of the worker**
+to trigger cleanup; or fetch inside the worker (no cross-thread transfer). The byte-window
+backpressure did NOT help because it doesn't reduce how many buffers pass *through* the worker.
+
+**Prototype (this branch `inplace-worker-buffer-return`):** the worker transfers each drained
+chunk buffer back to the main thread in its `ack`, per 1407691's "transfer back out" mitigation.
+See `results-inplace-memory-return.json` for the matched-pair re-measurement.
+
+## Prototype result — worker transfers drained buffers back out (2026-08-05)
+
+Firefox peak-RSS growth per medium file (8 MiB files, N∈{2,4,8,16}, 2 reps),
+`results-inplace-memory-return.json`:
+
+| engine | n=2 | n=4 | n=8 | n=16 | peak slope |
+|--------|-----|-----|-----|------|-----------|
+| in-place, backpressure only (shipped v1.49.0) | 98 | 169 | 284 | 489 | ~28 MiB/file |
+| **in-place + buffer-return (this branch)** | 98 | 157 | 270 | **414** | **~22.7 MiB/file** |
+| serial (same run) | 72 | 142 | 218 | 313 | ~17.6 MiB/file |
+
+**Verdict: the mitigation helps, partially.** Transferring each drained chunk buffer back out
+of the worker (Bug 1407691's documented workaround) cut in-place's per-file peak growth ~19%
+(489→414 MiB at N=16; slope ~28→~22.7). This confirms Bug 1407691 is a real contributor. It
+narrows but does not close the gap to serial (~17.6) — residual is the worker process itself +
+in-worker OPFS write buffering, and main now transiently holding the returned buffers.
+Throughput unchanged (in-place stayed faster within-run). Low-risk (one worker line + the
+client already tolerates the extra ack field; 1451 unit tests pass). Not a full fix; a buffer
+POOL (reuse returned buffers) or fetch-in-worker (no transfer at all) could push further.

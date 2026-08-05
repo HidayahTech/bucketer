@@ -38,7 +38,13 @@ self.onmessage = async (e) => {
     } else if (m.type === 'chunk') {
       const bytes = m.buffer.byteLength;
       await asm.writeChunk(m.key, new Uint8Array(m.buffer));
-      self.postMessage({ type: 'ack', bytes });
+      // Transfer the drained buffer BACK OUT to the main thread. Firefox Bug 1407691 (open):
+      // workers only GC when idle, so a continuous flood of transferred-in chunk buffers
+      // accumulates in the busy worker's process until it's terminated. Transferring each
+      // buffer back out is that bug's documented mitigation — it removes the worker's
+      // reference so the worker process stops growing; main-thread GC (which works normally)
+      // reclaims the now-orphaned buffer. See docs/review-download-parity/probe/inplace-memory-finding.md.
+      self.postMessage({ type: 'ack', bytes, buffer: m.buffer }, [m.buffer]);
     } else if (m.type === 'entryEnd') {
       try { const r = await asm.endEntry(m.key); self.postMessage({ type: 'written', key: m.key, crc: r.crc, size: r.size }); }
       catch (err) { self.postMessage({ type: 'entryError', key: m.key, name: err?.name || 'Error', message: err?.message || String(err) }); }

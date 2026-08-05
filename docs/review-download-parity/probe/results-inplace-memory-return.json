@@ -1,0 +1,307 @@
+{
+  "nMediums": [
+    2,
+    4,
+    8,
+    16
+  ],
+  "mediumMB": 8,
+  "reps": 2,
+  "firefox": {
+    "inplace": {
+      "runs": [
+        {
+          "n": 2,
+          "rep": 1,
+          "wallMs": 964,
+          "preMiB": 851,
+          "peakDeltaMiB": 102,
+          "retainedDeltaMiB": 95,
+          "workerCount": 1,
+          "opfsBaselineMiB": 1,
+          "opfsPeakMiB": 16,
+          "opfsSampleCount": 24
+        },
+        {
+          "n": 2,
+          "rep": 2,
+          "wallMs": 968,
+          "preMiB": 856,
+          "peakDeltaMiB": 95,
+          "retainedDeltaMiB": 62,
+          "workerCount": 1,
+          "opfsBaselineMiB": 1,
+          "opfsPeakMiB": 16,
+          "opfsSampleCount": 24
+        },
+        {
+          "n": 4,
+          "rep": 1,
+          "wallMs": 2039,
+          "preMiB": 855,
+          "peakDeltaMiB": 155,
+          "retainedDeltaMiB": 63,
+          "workerCount": 1,
+          "opfsBaselineMiB": 1,
+          "opfsPeakMiB": 32,
+          "opfsSampleCount": 52
+        },
+        {
+          "n": 4,
+          "rep": 2,
+          "wallMs": 2026,
+          "preMiB": 855,
+          "peakDeltaMiB": 159,
+          "retainedDeltaMiB": 32,
+          "workerCount": 1,
+          "opfsBaselineMiB": 1,
+          "opfsPeakMiB": 32,
+          "opfsSampleCount": 55
+        },
+        {
+          "n": 8,
+          "rep": 1,
+          "wallMs": 2457,
+          "preMiB": 856,
+          "peakDeltaMiB": 292,
+          "retainedDeltaMiB": 207,
+          "workerCount": 1,
+          "opfsBaselineMiB": 1,
+          "opfsPeakMiB": 64,
+          "opfsSampleCount": 64
+        },
+        {
+          "n": 8,
+          "rep": 2,
+          "wallMs": 2423,
+          "preMiB": 856,
+          "peakDeltaMiB": 249,
+          "retainedDeltaMiB": 226,
+          "workerCount": 1,
+          "opfsBaselineMiB": 1,
+          "opfsPeakMiB": 64,
+          "opfsSampleCount": 62
+        },
+        {
+          "n": 16,
+          "rep": 1,
+          "wallMs": 3216,
+          "preMiB": 856,
+          "peakDeltaMiB": 406,
+          "retainedDeltaMiB": 241,
+          "workerCount": 1,
+          "opfsBaselineMiB": 1,
+          "opfsPeakMiB": 128,
+          "opfsSampleCount": 83
+        },
+        {
+          "n": 16,
+          "rep": 2,
+          "wallMs": 3304,
+          "preMiB": 855,
+          "peakDeltaMiB": 422,
+          "retainedDeltaMiB": 404,
+          "workerCount": 1,
+          "opfsBaselineMiB": 1,
+          "opfsPeakMiB": 128,
+          "opfsSampleCount": 86
+        }
+      ],
+      "byN": [
+        {
+          "n": 2,
+          "medianPeakDeltaMiB": 102,
+          "medianRetainedDeltaMiB": 95,
+          "medianOpfsPeakMiB": 16,
+          "reps": 2
+        },
+        {
+          "n": 4,
+          "medianPeakDeltaMiB": 159,
+          "medianRetainedDeltaMiB": 63,
+          "medianOpfsPeakMiB": 32,
+          "reps": 2
+        },
+        {
+          "n": 8,
+          "medianPeakDeltaMiB": 292,
+          "medianRetainedDeltaMiB": 226,
+          "medianOpfsPeakMiB": 64,
+          "reps": 2
+        },
+        {
+          "n": 16,
+          "medianPeakDeltaMiB": 422,
+          "medianRetainedDeltaMiB": 404,
+          "medianOpfsPeakMiB": 128,
+          "reps": 2
+        }
+      ],
+      "slopeMiBPerFile": 22.74,
+      "interceptMiB": 73.17,
+      "engineConfirmation": {
+        "method": "window.Worker wrapped via addInitScript before navigation; counts `new Worker()` constructions during the run",
+        "workerCounts": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "confirmed": true,
+        "note": "every run constructed >=1 Worker: selectZipEngine only returns \"inplace\" when caps.webWorker && makeWorker, so this is direct evidence the in-place engine ran"
+      }
+    },
+    "serial": {
+      "runs": [
+        {
+          "n": 2,
+          "rep": 1,
+          "wallMs": 2145,
+          "preMiB": 854,
+          "peakDeltaMiB": 71,
+          "retainedDeltaMiB": -13,
+          "workerCount": 0,
+          "opfsBaselineMiB": 1,
+          "opfsPeakMiB": 24,
+          "opfsSampleCount": 52
+        },
+        {
+          "n": 2,
+          "rep": 2,
+          "wallMs": 2265,
+          "preMiB": 855,
+          "peakDeltaMiB": 73,
+          "retainedDeltaMiB": 8,
+          "workerCount": 0,
+          "opfsBaselineMiB": 1,
+          "opfsPeakMiB": 19,
+          "opfsSampleCount": 57
+        },
+        {
+          "n": 4,
+          "rep": 1,
+          "wallMs": 2708,
+          "preMiB": 856,
+          "peakDeltaMiB": 144,
+          "retainedDeltaMiB": 24,
+          "workerCount": 0,
+          "opfsBaselineMiB": 1,
+          "opfsPeakMiB": 38,
+          "opfsSampleCount": 60
+        },
+        {
+          "n": 4,
+          "rep": 2,
+          "wallMs": 2632,
+          "preMiB": 856,
+          "peakDeltaMiB": 140,
+          "retainedDeltaMiB": 23,
+          "workerCount": 0,
+          "opfsBaselineMiB": 1,
+          "opfsPeakMiB": 39,
+          "opfsSampleCount": 61
+        },
+        {
+          "n": 8,
+          "rep": 1,
+          "wallMs": 3476,
+          "preMiB": 858,
+          "peakDeltaMiB": 184,
+          "retainedDeltaMiB": 138,
+          "workerCount": 0,
+          "opfsBaselineMiB": 1,
+          "opfsPeakMiB": 68,
+          "opfsSampleCount": 75
+        },
+        {
+          "n": 8,
+          "rep": 2,
+          "wallMs": 3569,
+          "preMiB": 855,
+          "peakDeltaMiB": 252,
+          "retainedDeltaMiB": 107,
+          "workerCount": 0,
+          "opfsBaselineMiB": 1,
+          "opfsPeakMiB": 69,
+          "opfsSampleCount": 78
+        },
+        {
+          "n": 16,
+          "rep": 1,
+          "wallMs": 4987,
+          "preMiB": 859,
+          "peakDeltaMiB": 330,
+          "retainedDeltaMiB": 306,
+          "workerCount": 0,
+          "opfsBaselineMiB": 1,
+          "opfsPeakMiB": 133,
+          "opfsSampleCount": 96
+        },
+        {
+          "n": 16,
+          "rep": 2,
+          "wallMs": 4865,
+          "preMiB": 856,
+          "peakDeltaMiB": 297,
+          "retainedDeltaMiB": 273,
+          "workerCount": 0,
+          "opfsBaselineMiB": 1,
+          "opfsPeakMiB": 134,
+          "opfsSampleCount": 93
+        }
+      ],
+      "byN": [
+        {
+          "n": 2,
+          "medianPeakDeltaMiB": 73,
+          "medianRetainedDeltaMiB": 8,
+          "medianOpfsPeakMiB": 24,
+          "reps": 2
+        },
+        {
+          "n": 4,
+          "medianPeakDeltaMiB": 144,
+          "medianRetainedDeltaMiB": 24,
+          "medianOpfsPeakMiB": 39,
+          "reps": 2
+        },
+        {
+          "n": 8,
+          "medianPeakDeltaMiB": 252,
+          "medianRetainedDeltaMiB": 138,
+          "medianOpfsPeakMiB": 69,
+          "reps": 2
+        },
+        {
+          "n": 16,
+          "medianPeakDeltaMiB": 330,
+          "medianRetainedDeltaMiB": 306,
+          "medianOpfsPeakMiB": 134,
+          "reps": 2
+        }
+      ],
+      "slopeMiBPerFile": 17.61,
+      "interceptMiB": 67.65,
+      "engineConfirmation": {
+        "method": "window.Worker deleted via addInitScript before navigation (forced, structural, not inferred): typeof window.Worker !== \"function\" makes browser-capability.js's webWorker=false, so inPlaceSupported()=false and zip-job.js's selectZipEngine always returns \"serial\" regardless of runtime behavior",
+        "workerCounts": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "confirmed": true,
+        "note": "every run constructed 0 Workers, consistent with window.Worker being unavailable throughout — the serial engine ran. This is a guarantee of the forcing mechanism itself; the worker count is reported only as a sanity check that nothing bypassed it"
+      }
+    }
+  },
+  "verdict": "serial slope=17.61 MiB/file (expected ~40-48 per #59) vs in-place slope=22.74 MiB/file (expected near-0 if #59 is fixed). serial engine confirmed: true. inplace engine confirmed: true."
+}
