@@ -41,3 +41,14 @@ everywhere, so in-place would never have activated. Corrected: detect **inside t
 selection is optimistic (`opfs && streamingFetch && webWorker`) with a runtime worker fallback
 (worker `init` self-reports `{unsupported}` → `runInPlaceJob` returns `{unsupported:true}` →
 `runZipJob` runs serial). See design D8 (revised) and plan Tasks 4–6.
+
+## Task 8 — full-feature validation (run buqs2w3in, E2E_DEVICES=desktop) — all green
+
+| Lane | pass | fail | in-place ZIP arms |
+|------|------|------|-------------------|
+| node | 53 | 0 | n/a |
+| chromium × desktop | 55 | 0 | happy/resume/many-file ✔ WITH workerCount>=1 assertion (in-place engine proven to run) |
+| firefox × desktop | 55 | 0 | happy/resume/many-file ✔ WITH workerCount>=1 assertion |
+| webkit × desktop | 53 | 0 | no ZIP button (fallback), gate UNSUPPORTED — correct |
+
+The existing download-zip arms now execute through the in-place worker engine on chromium/firefox and produce byte-exact ZIPs incl. resume. Definitive end-to-end proof.

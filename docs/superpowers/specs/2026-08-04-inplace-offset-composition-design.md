@@ -5,6 +5,24 @@ Author: Claude (Opus 4.8), autonomous session, expert-persona decision chronicle
 Supersedes the "Phase 2" sketch in `2026-08-04-download-concurrency-design.md` §"Phase 2".
 Branch: `inplace-composition`.
 
+## OUTCOME (measured 2026-08-04 — read this first)
+
+This design was motivated primarily by GitLab #59 (Firefox OPFS process-memory growth). **The
+implementation shipped, but the #59 premise did NOT hold up under measurement.** A matched-pair
+Firefox probe (`docs/review-download-parity/probe/inplace-memory-finding.md`) with the forcing
+confirmed (in-place worker-count=1, serial=0) found:
+- In-place is a **solid ~2× throughput win** on medium-file ZIPs (and lower OPFS disk).
+- In-place is **NOT a #59 fix**: the Gecko OPFS memory growth affects `SyncAccessHandle`
+  writes too, not just the temp read-back cycle. In-place's transient RSS **peak is actually
+  higher** than serial (~28 vs ~19 MiB/file, structural — a two-process design); retained
+  growth was too noisy to prove either engine flat. Worker-queue backpressure (added, correct)
+  did not close the peak gap because the peak is not queue-dominated.
+
+**Operator decision (2026-08-04): ship for all in-place-capable engines as a throughput
+improvement, documented honestly as NOT a #59 fix.** #59 remains open for both engines. The
+"Problem" section below is preserved as the original motivation; treat its #59 framing as
+superseded by this outcome. The throughput/architecture benefits it describes are real.
+
 ## Problem
 
 The shipped concurrent ZIP engine (`runPrefetch` → serial `onReady` writer, v1.48.0) has
