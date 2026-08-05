@@ -1,0 +1,296 @@
+{
+  "config": {
+    "NMEDIUMS": [
+      2,
+      8,
+      16
+    ],
+    "REPS": 2,
+    "MEDIUM_MB": 8,
+    "MECHS": [
+      "transfer"
+    ],
+    "CONCURRENCIES": [
+      1,
+      2,
+      4
+    ]
+  },
+  "cells": [
+    {
+      "mech": "transfer",
+      "conc": 1,
+      "n": 2,
+      "rep": 1,
+      "ok": true,
+      "wallMs": 199,
+      "preMiB": 744,
+      "peakDeltaMiB": 85
+    },
+    {
+      "mech": "transfer",
+      "conc": 1,
+      "n": 2,
+      "rep": 2,
+      "ok": true,
+      "wallMs": 176,
+      "preMiB": 745,
+      "peakDeltaMiB": 88
+    },
+    {
+      "mech": "transfer",
+      "conc": 1,
+      "n": 8,
+      "rep": 1,
+      "ok": true,
+      "wallMs": 754,
+      "preMiB": 746,
+      "peakDeltaMiB": 292
+    },
+    {
+      "mech": "transfer",
+      "conc": 1,
+      "n": 8,
+      "rep": 2,
+      "ok": true,
+      "wallMs": 757,
+      "preMiB": 745,
+      "peakDeltaMiB": 277
+    },
+    {
+      "mech": "transfer",
+      "conc": 1,
+      "n": 16,
+      "rep": 1,
+      "ok": true,
+      "wallMs": 1515,
+      "preMiB": 746,
+      "peakDeltaMiB": 497
+    },
+    {
+      "mech": "transfer",
+      "conc": 1,
+      "n": 16,
+      "rep": 2,
+      "ok": true,
+      "wallMs": 1516,
+      "preMiB": 746,
+      "peakDeltaMiB": 506
+    },
+    {
+      "mech": "transfer",
+      "conc": 2,
+      "n": 2,
+      "rep": 1,
+      "ok": true,
+      "wallMs": 191,
+      "preMiB": 744,
+      "peakDeltaMiB": 91
+    },
+    {
+      "mech": "transfer",
+      "conc": 2,
+      "n": 2,
+      "rep": 2,
+      "ok": true,
+      "wallMs": 176,
+      "preMiB": 748,
+      "peakDeltaMiB": 91
+    },
+    {
+      "mech": "transfer",
+      "conc": 2,
+      "n": 8,
+      "rep": 1,
+      "ok": true,
+      "wallMs": 666,
+      "preMiB": 746,
+      "peakDeltaMiB": 294
+    },
+    {
+      "mech": "transfer",
+      "conc": 2,
+      "n": 8,
+      "rep": 2,
+      "ok": true,
+      "wallMs": 670,
+      "preMiB": 747,
+      "peakDeltaMiB": 300
+    },
+    {
+      "mech": "transfer",
+      "conc": 2,
+      "n": 16,
+      "rep": 1,
+      "ok": true,
+      "wallMs": 1346,
+      "preMiB": 746,
+      "peakDeltaMiB": 509
+    },
+    {
+      "mech": "transfer",
+      "conc": 2,
+      "n": 16,
+      "rep": 2,
+      "ok": true,
+      "wallMs": 1346,
+      "preMiB": 746,
+      "peakDeltaMiB": 499
+    },
+    {
+      "mech": "transfer",
+      "conc": 4,
+      "n": 2,
+      "rep": 1,
+      "ok": true,
+      "wallMs": 175,
+      "preMiB": 745,
+      "peakDeltaMiB": 85
+    },
+    {
+      "mech": "transfer",
+      "conc": 4,
+      "n": 2,
+      "rep": 2,
+      "ok": true,
+      "wallMs": 189,
+      "preMiB": 746,
+      "peakDeltaMiB": 83
+    },
+    {
+      "mech": "transfer",
+      "conc": 4,
+      "n": 8,
+      "rep": 1,
+      "ok": true,
+      "wallMs": 663,
+      "preMiB": 746,
+      "peakDeltaMiB": 322
+    },
+    {
+      "mech": "transfer",
+      "conc": 4,
+      "n": 8,
+      "rep": 2,
+      "ok": true,
+      "wallMs": 690,
+      "preMiB": 745,
+      "peakDeltaMiB": 315
+    },
+    {
+      "mech": "transfer",
+      "conc": 4,
+      "n": 16,
+      "rep": 1,
+      "ok": true,
+      "wallMs": 1291,
+      "preMiB": 745,
+      "peakDeltaMiB": 519
+    },
+    {
+      "mech": "transfer",
+      "conc": 4,
+      "n": 16,
+      "rep": 2,
+      "ok": true,
+      "wallMs": 1300,
+      "preMiB": 746,
+      "peakDeltaMiB": 506
+    }
+  ],
+  "slopes": {
+    "transfer@c1": {
+      "slopeMiBPerFile": 29.68918918918919,
+      "points": [
+        {
+          "x": 2,
+          "y": 88
+        },
+        {
+          "x": 8,
+          "y": 292
+        },
+        {
+          "x": 16,
+          "y": 506
+        }
+      ],
+      "wall": [
+        {
+          "n": 2,
+          "wallMs": 199
+        },
+        {
+          "n": 8,
+          "wallMs": 757
+        },
+        {
+          "n": 16,
+          "wallMs": 1516
+        }
+      ]
+    },
+    "transfer@c2": {
+      "slopeMiBPerFile": 29.655405405405407,
+      "points": [
+        {
+          "x": 2,
+          "y": 91
+        },
+        {
+          "x": 8,
+          "y": 300
+        },
+        {
+          "x": 16,
+          "y": 509
+        }
+      ],
+      "wall": [
+        {
+          "n": 2,
+          "wallMs": 191
+        },
+        {
+          "n": 8,
+          "wallMs": 670
+        },
+        {
+          "n": 16,
+          "wallMs": 1346
+        }
+      ]
+    },
+    "transfer@c4": {
+      "slopeMiBPerFile": 30.655405405405407,
+      "points": [
+        {
+          "x": 2,
+          "y": 85
+        },
+        {
+          "x": 8,
+          "y": 322
+        },
+        {
+          "x": 16,
+          "y": 519
+        }
+      ],
+      "wall": [
+        {
+          "n": 2,
+          "wallMs": 189
+        },
+        {
+          "n": 8,
+          "wallMs": 690
+        },
+        {
+          "n": 16,
+          "wallMs": 1300
+        }
+      ]
+    }
+  }
+}

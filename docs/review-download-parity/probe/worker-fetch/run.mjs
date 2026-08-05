@@ -1,0 +1,149 @@
+// Runner for the fetch-in-worker experiment. Sweeps mech ∈ {transfer, workerfetch} × N,
+// launches Firefox per cell, samples process-tree RSS (ps) across the marked 'run' span,
+// and reports the per-file PEAK-RSS SLOPE (peakDelta vs N) per mechanism — the same method
+// run-inplace-memory.mjs uses. If workerfetch's slope is materially below transfer's, moving
+// the fetch into the worker (no cross-thread ArrayBuffer transfer) cuts the Firefox peak.
+//
+//   NMEDIUMS=2,4,8,16 REPS=2 MEDIUM_MB=8 node docs/review-download-parity/probe/worker-fetch/run.mjs
+import http from 'node:http';
+import { readFileSync, existsSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { dirname, join, resolve } from 'node:path';
+import { firefox } from 'playwright';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const REPO = join(HERE, '..', '..', '..', '..'); // docs/review-download-parity/probe/worker-fetch → repo root
+const NMEDIUMS = (process.env.NMEDIUMS || '2,4,8,16').split(',').map(Number);
+const REPS = parseInt(process.env.REPS || '2', 10);
+const MEDIUM_MB = parseInt(process.env.MEDIUM_MB || '8', 10);
+const MECHS = (process.env.MECHS || 'transfer,workerfetch').split(',');
+const CONCURRENCIES = (process.env.CONCURRENCIES || '4').split(',').map(Number); // floor-lever sweep
+const SAMPLE_MS = 40;
+
+const probeHtml = readFileSync(join(HERE, 'probe.html'), 'utf8');
+const fetchWorker = readFileSync(join(HERE, 'fetch-worker.js'), 'utf8');
+
+const server = http.createServer((req, res) => {
+  const path = req.url.split('?')[0];
+  const send = (body, type = 'text/javascript; charset=utf-8') => { res.setHeader('Content-Type', type); res.end(body); };
+  if (path === '/' || path === '/probe.html') return send(probeHtml, 'text/html; charset=utf-8');
+  if (path === '/fetch-worker.js') return send(fetchWorker);
+  // Real byte source: stream `?bytes=N` bytes so both mechanisms use a genuine fetch()
+  // response body (not a synthetic in-page stream). Streamed in 128 KiB chunks so the
+  // server never holds the whole response in memory.
+  if (path === '/blob') {
+    const total = parseInt(new URLSearchParams(req.url.split('?')[1] || '').get('bytes') || '0', 10);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    res.setHeader('Content-Length', String(total));
+    const CH = 128 * 1024; const buf = Buffer.alloc(CH, 65);
+    let sent = 0;
+    const pump = () => {
+      while (sent < total) {
+        const n = Math.min(CH, total - sent);
+        sent += n;
+        if (!res.write(n === CH ? buf : buf.subarray(0, n))) { res.once('drain', pump); return; }
+      }
+      res.end();
+    };
+    return pump();
+  }
+  if (path.startsWith('/src/')) {
+    // Resolve and confirm the target stays inside <repo>/src before reading — a `..`-laden
+    // path must never escape the source tree, even though this server is 127.0.0.1-only and
+    // short-lived. Also reject non-.js just to keep the surface tight.
+    const srcRoot = resolve(REPO, 'src');
+    const file = resolve(REPO, path.slice(1)); // /src/lib/x.js → <repo>/src/lib/x.js
+    if ((file === srcRoot || file.startsWith(srcRoot + '/')) && file.endsWith('.js') && existsSync(file)) {
+      return send(readFileSync(file, 'utf8'));
+    }
+    res.statusCode = 404; res.end('not found'); return;
+  }
+  res.statusCode = 404; res.end('not found');
+});
+const port = await new Promise((r) => server.listen(0, '127.0.0.1', () => r(server.address().port)));
+
+function treeRssMiB(rootPid) {
+  try {
+    const rows = execFileSync('ps', ['-eo', 'pid,ppid,rss', '--no-headers'], { encoding: 'utf8' })
+      .trim().split('\n').map((l) => l.trim().split(/\s+/).map(Number));
+    const kids = new Map();
+    for (const [pid, ppid] of rows) { if (!kids.has(ppid)) kids.set(ppid, []); kids.get(ppid).push(pid); }
+    const rssOf = new Map(rows.map(([pid, , rss]) => [pid, rss]));
+    let total = rssOf.get(rootPid) || 0;
+    const stack = [rootPid];
+    while (stack.length) { for (const c of kids.get(stack.pop()) || []) { total += rssOf.get(c) || 0; stack.push(c); } }
+    return Math.round(total / 1024);
+  } catch { return null; }
+}
+const median = (a) => { const s = [...a].sort((x, y) => x - y); return s[Math.floor(s.length / 2)]; };
+function slope(points) { // least-squares slope of y vs x
+  const n = points.length; if (n < 2) return null;
+  const sx = points.reduce((s, p) => s + p.x, 0), sy = points.reduce((s, p) => s + p.y, 0);
+  const sxx = points.reduce((s, p) => s + p.x * p.x, 0), sxy = points.reduce((s, p) => s + p.x * p.y, 0);
+  return (n * sxy - sx * sy) / (n * sxx - sx * sx);
+}
+
+async function measure(mech, n, conc) {
+  const server2 = await firefox.launchServer({ headless: true });
+  const pid = server2.process()?.pid;
+  const browser = await firefox.connect(server2.wsEndpoint());
+  const samples = [];
+  const sampler = setInterval(() => { const v = treeRssMiB(pid); if (v != null) samples.push({ t: Date.now(), rss: v }); }, SAMPLE_MS);
+  let out = {};
+  try {
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    await page.goto(`http://127.0.0.1:${port}/?mech=${mech}&n=${n}&mb=${MEDIUM_MB}&concurrency=${conc}`);
+    await page.waitForFunction('window.__RESULT !== undefined', null, { timeout: 120000 });
+    const r = await page.evaluate('window.__RESULT');
+    clearInterval(sampler);
+    const marks = r.marks || [];
+    const runMark = marks.find((m) => m.label === 'run');
+    const endMark = marks.find((m) => m.label === '/run');
+    let peakDelta = null, pre = null;
+    if (runMark && endMark) {
+      const before = samples.filter((s) => s.t < runMark.t).map((s) => s.rss);
+      const during = samples.filter((s) => s.t >= runMark.t && s.t <= endMark.t).map((s) => s.rss);
+      const tail = before.slice(-Math.ceil(1000 / SAMPLE_MS));
+      pre = tail.length ? median(tail) : null;
+      peakDelta = (during.length && pre != null) ? Math.max(...during) - pre : null;
+    }
+    out = { ok: r.ok, error: r.error, wallMs: r.wallMs, preMiB: pre, peakDeltaMiB: peakDelta };
+  } catch (e) { clearInterval(sampler); out = { ok: false, error: `run: ${e.message?.split('\n')[0]}` }; }
+  finally { await browser.close().catch(() => {}); await server2.close().catch(() => {}); }
+  return out;
+}
+
+const report = { config: { NMEDIUMS, REPS, MEDIUM_MB, MECHS, CONCURRENCIES }, cells: [] };
+for (const mech of MECHS) {
+  for (const conc of CONCURRENCIES) {
+    for (const n of NMEDIUMS) {
+      for (let rep = 1; rep <= REPS; rep++) {
+        const r = await measure(mech, n, conc);
+        report.cells.push({ mech, conc, n, rep, ...r });
+        console.log(`${mech} c=${conc} n=${n} #${rep}  peakDelta=${r.peakDeltaMiB} wallMs=${r.wallMs?.toFixed?.(0)} ${r.error || ''}`);
+      }
+    }
+  }
+}
+
+report.slopes = {};
+for (const mech of MECHS) {
+  for (const conc of CONCURRENCIES) {
+    const pts = [], wall = [];
+    for (const n of NMEDIUMS) {
+      const cells = report.cells.filter((c) => c.mech === mech && c.conc === conc && c.n === n && c.peakDeltaMiB != null);
+      if (cells.length) { pts.push({ x: n, y: median(cells.map((c) => c.peakDeltaMiB)) }); wall.push({ n, wallMs: median(cells.map((c) => c.wallMs)) }); }
+    }
+    report.slopes[`${mech}@c${conc}`] = { slopeMiBPerFile: slope(pts), points: pts, wall };
+  }
+}
+await new Promise((r) => server.close(r));
+writeFileSync(join(HERE, 'results.json'), JSON.stringify(report, null, 2));
+console.log('\nSLOPE MiB/file (and wallMs at max N) by mech@concurrency:');
+for (const [k, v] of Object.entries(report.slopes)) {
+  const maxWall = v.wall?.[v.wall.length - 1];
+  console.log(`  ${k}: slope=${v.slopeMiBPerFile?.toFixed?.(2)} MiB/file  wallMs@n${maxWall?.n}=${maxWall?.wallMs?.toFixed?.(0)}`);
+}
+console.log('wrote', join(HERE, 'results.json'));

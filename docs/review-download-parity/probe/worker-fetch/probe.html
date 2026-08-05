@@ -1,0 +1,114 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>fetch-in-worker probe — single shot</title>
+<body><pre id="out">running…</pre></body>
+<script type="module">
+// SINGLE-SHOT probe comparing two ways to build a store-only ZIP on OPFS from N medium
+// "files", isolating the cross-thread ArrayBuffer transfer (Firefox Bug 1407691):
+//
+//   ?mech=transfer      main generates each file's bytes and postMessage-TRANSFERS them into
+//                       the REAL shipped assembler worker (src/worker/zip-assembler.worker.js
+//                       + src/lib/assembler-client.js, incl. the v1.49.1 buffer-return) which
+//                       writes them via SyncAccessHandle. This is the shipped in-place path.
+//   ?mech=workerfetch   a worker GENERATES the bytes itself and writes them via the same
+//                       assembler — NO buffer ever crosses a thread. This is Approach B.
+//
+//   &n=8&mb=8&chunk=131072&latency=0&concurrency=4
+//
+// Both mechanisms use a REAL fetch() against the runner's /blob endpoint (streamed bytes), so
+// the only difference is WHERE the fetch happens and whether the response bytes cross the
+// thread boundary. Both write a byte-identical ZIP layout (computeZipLayout) to OPFS. The
+// external runner samples process-tree RSS across the marked 'run' span.
+import { computeZipLayout } from '/src/lib/zip-layout.js';
+import { createAssemblerClient } from '/src/lib/assembler-client.js';
+
+const q = new URLSearchParams(location.search);
+const MECH = q.get('mech') || 'workerfetch';
+const N = parseInt(q.get('n') || '8', 10);
+const MB = parseInt(q.get('mb') || '8', 10);
+const CHUNK = parseInt(q.get('chunk') || String(128 * 1024), 10);
+const LATENCY = parseInt(q.get('latency') || '0', 10);
+const CONCURRENCY = parseInt(q.get('concurrency') || '4', 10);
+
+const out = document.getElementById('out');
+const log = (m) => { out.textContent += '\n' + m; };
+
+function buildItems() {
+  const size = MB * 1024 * 1024;
+  const items = [];
+  for (let i = 0; i < N; i++) items.push({ key: `mem/medium-${i}.bin`, size, lastModified: 0 });
+  return items;
+}
+
+async function runPool(items, fn, concurrency) {
+  let i = 0;
+  const next = async () => { while (i < items.length) { const it = items[i++]; await fn(it); } };
+  await Promise.all(Array.from({ length: concurrency }, next));
+}
+
+const stagingName = `probe-wf-${MECH}-${N}.zip`;
+
+// mech=transfer: main generates, TRANSFERS to the real shipped worker+client, worker writes.
+async function runTransfer(layout) {
+  const worker = new Worker('/src/worker/zip-assembler.worker.js', { type: 'module' });
+  const client = createAssemblerClient(worker);
+  const { supported } = await client.init(stagingName, layout, layout.entries.map((e) => e.key));
+  if (!supported) { worker.terminate(); throw new Error('worker unsupported'); }
+  const byKey = new Map(layout.entries.map((e) => [e.key, e]));
+  const done = new Map();
+  const t0 = performance.now();
+  await runPool(layout.entries.map((e) => e.key), async (key) => {
+    const resp = await fetch(`/blob?bytes=${byKey.get(key).declaredSize}`);
+    const reader = resp.body.getReader();
+    for (;;) { const { done: d, value } = await reader.read(); if (d) break; await client.writeChunk(key, value); }
+    done.set(key, await client.endEntry(key));
+  }, CONCURRENCY);
+  const records = layout.entries.map((e) => ({
+    path: e.path, zipOffset: e.headerOffset, size: done.get(e.key).size, crc: done.get(e.key).crc, time: e.time, date: e.date,
+  }));
+  await client.finish(records);
+  const wallMs = performance.now() - t0;
+  worker.terminate();
+  try { const root = await navigator.storage.getDirectory(); await root.removeEntry(stagingName); } catch { /* best effort */ }
+  return wallMs;
+}
+
+// mech=workerfetch: a worker generates + writes; no cross-thread transfer.
+async function runWorkerFetch(layout, items) {
+  const worker = new Worker('/fetch-worker.js', { type: 'module' });
+  const wallMs = await new Promise((resolve, reject) => {
+    worker.onmessage = (e) => {
+      if (e.data.type === 'done') resolve(e.data.wallMs);
+      else if (e.data.type === 'error') reject(new Error(`${e.data.name}: ${e.data.message}`));
+    };
+    worker.onerror = (e) => reject(new Error(e.message || 'worker error'));
+    worker.postMessage({ type: 'run', stagingName, layout, items: items.map((it) => ({ key: it.key })), chunkBytes: CHUNK, latencyMs: LATENCY, concurrency: CONCURRENCY });
+  });
+  worker.terminate();
+  return wallMs;
+}
+
+(async () => {
+  const marks = [];
+  const mark = (label) => marks.push({ label, t: Date.now() });
+  const result = { mech: MECH, n: N, mb: MB, chunk: CHUNK, concurrency: CONCURRENCY, latencyMs: LATENCY, ua: navigator.userAgent, marks };
+  try {
+    if (!navigator.storage?.getDirectory) throw new Error('no OPFS');
+    const items = buildItems();
+    const layout = computeZipLayout(items, '', {});
+    window.__READY = true;
+    await new Promise((r) => setTimeout(r, 2000)); // stable pre-run baseline for the runner
+    mark('run');
+    const wallMs = MECH === 'transfer' ? await runTransfer(layout) : await runWorkerFetch(layout, items);
+    mark('/run');
+    result.wallMs = wallMs;
+    result.ok = true;
+  } catch (err) {
+    result.ok = false;
+    result.error = err ? `${err.name}: ${err.message}` : 'rejected with null';
+  }
+  await new Promise((r) => setTimeout(r, 3000)); // settle window (post-run RSS) for the runner
+  window.__RESULT = result;
+  log('DONE ' + JSON.stringify(result.ok) + ' ' + (result.error || ''));
+})().catch((e) => { window.__RESULT = { ok: false, fatal: String(e) }; });
+</script>
