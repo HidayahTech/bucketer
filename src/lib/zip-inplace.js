@@ -42,6 +42,7 @@ async function loadAllItems(jobId) {
 
 export async function runInPlaceJob(job, {
   presign, probe, fetchImpl = fetch, root, concurrency, makeWorker, onProgress, shouldCancel = () => false,
+  writeWindowBytes,
 }) {
   const prefix = job.prefix ?? '';
 
@@ -76,7 +77,7 @@ export async function runInPlaceJob(job, {
   const freshKeys = pendingItems.map((it) => it.key);
 
   const worker = makeWorker();
-  const client = createAssemblerClient(worker);
+  const client = createAssemblerClient(worker, { writeWindowBytes });
 
   let completed = priorCompleted;
   let liveBytes = 0;
@@ -176,18 +177,17 @@ export async function runInPlaceJob(job, {
           throw new Error(`fetch failed (${res?.status ?? 'no response'})`);
         }
 
-        // client.writeChunk is fire-and-forget: it transfers the chunk's ArrayBuffer to the
-        // worker (assembler-client.js), so main-thread memory is freed immediately rather
-        // than accumulating behind an awaited response. Worker-side queue depth under N
-        // concurrent fast streams is, in practice, bounded by network arrival rate versus
-        // the synchronous OPFS SyncAccessHandle write rate, not by anything enforced here —
-        // if Task 9's memory probe shows unbounded growth, a credit/ack window is the
-        // follow-up (noted as YAGNI in the design doc unless measurement says otherwise).
+        // client.writeChunk transfers the chunk's ArrayBuffer to the worker
+        // (assembler-client.js) and is awaited here: the client tracks a global
+        // outstanding-bytes credit window and only resolves once the worker's acks have
+        // drained it back under the window. This throttles the reader to the worker's
+        // actual write rate instead of piling unbounded chunks into its message queue
+        // (measured as excess transient RSS on Firefox — see Task 9's memory probe).
         const reader = res.body.getReader();
         for (;;) {
           const { done, value } = await reader.read();
           if (done) break;
-          client.writeChunk(item.key, value);
+          await client.writeChunk(item.key, value);
           bump(value.length);
         }
 

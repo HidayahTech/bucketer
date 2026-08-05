@@ -36,7 +36,9 @@ self.onmessage = async (e) => {
       await asm.writeHeaders();
       self.postMessage({ type: 'ready' });
     } else if (m.type === 'chunk') {
+      const bytes = m.buffer.byteLength;
       await asm.writeChunk(m.key, new Uint8Array(m.buffer));
+      self.postMessage({ type: 'ack', bytes });
     } else if (m.type === 'entryEnd') {
       try { const r = await asm.endEntry(m.key); self.postMessage({ type: 'written', key: m.key, crc: r.crc, size: r.size }); }
       catch (err) { self.postMessage({ type: 'entryError', key: m.key, name: err?.name || 'Error', message: err?.message || String(err) }); }

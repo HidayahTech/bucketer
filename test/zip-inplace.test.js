@@ -30,7 +30,7 @@ function inMemoryWorker(captured) {
     terminate(){ captured.bytes = buf; },
     async postMessage(m /*, transfer */){
       if (m.type==='init'){ asm=createAssembler(sink,m.layout); await asm.writeHeaders(); emit({type:'ready'}); }
-      else if (m.type==='chunk'){ await asm.writeChunk(m.key, new Uint8Array(m.buffer)); }
+      else if (m.type==='chunk'){ await asm.writeChunk(m.key, new Uint8Array(m.buffer)); emit({type:'ack', bytes: m.buffer.byteLength}); }
       else if (m.type==='entryEnd'){ try{ const r=await asm.endEntry(m.key); emit({type:'written',key:m.key,crc:r.crc,size:r.size}); }catch(err){ emit({type:'entryError',key:m.key,name:err.name,message:err.message}); } }
       else if (m.type==='finish'){ const r=await asm.finish(m.records); captured.bytes=buf; emit({type:'finished',totalBytes:r.totalBytes}); }
     },
@@ -115,7 +115,7 @@ function sharedFakeOpfs() {
       terminate() {},
       async postMessage(m) {
         if (m.type === 'init') { asm = createAssembler(sink, m.layout); await asm.writeHeaders(); emit({ type: 'ready' }); }
-        else if (m.type === 'chunk') { await asm.writeChunk(m.key, new Uint8Array(m.buffer)); }
+        else if (m.type === 'chunk') { await asm.writeChunk(m.key, new Uint8Array(m.buffer)); emit({ type: 'ack', bytes: m.buffer.byteLength }); }
         else if (m.type === 'entryEnd') {
           try { const r = await asm.endEntry(m.key); emit({ type: 'written', key: m.key, crc: r.crc, size: r.size }); }
           catch (err) { emit({ type: 'entryError', key: m.key, name: err.name, message: err.message }); }
@@ -295,6 +295,7 @@ function quotaFatalWorker(triggerKey) {
       else if (m.type === 'chunk') {
         if (m.key === triggerKey) { emit({ type: 'fatal', name: 'QuotaExceededError', message: 'quota exceeded' }); return; }
         await asm.writeChunk(m.key, new Uint8Array(m.buffer));
+        emit({ type: 'ack', bytes: m.buffer.byteLength });
       } else if (m.type === 'entryEnd') {
         try { const r = await asm.endEntry(m.key); emit({ type: 'written', key: m.key, crc: r.crc, size: r.size }); }
         catch (err) { emit({ type: 'entryError', key: m.key, name: err.name, message: err.message }); }
