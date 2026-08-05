@@ -42,6 +42,20 @@ export function createAssemblerClient(worker, { writeWindowBytes = 16 * 1024 * 1
     else if (m.type === 'finished') { finishResolve?.({ totalBytes: m.totalBytes }); releaseWaiters(); }
     else if (m.type === 'fatal') { fatalCb?.({ name: m.name, message: m.message }); finishReject?.(Object.assign(new Error(m.message), { name: m.name })); releaseWaiters(); }
   });
+
+  // The worker can die without ever posting a 'fatal' message — a raw Worker error event
+  // (e.g. an uncaught throw from createSyncAccessHandle racing a lock conflict during
+  // init). Without this, init() never resolves and a pending writeChunk never drains, so
+  // runInPlaceJob hangs forever awaiting either. Treat it like 'fatal': notify, resolve a
+  // still-pending init as unsupported (so runZipJob falls back to serial), and release any
+  // writeChunk waiters.
+  worker.addEventListener('error', (e) => {
+    const message = e?.message || 'worker error';
+    fatalCb?.({ name: 'WorkerError', message });
+    readyResolve?.({ supported: false, reason: message });
+    finishReject?.(Object.assign(new Error(message), { name: 'WorkerError' }));
+    releaseWaiters();
+  });
   return {
     init(stagingName, layout, freshKeys) {
       return new Promise((res) => { readyResolve = res; worker.postMessage({ type: 'init', stagingName, layout, freshKeys }); });

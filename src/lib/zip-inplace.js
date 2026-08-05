@@ -55,11 +55,24 @@ export async function runInPlaceJob(job, {
   // 2. Resume guard — BEFORE the worker inits (its init truncates/creates the staging file,
   // which would mask an eviction). Only touches OPFS when there is something to resume; a
   // fresh job (no DONE items) never calls root.getFileHandle at all.
+  //
+  // Two independent triggers force a clean rebuild (either resets every DONE item):
+  //  - size: the staging file shrank below the layout's data end (eviction).
+  //  - offset mismatch: a DONE item's recorded zipOffset doesn't match this layout's
+  //    key-sorted headerOffset for that key. This catches the case the size check cannot:
+  //    a job fully written by the SERIAL engine (completion-order data, staging size ==
+  //    totalDataEnd exactly) then resumed by in-place. In-place always records
+  //    zipOffset === headerOffset for data it wrote itself (init recomputes the identical
+  //    layout on resume, so the same key always maps to the same headerOffset), so this
+  //    condition never trips on in-place-written data — only on data laid down by a
+  //    different pass (serial's completion order, or a missing/null offset).
   const doneItems = allItems.filter((it) => it.status === ITEM_STATUS.DONE);
   if (doneItems.length > 0) {
     const fh = await root.getFileHandle(stagingName(job.id)).catch(() => null);
     const size = fh ? (await fh.getFile()).size : 0;
-    if (size < layout.totalDataEnd) {
+    const offsetMismatch = doneItems.some((it) => it.zipOffset == null
+      || it.zipOffset !== layoutByKey.get(it.key)?.headerOffset);
+    if (size < layout.totalDataEnd || offsetMismatch) {
       for (const it of doneItems) {
         await updateItem(job.id, it.key, {
           status: ITEM_STATUS.PENDING, zipOffset: null, zipEnd: null, crc: null, time: null, date: null,

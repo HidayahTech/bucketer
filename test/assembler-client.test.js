@@ -5,8 +5,15 @@ import { createAssemblerClient } from '../src/lib/assembler-client.js';
 
 // A fake worker that echoes the protocol deterministically, auto-acking chunks so writeChunk
 // (now awaitable, backpressure-gated) resolves without a test having to drive acks manually.
+//
+// addEventListener is keyed by event name (not a single flat list): createAssemblerClient
+// registers both a 'message' listener and an 'error' listener, and a fake worker that ignored
+// the event name would fan every emit() out to both — e.g. corrupting the onFatal payload
+// captured by a plain 'fatal' message with the 'error' handler's unrelated WorkerError. `emit`
+// drives only 'message' listeners (the existing behavior every prior test relies on);
+// `emitError` drives only 'error' listeners, for the worker-death tests below.
 function fakeWorker() {
-  const listeners = [];
+  const listeners = { message: [], error: [] };
   const w = {
     postMessage(msg) {
       queueMicrotask(() => {
@@ -16,17 +23,19 @@ function fakeWorker() {
         else if (msg.type === 'finish') emit({ type: 'finished', totalBytes: 999 });
       });
     },
-    addEventListener(_e, fn) { listeners.push(fn); },
+    addEventListener(evt, fn) { (listeners[evt] ??= []).push(fn); },
     terminate() {},
   };
-  function emit(data) { for (const fn of listeners) fn({ data }); }
-  return { w, emit };
+  function emit(data) { for (const fn of listeners.message) fn({ data }); }
+  function emitError(err) { for (const fn of listeners.error) fn(err); }
+  return { w, emit, emitError };
 }
 
 // A fake worker whose 'chunk' handling never auto-acks — the test drives acks manually via
-// `emit` to exercise the credit-window backpressure path deterministically.
+// `emit` to exercise the credit-window backpressure path deterministically. See fakeWorker's
+// comment above for why listeners are keyed by event name.
 function controllableFakeWorker() {
-  const listeners = [];
+  const listeners = { message: [], error: [] };
   const w = {
     postMessage(msg) {
       queueMicrotask(() => {
@@ -34,11 +43,12 @@ function controllableFakeWorker() {
         // 'chunk': no auto-ack — the test controls draining via emit({type:'ack',...}).
       });
     },
-    addEventListener(_e, fn) { listeners.push(fn); },
+    addEventListener(evt, fn) { (listeners[evt] ??= []).push(fn); },
     terminate() {},
   };
-  function emit(data) { for (const fn of listeners) fn({ data }); }
-  return { w, emit };
+  function emit(data) { for (const fn of listeners.message) fn({ data }); }
+  function emitError(err) { for (const fn of listeners.error) fn(err); }
+  return { w, emit, emitError };
 }
 
 test('client: init resolves {supported:true} on ready; endEntry resolves with written record', async () => {
@@ -123,5 +133,39 @@ test('client: a pending writeChunk is released (not left hanging) when a fatal m
 
   const p = c.writeChunk('x', new Uint8Array(10)); // exceeds window; no ack will ever arrive
   emit({ type: 'fatal', name: 'QuotaExceededError', message: 'full' });
+  await p; // must resolve, not hang forever
+});
+
+// The worker can die without ever posting a 'fatal' message — a raw Worker error event, e.g.
+// an uncaught throw from createSyncAccessHandle racing a lock conflict during init. Without a
+// listener for it, a pending init() (or writeChunk) would hang forever, since nothing ever
+// resolves it. These two tests drive that path via emitError, which — unlike emit — invokes
+// only the client's 'error' listener, matching how a real Worker fires 'error' as a distinct
+// event from 'message'.
+test('client: a worker "error" event resolves a pending init as unsupported (not a hang) and fires onFatal', async () => {
+  const { w, emitError } = controllableFakeWorker();
+  const c = createAssemblerClient(w, { writeWindowBytes: 5 });
+
+  let fatal = null;
+  c.onFatal((f) => { fatal = f; });
+
+  const initPromise = c.init('s.zip', { entries: [] }, ['x']);
+  // Fired synchronously, before the fake worker's queued 'ready' microtask ever runs —
+  // simulates the worker dying during init, before it manages to post anything.
+  emitError({ message: 'boom' });
+
+  const initRes = await initPromise;
+  assert.deepEqual(initRes, { supported: false, reason: 'boom' });
+  assert.equal(fatal?.name, 'WorkerError');
+  assert.equal(fatal?.message, 'boom');
+});
+
+test('client: a worker "error" event releases a pending writeChunk waiter blocked on the credit window', async () => {
+  const { w, emitError } = controllableFakeWorker();
+  const c = createAssemblerClient(w, { writeWindowBytes: 5 });
+  await c.init('s.zip', { entries: [] }, ['x']);
+
+  const p = c.writeChunk('x', new Uint8Array(10)); // exceeds window; no ack will ever arrive
+  emitError({ message: 'boom' });
   await p; // must resolve, not hang forever
 });

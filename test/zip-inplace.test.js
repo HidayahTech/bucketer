@@ -11,7 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import 'fake-indexeddb/auto';
 import {
-  appendManifestPage, saveJob, countItemsByStatus, resetFailedToPending, ITEM_STATUS,
+  appendManifestPage, saveJob, countItemsByStatus, resetFailedToPending, updateItem, ITEM_STATUS,
 } from '../src/lib/download-records.js';
 import { computeZipLayout } from '../src/lib/zip-layout.js';
 import { createAssembler } from '../src/lib/zip-assemble.js';
@@ -26,7 +26,7 @@ function inMemoryWorker(captured) {
   const sink = { write(u8, at){ if(at+u8.length>buf.length){const n=new Uint8Array(at+u8.length);n.set(buf);buf=n;} buf.set(u8,at); }, truncate(n){ const nb=new Uint8Array(n); nb.set(buf.subarray(0,Math.min(n,buf.length))); buf=nb; }, flush(){} };
   const emit = (data) => { for (const fn of listeners) fn({ data }); };
   return {
-    addEventListener(_e, fn){ listeners.push(fn); },
+    addEventListener(e, fn){ if (e === 'message') listeners.push(fn); },
     terminate(){ captured.bytes = buf; },
     async postMessage(m /*, transfer */){
       if (m.type==='init'){ asm=createAssembler(sink,m.layout); await asm.writeHeaders(); emit({type:'ready'}); }
@@ -111,7 +111,7 @@ function sharedFakeOpfs() {
     const listeners = [];
     const emit = (data) => { for (const fn of listeners) fn({ data }); };
     return {
-      addEventListener(_e, fn) { listeners.push(fn); },
+      addEventListener(e, fn) { if (e === 'message') listeners.push(fn); },
       terminate() {},
       async postMessage(m) {
         if (m.type === 'init') { asm = createAssembler(sink, m.layout); await asm.writeHeaders(); emit({ type: 'ready' }); }
@@ -241,6 +241,79 @@ test('eviction: a staging file that shrinks between runs resets every DONE item 
   assert.deepEqual(fetchCalls.sort(), ['p/a.txt', 'p/b.txt'], 'both items refetched after eviction, including the one already DONE');
 });
 
+// CRITICAL point: the two ZIP engines share the same job records + staging file
+// (zip-naming.js's stagingName). Serial packs entry data in COMPLETION order; in-place
+// writes each entry at its KEY-SORTED layout offset. If a job is fully written by serial
+// (staging size == layout.totalDataEnd exactly — the size-based eviction check above cannot
+// tell this apart from a valid in-place-written job) and then resumed by in-place, the DONE
+// records' zipOffset values reflect serial's completion order, not the key-sorted layout —
+// finishing on them as-is would emit a central directory pointing at the wrong data
+// (silent corruption). This proves the offset-mismatch guard catches exactly that case.
+//
+// Normal in-place resume (DONE items whose zipOffset already equals the layout's
+// headerOffset) is proven NOT to reset by the existing "resume completes without
+// refetching the already-DONE item" test above: a.txt stays DONE and is fetched exactly
+// once across both runs — if the offset guard false-tripped on ordinary in-place data it
+// would be refetched a second time, which that test's assertion rules out.
+test('resume guard: DONE items whose zipOffset does not match the key-sorted layout headerOffset are reset to PENDING and rebuilt cleanly (serial completion-order data resumed by in-place)', async () => {
+  const job = { id: 'j9', prefix: 'p/', status: 'running', counters: {} };
+  await saveJob(job);
+  const items = [
+    { key: 'p/a.txt', size: 3, lastModified: 0, status: ITEM_STATUS.PENDING },
+    { key: 'p/b.txt', size: 5, lastModified: 0, status: ITEM_STATUS.PENDING },
+  ];
+  await appendManifestPage('j9', items, { done: true });
+
+  const layout = computeZipLayout(items, 'p/');
+  const byKey = Object.fromEntries(layout.entries.map((e) => [e.key, e]));
+  const { root, makeWorker, state } = sharedFakeOpfs();
+
+  // Mark both items DONE with zipOffset SWAPPED relative to the key-sorted layout — as
+  // serial's completion order would leave them if b finished before a — and size the
+  // staging buffer to totalDataEnd exactly, so the size-based check alone would treat this
+  // as an intact, finished job.
+  await updateItem('j9', 'p/a.txt', {
+    status: ITEM_STATUS.DONE,
+    zipOffset: byKey['p/b.txt'].headerOffset,
+    zipEnd: byKey['p/b.txt'].entryEnd,
+    crc: 0, time: byKey['p/a.txt'].time, date: byKey['p/a.txt'].date,
+  });
+  await updateItem('j9', 'p/b.txt', {
+    status: ITEM_STATUS.DONE,
+    zipOffset: byKey['p/a.txt'].headerOffset,
+    zipEnd: byKey['p/a.txt'].entryEnd,
+    crc: 0, time: byKey['p/b.txt'].time, date: byKey['p/b.txt'].date,
+  });
+  state.buf = new Uint8Array(layout.totalDataEnd); // right size, garbage/stale content
+
+  const bodies = { 'p/a.txt': [65, 66, 67], 'p/b.txt': [1, 2, 3, 4, 5] };
+  const fetchCalls = [];
+  const res = await runInPlaceJob(job, {
+    presign: presignQ, probe: null,
+    fetchImpl: async (url) => {
+      const key = new URL(url).searchParams.get('key');
+      fetchCalls.push(key);
+      return { ok: true, status: 200, body: streamOf(bodies[key]) };
+    },
+    root, concurrency: 2, makeWorker, onProgress: () => {},
+  });
+
+  assert.equal(res.finished, true, 'the job must still finish — via a clean rebuild, not by finishing on the mismatched offsets');
+  assert.deepEqual(fetchCalls.sort(), ['p/a.txt', 'p/b.txt'], 'both mismatched-offset DONE items must be reset to PENDING and refetched, not trusted as-is');
+  assert.equal(await countItemsByStatus('j9', ITEM_STATUS.DONE), 2);
+
+  // Not a corrupt finish: the independent witness confirms real, correctly-offset ZIP bytes.
+  const entries = readZip(state.buf);
+  assert.deepEqual(entries.map((e) => e.name).sort(), ['a.txt', 'b.txt']);
+  const byName = Object.fromEntries(entries.map((e) => [e.name, e]));
+  assert.deepEqual([...byName['a.txt'].data], [65, 66, 67]);
+  assert.deepEqual([...byName['b.txt'].data], [1, 2, 3, 4, 5]);
+  // The rebuild must land each entry at ITS OWN key-sorted offset, not the stale swapped
+  // ones the DONE records held before the reset.
+  assert.equal(byName['a.txt'].lho, byKey['p/a.txt'].headerOffset);
+  assert.equal(byName['b.txt'].lho, byKey['p/b.txt'].headerOffset);
+});
+
 test('a worker reporting unsupported returns {unsupported:true} immediately, before any fetch, and terminates the worker', async () => {
   const job = { id: 'j4', prefix: 'p/', status: 'running', counters: {} };
   await saveJob(job);
@@ -253,7 +326,7 @@ test('a worker reporting unsupported returns {unsupported:true} immediately, bef
     const listeners = [];
     const emit = (data) => { for (const fn of listeners) fn({ data }); };
     return {
-      addEventListener(_e, fn) { listeners.push(fn); },
+      addEventListener(e, fn) { if (e === 'message') listeners.push(fn); },
       terminate() { terminated = true; },
       postMessage(m) {
         if (m.type === 'init') queueMicrotask(() => emit({ type: 'unsupported', reason: 'no createSyncAccessHandle in worker' }));
@@ -288,7 +361,7 @@ function quotaFatalWorker(triggerKey) {
     flush() {},
   };
   return {
-    addEventListener(_e, fn) { listeners.push(fn); },
+    addEventListener(e, fn) { if (e === 'message') listeners.push(fn); },
     terminate() {},
     async postMessage(m) {
       if (m.type === 'init') { asm = createAssembler(sink, m.layout); await asm.writeHeaders(); emit({ type: 'ready' }); }
@@ -438,7 +511,7 @@ test('runZipJob: caps support in-place but the worker reports unsupported -> fal
     const listeners = [];
     const emit = (data) => { for (const fn of listeners) fn({ data }); };
     return {
-      addEventListener(_e, fn) { listeners.push(fn); },
+      addEventListener(e, fn) { if (e === 'message') listeners.push(fn); },
       terminate() { terminated = true; },
       postMessage(m) {
         if (m.type === 'init') queueMicrotask(() => emit({ type: 'unsupported', reason: 'no createSyncAccessHandle in worker' }));
