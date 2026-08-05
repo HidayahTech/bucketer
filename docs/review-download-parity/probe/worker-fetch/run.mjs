@@ -9,7 +9,7 @@ import http from 'node:http';
 import { readFileSync, existsSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { firefox } from 'playwright';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -29,8 +29,15 @@ const server = http.createServer((req, res) => {
   if (path === '/' || path === '/probe.html') return send(probeHtml, 'text/html; charset=utf-8');
   if (path === '/fetch-worker.js') return send(fetchWorker);
   if (path.startsWith('/src/')) {
-    const file = join(REPO, path.slice(1)); // /src/lib/x.js → <repo>/src/lib/x.js
-    if (existsSync(file)) return send(readFileSync(file, 'utf8'));
+    // Resolve and confirm the target stays inside <repo>/src before reading — a `..`-laden
+    // path must never escape the source tree, even though this server is 127.0.0.1-only and
+    // short-lived. Also reject non-.js just to keep the surface tight.
+    const srcRoot = resolve(REPO, 'src');
+    const file = resolve(REPO, path.slice(1)); // /src/lib/x.js → <repo>/src/lib/x.js
+    if ((file === srcRoot || file.startsWith(srcRoot + '/')) && file.endsWith('.js') && existsSync(file)) {
+      return send(readFileSync(file, 'utf8'));
+    }
+    res.statusCode = 404; res.end('not found'); return;
   }
   res.statusCode = 404; res.end('not found');
 });
