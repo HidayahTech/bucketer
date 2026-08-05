@@ -1,0 +1,34 @@
+{
+  "config": {
+    "NMEDIUMS": [
+      2
+    ],
+    "REPS": 1,
+    "MEDIUM_MB": 8,
+    "MECHS": [
+      "transfer"
+    ]
+  },
+  "cells": [
+    {
+      "mech": "transfer",
+      "n": 2,
+      "rep": 1,
+      "ok": true,
+      "wallMs": 168,
+      "preMiB": 745,
+      "peakDeltaMiB": 39
+    }
+  ],
+  "slopes": {
+    "transfer": {
+      "slopeMiBPerFile": null,
+      "points": [
+        {
+          "x": 2,
+          "y": 39
+        }
+      ]
+    }
+  }
+}
