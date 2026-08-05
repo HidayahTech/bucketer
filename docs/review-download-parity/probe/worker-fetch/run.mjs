@@ -18,6 +18,7 @@ const NMEDIUMS = (process.env.NMEDIUMS || '2,4,8,16').split(',').map(Number);
 const REPS = parseInt(process.env.REPS || '2', 10);
 const MEDIUM_MB = parseInt(process.env.MEDIUM_MB || '8', 10);
 const MECHS = (process.env.MECHS || 'transfer,workerfetch').split(',');
+const CONCURRENCIES = (process.env.CONCURRENCIES || '4').split(',').map(Number); // floor-lever sweep
 const SAMPLE_MS = 40;
 
 const probeHtml = readFileSync(join(HERE, 'probe.html'), 'utf8');
@@ -83,7 +84,7 @@ function slope(points) { // least-squares slope of y vs x
   return (n * sxy - sx * sy) / (n * sxx - sx * sx);
 }
 
-async function measure(mech, n) {
+async function measure(mech, n, conc) {
   const server2 = await firefox.launchServer({ headless: true });
   const pid = server2.process()?.pid;
   const browser = await firefox.connect(server2.wsEndpoint());
@@ -93,7 +94,7 @@ async function measure(mech, n) {
   try {
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
-    await page.goto(`http://127.0.0.1:${port}/?mech=${mech}&n=${n}&mb=${MEDIUM_MB}`);
+    await page.goto(`http://127.0.0.1:${port}/?mech=${mech}&n=${n}&mb=${MEDIUM_MB}&concurrency=${conc}`);
     await page.waitForFunction('window.__RESULT !== undefined', null, { timeout: 120000 });
     const r = await page.evaluate('window.__RESULT');
     clearInterval(sampler);
@@ -114,29 +115,35 @@ async function measure(mech, n) {
   return out;
 }
 
-const report = { config: { NMEDIUMS, REPS, MEDIUM_MB, MECHS }, cells: [] };
+const report = { config: { NMEDIUMS, REPS, MEDIUM_MB, MECHS, CONCURRENCIES }, cells: [] };
 for (const mech of MECHS) {
-  for (const n of NMEDIUMS) {
-    for (let rep = 1; rep <= REPS; rep++) {
-      const r = await measure(mech, n);
-      report.cells.push({ mech, n, rep, ...r });
-      console.log(`${mech} n=${n} #${rep}  peakDelta=${r.peakDeltaMiB} wallMs=${r.wallMs?.toFixed?.(0)} ${r.error || ''}`);
+  for (const conc of CONCURRENCIES) {
+    for (const n of NMEDIUMS) {
+      for (let rep = 1; rep <= REPS; rep++) {
+        const r = await measure(mech, n, conc);
+        report.cells.push({ mech, conc, n, rep, ...r });
+        console.log(`${mech} c=${conc} n=${n} #${rep}  peakDelta=${r.peakDeltaMiB} wallMs=${r.wallMs?.toFixed?.(0)} ${r.error || ''}`);
+      }
     }
   }
 }
 
 report.slopes = {};
 for (const mech of MECHS) {
-  const pts = [];
-  for (const n of NMEDIUMS) {
-    const cells = report.cells.filter((c) => c.mech === mech && c.n === n && c.peakDeltaMiB != null);
-    if (cells.length) pts.push({ x: n, y: median(cells.map((c) => c.peakDeltaMiB)) });
+  for (const conc of CONCURRENCIES) {
+    const pts = [], wall = [];
+    for (const n of NMEDIUMS) {
+      const cells = report.cells.filter((c) => c.mech === mech && c.conc === conc && c.n === n && c.peakDeltaMiB != null);
+      if (cells.length) { pts.push({ x: n, y: median(cells.map((c) => c.peakDeltaMiB)) }); wall.push({ n, wallMs: median(cells.map((c) => c.wallMs)) }); }
+    }
+    report.slopes[`${mech}@c${conc}`] = { slopeMiBPerFile: slope(pts), points: pts, wall };
   }
-  report.slopes[mech] = { slopeMiBPerFile: slope(pts), points: pts };
 }
 await new Promise((r) => server.close(r));
 writeFileSync(join(HERE, 'results.json'), JSON.stringify(report, null, 2));
-const t = report.slopes.transfer?.slopeMiBPerFile, w = report.slopes.workerfetch?.slopeMiBPerFile;
-console.log(`\nSLOPE MiB/file — transfer=${t?.toFixed?.(2)} workerfetch=${w?.toFixed?.(2)}`);
-if (t != null && w != null) console.log(w < t ? `workerfetch is LOWER by ${(t - w).toFixed(2)} MiB/file (${Math.round((1 - w / t) * 100)}% less)` : `workerfetch NOT lower`);
+console.log('\nSLOPE MiB/file (and wallMs at max N) by mech@concurrency:');
+for (const [k, v] of Object.entries(report.slopes)) {
+  const maxWall = v.wall?.[v.wall.length - 1];
+  console.log(`  ${k}: slope=${v.slopeMiBPerFile?.toFixed?.(2)} MiB/file  wallMs@n${maxWall?.n}=${maxWall?.wallMs?.toFixed?.(0)}`);
+}
 console.log('wrote', join(HERE, 'results.json'));
