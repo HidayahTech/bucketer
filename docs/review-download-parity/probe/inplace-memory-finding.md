@@ -153,3 +153,39 @@ per-entry records reporting into the worker; presign-in-worker (credentials/SDK 
 either presign-all-up-front with refresh, or an on-demand presign message channel);
 rework cancel/quota/progress across the boundary; new e2e. A full feature cycle, and a bigger
 worker. Experiment harness: `docs/review-download-parity/probe/worker-fetch/`.
+
+## Cheap-lever experiment — concurrency (2026-08-05): NEGATIVE
+
+Swept the SHIPPED transfer path at concurrency 1/2/4 (N=2,8,16, 2 reps), measuring peak slope
+AND wall time:
+
+| concurrency | peak slope | wall @ N=16 |
+|-------------|-----------|-------------|
+| 1 | 29.7 MiB/file | 1516 ms |
+| 2 | 29.7 MiB/file | 1346 ms |
+| 4 | 30.7 MiB/file | 1300 ms |
+
+**Concurrency does NOT move the floor.** The per-file peak slope is identical across 1/2/4 —
+even at concurrency=1 (one file in flight) each medium file leaves ~30 MiB un-reclaimed. So
+the floor is **pure retention** (deferred GC of completed fetches' response buffers), not a
+concurrent-working-set effect. Lowering concurrency only costs throughput (~17% slower at c=1)
+for zero memory benefit. Concurrency is not a lever.
+
+## Levers summary — where the Firefox per-file memory goes, and what moves it
+
+| Lever | Effect on Firefox per-file peak | Status |
+|-------|--------------------------------|--------|
+| serial engine (baseline) | ~17.6 MiB/file (real app) | shipped v1.48.0 |
+| in-place, no mitigation | ~28 MiB/file — transfer adds ~10 on top | v1.49.0 |
+| **+ buffer-return (transfer out)** | **~22.7 (~19% off the transfer part)** | **shipped v1.49.1** |
+| byte-window backpressure | no effect (not queue-dominated) | tried, inert |
+| lower concurrency | **no effect** (floor is retention) | tried, negative |
+| Approach B: fetch-in-worker | ~32% off in harness → ≈ serial; removes ALL transfer excess | validated, not built (full rewrite) |
+| the ~20 MiB/file fetch-buffer floor | untouched by any app-level lever | **Firefox platform limit** |
+
+**Conclusion:** the cheap wins are exhausted. v1.49.1 captured the transfer mitigation; the
+remaining residual is a Firefox platform behavior (deferred GC of fetch response buffers) that
+no app-level knob we found (concurrency, backpressure) addresses. The only remaining lever is
+the Approach B rewrite, which removes the transfer excess entirely (→ ~serial) but a full
+feature cycle for a ~13% incremental gain over v1.49.1 and still cannot touch the platform
+floor. #59 stays open as a documented Firefox limitation.
