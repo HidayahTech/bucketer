@@ -7,6 +7,16 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.49.1] — 2026-08-05 — Lower Firefox memory for large ZIPs
+
+Downloading a ZIP of many medium-to-large files now uses less memory on Firefox. The
+background worker that assembles the archive now hands each file's buffer back to the main
+thread the moment it has been written, working around a known Firefox limitation where a
+continuously busy worker holds onto that memory until it stops. Measured about 19% lower peak
+memory growth per file on Firefox; no change to how archives are built, to speed, or to
+anything you see. This narrows — but does not eliminate — Firefox's higher memory use on very
+large archives, which remains a known limitation.
+
 ## [1.49.0] — 2026-08-04 — In-place ZIP assembly
 
 ZIP downloads now assemble faster on Chromium and Firefox. Because a store-only archive's
