@@ -73,6 +73,7 @@ import { runZipJob, discardZipStaging, zipFileName, openZipStaging, zipGate } fr
 import { exportZip } from '../lib/zip-export.js';
 import { CONCURRENCY, sweepOrphanTemps } from '../lib/zip-prefetch.js';
 import { detectCapabilities, readStorageQuota } from '../lib/browser-capability.js';
+import { makeAssemblerWorker } from '../lib/assembler-worker-url.js';
 import { presignDownloadParams } from '../lib/presign-params.js';
 import { normalizeRoots, selectionLabel } from '../lib/download-roots.js';
 import { DOWNLOAD_PRESIGN_EXPIRES, DOWNLOAD_ISSUE_DELAY_MS } from '../lib/constants.js';
@@ -819,6 +820,8 @@ export function App() {
         probe: probeUrl,
         root,
         concurrency: CONCURRENCY,
+        caps: browserCapabilities,
+        makeWorker: () => makeAssemblerWorker(),
         shouldCancel: () => taskStore.isCancelRequested(id),
         onProgress: ({ done, bytesDone, active }) => taskStore.update(id, { current: done, bytesDone, active }, false),
       });

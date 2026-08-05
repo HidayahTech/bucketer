@@ -9,7 +9,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  detectCapabilities, availableTiers, selectTier, tierLabel, TIERS,
+  detectCapabilities, availableTiers, selectTier, tierLabel, TIERS, inPlaceSupported,
 } from '../src/lib/browser-capability.js';
 
 // Minimal window stand-ins. Each names the real engine it mirrors, measured 2026-07-31.
@@ -141,6 +141,20 @@ describe('selectTier', () => {
     assert.equal(selectTier(bare, { largestFileBytes: 1, prefer: TIERS.MANAGED_FOLDER }),
       TIERS.HANDOFF);
   });
+});
+
+test('webWorker feature-detected; inPlaceSupported gates on opfs+streamingFetch+webWorker', () => {
+  const win = {
+    navigator: { storage: { getDirectory(){} } },
+    Response: { prototype: { body: 1 } },
+    FileSystemFileHandle: { prototype: { createWritable(){} } },
+    Worker: function(){},
+  };
+  const caps = detectCapabilities(win);
+  assert.equal(caps.webWorker, true);
+  assert.equal(inPlaceSupported(caps), true);
+  assert.equal(inPlaceSupported({ ...caps, webWorker: false }), false);
+  assert.equal(inPlaceSupported({ ...caps, opfs: false }), false);
 });
 
 describe('tierLabel', () => {

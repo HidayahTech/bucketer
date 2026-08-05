@@ -59,8 +59,17 @@ export function detectCapabilities(win = globalThis) {
     opfs:            isFn(nav?.storage?.getDirectory),
     storageEstimate: isFn(nav?.storage?.estimate),
     streamingFetch,
+    webWorker:       typeof win?.Worker === 'function',
     likelyMobile:    detectMobileHint(win),
   };
+}
+
+// `createSyncAccessHandle` is exposed only in worker global scope — it cannot be
+// feature-detected from the main thread (see docs/review-download-parity/, Task 1 fidelity
+// probe). Selection here is optimistic: gate on what IS detectable, then let the in-place
+// worker's own init self-report support and fall back at runtime if it can't.
+export function inPlaceSupported(caps) {
+  return !!(caps?.opfs && caps?.streamingFetch && caps?.webWorker);
 }
 
 // ADVISORY ONLY. Backgrounding and page-memory limits are the real mobile constraints and

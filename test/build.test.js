@@ -207,6 +207,51 @@ describe('Build output — Referrer-Policy for privacy (#12)', () => {
   });
 });
 
+describe('Build output — assembler worker inlined as Blob URL (Task 7)', () => {
+  // The zip-assembler worker (src/worker/zip-assembler.worker.js) must ship as
+  // part of the single-file bundle rather than as an external asset. build.mjs
+  // bundles it separately and substitutes its source into
+  // assembler-worker-url.js's '__WORKER_SRC__' placeholder via an esbuild
+  // plugin. createSyncAccessHandle only appears in the worker's own source, so
+  // its presence proves the substitution actually ran.
+  test('worker source is inlined into the single-file bundle', () => {
+    assert.ok(jsBundle.includes('createSyncAccessHandle'), 'worker source must be inlined');
+  });
+
+  // BUG-001-class guard: a pure unit test of the exact substitution shape build.mjs's
+  // inline-worker plugin uses at the assembler-worker-url.js placeholder site —
+  // `.replace("'__WORKER_SRC__'", () => JSON.stringify(workerSrc))`. Asserting against the
+  // real bundle (as a prior version of this test did, checking that an unrelated worker
+  // string literal round-tripped) is VACUOUS: the real worker source happens to contain no
+  // "$"-prefixed replacement-pattern sequence, so a function replacer and a plain string
+  // replacer produce byte-identical output on it — the assertion passes either way and can
+  // never catch a regression back to BUG-001's buggy form. This test instead drives a
+  // synthetic source containing every dangerous sequence ($&, $`, $', $1) through the
+  // identical call shape and proves it survives verbatim only with a function replacer —
+  // and visibly corrupts with a plain string one, so this test would have caught BUG-001.
+  test('the __WORKER_SRC__ substitution pattern preserves $-replacement sequences verbatim (BUG-001 class)', () => {
+    const dangerous = 'const s = "$& $` $\' $1 $9 end";';
+    const template = "const src = '__WORKER_SRC__';";
+
+    const viaFunctionReplacer = template.replace("'__WORKER_SRC__'", () => JSON.stringify(dangerous));
+    const roundTripped = JSON.parse(viaFunctionReplacer.match(/const src = (.*);/)[1]);
+    assert.equal(roundTripped, dangerous, 'a function replacer must round-trip $-sequences verbatim');
+
+    // Contrast: the buggy BUG-001-class form (a plain string, not a function, as the
+    // replacement) corrupts the very same input by interpreting $&, $`, $' as special
+    // replacement patterns instead of literal text.
+    const viaStringReplacer = template.replace("'__WORKER_SRC__'", JSON.stringify(dangerous));
+    assert.notEqual(
+      viaStringReplacer, viaFunctionReplacer,
+      'a plain string replacer corrupts $-sequences, unlike the function replacer build.mjs actually uses'
+    );
+  });
+
+  test('placeholder is replaced at build, not shipped literally', () => {
+    assert.ok(!html.includes('__WORKER_SRC__'), 'placeholder must be replaced at build');
+  });
+});
+
 describe('Build output — changelog wrapped bullets (#50)', () => {
   // #50: parseChangelog in build.mjs only captured lines starting with "- ",
   // silently dropping a wrapped bullet's indented continuation lines. Every
