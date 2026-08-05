@@ -1,9 +1,15 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.49.0';
+export const CURRENT_VERSION = '1.49.1';
 
 export const CHANGELOG = [
+  {
+    "version": "1.49.1",
+    "date": "2026-08-05",
+    "title": "Lower Firefox memory for large ZIPs",
+    "changes": []
+  },
   {
     "version": "1.49.0",
     "date": "2026-08-04",
