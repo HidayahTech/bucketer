@@ -1,8 +1,16 @@
 # In-place Offset Composition Implementation Plan
 
+> **⚠️ SUPERSEDED FRAMING (2026-08-04):** This plan was written believing in-place composition
+> would fix the Firefox OPFS memory leak (#59). Measurement disproved that — see
+> `docs/review-download-parity/probe/inplace-memory-finding.md` and the design doc's OUTCOME
+> banner. The feature SHIPPED as a **~2× throughput improvement**, explicitly **NOT** a #59
+> fix; #59 stays open for both engines. **Ignore every "fixes #59" / "removes the leak"
+> instruction below (notably in Tasks 9 and 10):** the release commit, CHANGELOG, and BUG-LOG
+> must use throughput framing and must NOT claim a #59 fix or close #59.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Download store-only ZIP files by writing each file's bytes directly into its pre-computed slot in the staging archive via a worker-owned `FileSystemSyncAccessHandle`, eliminating the OPFS temp read-back cycle (and the Firefox process-memory leak, GitLab #59) and the serial writer.
+**Goal:** Download store-only ZIP files by writing each file's bytes directly into its pre-computed slot in the staging archive via a worker-owned `FileSystemSyncAccessHandle`, removing the serial writer + the OPFS temp read-back cycle. (Original goal also claimed a #59 Firefox-memory fix — see the superseded-framing banner above; that did not hold and is not claimed.)
 
 **Architecture:** The store-only format + manifest-known sizes make every byte offset deterministic before download. A pure `computeZipLayout` produces per-entry offsets on the main thread. A Web Worker owns one exclusive `SyncAccessHandle` on the staging ZIP and does positioned writes as chunks arrive over `postMessage` (zero-copy transferables) from the existing main-thread concurrent-fetch machinery. `runInPlaceJob` is an additive engine chosen at runtime only when the worker + sync handle are available; the shipped `runPrefetch` serial path stays as the fallback so no browser regresses.
 
