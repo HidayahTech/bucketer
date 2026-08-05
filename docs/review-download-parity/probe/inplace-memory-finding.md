@@ -113,3 +113,43 @@ in-worker OPFS write buffering, and main now transiently holding the returned bu
 Throughput unchanged (in-place stayed faster within-run). Low-risk (one worker line + the
 client already tolerates the extra ack field; 1451 unit tests pass). Not a full fix; a buffer
 POOL (reuse returned buffers) or fetch-in-worker (no transfer at all) could push further.
+
+## Experiment — "fetch inside the worker" (Approach B), 2026-08-05
+
+Standalone A/B harness (`worker-fetch/`, real `fetch()` against a streamed /blob endpoint,
+Firefox, N∈{2,4,8,16}, 2 reps): `transfer` = the shipped path (main fetches → transfers
+buffers → worker writes); `workerfetch` = a worker fetches + writes with NO cross-thread
+transfer. Isolates the transfer variable.
+
+| N | transfer peak | workerfetch peak |
+|---|--------------|------------------|
+| 2 | ~91 | ~74 |
+| 4 | ~167 | ~153 |
+| 8 | ~306 | ~251 |
+| 16 | ~517 | ~370 |
+| **peak slope** | **30.4 MiB/file** | **20.7 MiB/file** |
+
+**Result: Approach B cuts per-file peak growth ~32%** (real fetch). A *synthetic*-bytes
+variant of the same A/B showed ~83% (transfer=14.6 vs workerfetch=2.5, workerfetch nearly
+FLAT) — the gap between 83% and 32% is the crucial finding: **real `fetch()` adds a ~20
+MiB/file network-buffer floor to BOTH mechanisms** (response bodies not promptly GC'd during
+busy work — the engine-independent deferred-ArrayBuffer-GC effect). Moving fetch into the
+worker removes the cross-thread transfer contribution (~10 MiB/file) but NOT that floor.
+
+**Interpretation:**
+- Approach B would bring in-place's Firefox per-file peak from ~30 down to ~21 MiB/file
+  (this harness) — landing ≈ the real-app **serial** engine (~17.6). I.e. it would **erase
+  in-place's Firefox memory regression (down to ~serial) while keeping the ~2× throughput**,
+  but not go below serial.
+- Incremental over the SHIPPED v1.49.1 buffer-return (~19% already recovered): ~another 13%.
+  Buffer-return is a partial version of the same idea (get buffers out of the busy worker);
+  workerfetch never puts them in.
+- The ~20 MiB/file fetch-buffer floor is the true residual of #59 and is NOT addressed by any
+  worker/transfer change — it would need a different lever (e.g. smaller in-flight windows,
+  or Firefox fixing deferred ArrayBuffer GC).
+
+**Cost of productionizing Approach B:** substantial — move fetch + CORS/offline probe +
+per-entry records reporting into the worker; presign-in-worker (credentials/SDK on main →
+either presign-all-up-front with refresh, or an on-demand presign message channel);
+rework cancel/quota/progress across the boundary; new e2e. A full feature cycle, and a bigger
+worker. Experiment harness: `docs/review-download-parity/probe/worker-fetch/`.

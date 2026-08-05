@@ -1,9 +1,12 @@
 {
   "config": {
     "NMEDIUMS": [
-      2
+      2,
+      4,
+      8,
+      16
     ],
-    "REPS": 1,
+    "REPS": 2,
     "MEDIUM_MB": 8,
     "MECHS": [
       "transfer",
@@ -16,36 +19,186 @@
       "n": 2,
       "rep": 1,
       "ok": true,
-      "wallMs": 180,
+      "wallMs": 177,
+      "preMiB": 745,
+      "peakDeltaMiB": 92
+    },
+    {
+      "mech": "transfer",
+      "n": 2,
+      "rep": 2,
+      "ok": true,
+      "wallMs": 179,
       "preMiB": 746,
-      "peakDeltaMiB": 85
+      "peakDeltaMiB": 90
+    },
+    {
+      "mech": "transfer",
+      "n": 4,
+      "rep": 1,
+      "ok": true,
+      "wallMs": 375,
+      "preMiB": 747,
+      "peakDeltaMiB": 165
+    },
+    {
+      "mech": "transfer",
+      "n": 4,
+      "rep": 2,
+      "ok": true,
+      "wallMs": 357,
+      "preMiB": 743,
+      "peakDeltaMiB": 168
+    },
+    {
+      "mech": "transfer",
+      "n": 8,
+      "rep": 1,
+      "ok": true,
+      "wallMs": 659,
+      "preMiB": 744,
+      "peakDeltaMiB": 296
+    },
+    {
+      "mech": "transfer",
+      "n": 8,
+      "rep": 2,
+      "ok": true,
+      "wallMs": 654,
+      "preMiB": 745,
+      "peakDeltaMiB": 315
+    },
+    {
+      "mech": "transfer",
+      "n": 16,
+      "rep": 1,
+      "ok": true,
+      "wallMs": 1315,
+      "preMiB": 746,
+      "peakDeltaMiB": 513
+    },
+    {
+      "mech": "transfer",
+      "n": 16,
+      "rep": 2,
+      "ok": true,
+      "wallMs": 1297,
+      "preMiB": 745,
+      "peakDeltaMiB": 521
     },
     {
       "mech": "workerfetch",
       "n": 2,
       "rep": 1,
       "ok": true,
-      "wallMs": 217,
-      "preMiB": 746,
-      "peakDeltaMiB": 74
+      "wallMs": 277,
+      "preMiB": 745,
+      "peakDeltaMiB": 72
+    },
+    {
+      "mech": "workerfetch",
+      "n": 2,
+      "rep": 2,
+      "ok": true,
+      "wallMs": 212,
+      "preMiB": 743,
+      "peakDeltaMiB": 75
+    },
+    {
+      "mech": "workerfetch",
+      "n": 4,
+      "rep": 1,
+      "ok": true,
+      "wallMs": 472,
+      "preMiB": 745,
+      "peakDeltaMiB": 152
+    },
+    {
+      "mech": "workerfetch",
+      "n": 4,
+      "rep": 2,
+      "ok": true,
+      "wallMs": 402,
+      "preMiB": 744,
+      "peakDeltaMiB": 153
+    },
+    {
+      "mech": "workerfetch",
+      "n": 8,
+      "rep": 1,
+      "ok": true,
+      "wallMs": 857,
+      "preMiB": 744,
+      "peakDeltaMiB": 244
+    },
+    {
+      "mech": "workerfetch",
+      "n": 8,
+      "rep": 2,
+      "ok": true,
+      "wallMs": 812,
+      "preMiB": 745,
+      "peakDeltaMiB": 258
+    },
+    {
+      "mech": "workerfetch",
+      "n": 16,
+      "rep": 1,
+      "ok": true,
+      "wallMs": 1623,
+      "preMiB": 747,
+      "peakDeltaMiB": 377
+    },
+    {
+      "mech": "workerfetch",
+      "n": 16,
+      "rep": 2,
+      "ok": true,
+      "wallMs": 1798,
+      "preMiB": 744,
+      "peakDeltaMiB": 362
     }
   ],
   "slopes": {
     "transfer": {
-      "slopeMiBPerFile": null,
+      "slopeMiBPerFile": 30.36521739130435,
       "points": [
         {
           "x": 2,
-          "y": 85
+          "y": 92
+        },
+        {
+          "x": 4,
+          "y": 168
+        },
+        {
+          "x": 8,
+          "y": 315
+        },
+        {
+          "x": 16,
+          "y": 521
         }
       ]
     },
     "workerfetch": {
-      "slopeMiBPerFile": null,
+      "slopeMiBPerFile": 20.743478260869566,
       "points": [
         {
           "x": 2,
-          "y": 74
+          "y": 75
+        },
+        {
+          "x": 4,
+          "y": 153
+        },
+        {
+          "x": 8,
+          "y": 258
+        },
+        {
+          "x": 16,
+          "y": 377
         }
       ]
     }
