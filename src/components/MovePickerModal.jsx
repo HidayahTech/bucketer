@@ -11,6 +11,7 @@ import { Modal } from './Modal.jsx';
 import { Breadcrumb } from './Breadcrumb.jsx';
 import { leafName } from '../lib/format.js';
 import { validateMove, validateCopy } from '../lib/move-guards.js';
+import { clampToFloor } from '../lib/base-prefix.js';
 
 export function MovePickerModal({ client, bucket, selection, initialPrefix = '', onCancel, onMove, mode = 'move' }) {
   const [prefix, setPrefix]   = useState(initialPrefix);
@@ -58,7 +59,10 @@ export function MovePickerModal({ client, bucket, selection, initialPrefix = '',
   return (
     <Modal onClose={onCancel} class="move-dialog">
       <div class="modal-title">{verb} {count} item{count !== 1 ? 's' : ''} to…</div>
-      <Breadcrumb prefix={prefix} onNavigate={setPrefix} />
+      {/* initialPrefix doubles as the floor (#60): the picker must never list above
+          the connection's base prefix, so the breadcrumb is pinned and navigation
+          clamped — its ListObjectsV2 must never see Prefix: undefined while scoped. */}
+      <Breadcrumb prefix={prefix} floor={initialPrefix} onNavigate={p => setPrefix(clampToFloor(p, initialPrefix))} />
       <div class="move-picker-list">
         {loading && <div class="move-picker-loading"><span class="spinner" /> Loading…</div>}
         {error && <div class="move-picker-error">{error}</div>}
