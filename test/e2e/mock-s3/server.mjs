@@ -76,7 +76,11 @@ export function createMockS3(opts = {}) {
     const range = req.headers.range || null;
     const isNavGet = req.method === 'GET' && signed
       && !req.url.includes('list-type') && range !== 'bytes=0-0';
-    requestEntries.push({ method: req.method, path: req.url.split('?')[0], signed, range, isNavGet });
+    // isList/listPrefix (#60): the query string is otherwise stripped from `path`,
+    // which would make "no root-level List ever happened" an unwritable assertion.
+    const q = new URL(req.url, 'http://mock').searchParams;
+    const isList = req.method === 'GET' && q.get('list-type') === '2';
+    requestEntries.push({ method: req.method, path: req.url.split('?')[0], signed, range, isNavGet, isList, listPrefix: isList ? (q.get('prefix') || '') : null });
     if (requestEntries.length > REQUEST_LOG_CAP) requestEntries.shift();
   }
   const requestLog = {
@@ -102,13 +106,23 @@ export function createMockS3(opts = {}) {
     return ver;
   }
 
-  function reset()        { buckets.clear(); faults = []; cors = DEFAULT_CORS(); latencyMs = bootLatencyMs; requestLog.reset(); }
+  function reset()        { buckets.clear(); faults = []; cors = DEFAULT_CORS(); latencyMs = bootLatencyMs; scopePrefix = null; requestLog.reset(); }
   function configure(cfg) {
     if (cfg.cors)   cors = { ...DEFAULT_CORS(), ...cfg.cors };
     if (cfg.faults) faults = cfg.faults;
     if (typeof cfg.latencyMs === 'number') latencyMs = cfg.latencyMs;
     if (cfg.bucket && typeof cfg.versioning === 'boolean') bkt(cfg.bucket).versioning = cfg.versioning;
+    if ('scopePrefix' in cfg) scopePrefix = cfg.scopePrefix || null;
   }
+
+  // Prefix-scoped credential simulation (#60): a standing per-instance constraint
+  // (the mock ignores signatures, so there is no per-request identity). Models a B2
+  // namePrefix / IAM s3:prefix restriction: listings must ask for a prefix at or
+  // under the scope; object ops must target keys under it. Checked BEFORE faults —
+  // deny takes precedence, mirroring real IAM semantics.
+  let scopePrefix = null; // e.g. 'clients/acme/' — null = unscoped (default)
+  function inScope(key) { return !scopePrefix || (key || '').startsWith(scopePrefix); }
+  function denyScope(req, res) { return sendError(req, res, 403, 'AccessDenied', 'Access Denied'); }
   // `skipRange: true` makes a fault ignore ranged requests. Exists so a spec can fail the
   // download GET while the one-byte pre-flight probe (a Range GET on the same key)
   // succeeds — the "object vanished between probe and issue" scenario, which is the case
@@ -244,6 +258,7 @@ export function createMockS3(opts = {}) {
 
   // ── Handlers ───────────────────────────────────────────────────────────────
   function listObjectsV2(req, res, b, q) {
+    if (scopePrefix && !(q.get('prefix') || '').startsWith(scopePrefix)) return denyScope(req, res);
     const f = matchFault('ListObjectsV2', 'GET'); if (f) return sendError(req, res, f.status, f.code, f.message);
     const prefix = q.get('prefix') || '';
     const delimiter = q.get('delimiter') || '';
@@ -277,6 +292,7 @@ export function createMockS3(opts = {}) {
   }
 
   function listVersions(req, res, b, q) {
+    if (scopePrefix && !(q.get('prefix') || '').startsWith(scopePrefix)) return denyScope(req, res);
     const prefix = q.get('prefix') || '';
     const versions = [], markers = [];
     for (const [k, vs] of b.objects) {
@@ -300,6 +316,7 @@ export function createMockS3(opts = {}) {
   }
 
   async function putObject(req, res, b, key) {
+    if (!inScope(key)) return denyScope(req, res);
     const f = matchFault('PutObject', 'PUT', key); if (f) return sendError(req, res, f.status, f.code, f.message);
     const body = await readBody(req);
     const etag = `"${md5hex(body)}"`;
@@ -314,6 +331,7 @@ export function createMockS3(opts = {}) {
   }
 
   function headObject(req, res, b, key) {
+    if (!inScope(key)) return denyScope(req, res);
     const o = current(b, key);
     if (!o) { res.writeHead(404, corsHeaders(req)); return res.end(); }
     const metaHeaders = {}; for (const [k, v] of Object.entries(o.metadata)) metaHeaders[`x-amz-meta-${k}`] = v;
@@ -346,6 +364,7 @@ export function createMockS3(opts = {}) {
   }
 
   function getObject(req, res, b, key, q) {
+    if (!inScope(key)) return denyScope(req, res);
     const f = matchFault('GetObject', 'GET', key, { hasRange: !!req.headers.range });
     // killAtByte is not an error response: headers and a prefix of the body are written, then
     // the socket is destroyed, which is what a dropped connection actually looks like to a
@@ -417,6 +436,7 @@ export function createMockS3(opts = {}) {
   }
 
   function deleteObject(req, res, b, key, q) {
+    if (!inScope(key)) return denyScope(req, res);
     const f = matchFault('DeleteObject', 'DELETE', key); if (f) return sendError(req, res, f.status, f.code, f.message);
     const versionId = q.get('versionId');
     const vs = b.objects.get(key);
@@ -450,6 +470,7 @@ export function createMockS3(opts = {}) {
     const deleted = [], errors = [];
     for (const k of keys) {
       const key = k.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+      if (!inScope(key)) { errors.push(`<Error><Key>${xmlEsc(key)}</Key><Code>AccessDenied</Code><Message>Access Denied</Message></Error>`); continue; }
       const f = matchFault('DeleteObject', 'POST', key);
       if (f) { errors.push(`<Error><Key>${xmlEsc(key)}</Key><Code>${xmlEsc(f.code)}</Code><Message>${xmlEsc(f.message)}</Message></Error>`); continue; }
       // On a versioned bucket a batch delete (no per-key VersionId) creates a delete marker, same as
@@ -462,6 +483,8 @@ export function createMockS3(opts = {}) {
   }
 
   function initiateMultipart(req, res, b, key) {
+    // Part ops need no separate guard: no uploadId can exist for a key denied here.
+    if (!inScope(key)) return denyScope(req, res);
     const id = `mock-${newId()}`;
     b.uploads.set(id, { key, metadata: metaFromHeaders(req), contentType: req.headers['content-type'] || 'application/octet-stream', parts: new Map() });
     sendXml(req, res, 200, `<InitiateMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Bucket>bucket</Bucket><Key>${xmlEsc(key)}</Key><UploadId>${id}</UploadId></InitiateMultipartUploadResult>`);
@@ -547,11 +570,14 @@ export function createMockS3(opts = {}) {
   }
 
   function copyObject(req, res, b, destKey, q) {
-    const f = matchFault('CopyObject', 'PUT', destKey); if (f) return sendError(req, res, f.status, f.code, f.message);
     const header = req.headers['x-amz-copy-source'];
+    const srcKey = decodeURIComponent(header.replace(/^\//, '').split('?')[0]).split('/').slice(1).join('/');
+    // B2 gates CopyObject under readFiles (source) AND writeFiles (dest) — a scoped
+    // key can neither read outside its prefix nor write outside it (#60).
+    if (!inScope(destKey) || !inScope(srcKey)) return denyScope(req, res);
+    const f = matchFault('CopyObject', 'PUT', destKey); if (f) return sendError(req, res, f.status, f.code, f.message);
     const src = resolveCopySource(b, header);
     if (!src) return sendError(req, res, 404, 'NoSuchKey', header);
-    const srcKey = decodeURIComponent(header.replace(/^\//, '').split('?')[0]).split('/').slice(1).join('/');
     const directive = (req.headers['x-amz-metadata-directive'] || 'COPY').toUpperCase();
     // STRICT: real S3 rejects a same-key copy that doesn't change metadata.
     if (srcKey === destKey && directive === 'COPY') return sendError(req, res, 400, 'InvalidRequest', 'This copy request is illegal because it is trying to copy an object to itself without changing metadata');

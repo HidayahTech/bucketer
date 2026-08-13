@@ -326,6 +326,102 @@ describe('mock S3 — conditional requests', () => {
   });
 });
 
+// Prefix-scoped keys (#60): scopePrefix models a credential restricted to a
+// key-name prefix (B2 namePrefix / IAM s3:prefix) as a standing per-instance
+// constraint — the mock ignores signatures, so there is no per-request identity.
+// Scope is a hard boundary, checked before faults (deny takes precedence).
+describe('mock S3 — prefix scope (scopePrefix)', () => {
+  const SCOPE = 'clients/acme/';
+  const denied = (err) => err.name === 'AccessDenied' && err.$metadata.httpStatusCode === 403;
+
+  beforeEach(() => mock.configure({ scopePrefix: SCOPE }));
+
+  test('root ListObjectsV2 is denied with 403 AccessDenied', async () => {
+    await assert.rejects(client.send(new ListObjectsV2Command({ Bucket: BUCKET })), denied);
+  });
+
+  test('listing at the scope and nested under it succeeds', async () => {
+    await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: SCOPE + '2026/r.pdf', Body: body('x') }));
+    const atScope = await client.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: SCOPE, Delimiter: '/' }));
+    assert.equal((atScope.CommonPrefixes || []).length, 1);
+    const nested = await client.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: SCOPE + '2026/' }));
+    assert.equal(nested.KeyCount, 1);
+  });
+
+  test('object ops inside the scope succeed', async () => {
+    await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: SCOPE + 'f.txt', Body: body('ok') }));
+    const got = await client.send(new GetObjectCommand({ Bucket: BUCKET, Key: SCOPE + 'f.txt' }));
+    assert.equal(await streamToString(got.Body), 'ok');
+    await client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: SCOPE + 'f.txt' }));
+  });
+
+  test('PutObject outside the scope is denied', async () => {
+    await assert.rejects(client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'clients/other/f.txt', Body: body('no') })), denied);
+  });
+
+  test('GetObject/HeadObject outside the scope are denied even when the key exists', async () => {
+    mock.configure({ scopePrefix: null });
+    await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'clients/other/f.txt', Body: body('secret') }));
+    mock.configure({ scopePrefix: SCOPE });
+    await assert.rejects(client.send(new GetObjectCommand({ Bucket: BUCKET, Key: 'clients/other/f.txt' })), denied);
+    // HEAD error responses carry no XML body (real S3 too), so the SDK can't see the
+    // code — the 403 status is the only signal, which is what isPermissionError uses.
+    await assert.rejects(client.send(new HeadObjectCommand({ Bucket: BUCKET, Key: 'clients/other/f.txt' })),
+      (err) => err.$metadata.httpStatusCode === 403);
+  });
+
+  test('CopyObject is denied when either side is outside the scope', async () => {
+    mock.configure({ scopePrefix: null });
+    await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'clients/other/src.txt', Body: body('s') }));
+    await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: SCOPE + 'src.txt', Body: body('s') }));
+    mock.configure({ scopePrefix: SCOPE });
+    await assert.rejects(client.send(new CopyObjectCommand({
+      Bucket: BUCKET, Key: SCOPE + 'dst.txt', CopySource: `${BUCKET}/clients/other/src.txt`,
+    })), denied, 'out-of-scope source must be denied');
+    await assert.rejects(client.send(new CopyObjectCommand({
+      Bucket: BUCKET, Key: 'clients/other/dst.txt', CopySource: `${BUCKET}/${SCOPE}src.txt`,
+    })), denied, 'out-of-scope destination must be denied');
+  });
+
+  test('multipart initiate outside the scope is denied — nothing to UploadPart against', async () => {
+    await assert.rejects(client.send(new CreateMultipartUploadCommand({ Bucket: BUCKET, Key: 'clients/other/big.bin' })), denied);
+    const ok = await client.send(new CreateMultipartUploadCommand({ Bucket: BUCKET, Key: SCOPE + 'big.bin' }));
+    assert.ok(ok.UploadId, 'in-scope initiate still works');
+  });
+
+  test('batch delete: in-scope keys delete, out-of-scope keys come back as per-key AccessDenied', async () => {
+    mock.configure({ scopePrefix: null });
+    await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: SCOPE + 'a.txt', Body: body('a') }));
+    await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'clients/other/b.txt', Body: body('b') }));
+    mock.configure({ scopePrefix: SCOPE });
+    const resp = await client.send(new DeleteObjectsCommand({
+      Bucket: BUCKET, Delete: { Objects: [{ Key: SCOPE + 'a.txt' }, { Key: 'clients/other/b.txt' }] },
+    }));
+    assert.ok((resp.Errors || []).some(e => e.Key === 'clients/other/b.txt' && e.Code === 'AccessDenied'));
+    mock.configure({ scopePrefix: null });
+    await assert.rejects(client.send(new HeadObjectCommand({ Bucket: BUCKET, Key: SCOPE + 'a.txt' })), 'a must be gone');
+    await client.send(new HeadObjectCommand({ Bucket: BUCKET, Key: 'clients/other/b.txt' })); // still there
+  });
+
+  test('ListObjectVersions outside the scope is denied; inside succeeds', async () => {
+    await assert.rejects(client.send(new ListObjectVersionsCommand({ Bucket: BUCKET })), denied);
+    await client.send(new ListObjectVersionsCommand({ Bucket: BUCKET, Prefix: SCOPE }));
+  });
+
+  test('reset() clears the scope', async () => {
+    mock.reset();
+    await client.send(new ListObjectsV2Command({ Bucket: BUCKET }));
+  });
+
+  test('requestLog records list requests with their prefix', async () => {
+    mock.requestLog.reset();
+    await client.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: SCOPE, Delimiter: '/' }));
+    const lists = mock.requestLog.list().filter(r => r.isList);
+    assert.equal(lists.length, 1);
+    assert.equal(lists[0].listPrefix, SCOPE);
+  });
+});
+
 describe('mock S3 — fault injection for transfers', () => {
   const url = (key) => `http://127.0.0.1:${port}/${BUCKET}/${key}`;
 
