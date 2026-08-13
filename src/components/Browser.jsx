@@ -32,6 +32,7 @@ import { Breadcrumb } from './Breadcrumb.jsx';
 import { SortTh } from './SortTh.jsx';
 import { MovePickerModal } from './MovePickerModal.jsx';
 import { dragPayload, dropAccepted } from '../lib/move-drag.js';
+import { normalizeBasePrefix, withinFloor, clampToFloor } from '../lib/base-prefix.js';
 
 function formatDate(dateStr) {
   if (!dateStr) return '';
@@ -43,11 +44,22 @@ function formatDate(dateStr) {
 // Delete operations are owned by App.jsx (via onDeleteRequest) so they survive navigation.
 // cacheRef and abortRef are Refs (not state) to avoid triggering re-renders.
 export function Browser({ client, bucket, provider, credentials, onCapabilityChange, capabilities, onUploadTargetChange, onInitialListFailed, onExternalDrop, onDeleteRequest, onMoveRequest, onDownloadRequest, onMount, prefetchSizeLimit, isFirstMount }) {
+  // The connection's floor (#60): every navigation entry point clamps to it, so a
+  // prefix-scoped key never sees a request above its base prefix. '' = unscoped.
+  const basePrefix = normalizeBasePrefix(credentials?.basePrefix);
   const [prefix, setPrefix] = useState(() => {
     if (isFirstMount) {
-      return new URLSearchParams(window.location.hash.slice(1)).get('prefix') || '';
+      const fromHash = new URLSearchParams(window.location.hash.slice(1)).get('prefix') || '';
+      return clampToFloor(fromHash, basePrefix);
     }
-    return '';
+    return clampToFloor('', basePrefix);
+  });
+  // Say the clamp out loud (once, dismissible): a deep link that pointed outside
+  // the floor lands on the floor instead — silence would read as a broken link.
+  const [clampNotice, setClampNotice] = useState(() => {
+    if (!isFirstMount || !basePrefix) return false;
+    const fromHash = new URLSearchParams(window.location.hash.slice(1)).get('prefix') || '';
+    return !!fromHash && !withinFloor(fromHash, basePrefix);
   });
   const [items, setItems] = useState([]);
   const [commonPrefixes, setCommonPrefixes] = useState([]);
@@ -242,6 +254,9 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
 
   // Navigate to a new prefix — flush state and push a browser history entry (§4.7, §4.14)
   function navigateTo(newPrefix, { historyMode = 'push' } = {}) {
+    // Single floor choke point (#60): breadcrumb, popstate, and folder clicks all
+    // land here, so no navigation can escape the connection's base prefix.
+    newPrefix = clampToFloor(newPrefix, basePrefix);
     if (abortRef.current) abortRef.current.abort();
     // Save current listing to cache before leaving (skip for initial replace-navigation)
     if (cacheTTL > 0 && historyMode !== 'replace' && (items.length > 0 || commonPrefixes.length > 0)) {
@@ -829,7 +844,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
         <ErrorBlock
           error={listError}
           title="Cannot list bucket contents"
-          guidance="Check that your key has ListObjects permission on this bucket."
+          guidance="Check that your key has ListObjects permission on this bucket. If the key is restricted to a folder (a prefix-scoped key), set Base folder in the connection form so browsing starts there."
           diagnostics={diagnosticsProps(credentials, true)}
         />
       </div>
@@ -877,6 +892,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
         <MovePickerModal
           client={client}
           bucket={bucket}
+          initialPrefix={basePrefix}
           selection={moveSel}
           mode={moveSel.mode || 'move'}
           onCancel={() => setMoveSel(null)}
@@ -1000,8 +1016,17 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
         );
       })()}
 
+      {clampNotice && (
+        <div class="banner banner-info" style={{ marginBottom: '.5rem' }}>
+          <div class="banner-body">
+            This link pointed to a folder outside this connection’s base folder — showing {basePrefix} instead.
+            <button type="button" class="btn btn-ghost btn-sm" style={{ marginLeft: '.5rem' }} onClick={() => setClampNotice(false)}>Dismiss</button>
+          </div>
+        </div>
+      )}
       <Breadcrumb
         prefix={prefix}
+        floor={basePrefix}
         onNavigate={navigateTo}
         onMoveOver={handleTargetDragOver}
         onMoveLeave={handleTargetDragLeave}
