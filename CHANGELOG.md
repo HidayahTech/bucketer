@@ -7,6 +7,23 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.50.0] — 2026-08-13 — Keys that only reach one folder now work
+
+Access keys restricted to a folder inside a bucket — a Backblaze B2 application key created
+with a Name Prefix, or an AWS policy limited to a prefix — can now connect and work. A new
+optional **Base folder** field on the connect form tells Bucketer where your key's access
+starts: browsing begins there, and the breadcrumb, move picker, duplicate scan, and upload
+destination all treat it as the top — nothing ever asks the server for folders the key
+cannot see. Share links carry the base folder, so a recipient lands in the right place, and
+a link pointing outside it lands safely at the base folder with a note saying so. If you
+connect a restricted key without setting the field, the error now explains what happened
+and names the field to set. The B2 setup guide covers it too. Connections without a base
+folder behave exactly as before.
+
+Also fixed along the way (BUG-058): opening a link with a folder in its URL and then
+connecting had silently ignored the folder and started at the bucket root; the folder in
+the link is honored again.
+
 ## [1.49.1] — 2026-08-05 — Lower Firefox memory for large ZIPs
 
 Downloading a ZIP of many medium-to-large files now uses less memory on Firefox. The
