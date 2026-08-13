@@ -142,6 +142,16 @@ export function App() {
   });
   const [currentPrefix, setCurrentPrefix] = useState('');
   const [browserKey, setBrowserKey] = useState(0); // force re-mount on reconnect
+  // True until the first Browser mount of this page session. Browser's hash-prefix
+  // restore ("only the very first mount restores the URL-specified path", v1.14.4)
+  // keyed on browserKey === 0, but handleConnect increments browserKey before the
+  // first connected render, so that path had silently died — every deep-linked
+  // #prefix= was ignored on connect. A ref survives the increment; the effect below
+  // retires it after the first connected render, so reconnects still start at root.
+  const firstBrowserMountRef = useRef(true);
+  useEffect(() => {
+    if (session === 'connected') firstBrowserMountRef.current = false;
+  }, [session]);
   // Bumped once when the mount effect hydrates `credentials` from a just-migrated
   // connection (see the `else if (conn)` branch below). CredentialForm reads
   // `initial` only in its own useState initializer, so without a key change,
@@ -1300,7 +1310,7 @@ export function App() {
 
             <Browser
               key={browserKey}
-              isFirstMount={browserKey === 0}
+              isFirstMount={firstBrowserMountRef.current}
               client={client}
               bucket={credentials.bucket}
               provider={credentials.provider}
