@@ -99,16 +99,28 @@ describe('saveCredentials / loadCredentials', () => {
     saveCredentials({ ...creds, provider: '' });
     assert.equal(loadCredentials().provider, null);
   });
+
+  // Prefix-scoped keys (#60): the flat mirror must carry basePrefix, or an
+  // ad-hoc (unsaved) scoped connection silently loses its floor on reload.
+  test('round-trips basePrefix', () => {
+    saveCredentials({ ...creds, basePrefix: 'team/alice/' });
+    assert.equal(loadCredentials().basePrefix, 'team/alice/');
+  });
+
+  test('basePrefix loads as empty string when never saved (pre-feature storage)', () => {
+    assert.equal(loadCredentials().basePrefix, '');
+  });
 });
 
 describe('clearCredentials', () => {
   test('removes all credential fields from both stores', () => {
-    saveCredentials({ endpoint: 'https://s3.example.com', bucket: 'b', keyId: 'k', secretKey: 's', provider: 'r2', regionOverride: '' });
+    saveCredentials({ endpoint: 'https://s3.example.com', bucket: 'b', keyId: 'k', secretKey: 's', provider: 'r2', regionOverride: '', basePrefix: 'team/alice/' });
     clearCredentials();
     const loaded = loadCredentials();
     assert.equal(loaded.endpoint,  '');
     assert.equal(loaded.secretKey, '');
     assert.equal(loaded.keyId,     '');
+    assert.equal(loaded.basePrefix, '', 'clearCredentials must wipe basePrefix with the other credential fields');
   });
 
   // T2-1: clearCredentials must not wipe settings. A user who clicks "Disconnect"

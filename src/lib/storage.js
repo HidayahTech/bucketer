@@ -27,6 +27,7 @@ const CREDENTIAL_KEYS = {
   keyId:          's3b_key_id',
   provider:       's3b_provider',
   regionOverride: 's3b_region_override',
+  basePrefix:     's3b_base_prefix',
 };
 
 // Settings fields — user preferences that survive disconnect. Only wiped by resetSettings().
@@ -78,15 +79,17 @@ export function loadCredentials() {
     secretKey:      safeGet(sessionStorage, SS_KEY_SECRET),
     provider:       (rawProvider && isValidProvider(rawProvider)) ? rawProvider : null,
     regionOverride: safeGet(localStorage, LS_KEYS.regionOverride),
+    basePrefix:     safeGet(localStorage, LS_KEYS.basePrefix),
   };
 }
 
-export function saveCredentials({ endpoint, bucket, keyId, secretKey, provider, regionOverride }) {
+export function saveCredentials({ endpoint, bucket, keyId, secretKey, provider, regionOverride, basePrefix }) {
   safeSet(localStorage, LS_KEYS.endpoint, endpoint);
   safeSet(localStorage, LS_KEYS.bucket, bucket);
   safeSet(localStorage, LS_KEYS.keyId, keyId);
   safeSet(localStorage, LS_KEYS.provider, isValidProvider(provider) ? provider : '');
   safeSet(localStorage, LS_KEYS.regionOverride, regionOverride || '');
+  safeSet(localStorage, LS_KEYS.basePrefix, basePrefix || '');
   safeSet(sessionStorage, SS_KEY_SECRET, secretKey);
 }
 

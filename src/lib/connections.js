@@ -277,6 +277,7 @@ export function resolveConnection(id) {
     id:             conn.id,
     name:           conn.name,
     bucket:         conn.bucket,
+    basePrefix:     conn.basePrefix || '',
     capabilities:   conn.capabilities || null,
     credentialId:   cred.id,
     endpoint:       cred.endpoint,

@@ -1,9 +1,15 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.49.1';
+export const CURRENT_VERSION = '1.50.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.50.0",
+    "date": "2026-08-13",
+    "title": "Keys that only reach one folder now work",
+    "changes": []
+  },
   {
     "version": "1.49.1",
     "date": "2026-08-05",

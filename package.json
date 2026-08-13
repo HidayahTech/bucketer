@@ -1,6 +1,6 @@
 {
   "type": "module",
-  "version": "1.49.1",
+  "version": "1.50.0",
   "scripts": {
     "build": "node build.mjs",
     "dev": "node build.mjs --mode=dev",

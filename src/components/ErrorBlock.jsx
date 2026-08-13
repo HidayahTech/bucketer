@@ -18,7 +18,7 @@ import { runDiagnostics, VERDICT_MESSAGES } from '../lib/connection-diagnostics.
 
 const STATUS_ICONS = { pass: '✓', fail: '✗', skip: '–' };
 
-export function ErrorBlock({ error, title, consequence, guidance, diagnostics }) {
+export function ErrorBlock({ error, title, consequence, guidance, diagnostics, basePrefixUnset }) {
   const [diag, setDiag] = useState(null); // null | 'running' | { checks, verdict }
   // #51: results belong to the error they diagnosed — when a different error
   // lands in the same mounted block, clear them and restore the button.
@@ -28,6 +28,12 @@ export function ErrorBlock({ error, title, consequence, guidance, diagnostics })
   const isCorsLike = parsed.message?.toLowerCase().includes('fetch') ||
                      parsed.message?.toLowerCase().includes('network') ||
                      parsed.status === null;
+  // Prefix-scoped keys (#60): a denied connection whose Base folder is unset is
+  // very often a key restricted to a folder (B2 Name Prefix, IAM s3:prefix) probing
+  // the bucket root. Only the call site knows whether a base folder exists, so the
+  // hint is gated on basePrefixUnset and never shows once one is set.
+  const isDeniedLike = parsed.code === 'AccessDenied' || parsed.status === 403 || parsed.status === 401;
+  const showScopeHint = !!basePrefixUnset && isDeniedLike;
 
   async function handleDiagnose() {
     setDiag('running');
@@ -45,6 +51,15 @@ export function ErrorBlock({ error, title, consequence, guidance, diagnostics })
           routing failure masked by the browser's CORS layer. Verify your endpoint URL, bucket
           name, and credentials using a non-browser tool (e.g. curl or the AWS CLI) to see the
           actual error response.
+          {basePrefixUnset && ' A key restricted to a folder inside the bucket can also present this way — if that matches your key, set Base folder in the form above.'}
+        </div>
+      )}
+      {showScopeHint && (
+        <div style={{ marginTop: '.3rem' }}>
+          <strong>Note:</strong> This can mean the credentials are simply wrong — but it's also
+          common for an access key to be restricted to a folder inside the bucket rather than the
+          whole bucket (Backblaze B2 calls this a key's Name Prefix). If that matches your key,
+          set <strong>Base folder</strong> in the form above to that folder and reconnect.
         </div>
       )}
       {isCorsLike && diagnostics && !diag && (

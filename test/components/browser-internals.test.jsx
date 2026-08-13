@@ -71,6 +71,76 @@ describe('Breadcrumb — nested prefix', () => {
   });
 });
 
+describe('Breadcrumb — floor pinning (prefix-scoped keys, #60)', () => {
+  test('at the floor, renders the floor leaf as the current label instead of "(root)"', () => {
+    const { query, cleanup } = mount(h(Breadcrumb, { prefix: 'team/alice/', floor: 'team/alice/', onNavigate: () => {} }));
+    const current = query('.current');
+    assert.ok(current, '.current element must exist at the floor');
+    assert.ok(current.textContent.includes('alice'), 'floor leaf segment must be the label');
+    assert.ok(!current.textContent.includes('root'), 'no "(root)" label while scoped');
+    cleanup();
+  });
+
+  test('segments above the floor are hidden entirely', () => {
+    const { queryAll, text, cleanup } = mount(h(Breadcrumb, { prefix: 'team/alice/2026/reports/', floor: 'team/alice/', onNavigate: () => {} }));
+    assert.ok(!text().includes('team/') || !queryAll('.crumb').some(c => c.textContent.trim() === 'team'),
+      'no crumb for the "team" segment above the floor');
+    assert.ok(!queryAll('.crumb').some(c => c.textContent.trim() === 'root'), 'no "root" crumb while scoped');
+    cleanup();
+  });
+
+  test('the floor crumb is first, labeled with the floor leaf, and navigates to the floor', () => {
+    let navigatedTo = null;
+    const { queryAll, cleanup } = mount(h(Breadcrumb, { prefix: 'team/alice/2026/', floor: 'team/alice/', onNavigate: p => { navigatedTo = p; } }));
+    const crumbs = queryAll('.crumb');
+    assert.ok(crumbs[0].textContent.includes('alice'), 'first crumb must be the floor leaf');
+    fire(crumbs[0], 'click');
+    assert.equal(navigatedTo, 'team/alice/', 'floor crumb must navigate to the floor, never ""');
+    cleanup();
+  });
+
+  test('the floor crumb carries an explanatory title tooltip', () => {
+    const { queryAll, cleanup } = mount(h(Breadcrumb, { prefix: 'team/alice/2026/', floor: 'team/alice/', onNavigate: () => {} }));
+    const first = queryAll('.crumb')[0];
+    assert.ok(first.getAttribute('title')?.includes('team/alice/'), 'tooltip must name the floor');
+    cleanup();
+  });
+
+  test('segments below the floor render as normal crumbs', () => {
+    let navigatedTo = null;
+    const { queryAll, cleanup } = mount(h(Breadcrumb, { prefix: 'team/alice/2026/reports/', floor: 'team/alice/', onNavigate: p => { navigatedTo = p; } }));
+    const y2026 = queryAll('.crumb').find(c => c.textContent.includes('2026'));
+    assert.ok(y2026, 'the "2026" crumb must exist');
+    fire(y2026, 'click');
+    assert.equal(navigatedTo, 'team/alice/2026/');
+    cleanup();
+  });
+
+  test('drop on the floor crumb moves to the floor, not the bucket root', () => {
+    let dropped;
+    const { queryAll, cleanup } = mount(h(Breadcrumb, {
+      prefix: 'team/alice/2026/', floor: 'team/alice/', onNavigate: () => {},
+      onMoveDrop: (target) => { dropped = target; },
+    }));
+    fire(queryAll('.crumb')[0], 'drop');
+    assert.equal(dropped, 'team/alice/', 'dropping on the floor crumb must target the floor');
+    cleanup();
+  });
+
+  test('a prefix that does not start with the floor falls back to unscoped rendering (defensive)', () => {
+    const { text, cleanup } = mount(h(Breadcrumb, { prefix: 'other/place/', floor: 'team/alice/', onNavigate: () => {} }));
+    assert.ok(text().includes('root'), 'defensive fallback must render like the unscoped breadcrumb');
+    cleanup();
+  });
+
+  test('floor="" and omitted floor render identically to today (regression anchor)', () => {
+    const a = mount(h(Breadcrumb, { prefix: 'photos/2024/', onNavigate: () => {} }));
+    const b = mount(h(Breadcrumb, { prefix: 'photos/2024/', floor: '', onNavigate: () => {} }));
+    try { assert.equal(a.html(), b.html()); }
+    finally { a.cleanup(); b.cleanup(); }
+  });
+});
+
 describe('Breadcrumb — move drop targets (drag-and-drop move)', () => {
   test('firing drop on the root crumb calls onMoveDrop with the empty prefix', () => {
     let dropped;

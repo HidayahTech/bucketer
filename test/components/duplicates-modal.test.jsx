@@ -123,6 +123,47 @@ describe('DuplicatesModal — idle container', () => {
   });
 });
 
+describe('DuplicatesModal — base prefix floor (#60)', () => {
+  test('scoped "entire scope" scan targets the floor, never the bucket root', async () => {
+    let scanned = null;
+    const scan = async (args) => { scanned = args; return []; };
+    const view = mount(h(DuplicatesModal, modalProps({
+      basePrefix: 'team/alice/', currentPrefix: 'team/alice/',
+      load: async () => null, scan, save: async () => {},
+    })));
+    await tick();
+    view.query('.dup-scope').value = 'bucket';
+    fire(view.query('.dup-scope'), 'change');
+    fire(view.query('.dup-scan'), 'click');
+    for (let i = 0; i < 20 && !scanned; i++) await tick();
+    assert.ok(scanned, 'scan must run');
+    assert.equal(scanned.prefix, 'team/alice/', 'the widest scan while scoped is the floor, not ""');
+    view.cleanup();
+  });
+
+  test('scoped scan-scope option says "Entire scope", not "Whole bucket"', () => {
+    const view = mount(h(DuplicatesModal, modalProps({ basePrefix: 'team/alice/', load: async () => null })));
+    try {
+      assert.ok(view.text().includes('Entire scope'), '"Whole bucket" is a promise a scoped key cannot keep');
+      assert.ok(!view.text().includes('Whole bucket'));
+    } finally { view.cleanup(); }
+  });
+
+  test('unscoped modal keeps "Whole bucket" wording and root-prefix scans (regression anchor)', async () => {
+    let scanned = null;
+    const scan = async (args) => { scanned = args; return []; };
+    const view = mount(h(DuplicatesModal, modalProps({ load: async () => null, scan, save: async () => {} })));
+    await tick();
+    assert.ok(view.text().includes('Whole bucket'));
+    view.query('.dup-scope').value = 'bucket';
+    fire(view.query('.dup-scope'), 'change');
+    fire(view.query('.dup-scan'), 'click');
+    for (let i = 0; i < 20 && !scanned; i++) await tick();
+    assert.equal(scanned.prefix, '', 'unscoped whole-bucket scan still starts at the root');
+    view.cleanup();
+  });
+});
+
 describe('DuplicatesModal — durable results', () => {
   test('restores a previously saved scan when reopened (no re-scan needed)', async () => {
     const view = mount(h(DuplicatesModal, modalProps({ load: async () => savedRecord() })));

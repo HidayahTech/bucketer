@@ -33,6 +33,15 @@ describe('SetupGuide — B2', () => {
     cleanup();
   });
 
+  // Prefix-scoped keys (#60): the app-key step is where users create restricted
+  // keys, so it must bridge B2's "Name Prefix" vocabulary to the Base folder field.
+  test('bridges Name Prefix keys to the Base folder field', () => {
+    const { text, cleanup } = mount(h(SetupGuide, props));
+    assert.ok(text().includes('Name Prefix'), 'B2 guide must mention Name Prefix restrictions');
+    assert.ok(text().includes('Base folder'), 'B2 guide must point at the Base folder field');
+    cleanup();
+  });
+
   test('includes native CORS removal step (B2-specific)', () => {
     const { text, cleanup } = mount(h(SetupGuide, props));
     assert.ok(text().includes('native CORS') || text().includes('ClearNativeCors') || text().includes('b2 bucket update'),

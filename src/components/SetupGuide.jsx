@@ -110,6 +110,9 @@ winget install Amazon.AWSCLI`}</Code>
         <p class="cors-note">
           Use an application key — <strong>not</strong> your master key. Create one in the B2 console
           under <em>App Keys</em> with access to this bucket. Enable the <strong>List All Bucket Names</strong> (<code>listAllBucketNames</code>) capability — the AWS SDK calls ListBuckets on initialisation and will fail entirely without it.
+          If you restrict the key with a <strong>Name Prefix</strong>, enter that same folder into
+          the <strong>Base folder</strong> field on the connect form — otherwise the first connection
+          attempt will fail, because Bucketer lists the bucket root by default.
         </p>
         <Code>{`aws configure --profile bucketer
 # AWS Access Key ID:     ${keyId || '<your-key-id>'}

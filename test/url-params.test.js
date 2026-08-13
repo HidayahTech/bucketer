@@ -47,6 +47,20 @@ describe('buildShareUrl', () => {
     assert.equal(buildShareUrl({ endpoint: 'https://s3.example.com', bucket: 'my-bucket' }), null);
   });
 
+  // Prefix-scoped keys (#60): basePrefix is operationally necessary, not secret —
+  // it rides unconditionally like endpoint/bucket, without which a link to a
+  // scoped connection simply doesn't work for the recipient.
+  test('basePrefix is included in the hash when set', () => {
+    const url = buildShareUrl({ endpoint: 'https://s3.example.com', bucket: 'my-bucket', basePrefix: 'team/alice/' });
+    const p = new URLSearchParams(url.split('#')[1]);
+    assert.equal(p.get('basePrefix'), 'team/alice/');
+  });
+
+  test('no basePrefix param at all when the connection is unscoped', () => {
+    const url = buildShareUrl({ endpoint: 'https://s3.example.com', bucket: 'my-bucket', basePrefix: '' });
+    assert.ok(!url.includes('basePrefix'), 'unscoped links must be byte-identical to pre-feature output');
+  });
+
   test('returns base URL without hash when credentials are all empty', () => {
     const url = buildShareUrl({});
     assert.equal(url, 'https://app.example.com/');
@@ -181,6 +195,34 @@ describe('readUrlParams', () => {
     loc.hash = '#keyId=' + k;
     assert.equal(readUrlParams().keyId, k);
   });
+
+  // Prefix-scoped keys (#60)
+  test('reads and normalizes basePrefix from the hash', () => {
+    loc.hash = '#basePrefix=team%2Falice';
+    assert.equal(readUrlParams().basePrefix, 'team/alice/');
+  });
+
+  test('ignores a basePrefix containing ".." segments', () => {
+    loc.hash = '#basePrefix=team%2F..%2Fother%2F';
+    assert.equal(readUrlParams().basePrefix, undefined);
+  });
+
+  test('ignores a basePrefix containing backslashes', () => {
+    loc.hash = '#basePrefix=team%5Calice';
+    assert.equal(readUrlParams().basePrefix, undefined);
+  });
+
+  test('ignores a basePrefix longer than 1024 chars', () => {
+    loc.hash = '#basePrefix=' + 'a'.repeat(1025);
+    assert.equal(readUrlParams().basePrefix, undefined);
+  });
+
+  test('basePrefix and prefix params coexist without clobbering each other', () => {
+    loc.hash = '#basePrefix=team%2Falice%2F&prefix=team%2Falice%2Freports%2F';
+    const p = readUrlParams();
+    assert.equal(p.basePrefix, 'team/alice/');
+    assert.equal(p.prefix, undefined, 'readUrlParams must not consume the navigation prefix param');
+  });
 });
 
 describe('hasUrlParams', () => {
@@ -207,6 +249,11 @@ describe('hasUrlParams', () => {
 
   test('true when only keyId is present', () => {
     loc.hash = '#keyId=AKID123';
+    assert.equal(hasUrlParams(), true);
+  });
+
+  test('true when only basePrefix is present (#60)', () => {
+    loc.hash = '#basePrefix=team%2Falice%2F';
     assert.equal(hasUrlParams(), true);
   });
 });

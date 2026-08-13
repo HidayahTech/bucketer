@@ -34,5 +34,11 @@ export function credentialErrors(form) {
     e.secretKey = 'Secret key must not contain spaces — check for an accidental paste.';
   if (form.regionOverride && /\s/.test(form.regionOverride))
     e.regionOverride = 'Region must not contain spaces.';
+  // Base folder (prefix-scoped keys, #60): optional. Slashes are normalized on
+  // submit, so only structural violations block — a '..' path segment is
+  // nonsensical in an S3 key namespace, and a backslash is a Windows-path paste.
+  if (form.basePrefix &&
+      (form.basePrefix.includes('\\') || form.basePrefix.split('/').some(s => s === '..')))
+    e.basePrefix = 'Base folder can’t contain ".." or backslashes — use a plain folder path like team/alice/.';
   return e;
 }

@@ -120,3 +120,55 @@ describe('MovePickerModal — actions', () => {
     cleanup();
   });
 });
+
+// Floor threading for prefix-scoped keys (#60), plus the unscoped regression
+// anchor: with no initialPrefix the picker must keep opening at the true
+// bucket root exactly as before the feature.
+describe('MovePickerModal — floor (#60)', () => {
+  function recordingClient(requests) {
+    return {
+      send(cmd) {
+        requests.push(cmd.input.Prefix ?? '');
+        return Promise.resolve({ CommonPrefixes: [{ Prefix: (cmd.input.Prefix || '') + 'sub/' }], IsTruncated: false });
+      },
+    };
+  }
+  const scopedSelection = { files: [{ key: 'team/alice/a.txt', size: 1 }], prefixes: [] };
+
+  test('scoped picker lists the floor, not the bucket root', async () => {
+    const requests = [];
+    const { cleanup } = mount(h(MovePickerModal, {
+      client: recordingClient(requests), bucket: 'bk', selection: scopedSelection,
+      initialPrefix: 'team/alice/', ...NOOP,
+    }));
+    await tick();
+    assert.equal(requests[0], 'team/alice/', 'first listing must target the floor');
+    assert.ok(!requests.includes(''), 'no root-level listing while scoped');
+    cleanup();
+  });
+
+  test('scoped picker breadcrumb is floor-pinned (no root crumb)', async () => {
+    const requests = [];
+    const { query, cleanup } = mount(h(MovePickerModal, {
+      client: recordingClient(requests), bucket: 'bk', selection: scopedSelection,
+      initialPrefix: 'team/alice/', ...NOOP,
+    }));
+    await tick();
+    const crumbText = query('.breadcrumb').textContent;
+    assert.ok(crumbText.includes('alice'), 'floor leaf must label the picker breadcrumb');
+    assert.ok(!crumbText.includes('root'), 'no root crumb in a scoped picker');
+    cleanup();
+  });
+
+  test('unscoped picker still opens at the bucket root (regression anchor)', async () => {
+    const requests = [];
+    const { query, cleanup } = mount(h(MovePickerModal, {
+      client: recordingClient(requests), bucket: 'bk', selection: scopedSelection,
+      ...NOOP,
+    }));
+    await tick();
+    assert.equal(requests[0], '', 'unscoped picker must list the root as before');
+    assert.ok(query('.breadcrumb').textContent.includes('root'));
+    cleanup();
+  });
+});

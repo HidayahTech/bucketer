@@ -4,6 +4,37 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-058 — Deep-linked #prefix= silently ignored on connect (dead isFirstMount path)
+
+**Symptom.** Opening a share link carrying `#prefix=photos/2024/` and connecting landed
+at the bucket root; the URL-specified folder was silently ignored. Found while building
+the prefix-scoped-keys e2e specs (#60): the clamped-deep-link spec's notice never
+rendered because the hash-restore path it rides on never executed.
+
+**Root cause.** Browser restores the hash prefix only when `isFirstMount` is true, and
+App computed `isFirstMount={browserKey === 0}` (v1.14.4). A later change made
+`handleConnect` increment `browserKey` on every connect — including the first — so
+Browser's first connected render always saw `browserKey === 1`. The restore branch
+became unreachable; nothing failed loudly because starting at root is a valid state.
+
+**Fix.** App tracks "first Browser mount of this page session" in a ref
+(`firstBrowserMountRef`), retired by an effect after the first connected render.
+Reconnects and permission-refresh remounts still start at root, exactly per the
+v1.14.4 comment's intent ("only the very first mount restores the URL-specified path").
+
+**Why it wasn't caught earlier.** No e2e ever asserted that a fresh page load with a
+`#prefix=` hash lands in that folder after connect — existing specs asserted the hash
+is *written* during navigation (BUG-029) and that form fields survive disconnect
+(BUG-047), never the restore direction. A dead code path with a valid-looking fallback
+is invisible to a green suite.
+
+**Test case.** `test/e2e/browser/prefix-scope.test.mjs` — "an in-floor deep-link prefix
+lands in that subfolder" (fails on pre-fix code: the row never renders because the app
+lists the root/floor instead of the deep-linked folder), plus the clamp spec that
+asserts the out-of-floor notice renders. Component-level:
+`test/components/browser-base-prefix.test.jsx` "an initial hash prefix inside the floor
+is honored" (drives Browser with `isFirstMount: true` directly).
+
 ## BUG-054 — A verified download job could become unreachable on every browser
 
 **Symptom.** Caught before release, by the 2026-08-01 independent postmortem (finding F3;
