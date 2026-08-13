@@ -61,52 +61,58 @@ Two further rules, from the 2026-07-31 postmortem:
 
 ## Test Suite
 
-Tests live in `test/` and run with `node --test` (no framework). The suite has two layers:
+Tests live in `test/` and run with `node --test` (no framework).
 
-**Unit tests — pure Node, no build step needed:**
-- `format.test.js` — `formatBytes`, `formatSpeed`, `formatEta`, `leafName`, `parseS3Error`, `isPermissionError`, `isBlockedByExtension` (BUG-025)
-- `media.test.js` — `mediaKind`, `mimeKind`, `mimeType`
-- `provider.test.js` — `detectProvider`, `extractRegion`, `requiresPathStyle`, `defaultMaxKeys`, `needsCorsConfig`, `buildEndpoint`
-- `upload-queue.test.js` — `UploadQueue` concurrency, clear, error handling
-- `calc-part-size.test.js` — `calcPartSize` (S3 5 MB floor, 10,000-part ceiling)
-- `collect-parts.test.js` — `collectParts` pagination (BUG-007); uses mock S3 client
-- `url-params.test.js` — `buildShareUrl`, `readUrlParams`, `hasUrlParams`, `pushPrefixHistory`; uses `global.window` mock
-- `indexeddb-pure.test.js` — `buildFileIdentity`, `fileIdentityMatches`, `uploadExpiryWarningMs`, tab-conflict functions; uses `global.localStorage` mock
-- `indexeddb-storage.test.js` — `saveResumeRecord`/`loadResumeRecord`/`deleteResumeRecord`, `computeFileHash`, `buildFileIdentityWithHash`, upload log; uses `fake-indexeddb`
-- `storage.test.js` — all credential and settings functions; uses `global.localStorage`/`global.sessionStorage` mocks
-- `file-entries.test.js` — `collectFileEntries` traversal and >100-file pagination; uses a pure-JS FileSystemEntry mock
-- `s3-client.test.js` — `createS3Client` region resolution and `forcePathStyle`
-- `cors-config.test.js` — `corsJson` structure, AllowedMethods (BUG-012), required SDK headers
-- `credential-form-validation.test.js` — `credentialErrors` for bucket, keyId, secretKey, regionOverride (BUG-016)
+**The directory is the authoritative file list — this document is not.** An earlier
+version of this section enumerated every test file; it went stale (dozens of files
+missing) and the stale list nearly caused an agent to overwrite an existing test file it
+believed didn't exist (2026-08-13, `move-picker-modal.test.jsx`). Before creating a
+"new" test file, always check whether one already exists for that module
+(`ls test/ test/components/`), and extend it rather than replacing it. The groups below
+describe the layers and their conventions, with anchor examples only.
+
+**Unit tests (`test/*.test.js`) — pure Node, no build step, run by `npm test`:**
+~70 files, roughly one per `src/lib` module, grouped by domain:
+- Formatting/provider/media basics (`format`, `provider`, `media`, `sort`, `constants`)
+- S3 operations: listing, move (queue/guards/key/multipart/drag), delete, purge,
+  crawl, dedup (`list-objects`, `move-*`, `delete-queue`, `purge-versions`,
+  `crawl-prefix`, `dedup-scan*`)
+- Upload pipeline: queue, sharding, part sizing, resume records, metadata, cleanup
+  (`upload-*`, `calc-part-size`, `collect-parts` (BUG-007), `indexeddb-*` — the latter
+  using `fake-indexeddb`)
+- Download manager + ZIP: manifests, naming, lifecycle, verification, zip
+  layout/assembly/jobs/prefetch (`download-*`, `zip-*`, `rate-tracker`,
+  `verify-bytes`)
+- Persistence and connection model: `storage`, `connections`, `vault`, `url-params`,
+  `base-prefix` (prefix-scoped keys, #60) — browser globals mocked via
+  `global.localStorage`/`global.window` set before import
+- Validation and config: `credential-form-validation` (BUG-016), `cors-config`
+  (BUG-012), `validate-object-name`, `s3-client`
 
 **Source-level structural assertions — no build step needed:**
-- `source-invariants.test.js` — SetupGuide buttons have explicit type (BUG-006), App.jsx hook imports (BUG-014), selectedProfileId declared before credentials (BUG-017), UploadLog MAX_DISPLAY cap (BUG-021)
+- `source-invariants.test.js` — regex/structural checks against `src/` (BUG-006,
+  BUG-014, BUG-017, BUG-021, package-lock version lockstep)
+- `e2e-matrix-helpers.test.js` — `.gitlab-ci.yml` image pin ⇄ locked playwright version
 
 **Build output assertions — require `npm run build` first:**
-- `build.test.js` — placeholder replacement (BUG-001), Preact JSX transform (BUG-002), version consistency, CORS DELETE (BUG-012), single-bundle structure
+- `build.test.js` — placeholder replacement (BUG-001), Preact JSX transform (BUG-002),
+  version consistency, CORS DELETE (BUG-012), single-bundle structure
 
-**Component rendering tests — require `npm run test:ui`, NOT `npm test`:**
+**Component rendering tests (`test/components/*.test.jsx`) — require `npm run test:ui`, NOT `npm test`:**
 
-Component tests live in `test/components/` and are `.jsx` files. They use jsdom (a browser DOM emulator) and `preact/test-utils` to render components and assert on their output.
-
-- `test/components/about-modal.test.jsx` — AboutModal content and all three close mechanisms
-- `test/components/app.test.jsx` — App disconnected state rendering
-- `test/components/browser-internals.test.jsx` — Breadcrumb, SortTh sub-components
-- `test/components/capability-panel.test.jsx` — CapabilityPanel permitted/denied/unknown/mixed states
-- `test/components/changelog-modal.test.jsx` — ChangelogModal content and close mechanisms
-- `test/components/credential-form.test.jsx` — CredentialForm fields, validation, provider auto-detection, submission
-- `test/components/delete-queue.test.jsx` — DeleteQueue confirm dialog titles, versioning caveats, interactions
-- `test/components/error-block.test.jsx` — ErrorBlock renders, CORS heuristic, S3 error metadata
-- `test/components/file-banner.test.jsx` — FileBanner protocol detection
-- `test/components/hidden-versions.test.jsx` — HiddenVersions R2 gate and initial state
-- `test/components/modal.test.jsx` — Modal overlay/dialog classes, onClose, stopPropagation
-- `test/components/multipart-failure-consequence.test.jsx` — provider-specific multipart error messages (R2, B2, generic)
-- `test/components/profile-picker.test.jsx` — ProfilePicker empty state, list, selection, delete, save form
-- `test/components/settings-panel.test.jsx` — SettingsPanel fields, validation, update check toggle
-- `test/components/setup-guide.test.jsx` — all 7 provider guides render correctly; Wasabi has no CORS command
-- `test/components/storage-modal.test.jsx` — StorageModal structure, close mechanisms, isConnected prop, wipe section
-- `test/components/upload-log.test.jsx` — UploadLog empty state
-- `test/components/upload-queue-ui.test.jsx` — UploadItem and BatchSummary in all states
+They use jsdom (a browser DOM emulator) and `preact/test-utils` to render components
+and assert on their output. Nearly every component in `src/components/` has a matching
+test file (~37 files) — assume one exists and check before creating. Naming: the
+component's kebab-case name; additional aspect files use a suffix (e.g.
+`browser-internals`, `browser-base-prefix`, `browser-download-entries`,
+`browser-folder-rename`, `upload-queue-ui`, `upload-queue-destination`,
+`master-queue-download`). Representative anchors:
+- `credential-form.test.jsx` — fields (incl. Base folder), validation, provider
+  auto-detection, submission
+- `browser-internals.test.jsx` — Breadcrumb (incl. floor pinning), SortTh,
+  CopyLinkPopover
+- `error-block.test.jsx` — CORS heuristic, S3 error metadata, prefix-scope hints
+- `setup-guide.test.jsx` — all provider guides render; provider-specific caveats
 
 **How the component test layer works:**
 
