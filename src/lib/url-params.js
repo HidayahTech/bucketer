@@ -10,6 +10,8 @@
 // The secret key is never included, so a recipient always authenticates by entering
 // at least their secret key.
 
+import { normalizeBasePrefix } from './base-prefix.js';
+
 function hashParams() {
   return new URLSearchParams(window.location.hash.slice(1));
 }
@@ -45,13 +47,23 @@ export function readUrlParams() {
     if (v && v.length <= 128 && !/\s/.test(v)) out.keyId = v;
   }
   if (p.has('region'))   out.regionOverride = p.get('region');
+  if (p.has('basePrefix')) {
+    const v = p.get('basePrefix');
+    // Same defensive posture as bucket: reject traversal and Windows-path pastes,
+    // cap length. Prefixes legitimately contain most other characters (spaces
+    // included), so normalization is the only other treatment (#60).
+    if (v && v.length <= 1024 && !v.includes('\\') && !v.split('/').some(s => s === '..')) {
+      const normalized = normalizeBasePrefix(v);
+      if (normalized) out.basePrefix = normalized;
+    }
+  }
   return out;
 }
 
 // True when at least one config param is present in the current hash.
 export function hasUrlParams() {
   const p = hashParams();
-  return ['endpoint', 'bucket', 'provider', 'region', 'keyId'].some(k => p.has(k));
+  return ['endpoint', 'bucket', 'provider', 'region', 'keyId', 'basePrefix'].some(k => p.has(k));
 }
 
 // Build a shareable URL with the connection config in the hash. The secret key is
@@ -65,6 +77,7 @@ export function buildShareUrl(credentials, { includeKeyId = false } = {}) {
   if (credentials.bucket)                 p.set('bucket',   credentials.bucket);
   if (credentials.provider)               p.set('provider', credentials.provider);
   if (credentials.regionOverride)         p.set('region',   credentials.regionOverride);
+  if (credentials.basePrefix)             p.set('basePrefix', credentials.basePrefix);
   if (includeKeyId && credentials.keyId)  p.set('keyId',    credentials.keyId);
   const hash = p.toString();
   const base = window.location.origin + window.location.pathname;
