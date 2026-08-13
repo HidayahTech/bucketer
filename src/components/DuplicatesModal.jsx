@@ -185,7 +185,7 @@ function progressLabel(p) {
   return 'Scanning…';
 }
 
-export function DuplicatesModal({ client, bucket, endpoint, currentPrefix, provider, capabilities, onDeleteRequest, onClose, scan, verify, load, save, del }) {
+export function DuplicatesModal({ client, bucket, endpoint, currentPrefix, basePrefix, provider, capabilities, onDeleteRequest, onClose, scan, verify, load, save, del }) {
   const [scope, setScope] = useState('prefix');
   const [status, setStatus] = useState('idle');
   const [groups, setGroups] = useState([]);
@@ -238,7 +238,9 @@ export function DuplicatesModal({ client, bucket, endpoint, currentPrefix, provi
 
   const runScan = useCallback(async () => {
     setStatus('scanning'); setError(null); setGroups([]); setProgress(null); setRestored(false);
-    const prefix = scope === 'bucket' ? '' : (currentPrefix || '');
+    // The widest scan a prefix-scoped connection can make is its base prefix (#60) —
+    // scanning '' would reproduce the exact AccessDenied this feature exists to fix.
+    const prefix = scope === 'bucket' ? (basePrefix || '') : (currentPrefix || '');
     let totalObjects = 0;
     const onProgress = (p) => { if (p && p.phase === 'listing') totalObjects = p.count; setProgress(p); };
     try {
@@ -258,7 +260,7 @@ export function DuplicatesModal({ client, bucket, endpoint, currentPrefix, provi
       setError(err?.message || String(err));
       setStatus('error');
     }
-  }, [scope, currentPrefix, client, bucket, provider, scan]);
+  }, [scope, currentPrefix, basePrefix, client, bucket, provider, scan]);
 
   function selectKeeper(gid, key) {
     // Changing the keeper invalidates a prior verification (it confirmed a different keeper).
@@ -312,7 +314,7 @@ export function DuplicatesModal({ client, bucket, endpoint, currentPrefix, provi
           <select class="dup-scope" value={scope} disabled={status === 'scanning'}
             onChange={(e) => setScope(e.target.value)}>
             <option value="prefix">Current folder{currentPrefix ? ` (${currentPrefix})` : ' (root)'}</option>
-            <option value="bucket">Whole bucket</option>
+            <option value="bucket">{basePrefix ? 'Entire scope' : 'Whole bucket'}</option>
           </select>
         </label>
         <button type="button" class="btn btn-sm dup-scan" disabled={status === 'scanning'} onClick={runScan}>
@@ -326,7 +328,7 @@ export function DuplicatesModal({ client, bucket, endpoint, currentPrefix, provi
 
       {scanMeta && status === 'done' && (
         <p class="hint dup-scanned-meta" style={{ margin: 0 }}>
-          Last scan: {scanMeta.scope === 'bucket' ? 'whole bucket' : `folder ${scanMeta.prefix || '(root)'}`}
+          Last scan: {scanMeta.scope === 'bucket' ? (basePrefix ? 'entire scope' : 'whole bucket') : `folder ${scanMeta.prefix || '(root)'}`}
           {scanMeta.objectCount ? ` · ${scanMeta.objectCount.toLocaleString()} objects` : ''}
           {scanMeta.scannedAt ? ` · ${new Date(scanMeta.scannedAt).toLocaleString()}` : ''}
           {restored ? ' · restored from cache' : ''}

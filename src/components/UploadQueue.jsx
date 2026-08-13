@@ -44,6 +44,7 @@ import { useDoubleClickSafety } from '../hooks/useDoubleClickSafety.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
 import { BatchSummary } from './BatchSummary.jsx';
 import { createUpdateBatcher } from '../lib/update-batcher.js';
+import { normalizeBasePrefix, withinFloor } from '../lib/base-prefix.js';
 
 // Status: queued | uploading | paused | resuming | done | error | aborted
 let _idCounter = 0;
@@ -98,6 +99,17 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   const destinationPrefixRef = useRef(destinationPrefix);
   destinationPrefixRef.current = destinationPrefix;
 
+  // Prefix-scoped keys (#60): the free-text destination is the one upload surface
+  // that can name an arbitrary path. While scoped, refuse anything outside the
+  // floor visibly (inline error + disabled pickers) — no silent autocorrect.
+  // The ref mirrors it for addFiles, whose closure is captured once at mount.
+  const basePrefix = normalizeBasePrefix(credentials?.basePrefix);
+  const destWithSlash = destinationPrefix && !destinationPrefix.endsWith('/')
+    ? destinationPrefix + '/' : destinationPrefix;
+  const destOutsideFloor = !!basePrefix && !withinFloor(destWithSlash || '', basePrefix);
+  const destOutsideFloorRef = useRef(destOutsideFloor);
+  destOutsideFloorRef.current = destOutsideFloor;
+
   // Fire onUploadsComplete once when the queue fully drains (no uploading/queued items left).
   // Passes the set of parent prefixes that received at least one successful upload this drain
   // cycle, then resets the accumulator for the next batch.
@@ -150,6 +162,10 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   // relativePath preserves folder structure (e.g. "photos/2024/img.jpg").
   // For plain file picks it equals file.name.
   function addFiles(fileEntries) {
+    // Defense in depth for scoped connections: the pickers are already disabled and
+    // the field error visible, but external drops route here too — refuse rather
+    // than upload outside the floor.
+    if (destOutsideFloorRef.current) return;
     const batchId = String(Date.now() + Math.random());
     // Smallest-first: minimises time-to-first-completion, reduces active file count
     // quickly so the part-concurrency rebalancer kicks in sooner for large files.
@@ -807,17 +823,22 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
               Where uploaded files will be placed. Navigating the browser updates this automatically.
               You can also type any path here — it doesn't need to exist yet.
             </span>
+            {destOutsideFloor && (
+              <span class="field-error">Destination must stay under {basePrefix} — this connection's key only reaches that folder.</span>
+            )}
           </div>
 
           <div style={{ display: 'flex', gap: '.5rem', marginBottom: '.5rem' }}>
             <button
               type="button"
               class="btn btn-ghost btn-sm"
+              disabled={destOutsideFloor}
               onClick={() => fileInputRef.current?.click()}
             >Choose files</button>
             <button
               type="button"
               class="btn btn-ghost btn-sm"
+              disabled={destOutsideFloor}
               onClick={() => folderInputRef.current?.click()}
             >Choose folder</button>
           </div>

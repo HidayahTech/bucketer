@@ -1067,6 +1067,7 @@ export function App() {
           bucket={credentials.bucket}
           endpoint={credentials.endpoint}
           currentPrefix={currentPrefix}
+          basePrefix={credentials.basePrefix}
           provider={credentials.provider}
           capabilities={capabilities}
           onDeleteRequest={handleDeleteRequest}
