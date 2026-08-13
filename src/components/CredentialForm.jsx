@@ -2,6 +2,7 @@
 import { useState, useRef, useEffect } from 'preact/hooks';
 import { detectProvider, extractRegion, buildEndpoint, PROVIDERS, PROVIDER_LABELS } from '../lib/provider.js';
 import { credentialErrors } from '../lib/credential-validation.js';
+import { normalizeBasePrefix } from '../lib/base-prefix.js';
 import { SetupGuide } from './SetupGuide.jsx';
 
 // Credential entry form (REQ-1, §4.5, §4.8).
@@ -61,6 +62,7 @@ export function CredentialForm({ initial, onSave, onFormChange, loading, autoFoc
   const [form, setForm] = useState({
     endpoint:         initial.endpoint || '',
     bucket:           initial.bucket || '',
+    basePrefix:       initial.basePrefix || '',
     keyId:            initial.keyId || '',
     secretKey:        initial.secretKey || '',
     providerOverride: _initProviderOverride,
@@ -215,6 +217,7 @@ export function CredentialForm({ initial, onSave, onFormChange, loading, autoFoc
     onSave({
       endpoint: form.endpoint.trim().replace(/\/$/, ''),
       bucket: form.bucket.trim(),
+      basePrefix: normalizeBasePrefix(form.basePrefix),
       keyId: form.keyId.trim(),
       secretKey: form.secretKey,
       provider,
@@ -261,6 +264,25 @@ export function CredentialForm({ initial, onSave, onFormChange, loading, autoFoc
           spellcheck={false}
         />
         {errors.bucket && <span class="field-error">{errors.bucket}</span>}
+      </div>
+
+      <div class="form-group">
+        <label htmlFor="cred-baseprefix">Base folder</label>
+        <input
+          id="cred-baseprefix"
+          name="cred-baseprefix"
+          type="text"
+          value={form.basePrefix}
+          onInput={set('basePrefix')}
+          onPaste={onPaste('basePrefix')}
+          placeholder="photos/2024/"
+          autocomplete="off"
+          spellcheck={false}
+        />
+        <span class="hint">
+          Only if your access key is limited to a folder inside the bucket — leave blank for full bucket access.
+        </span>
+        {errors.basePrefix && <span class="field-error">{errors.basePrefix}</span>}
       </div>
 
       <div class="form-group">
@@ -339,7 +361,7 @@ export function CredentialForm({ initial, onSave, onFormChange, loading, autoFoc
       <div class="form-group">
         <span class="hint" style={{ color: 'var(--text-warn)' }}>
           Use a bucket-scoped application key with minimum required permissions.
-          {detected === PROVIDERS.B2 && ' B2: do not use the master application key with the S3 API.'}
+          {detected === PROVIDERS.B2 && ' B2: do not use the master application key with the S3 API. If your key is limited to a Name Prefix, enter that folder above as Base folder.'}
         </span>
       </div>
 

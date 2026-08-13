@@ -286,6 +286,67 @@ describe('CredentialForm — form submission', () => {
   });
 });
 
+describe('CredentialForm — base folder field (#60)', () => {
+  test('renders the optional Base folder input', () => {
+    const { query, cleanup } = mount(h(CredentialForm, defaultProps()));
+    try {
+      const input = query('#cred-baseprefix');
+      assert.ok(input, 'base folder input must be present');
+      assert.ok(!input.required, 'base folder must not be required');
+      assert.equal(input.placeholder, 'photos/2024/');
+    } finally { cleanup(); }
+  });
+
+  test('shows the leave-blank hint', () => {
+    const { text, cleanup } = mount(h(CredentialForm, defaultProps()));
+    try { assert.ok(text().includes('leave blank for full bucket access')); }
+    finally { cleanup(); }
+  });
+
+  test('shows a field error and blocks submit when the value contains ".."', () => {
+    let saveCalled = false;
+    const { query, cleanup } = mount(h(CredentialForm, defaultProps({
+      initial: { ...B2_INITIAL, basePrefix: 'team/../other/' },
+      onSave: () => { saveCalled = true; },
+    })));
+    try {
+      assert.ok(query('.field-error'), 'a field error must render for a ".." base folder');
+      fire(query('button[type="submit"]'), 'click');
+      assert.ok(!saveCalled, 'onSave must not fire while base folder is invalid');
+    } finally { cleanup(); }
+  });
+
+  test('submit passes the normalized base folder (trailing slash appended)', () => {
+    let saved = null;
+    const { query, cleanup } = mount(h(CredentialForm, defaultProps({
+      initial: { ...B2_INITIAL, basePrefix: 'team/alice' },
+      onSave: data => { saved = data; },
+    })));
+    try {
+      fire(query('button[type="submit"]'), 'click');
+      assert.equal(saved.basePrefix, 'team/alice/');
+    } finally { cleanup(); }
+  });
+
+  test('submit passes empty basePrefix for an unscoped connection', () => {
+    let saved = null;
+    const { query, cleanup } = mount(h(CredentialForm, defaultProps({
+      initial: B2_INITIAL,
+      onSave: data => { saved = data; },
+    })));
+    try {
+      fire(query('button[type="submit"]'), 'click');
+      assert.equal(saved.basePrefix, '');
+    } finally { cleanup(); }
+  });
+
+  test('the key-hygiene warning points Name-Prefix keys at the Base folder field', () => {
+    const { text, cleanup } = mount(h(CredentialForm, defaultProps({ initial: B2_INITIAL })));
+    try { assert.ok(text().includes('Name Prefix'), 'warning line must bridge B2 Name Prefix vocabulary'); }
+    finally { cleanup(); }
+  });
+});
+
 describe('CredentialForm — autofocus secret', () => {
   test('focuses the Secret Key field on mount when autoFocusSecret is set', async () => {
     const initial = { endpoint: 'https://s3.example.com', bucket: 'b', keyId: 'AKID', secretKey: '', provider: null, regionOverride: '' };
