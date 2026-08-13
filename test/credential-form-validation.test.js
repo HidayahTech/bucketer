@@ -83,6 +83,37 @@ describe('credentialErrors — regionOverride', () => {
   });
 });
 
+describe('credentialErrors — basePrefix', () => {
+  test('no error when basePrefix is empty (field is optional)', () => {
+    assert.equal(credentialErrors({ ...clean, basePrefix: '' }).basePrefix, undefined);
+  });
+
+  test('no error for a plain folder path', () => {
+    assert.equal(credentialErrors({ ...clean, basePrefix: 'team/alice/' }).basePrefix, undefined);
+  });
+
+  test('no error for a path with spaces inside segments', () => {
+    assert.equal(credentialErrors({ ...clean, basePrefix: 'Team Notes/2026/' }).basePrefix, undefined);
+  });
+
+  test('no error for a leading slash (silently normalized on submit)', () => {
+    assert.equal(credentialErrors({ ...clean, basePrefix: '/team/alice/' }).basePrefix, undefined);
+  });
+
+  test('error when basePrefix contains a ".." segment', () => {
+    assert.ok(credentialErrors({ ...clean, basePrefix: 'team/../other/' }).basePrefix);
+    assert.ok(credentialErrors({ ...clean, basePrefix: '../' }).basePrefix);
+  });
+
+  test('error when basePrefix contains a backslash', () => {
+    assert.ok(credentialErrors({ ...clean, basePrefix: 'team\\alice/' }).basePrefix);
+  });
+
+  test('no error for a segment merely containing dots (e.g. "v1..2-archive")', () => {
+    assert.equal(credentialErrors({ ...clean, basePrefix: 'v1..2-archive/' }).basePrefix, undefined);
+  });
+});
+
 describe('credentialErrors — clean form returns no errors', () => {
   test('empty errors object for fully valid input', () => {
     assert.deepEqual(credentialErrors(clean), {});
