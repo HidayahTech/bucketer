@@ -64,6 +64,38 @@ describe('ErrorBlock', () => {
     cleanup();
   });
 
+  // Prefix-scoped keys (#60): a denied connection with no Base folder set gets a
+  // recovery hint naming the field. Gated on basePrefixUnset so the hint never
+  // shows once a base folder exists (the restriction is already declared).
+  test('shows the Base folder hint on a 403 when no base folder is set', () => {
+    const denied = { name: 'AccessDenied', Code: 'AccessDenied', message: 'Access Denied', $metadata: { httpStatusCode: 403 } };
+    const { text, cleanup } = mount(h(ErrorBlock, { error: denied, basePrefixUnset: true }));
+    assert.ok(text().includes('Base folder'), 'the hint must name the field');
+    assert.ok(text().includes('Name Prefix'), 'the hint must bridge B2 vocabulary');
+    cleanup();
+  });
+
+  test('no Base folder hint when a base folder is already set', () => {
+    const denied = { name: 'AccessDenied', Code: 'AccessDenied', message: 'Access Denied', $metadata: { httpStatusCode: 403 } };
+    const { text, cleanup } = mount(h(ErrorBlock, { error: denied }));
+    assert.ok(!text().includes('Base folder'));
+    cleanup();
+  });
+
+  test('no Base folder hint on a non-permission error', () => {
+    const notFound = { name: 'NoSuchBucket', Code: 'NoSuchBucket', message: 'not here', $metadata: { httpStatusCode: 404 } };
+    const { text, cleanup } = mount(h(ErrorBlock, { error: notFound, basePrefixUnset: true }));
+    assert.ok(!text().includes('Base folder'));
+    cleanup();
+  });
+
+  test('the CORS note mentions prefix-restricted keys when no base folder is set', () => {
+    const { text, cleanup } = mount(h(ErrorBlock, { error: new Error('Failed to fetch'), basePrefixUnset: true }));
+    assert.ok(text().includes('restricted to a folder'),
+      'a real B2 denial can present as a CORS-shaped failure — the note must mention the folder-restriction cause');
+    cleanup();
+  });
+
   test('shows CORS note for fetch/network errors', () => {
     const { text, cleanup } = mount(h(ErrorBlock, { error: new Error('Failed to fetch') }));
     assert.ok(text().includes('CORS'), 'should show CORS note for fetch errors');

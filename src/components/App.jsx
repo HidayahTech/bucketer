@@ -43,6 +43,7 @@ import {
   defaultConnectionName, hasMigratedConnections,
 } from '../lib/connections.js';
 import { readUrlParams, hasUrlParams, buildShareUrl } from '../lib/url-params.js';
+import { normalizeBasePrefix } from '../lib/base-prefix.js';
 import {
   vaultExists, isUnlocked, recallSecret, rememberSecret, createVault, VAULT_ENABLED,
 } from '../lib/vault.js';
@@ -329,6 +330,7 @@ export function App() {
         name:         defaultConnectionName({ provider: credentials.provider, bucket: credentials.bucket }),
         credentialId: cred.id,
         bucket:       credentials.bucket,
+        basePrefix:   credentials.basePrefix || '',
         capabilities: null,
       });
       setConnections(listResolvedConnections());
@@ -373,7 +375,7 @@ export function App() {
     const conn = selectedConnectionId ? resolveConnection(selectedConnectionId) : null;
     const base = conn
       ? { ...conn, secretKey: '' }
-      : { endpoint: '', bucket: '', keyId: '', secretKey: '', provider: null, regionOverride: '' };
+      : { endpoint: '', bucket: '', keyId: '', secretKey: '', provider: null, regionOverride: '', basePrefix: '' };
     // Disconnecting does not change the URL, so if the address bar still carries a
     // share link's connection details, keep them rather than blanking the form —
     // otherwise the page contradicts its own URL, and re-entering that URL cannot
@@ -962,6 +964,7 @@ export function App() {
       name:         name || defaultConnectionName({ provider, bucket: trimmedBucket }),
       credentialId: cred.id,
       bucket:       trimmedBucket,
+      basePrefix:   normalizeBasePrefix(liveFormData.basePrefix),
     };
     // Only set capabilities when creating. On update, omit the key so
     // saveConnectionRecord's merge keeps what is in storage: capability changes are
@@ -1004,6 +1007,7 @@ export function App() {
       id,
       name:           conn.name,
       bucket:         conn.bucket,
+      basePrefix:     conn.basePrefix,
       // Mirrors the `if (!existing) conn.capabilities = null;` branch above: a
       // new connection's capabilities are null; an updated one keeps whatever
       // was already known (existing is the pre-write snapshot from React state —
@@ -1174,6 +1178,7 @@ export function App() {
                       title="Connection failed"
                       guidance="Check your endpoint URL, bucket name, and credentials. If this looks like a CORS error, ensure CORS is configured on your bucket."
                       diagnostics={diagnosticsProps(credentials)}
+                      basePrefixUnset={!credentials.basePrefix}
                     />
                   </div>
                 )}
