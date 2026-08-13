@@ -232,6 +232,26 @@ describe('resolveConnection / listResolvedConnections', () => {
     assert.equal(resolveConnection(999), null);
   });
 
+  // Prefix-scoped keys (#60): basePrefix lives on the connection record, like bucket.
+  test('round-trips basePrefix through save/resolve', () => {
+    const cred = findOrCreateCredential({ endpoint: 'e', keyId: 'k', provider: 'b2', regionOverride: '' });
+    saveConnectionRecord({ id: 1, name: 'Scoped', credentialId: cred.id, bucket: 'b', capabilities: null, basePrefix: 'team/alice/' });
+    assert.equal(resolveConnection(1).basePrefix, 'team/alice/');
+  });
+
+  test('basePrefix resolves to empty string on records saved before the feature', () => {
+    const cred = findOrCreateCredential({ endpoint: 'e', keyId: 'k', provider: 'b2', regionOverride: '' });
+    saveConnectionRecord({ id: 1, name: 'Old', credentialId: cred.id, bucket: 'b', capabilities: null });
+    assert.equal(resolveConnection(1).basePrefix, '');
+  });
+
+  test('a partial update omitting basePrefix leaves the stored value untouched', () => {
+    const cred = findOrCreateCredential({ endpoint: 'e', keyId: 'k', provider: 'b2', regionOverride: '' });
+    saveConnectionRecord({ id: 1, name: 'Scoped', credentialId: cred.id, bucket: 'b', capabilities: null, basePrefix: 'team/alice/' });
+    saveConnectionRecord({ id: 1, name: 'Scoped (renamed)' });
+    assert.equal(resolveConnection(1).basePrefix, 'team/alice/');
+  });
+
   test('returns null when the credential is orphaned', () => {
     saveConnectionRecord({ id: 1, name: 'Orphan', credentialId: 'missing', bucket: 'b', capabilities: null });
     assert.equal(resolveConnection(1), null);
