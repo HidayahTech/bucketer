@@ -63,16 +63,18 @@ export async function withUploadRetry(run, { maxRetries = MAX_RETRIES, baseMs = 
   }
 }
 
-// Sends the command produced by makeCommand(), retrying only on throttling errors.
-// makeCommand is a thunk (not a prebuilt command) so each attempt gets a fresh command
-// instance, matching how the AWS SDK expects commands to be single-use.
-export async function sendWithRetry(client, makeCommand, { maxRetries = MAX_RETRIES, baseMs = RETRY_BASE_MS } = {}) {
+// Sends the command produced by makeCommand(), retrying on the errors `retryOn` matches
+// (throttling only, by default). makeCommand is a thunk (not a prebuilt command) so each
+// attempt gets a fresh command instance, matching how the AWS SDK expects commands to be
+// single-use. Callers copying large objects pass `retryOn: isRetryableUploadError` so a
+// transient network drop mid-part is retried rather than aborting the whole copy.
+export async function sendWithRetry(client, makeCommand, { maxRetries = MAX_RETRIES, baseMs = RETRY_BASE_MS, retryOn = isThrottlingError } = {}) {
   let attempt = 0;
   for (;;) {
     try {
       return await client.send(makeCommand());
     } catch (err) {
-      if (attempt < maxRetries && isThrottlingError(err)) {
+      if (attempt < maxRetries && retryOn(err)) {
         const base  = baseMs * 2 ** attempt;
         const delay = Math.round(base * (0.75 + Math.random() * 0.5));
         await new Promise(r => setTimeout(r, delay));
