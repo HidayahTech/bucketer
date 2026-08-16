@@ -80,3 +80,15 @@ export function renamedFolderPrefix(oldPrefix, newName) {
 export function renameFolderKey(oldPrefix, objectKey, newPrefix) {
   return newPrefix + objectKey.slice(oldPrefix.length);
 }
+
+// Build the x-amz-copy-source header value for a server-side copy. Two constraints meet
+// here: AWS requires the source key to be URL-encoded, and the browser's Headers
+// constructor rejects any character > 255 (the header is a ByteString / Latin-1) — which is
+// exactly what breaks keys carrying, e.g., yt-dlp's U+FF5C "｜" (BUG-060). Percent-encoding
+// each path segment satisfies both: non-ASCII becomes %XX (Latin-1 safe) and S3 URL-decodes
+// it back to the exact key. "/" is preserved as the key separator — encodeURIComponent would
+// turn it into %2F, which S3 does not treat as a separator.
+//   copySource('bk', 'a/Anwar ｜ x.opus') -> 'bk/a/Anwar%20%EF%BD%9C%20x.opus'
+export function copySource(bucket, key) {
+  return `${bucket}/${key.split('/').map(encodeURIComponent).join('/')}`;
+}

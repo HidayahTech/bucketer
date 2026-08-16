@@ -4,6 +4,44 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-060 — Moving an object whose key has a non-Latin-1 character fails ("Headers constructor")
+
+**Symptom.** Moving four objects (`Anwar al-Tafsir ｜ Week 1 [kPJPC9SbAjA].opus` and its
+`.sha256`, `.webm`, `.webm.sha256` siblings) failed immediately, one error each:
+`Headers constructor: Cannot convert value in record<ByteString, ByteString> … the
+character at index 58 has value 65372 which is greater than 255`. Any object whose key
+contains a character above U+00FF was un-moveable. The user assumed these were partially
+transferred before closing the browser; in fact they had never moved at all.
+
+**Root cause.** `65372 = U+FF5C "｜"`, the full-width vertical bar yt-dlp substitutes for the
+illegal `|` in filenames. A move is a server-side copy, and the copy built its
+`x-amz-copy-source` header from the raw key: `` CopySource: `${bucket}/${sourceKey}` ``
+(`move-queue.js`, `move-multipart.js`). That header is a ByteString (Latin-1, ≤255), so the
+browser's `Headers` constructor threw synchronously — before any request was sent — for any
+key with a character >255. AWS's own docs state the copy-source value "must be URL-encoded";
+Bucketer wasn't encoding it. The error proves the SDK passed the raw string through: the raw
+"｜" reached the `Headers` constructor. Because the throw happened at request *construction*
+(single `CopyObject` for these small files), nothing was sent to S3 — no orphaned uploads,
+sources intact.
+
+**Fix.** A shared `copySource(bucket, key)` helper in `move-key.js` percent-encodes each
+path segment (`key.split('/').map(encodeURIComponent).join('/')`): non-ASCII becomes `%XX`
+(Latin-1 safe), S3 URL-decodes it back to the exact key, and `/` is preserved as the key
+separator. Both copy sites use it. Scope: the two `CopySource` constructions only — the
+destination key already rides in the URL path, which the SDK encodes correctly.
+
+**Why it wasn't caught earlier.** Every move test and e2e spec used ASCII keys, which encode
+to themselves, so the raw interpolation looked correct. The failure only manifests in a real
+browser (the `Headers` ByteString check), and no test moved an object with a >255 character.
+
+**Test case.** Unit: `test/move-key.test.js` → `copySource` — the regression asserts
+`[...result].every(c => c.charCodeAt(0) <= 255)` (the exact failure mode), plus `%EF%BD%9C`
+encoding of U+FF5C and `/`-preservation. E2E (real browser, the only place the throw
+occurs): `test/e2e/browser/move-unicode-key.test.mjs` moves `Anwar ｜ Wörk 日 [x].opus` into
+a folder and asserts the real bucket relocates it. Matched-pair on chromium: FAILS on the
+raw-interpolation code (move never relocates the key → timeout), PASSES after — verified
+before commit; the full 3×3 container matrix runs it in CI.
+
 ## BUG-059 — Multipart copy aborted a whole large move on a single transient network blip
 
 **Symptom.** Moving or renaming a very large object (above the 5 GiB single-request copy

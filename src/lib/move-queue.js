@@ -18,7 +18,7 @@
 // shouldCancel() is polled between objects; in-flight copies complete.
 import { ListObjectsV2Command, CopyObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { COPY_MULTIPART_THRESHOLD } from './constants.js';
-import { destKeyForFile, destKeyForFolderObject, freeFileKey, freeFolderPrefix, renamedFolderPrefix, renameFolderKey } from './move-key.js';
+import { destKeyForFile, destKeyForFolderObject, freeFileKey, freeFolderPrefix, renamedFolderPrefix, renameFolderKey, copySource } from './move-key.js';
 import { copyObjectMultipart } from './move-multipart.js';
 import { sendWithRetry } from './s3-retry.js';
 
@@ -193,7 +193,7 @@ async function runTransfer(client, bucket, op, onProgress, mode, shouldCancel) {
           await copyObjectMultipart(client, { bucket, sourceKey: item.sourceKey, destKey: item.destKey, size: item.size });
         } else {
           await sendWithRetry(client, () => new CopyObjectCommand({
-            Bucket: bucket, CopySource: `${bucket}/${item.sourceKey}`,
+            Bucket: bucket, CopySource: copySource(bucket, item.sourceKey),
             Key: item.destKey, MetadataDirective: 'COPY',
           }));
         }

@@ -9,6 +9,7 @@ import {
 import { calcPartSize, uploadPartsWithPool } from './upload-queue.js';
 import { PART_CONCURRENCY, COPY_PART_SIZE_DEFAULT, COPY_PART_SIZE_MAX } from './constants.js';
 import { sendWithRetry, isRetryableUploadError } from './s3-retry.js';
+import { copySource } from './move-key.js';
 
 export async function copyObjectMultipart(client, { bucket, sourceKey, destKey, size, preferredPartBytes = COPY_PART_SIZE_DEFAULT }) {
   // Carry the source's metadata forward (UploadPartCopy would otherwise drop it).
@@ -39,7 +40,7 @@ export async function copyObjectMultipart(client, { bucket, sourceKey, destKey, 
       const end   = Math.min(start + partSize, size) - 1; // CopySourceRange is INCLUSIVE
       const resp = await sendWithRetry(client, () => new UploadPartCopyCommand({
         Bucket: bucket, Key: destKey, UploadId: uploadId, PartNumber: partNumber,
-        CopySource: `${bucket}/${sourceKey}`,
+        CopySource: copySource(bucket, sourceKey),
         CopySourceRange: `bytes=${start}-${end}`,
       }), { retryOn: isRetryableUploadError });
       // Part ETag is nested under CopyPartResult (NOT resp.ETag, as with UploadPart).

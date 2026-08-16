@@ -1,6 +1,6 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { destKeyForFile, folderBase, destKeyForFolderObject, suffixName, freeFileKey, freeFolderPrefix, renamedFolderPrefix, renameFolderKey } from '../src/lib/move-key.js';
+import { destKeyForFile, folderBase, destKeyForFolderObject, suffixName, freeFileKey, freeFolderPrefix, renamedFolderPrefix, renameFolderKey, copySource } from '../src/lib/move-key.js';
 
 // S3 has no move/rename — a move recomputes each object's key under a new prefix.
 // These pure functions are the heart of that remapping. Getting them wrong silently
@@ -132,5 +132,30 @@ describe('renameFolderKey', () => {
       renameFolderKey('photos/2024/', 'photos/2024/', 'photos/memories/'),
       'photos/memories/',
     );
+  });
+});
+
+// The x-amz-copy-source header is a ByteString (Latin-1): any character > 255 makes the
+// browser's Headers constructor throw before the request is even sent. Real object keys
+// contain such characters — e.g. yt-dlp replaces the illegal "|" with U+FF5C "｜" (65372).
+// copySource percent-encodes each path segment so the header value is always Latin-1 safe,
+// while preserving "/" as key separators. (BUG-060.)
+describe('copySource', () => {
+  test('leaves an all-ASCII key unchanged', () => {
+    assert.equal(copySource('bk', 'reports/q1.pdf'), 'bk/reports/q1.pdf');
+  });
+
+  test('percent-encodes a non-Latin-1 character (U+FF5C) so the header never throws', () => {
+    const key = 'audio/Anwar al-Tafsir ｜ Week 1 [kPJPC9SbAjA].opus';
+    const result = copySource('bk', key);
+    // The exact failure mode: every character must be within ByteString range (<= 255).
+    assert.ok([...result].every(c => c.charCodeAt(0) <= 255), 'must be Latin-1 safe');
+    assert.ok(result.includes('%EF%BD%9C'), 'U+FF5C must be percent-encoded');
+    assert.ok(result.includes('%20'), 'spaces must be percent-encoded');
+  });
+
+  test('preserves "/" as key separators rather than encoding them', () => {
+    assert.equal(copySource('bk', 'a/b/c.txt'), 'bk/a/b/c.txt');
+    assert.ok(!copySource('bk', 'a/b/c.txt').includes('%2F'));
   });
 });
