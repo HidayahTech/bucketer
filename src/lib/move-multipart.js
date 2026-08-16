@@ -7,10 +7,10 @@ import {
   CompleteMultipartUploadCommand, AbortMultipartUploadCommand,
 } from '@aws-sdk/client-s3';
 import { calcPartSize, uploadPartsWithPool } from './upload-queue.js';
-import { PART_CONCURRENCY } from './constants.js';
-import { sendWithRetry } from './s3-retry.js';
+import { PART_CONCURRENCY, COPY_PART_SIZE_DEFAULT, COPY_PART_SIZE_MAX } from './constants.js';
+import { sendWithRetry, isRetryableUploadError } from './s3-retry.js';
 
-export async function copyObjectMultipart(client, { bucket, sourceKey, destKey, size }) {
+export async function copyObjectMultipart(client, { bucket, sourceKey, destKey, size, preferredPartBytes = COPY_PART_SIZE_DEFAULT }) {
   // Carry the source's metadata forward (UploadPartCopy would otherwise drop it).
   const head = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: sourceKey }));
 
@@ -25,7 +25,11 @@ export async function copyObjectMultipart(client, { bucket, sourceKey, destKey, 
   const uploadId = create.UploadId;
 
   try {
-    const partSize = calcPartSize(size);              // ≥5 MB parts, ≤10,000 parts
+    // Copy parts are server-side (no client memory), so we use a large part size — capped at
+    // the universal-safe 4 GB ceiling — to keep the request count low. calcPartSize still
+    // enforces the ≥5 MB floor and the ≤10,000-part limit. All non-final parts are the same
+    // size (partSize), which Cloudflare R2 requires.
+    const partSize = calcPartSize(size, Math.min(preferredPartBytes, COPY_PART_SIZE_MAX));
     const partCount = Math.ceil(size / partSize);
     const partNumbers = Array.from({ length: partCount }, (_, i) => i + 1);
     const parts = new Array(partCount);
@@ -37,7 +41,7 @@ export async function copyObjectMultipart(client, { bucket, sourceKey, destKey, 
         Bucket: bucket, Key: destKey, UploadId: uploadId, PartNumber: partNumber,
         CopySource: `${bucket}/${sourceKey}`,
         CopySourceRange: `bytes=${start}-${end}`,
-      }));
+      }), { retryOn: isRetryableUploadError });
       // Part ETag is nested under CopyPartResult (NOT resp.ETag, as with UploadPart).
       parts[partNumber - 1] = { PartNumber: partNumber, ETag: resp.CopyPartResult.ETag };
     }, PART_CONCURRENCY);

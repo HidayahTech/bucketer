@@ -23,6 +23,22 @@ export const LARGE_FILE_WARN = 50 * 1024 * 1024 * 1024;
 // MULTIPART_THRESHOLD above, which governs fresh uploads (5 MiB).
 export const COPY_MULTIPART_THRESHOLD = 5 * 1024 * 1024 * 1024;
 
+// Default part size for multipart server-side copy (UploadPartCopy). Unlike an upload part
+// — a live ArrayBuffer in browser memory, hence the small 5 MiB upload floor — a copy part
+// is a server-side byte-range copy that never enters the browser, so there is zero
+// client-memory cost to large parts. Large parts mean far fewer requests: at the upload
+// floor a huge object is pinned at the 10,000-part cap, whereas at 1 GiB a 1 TB object is
+// ~1,024 parts and a 250 GB object ~250.
+export const COPY_PART_SIZE_DEFAULT = 1024 * 1024 * 1024; // 1 GiB
+
+// Universal safe ceiling for a copy part across every S3 provider Bucketer supports.
+// Providers split into two camps on the documented maximum part size: AWS / Cloudflare R2 /
+// MinIO allow 5 GiB (5,368,709,120), while Backblaze B2 / Wasabi / DigitalOcean Spaces allow
+// only 5 GB (5,000,000,000). 4 GB decimal sits comfortably below BOTH ceilings, and also
+// below 2^32 (4,294,967,296) — so it never lands on the 32-bit boundary value — making it
+// safe on any S3-compatible endpoint, including an uncharacterized "Generic S3" one.
+export const COPY_PART_SIZE_MAX = 4_000_000_000; // 4 GB (decimal)
+
 // Default concurrent file uploads when no user preference is saved.
 export const DEFAULT_FILE_CONCURRENCY = 3;
 

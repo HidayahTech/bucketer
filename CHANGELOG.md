@@ -7,6 +7,23 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.51.0] — 2026-08-16 — Far fewer requests when moving very large files
+
+Moving or renaming a very large object no longer floods the provider with requests. A move
+is a server-side copy plus a delete, and for objects above 5 GiB that copy is done in parts.
+Previously every large copy was split into the smallest allowed parts, so a 250 GB, 600 GB,
+or 1 TB file was pinned at the maximum of 10,000 copy requests regardless of its size. Copy
+parts are handled entirely on the storage server — they never travel through your browser —
+so there is no memory cost to using large parts. Bucketer now uses 1 GiB parts by default,
+which turns that same 1 TB move from 10,000 requests into about 1,024, and a 250 GB move
+into about 250. The part size is capped at 4 GB so it stays within every supported provider's
+limit (AWS, Backblaze B2, Cloudflare R2, Wasabi, DigitalOcean Spaces, MinIO).
+
+Large copies are also more resilient: a part copy that hits a transient network blip is now
+retried instead of failing the whole move (BUG-059). Since a large part holds its connection
+open longer, it is more exposed to a momentary drop — the copy path now recovers from those
+the same way uploads already did, rather than only retrying server throttling.
+
 ## [1.50.0] — 2026-08-13 — Keys that only reach one folder now work
 
 Access keys restricted to a folder inside a bucket — a Backblaze B2 application key created

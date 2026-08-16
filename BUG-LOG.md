@@ -4,6 +4,42 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-059 — Multipart copy aborted a whole large move on a single transient network blip
+
+**Symptom.** Moving or renaming a very large object (above the 5 GiB single-request copy
+cap, so copied via multipart `UploadPartCopy`) could fail outright when one part copy hit a
+momentary network drop — a reset connection, a DNS/routing blip — even though retrying would
+have succeeded. The larger the file, the longer each part held its connection open, so the
+exposure grew exactly on the biggest, most expensive-to-restart moves (250 GB–1 TB+).
+
+**Root cause.** `copyObjectMultipart` (`src/lib/move-multipart.js`) wrapped each
+`UploadPartCopy` in `sendWithRetry`, whose retry predicate was `isThrottlingError` only
+(503/429/SlowDown). Transient browser fetch failures surface as a `TypeError` ("Failed to
+fetch" / "NetworkError…"), which that predicate does not match, so a single blip threw
+straight out, the copy aborted the multipart upload, and the whole object failed. The upload
+path already retried these (via `withUploadRetry` / `isRetryableUploadError`); the copy path
+never adopted the broader predicate. Verified by a matched-pair unit test (below).
+
+**Fix.** `sendWithRetry` gained an optional `retryOn` predicate (default unchanged:
+`isThrottlingError`, so every existing caller behaves identically). The multipart copy path
+passes `retryOn: isRetryableUploadError`, so an `UploadPartCopy` now retries transient
+network errors as well as throttling. `UploadPartCopy` is idempotent per (uploadId,
+partNumber), so a retry safely overwrites the same part. Scope: limited to the part-copy
+call — the surrounding Create/Complete/Abort and the loose-file `CopyObject`/`DeleteObject`
+in `move-queue.js` were left on throttle-only retry, as their exposure is far smaller.
+
+**Why it wasn't caught earlier.** The copy path's retry was added for throttling (B2/Wasabi
+SlowDown on large folder moves) and no test ever injected a transient network error into a
+part copy; the gap was invisible to a green suite because throttling retry worked. It only
+became material now that copy parts are large (1 GiB), which lengthens each connection and
+raises the odds of a mid-part drop.
+
+**Test case.** `test/move-multipart.test.js` — "retries a part copy that fails once with a
+transient fetch error, then completes": the mock rejects part 2's first attempt with
+`new TypeError('Failed to fetch')`, then succeeds; the test asserts part 2 is attempted
+twice and the copy completes without aborting. Fails on pre-fix code (the `TypeError`
+propagates and the multipart upload aborts), passes after.
+
 ## BUG-058 — Deep-linked #prefix= silently ignored on connect (dead isFirstMount path)
 
 **Symptom.** Opening a share link carrying `#prefix=photos/2024/` and connecting landed
