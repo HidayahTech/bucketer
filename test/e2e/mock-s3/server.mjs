@@ -229,6 +229,7 @@ export function createMockS3(opts = {}) {
       // ── Bucket-level GETs ───────────────────────────────────────────────────
       if (method === 'GET' && q.get('list-type') === '2') return listObjectsV2(req, res, b, q);
       if (method === 'GET' && q.has('versions'))          return listVersions(req, res, b, q);
+      if (method === 'GET' && q.has('uploads'))           return listMultipartUploads(req, res, b, q);
 
       // ── Multipart ──────────────────────────────────────────────────────────
       if (method === 'POST' && q.has('uploads'))   return initiateMultipart(req, res, b, key);
@@ -486,8 +487,18 @@ export function createMockS3(opts = {}) {
     // Part ops need no separate guard: no uploadId can exist for a key denied here.
     if (!inScope(key)) return denyScope(req, res);
     const id = `mock-${newId()}`;
-    b.uploads.set(id, { key, metadata: metaFromHeaders(req), contentType: req.headers['content-type'] || 'application/octet-stream', parts: new Map() });
+    b.uploads.set(id, { key, initiated: nowISO(), metadata: metaFromHeaders(req), contentType: req.headers['content-type'] || 'application/octet-stream', parts: new Map() });
     sendXml(req, res, 200, `<InitiateMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Bucket>bucket</Bucket><Key>${xmlEsc(key)}</Key><UploadId>${id}</UploadId></InitiateMultipartUploadResult>`);
+  }
+
+  // GET /?uploads — list in-progress (incomplete) multipart uploads, optionally under ?prefix=.
+  function listMultipartUploads(req, res, b, q) {
+    const prefix = q.get('prefix') || '';
+    const uploadsXml = [...b.uploads.entries()]
+      .filter(([, up]) => up.key.startsWith(prefix))
+      .map(([id, up]) => `<Upload><Key>${xmlEsc(up.key)}</Key><UploadId>${xmlEsc(id)}</UploadId><Initiated>${up.initiated || nowISO()}</Initiated></Upload>`)
+      .join('');
+    sendXml(req, res, 200, `<ListMultipartUploadsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Bucket>bucket</Bucket><IsTruncated>false</IsTruncated>${uploadsXml}</ListMultipartUploadsResult>`);
   }
 
   async function uploadPart(req, res, b, key, q) {
