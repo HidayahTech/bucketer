@@ -593,7 +593,10 @@ export function App() {
       if (cancelled) return;
       const onScreen = taskStore.get();
       for (const j of jobs) {
-        if (j.bucket !== credentials.bucket) continue;
+        // Match the full origin, not just the bucket name: a different provider/endpoint can
+        // reuse the same bucket name, and resuming would run copy/delete against the wrong
+        // origin with the current credentials (credential confusion).
+        if (j.bucket !== credentials.bucket || j.provider !== credentials.provider || j.endpoint !== credentials.endpoint) continue;
         if (loadedMovesRef.current.has(j.id)) continue;
         if (onScreen.some(t => t.id === j.id)) continue; // a move already running this session
         loadedMovesRef.current.add(j.id);
