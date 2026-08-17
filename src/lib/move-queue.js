@@ -274,14 +274,17 @@ async function runTransfer(client, bucket, op, onProgress, mode, shouldCancel) {
     ? prefixes.filter(pfx => (prefixObjects.get(pfx) || []).every(o => movedKeySet.has(o.key)))
     : [];
 
-  // A cleanly-finished move leaves no record; an interrupted or partial one is kept so it
-  // can be resumed or discarded. The dest re-scan on resume skips whatever already landed.
+  // A cleanly-finished move leaves no record; an interrupted or partial one is kept so it can
+  // be resumed or discarded. "Clean" ignores collision skips (those items were never movable) —
+  // only a real copy/delete failure or a cancel leaves work behind. `resumable` tells the app
+  // it can offer Resume immediately, without waiting for a reconnect.
+  const clean = !cancelled && movedKeySet.size === movable.length;
+  const resumable = persisting && !clean;
   if (persisting) {
-    const clean = !cancelled && errors.length === 0 && movedKeySet.size === movable.length;
     await persist(() => (clean ? deleteMoveJob(op.jobId) : updateMoveJob(op.jobId, { inflightUploads: { ...inflightUploads } })));
   }
 
-  onProgress({ phase: 'done', moved, errors: [...errors], movedPrefixes, cancelled, bytesDone, bytesTotal });
+  onProgress({ phase: 'done', moved, errors: [...errors], movedPrefixes, cancelled, bytesDone, bytesTotal, resumable });
 }
 
 // Resume a persisted, interrupted move (jobRecord from move-jobs.js). The safety net is a
@@ -379,5 +382,5 @@ export async function resumeMoveOperation(client, bucket, jobRecord, onProgress,
 
   const clean = !cancelled && errors.length === 0;
   await persist(() => (clean ? deleteMoveJob(id) : updateMoveJob(id, { inflightUploads: { ...liveInflight } })));
-  onProgress({ phase: 'done', moved, errors: [...errors], movedPrefixes: [], cancelled, bytesDone, bytesTotal });
+  onProgress({ phase: 'done', moved, errors: [...errors], movedPrefixes: [], cancelled, bytesDone, bytesTotal, resumable: !clean });
 }

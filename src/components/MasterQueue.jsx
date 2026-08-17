@@ -67,7 +67,7 @@ function taskSummary(t) {
   const skippedText  = skipped > 0 ? ` · ${skipped} skipped` : '';
   const failedText   = failed > 0 ? ` · ${failed} error${failed !== 1 ? 's' : ''}` : '';
 
-  if (t.status === 'paused') return `Paused — move of ${t.subject} interrupted; resume to finish`;
+  if (t.status === 'paused') return `Paused — move of ${t.subject} interrupted${failedText} — Resume or Discard`;
   if (t.status === 'cancelled') {
     const ofText = t.total != null ? ` of ${t.total}` : '';
     return `Cancelled — ${verbs.done.toLowerCase()} ${t.current}${ofText}${skippedText}${failedText}`;

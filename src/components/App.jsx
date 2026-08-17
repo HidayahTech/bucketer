@@ -931,7 +931,7 @@ export function App() {
   // Shared onProgress for a move/copy/rename run and for a resumed move: refresh views on
   // each moved key, and on done refetch, unlock capabilities, and toast. Kept as one factory
   // so a fresh run and a resume behave identically.
-  function moveProgress(id, { capturedPrefix, dest, mode }) {
+  function moveProgress(id, { capturedPrefix, dest, mode, moveJobId }) {
     return (update) => {
       if (update.movedKeys?.length) browserActionsRef.current?.removeItems(update.movedKeys, []);
       if (update.phase === 'done') {
@@ -947,7 +947,17 @@ export function App() {
           showToast(`${verb} ${update.moved} item${update.moved === 1 ? '' : 's'}`);
         }
       }
-      taskStore.update(id, engineUpdateToPatch(update, 'moved'), !!update.phase);
+      const patch = engineUpdateToPatch(update, 'moved');
+      // A move that finished with unfinished work (errors or cancel) becomes a Paused row with
+      // Resume/Discard right away — the same state a reconnect would surface — instead of a
+      // terminal done. moveJobId is the persisted record's id (= this task's id on a fresh run;
+      // the original record id on a resumed one).
+      if (update.phase === 'done' && update.resumable) {
+        patch.status = 'paused';
+        patch.subPhase = null;
+        patch.moveJobId = moveJobId;
+      }
+      taskStore.update(id, patch, !!update.phase);
     };
   }
 
@@ -960,7 +970,7 @@ export function App() {
     const runOperation = mode === 'rename' ? runRenameOperation : mode === 'copy' ? runCopyOperation : runMoveOperation;
     const op = { ...task, jobId: id, provider: credentials.provider, endpoint: credentials.endpoint };
     try {
-      await runOperation(client, task.bucket, op, moveProgress(id, { capturedPrefix: task.capturedPrefix, dest: task.dest, mode }),
+      await runOperation(client, task.bucket, op, moveProgress(id, { capturedPrefix: task.capturedPrefix, dest: task.dest, mode, moveJobId: id }),
         () => taskStore.isCancelRequested(id));
     } catch (err) {
       taskStore.update(id, {
@@ -978,7 +988,7 @@ export function App() {
     taskStore.update(task.id, { status: 'running', subPhase: 'moving' }, true);
     try {
       await resumeMoveOperation(client, record.bucket, record,
-        moveProgress(task.id, { capturedPrefix: record.capturedPrefix, dest: record.dest, mode: 'move' }),
+        moveProgress(task.id, { capturedPrefix: record.capturedPrefix, dest: record.dest, mode: 'move', moveJobId: task.moveJobId }),
         () => taskStore.isCancelRequested(task.id));
     } catch (err) {
       taskStore.update(task.id, { status: 'done', subPhase: null,

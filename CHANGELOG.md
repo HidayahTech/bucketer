@@ -7,6 +7,17 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.55.0] — 2026-08-17 — Resume a failed move without refreshing
+
+When a move stops partway — because of errors (a storage cap, a permission block) or a
+cancel — it now turns into a **Paused** item offering **Resume** and **Discard** right there
+in the queue, instead of a finished row you had to refresh past to get the Resume option. It
+is the same paused state a reconnect would show, surfaced immediately; if it stopped on
+errors you can still expand the row to read them. Resume re-checks the destination (finishing
+whatever already copied and retrying the rest); Discard forgets the move. A move whose only
+"errors" were skipped duplicates now correctly counts as finished rather than lingering as
+resumable.
+
 ## [1.54.0] — 2026-08-16 — Clean up incomplete uploads
 
 A new **Incomplete uploads** button (next to Find duplicates) finds unfinished multipart

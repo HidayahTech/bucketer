@@ -88,3 +88,47 @@ describe('move — resume after reload', () => {
     } finally { await context.close(); }
   });
 });
+
+describe('move — resume inline after errors (no reload)', () => {
+  e2eTest('a move that ends with errors offers Resume in the same session, and resuming finishes it', async () => {
+    ctx.mock.reset();
+    const context = await newE2EContext(browser);
+    const page = await newE2EPage(context);
+    try {
+      await page.goto(app.url, { waitUntil: 'domcontentloaded' });
+      await connectApp(page, ctx.browserEndpoint);
+
+      await page.locator('button[title="Create a new folder"]').click();
+      const ni = page.locator('.modal-overlay input.form-input');
+      await ni.waitFor({ timeout: 5000 }); await ni.fill('dest'); await ni.press('Enter');
+      await page.locator('[data-testid="folder-row:dest"]').waitFor({ timeout: 5000 });
+      await page.locator('[data-testid="file-input"]').setInputFiles([
+        { name: 'a.txt', mimeType: 'text/plain', buffer: Buffer.from('aaa') },
+        { name: 'b.txt', mimeType: 'text/plain', buffer: Buffer.from('bbb') },
+      ]);
+      await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: 20000 });
+      await page.locator('[data-testid="file-row:a.txt"]').waitFor({ timeout: 10000 });
+
+      // Every copy fails, as a storage-cap block would, so the move ends with errors.
+      ctx.mock.configure({ faults: [{ op: 'CopyObject', method: 'PUT', status: 403, code: 'CapExceeded', message: 'storage cap exceeded' }] });
+
+      for (const name of ['a.txt', 'b.txt']) {
+        const cb = page.locator(`[data-testid="file-row:${name}"]`).locator('td.col-check input[type="checkbox"]');
+        await cb.scrollIntoViewIfNeeded();
+        await cb.check({ force: true });
+      }
+      await page.locator('.batch-bar button', { hasText: /^Move / }).click();
+      await page.locator('.move-picker-folder', { hasText: 'dest' }).click();
+      await page.locator('.move-here').click();
+
+      // The key observable: WITHOUT any reload, the errored move offers Resume in-session.
+      const resume = page.locator('[data-testid="move-resume"]');
+      await resume.waitFor({ timeout: 10000 });
+
+      // Clear the fault and resume → the move completes.
+      ctx.mock.configure({ faults: [] });
+      await resume.click();
+      await waitForKeys(['dest/', 'dest/a.txt', 'dest/b.txt']);
+    } finally { await context.close(); }
+  });
+});
