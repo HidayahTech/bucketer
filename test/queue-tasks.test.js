@@ -2,6 +2,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   subjectLabel, createDeleteTask, createTransferTask, createDownloadTask, engineUpdateToPatch,
+  createResumableMoveTask,
 } from '../src/lib/queue-tasks.js';
 
 describe('subjectLabel', () => {
@@ -111,5 +112,21 @@ describe('engineUpdateToPatch', () => {
   test('omits byte fields when the engine does not report them (e.g. delete)', () => {
     const p = engineUpdateToPatch({ deleted: 2 }, 'deleted');
     assert.ok(!('bytesDone' in p) && !('bytesTotal' in p));
+  });
+});
+
+describe('createResumableMoveTask', () => {
+  test('builds a paused move task from a persisted job record', () => {
+    const t = createResumableMoveTask({
+      id: 'mv-1', bucket: 'b', dest: 'arch/', capturedPrefix: 'src/',
+      items: [{ sourceKey: 'a', destKey: 'arch/a', size: 100 }, { sourceKey: 'b', destKey: 'arch/b', size: 200 }],
+    });
+    assert.equal(t.status, 'paused');
+    assert.equal(t.kind, 'move');
+    assert.equal(t.moveJobId, 'mv-1');
+    assert.equal(t.total, 2);
+    assert.equal(t.bytesTotal, 300);
+    assert.equal(t.subject, '2 files');
+    assert.equal(t.capturedPrefix, 'src/');
   });
 });

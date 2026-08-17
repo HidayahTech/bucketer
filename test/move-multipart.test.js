@@ -7,7 +7,7 @@ import { copyObjectMultipart } from '../src/lib/move-multipart.js';
 // metadata carried forward via HeadObject (UploadPartCopy copies bytes only), ETag read
 // from CopyPartResult, and best-effort abort on any failure (source never deleted).
 
-function mockClient({ partCopyRejectOn, networkFailOncePart } = {}) {
+function mockClient({ partCopyRejectOn, networkFailOncePart, existingParts = [] } = {}) {
   const calls = [];
   const partAttempts = new Map(); // PartNumber → attempt count, for retry simulation
   return {
@@ -18,6 +18,9 @@ function mockClient({ partCopyRejectOn, networkFailOncePart } = {}) {
       const input = cmd.input;
       calls.push({ name, input });
       switch (name) {
+        case 'ListPartsCommand':
+          // Resume: report the parts already copied (single page).
+          return Promise.resolve({ Parts: existingParts, IsTruncated: false });
         case 'HeadObjectCommand':
           return Promise.resolve({
             ContentType: 'image/png',
@@ -198,6 +201,59 @@ describe('copyObjectMultipart — per-part progress', () => {
     const client = mockClient();
     await copyObjectMultipart(client, { bucket: 'bk', sourceKey: 's', destKey: 'd', size: 12_000_000, preferredPartBytes: 5_000_000 });
     assert.ok(client.calls.some(c => c.name === 'CompleteMultipartUploadCommand'));
+  });
+});
+
+// Resume: a copy interrupted mid-parts (e.g. by a browser reload) can pick up its existing
+// multipart upload, copy only the parts not yet done (found via ListParts), and complete —
+// instead of restarting from byte zero.
+describe('copyObjectMultipart — resume via ListParts', () => {
+  test('fires onUploadIdCreated with the new upload id and part size', async () => {
+    const client = mockClient();
+    let seen = null;
+    await copyObjectMultipart(client, {
+      bucket: 'bk', sourceKey: 's', destKey: 'd', size: 12_000_000, preferredPartBytes: 5_000_000,
+      onUploadIdCreated: (id, ps) => { seen = { id, ps }; },
+    });
+    assert.deepEqual(seen, { id: 'up-1', ps: 5_000_000 });
+  });
+
+  test('resuming skips Create, copies only the missing parts, completes with all parts', async () => {
+    // 12 MB in 5 MB parts → 3 parts; parts 1 and 2 already done server-side.
+    const client = mockClient({ existingParts: [{ PartNumber: 1, ETag: 'done-1' }, { PartNumber: 2, ETag: 'done-2' }] });
+    await copyObjectMultipart(client, {
+      bucket: 'bk', sourceKey: 's', destKey: 'd', size: 12_000_000, preferredPartBytes: 5_000_000,
+      resumeUploadId: 'up-existing',
+    });
+    assert.ok(!client.calls.some(c => c.name === 'CreateMultipartUploadCommand'), 'must not create a new upload');
+    const copied = client.calls.filter(c => c.name === 'UploadPartCopyCommand').map(c => c.input.PartNumber);
+    assert.deepEqual(copied, [3], 'only the missing part is copied');
+    const complete = client.calls.find(c => c.name === 'CompleteMultipartUploadCommand');
+    assert.equal(complete.input.UploadId, 'up-existing');
+    assert.deepEqual(complete.input.MultipartUpload.Parts, [
+      { PartNumber: 1, ETag: 'done-1' },
+      { PartNumber: 2, ETag: 'done-2' },
+      { PartNumber: 3, ETag: 'etag-3' },
+    ]);
+  });
+
+  test('resume reports byte progress for both already-done and newly-copied parts', async () => {
+    const client = mockClient({ existingParts: [{ PartNumber: 1, ETag: 'done-1' }] });
+    const chunks = [];
+    await copyObjectMultipart(client, {
+      bucket: 'bk', sourceKey: 's', destKey: 'd', size: 12_000_000, preferredPartBytes: 5_000_000,
+      resumeUploadId: 'up-existing', onPartCopied: (b) => chunks.push(b),
+    });
+    assert.equal(chunks.reduce((a, b) => a + b, 0), 12_000_000, 'absolute progress across all parts');
+  });
+
+  test('a failed resume does NOT abort — the upload is kept for another attempt', async () => {
+    const client = mockClient({ existingParts: [{ PartNumber: 1, ETag: 'done-1' }], partCopyRejectOn: 3 });
+    await assert.rejects(copyObjectMultipart(client, {
+      bucket: 'bk', sourceKey: 's', destKey: 'd', size: 12_000_000, preferredPartBytes: 5_000_000,
+      resumeUploadId: 'up-existing',
+    }));
+    assert.ok(!client.calls.some(c => c.name === 'AbortMultipartUploadCommand'), 'resume keeps the upload on failure');
   });
 });
 

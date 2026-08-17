@@ -7,6 +7,17 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.53.0] — 2026-08-16 — Resume an interrupted move
+
+A move that gets interrupted — you close the tab, reload, or lose your connection partway
+through — is no longer lost. When you reconnect, it reappears in the operations queue as a
+paused item with **Resume** and **Discard**. Resume picks up where it left off: files already
+moved are skipped (Bucketer re-checks the destination), and a large file that was mid-copy
+continues from the parts already uploaded rather than starting over. Discard cleans up — it
+aborts any half-finished upload to reclaim its storage and forgets the move. Nothing is ever
+lost either way: a source file is only removed once its copy is confirmed. Only a bucket you
+reconnect to with the same key sees its own interrupted moves.
+
 ## [1.52.0] — 2026-08-16 — Moves show a real progress bar
 
 A move or copy in the operations queue now shows a progress bar, transfer speed, and ETA —

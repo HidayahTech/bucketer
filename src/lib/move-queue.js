@@ -21,6 +21,7 @@ import { COPY_MULTIPART_THRESHOLD } from './constants.js';
 import { destKeyForFile, destKeyForFolderObject, freeFileKey, freeFolderPrefix, renamedFolderPrefix, renameFolderKey, copySource } from './move-key.js';
 import { copyObjectMultipart } from './move-multipart.js';
 import { sendWithRetry } from './s3-retry.js';
+import { saveMoveJob, updateMoveJob, deleteMoveJob } from './move-jobs.js';
 
 const CONCURRENCY = 8;
 
@@ -185,6 +186,23 @@ async function runTransfer(client, bucket, op, onProgress, mode, shouldCancel) {
   onProgress({ phase: 'moving', total: work.length, bytesTotal, bytesDone });
   if (errors.length > 0) onProgress({ moved: 0, errors: [...errors], movedKeys: [], bytesDone, bytesTotal });
 
+  // Resumable-move persistence: only for mode 'move' with a job id. The record — carrying
+  // each in-flight multipart uploadId — is written before any part copy so a reload can
+  // resume. Writes are serialized (concurrent workers share one record) and best-effort: a
+  // failed persist must never fail the move itself.
+  const persisting = mode === 'move' && !!op.jobId;
+  const inflightUploads = {};
+  let persistChain = Promise.resolve();
+  const persist = (fn) => { persistChain = persistChain.then(fn).catch(() => {}); return persistChain; };
+  if (persisting) {
+    await persist(() => saveMoveJob({
+      id: op.jobId, provider: op.provider, endpoint: op.endpoint, bucket, mode,
+      dest, capturedPrefix: op.capturedPrefix ?? '', createdAt: op.createdAt ?? Date.now(),
+      items: movable.map(m => ({ sourceKey: m.sourceKey, destKey: m.destKey, size: m.size })),
+      inflightUploads: {},
+    }));
+  }
+
   let moved = 0;
   let mi = 0;
   let cancelled = false;
@@ -197,11 +215,19 @@ async function runTransfer(client, bucket, op, onProgress, mode, shouldCancel) {
         if (item.size > COPY_MULTIPART_THRESHOLD) {
           await copyObjectMultipart(client, {
             bucket, sourceKey: item.sourceKey, destKey: item.destKey, size: item.size,
+            onUploadIdCreated: persisting ? (uploadId, partSize) => {
+              inflightUploads[item.sourceKey] = { uploadId, partSize };
+              persist(() => updateMoveJob(op.jobId, { inflightUploads: { ...inflightUploads } }));
+            } : undefined,
             onPartCopied: (bytes) => {
               bytesDone += bytes;
               onProgress({ moved, errors: [...errors], movedKeys: [], bytesDone, bytesTotal });
             },
           });
+          if (persisting) { // Complete succeeded — this upload is no longer in flight.
+            delete inflightUploads[item.sourceKey];
+            persist(() => updateMoveJob(op.jobId, { inflightUploads: { ...inflightUploads } }));
+          }
         } else {
           await sendWithRetry(client, () => new CopyObjectCommand({
             Bucket: bucket, CopySource: copySource(bucket, item.sourceKey),
@@ -210,6 +236,12 @@ async function runTransfer(client, bucket, op, onProgress, mode, shouldCancel) {
           bytesDone += item.size || 0;
         }
       } catch (err) {
+        // A fresh multipart copy aborts its upload on failure (move-multipart.js), so drop
+        // any stale in-flight entry — resume would find no parts and must start it fresh.
+        if (persisting && inflightUploads[item.sourceKey]) {
+          delete inflightUploads[item.sourceKey];
+          persist(() => updateMoveJob(op.jobId, { inflightUploads: { ...inflightUploads } }));
+        }
         errors.push({ key: item.sourceKey, message: err.message || String(err) });
         onProgress({ moved, errors: [...errors], movedKeys: [] });
         continue;
@@ -242,5 +274,110 @@ async function runTransfer(client, bucket, op, onProgress, mode, shouldCancel) {
     ? prefixes.filter(pfx => (prefixObjects.get(pfx) || []).every(o => movedKeySet.has(o.key)))
     : [];
 
+  // A cleanly-finished move leaves no record; an interrupted or partial one is kept so it
+  // can be resumed or discarded. The dest re-scan on resume skips whatever already landed.
+  if (persisting) {
+    const clean = !cancelled && errors.length === 0 && movedKeySet.size === movable.length;
+    await persist(() => (clean ? deleteMoveJob(op.jobId) : updateMoveJob(op.jobId, { inflightUploads: { ...inflightUploads } })));
+  }
+
   onProgress({ phase: 'done', moved, errors: [...errors], movedPrefixes, cancelled, bytesDone, bytesTotal });
+}
+
+// Resume a persisted, interrupted move (jobRecord from move-jobs.js). The safety net is a
+// re-scan of the destination: any object already at its destKey was moved in a prior session
+// — its source is deleted (idempotently) and it is counted done, never re-copied. Remaining
+// items are copied fresh, except one whose multipart upload is still in flight
+// (record.inflightUploads[sourceKey]): that one continues via ListParts, copying only the
+// parts not yet done. A clean finish deletes the record.
+export async function resumeMoveOperation(client, bucket, jobRecord, onProgress, shouldCancel = () => false) {
+  const { id, dest, items, inflightUploads = {} } = jobRecord;
+
+  let existing;
+  try {
+    const destObjs = await listAllObjectsForPrefix(client, bucket, dest);
+    existing = new Set(destObjs.map(o => o.key));
+  } catch (err) {
+    onProgress({ phase: 'done', moved: 0, errors: [{ key: '(listing)', message: err.message }], movedPrefixes: [], cancelled: false });
+    return;
+  }
+
+  const already = items.filter(it => existing.has(it.destKey)); // copied last time — just delete source
+  const pending = items.filter(it => !existing.has(it.destKey)); // still to copy
+
+  const bytesTotal = pending.reduce((sum, it) => sum + (it.size || 0), 0);
+  let bytesDone = 0;
+  onProgress({ phase: 'moving', total: items.length, bytesTotal, bytesDone });
+
+  const errors = [];
+  let moved = 0;
+  let cancelled = false;
+  const liveInflight = { ...inflightUploads };
+  let persistChain = Promise.resolve();
+  const persist = (fn) => { persistChain = persistChain.then(fn).catch(() => {}); return persistChain; };
+
+  // Objects already at the destination: finish the move by removing the source (idempotent).
+  for (const it of already) {
+    if (shouldCancel()) { cancelled = true; break; }
+    try {
+      await sendWithRetry(client, () => new DeleteObjectCommand({ Bucket: bucket, Key: it.sourceKey }));
+      moved++;
+      onProgress({ moved, errors: [...errors], movedKeys: [it.sourceKey], bytesDone, bytesTotal });
+    } catch (err) {
+      errors.push({ key: it.sourceKey, message: err.message || String(err) });
+      onProgress({ moved, errors: [...errors], movedKeys: [] });
+    }
+  }
+
+  let pi = 0;
+  async function worker() {
+    while (pi < pending.length) {
+      if (shouldCancel()) { cancelled = true; return; }
+      const it = pending[pi++];
+      const resumeUploadId = liveInflight[it.sourceKey]?.uploadId;
+      try {
+        if (it.size > COPY_MULTIPART_THRESHOLD) {
+          await copyObjectMultipart(client, {
+            bucket, sourceKey: it.sourceKey, destKey: it.destKey, size: it.size,
+            preferredPartBytes: liveInflight[it.sourceKey]?.partSize,
+            resumeUploadId,
+            onUploadIdCreated: resumeUploadId ? undefined : (uploadId, partSize) => {
+              liveInflight[it.sourceKey] = { uploadId, partSize };
+              persist(() => updateMoveJob(id, { inflightUploads: { ...liveInflight } }));
+            },
+            onPartCopied: (bytes) => {
+              bytesDone += bytes;
+              onProgress({ moved, errors: [...errors], movedKeys: [], bytesDone, bytesTotal });
+            },
+          });
+          delete liveInflight[it.sourceKey];
+          persist(() => updateMoveJob(id, { inflightUploads: { ...liveInflight } }));
+        } else {
+          await sendWithRetry(client, () => new CopyObjectCommand({
+            Bucket: bucket, CopySource: copySource(bucket, it.sourceKey),
+            Key: it.destKey, MetadataDirective: 'COPY',
+          }));
+          bytesDone += it.size || 0;
+        }
+      } catch (err) {
+        errors.push({ key: it.sourceKey, message: err.message || String(err) });
+        onProgress({ moved, errors: [...errors], movedKeys: [] });
+        continue;
+      }
+      try {
+        await sendWithRetry(client, () => new DeleteObjectCommand({ Bucket: bucket, Key: it.sourceKey }));
+      } catch (err) {
+        errors.push({ key: it.sourceKey, message: `Copied to the destination, but the source could not be deleted — it now exists in both places (${err.message || String(err)}).` });
+        onProgress({ moved, errors: [...errors], movedKeys: [] });
+        continue;
+      }
+      moved++;
+      onProgress({ moved, errors: [...errors], movedKeys: [it.sourceKey], bytesDone, bytesTotal });
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, pending.length) }, worker));
+
+  const clean = !cancelled && errors.length === 0;
+  await persist(() => (clean ? deleteMoveJob(id) : updateMoveJob(id, { inflightUploads: { ...liveInflight } })));
+  onProgress({ phase: 'done', moved, errors: [...errors], movedPrefixes: [], cancelled, bytesDone, bytesTotal });
 }
