@@ -251,3 +251,18 @@ describe('MasterQueue — resumable move', () => {
     cleanup();
   });
 });
+
+describe('MasterQueue — interrupted move surfaces inline', () => {
+  test('a paused move WITH errors shows Resume, Discard, the error count, and an expandable list', () => {
+    const store = makeStore();
+    const base = createResumableMoveTask({ id: 'mv-1', bucket: 'b', dest: 'arch/', capturedPrefix: '', items: [{ sourceKey: 'a', destKey: 'arch/a', size: 1 }] });
+    store.add({ ...base, moveJobId: 'mv-1', collapsed: true, errors: [{ key: 'b.bin', message: 'storage cap exceeded' }] });
+    const { text, query, cleanup } = mount(h(MasterQueue, { store, onResumeMove: () => {}, onDiscardMove: () => {} }));
+    assert.ok(query('[data-testid="move-resume"]'), 'Resume');
+    assert.ok(query('[data-testid="move-discard"]'), 'Discard');
+    assert.equal(query('[data-testid="task-cancel"]'), null, 'no Cancel');
+    assert.ok(/1 error/.test(text()), text());
+    assert.ok([...document.querySelectorAll('button')].some(b => b.textContent.includes('Show details')), 'errors are expandable');
+    cleanup();
+  });
+});

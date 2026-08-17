@@ -11,7 +11,7 @@ import { loadMoveJob, clearAllMoveJobs, saveMoveJob } from '../src/lib/move-jobs
 
 const GiB = 1024 * 1024 * 1024;
 
-function mockClient({ destKeys = [], existingParts = [] } = {}) {
+function mockClient({ destKeys = [], existingParts = [], copyReject } = {}) {
   const calls = [];
   return {
     calls,
@@ -22,7 +22,10 @@ function mockClient({ destKeys = [], existingParts = [] } = {}) {
       switch (name) {
         case 'ListObjectsV2Command':
           return Promise.resolve({ Contents: destKeys.map(k => ({ Key: k, Size: 0 })), IsTruncated: false });
-        case 'CopyObjectCommand':      return Promise.resolve({ CopyObjectResult: { ETag: 'e' } });
+        case 'CopyObjectCommand': {
+          const err = copyReject?.(input);
+          return err ? Promise.reject(err) : Promise.resolve({ CopyObjectResult: { ETag: 'e' } });
+        }
         case 'DeleteObjectCommand':    return Promise.resolve({});
         case 'HeadObjectCommand':      return Promise.resolve({ ContentType: 'x', Metadata: {} });
         case 'CreateMultipartUploadCommand': return Promise.resolve({ UploadId: 'up-new' });
@@ -112,5 +115,39 @@ describe('runMoveOperation — persistence', () => {
     const client = mockClient({ destKeys: [] });
     await runMoveOperation(client, 'bk', { files: [{ key: 'a.bin', size: 100 }], dest: 'arch/' }, () => {});
     assert.equal(await loadMoveJob('a.bin'), null);
+  });
+});
+
+// The 'resumable' flag on the done update tells the app whether a move left unfinished work
+// (so it can offer Resume immediately, without a reconnect). Real failures / cancel keep the
+// job resumable; a clean finish — including one whose only "errors" are collision skips —
+// deletes the record and reports resumable:false.
+describe('runMoveOperation — resumable flag on done', () => {
+  beforeEach(async () => { await clearAllMoveJobs(); });
+
+  test('a real copy failure reports resumable:true and keeps the record', async () => {
+    const client = mockClient({ destKeys: [], copyReject: (i) => i.Key === 'arch/b.bin' ? new Error('cap exceeded') : undefined });
+    const op = { jobId: 'mv-r1', provider: 'b2', endpoint: 'e',
+      files: [{ key: 'a.bin', size: 1 }, { key: 'b.bin', size: 1 }], dest: 'arch/' };
+    const updates = await collect(cb => runMoveOperation(client, 'bk', op, cb));
+    assert.equal(updates.find(u => u.phase === 'done').resumable, true);
+    assert.ok(await loadMoveJob('mv-r1'), 'record kept for resume');
+  });
+
+  test('a clean move reports resumable:false and deletes the record', async () => {
+    const client = mockClient({ destKeys: [] });
+    const op = { jobId: 'mv-r2', provider: 'b2', endpoint: 'e', files: [{ key: 'a.bin', size: 1 }], dest: 'arch/' };
+    const updates = await collect(cb => runMoveOperation(client, 'bk', op, cb));
+    assert.equal(updates.find(u => u.phase === 'done').resumable, false);
+    assert.equal(await loadMoveJob('mv-r2'), null);
+  });
+
+  test('a skip-only move (collision) is clean — resumable:false, record deleted', async () => {
+    // The one file already exists at the destination → skipped, nothing actually failed.
+    const client = mockClient({ destKeys: ['arch/a.bin'] });
+    const op = { jobId: 'mv-r3', provider: 'b2', endpoint: 'e', files: [{ key: 'a.bin', size: 1 }], dest: 'arch/' };
+    const updates = await collect(cb => runMoveOperation(client, 'bk', op, cb));
+    assert.equal(updates.find(u => u.phase === 'done').resumable, false);
+    assert.equal(await loadMoveJob('mv-r3'), null);
   });
 });
