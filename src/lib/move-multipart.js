@@ -11,7 +11,10 @@ import { PART_CONCURRENCY, COPY_PART_SIZE_DEFAULT, COPY_PART_SIZE_MAX } from './
 import { sendWithRetry, isRetryableUploadError } from './s3-retry.js';
 import { copySource } from './move-key.js';
 
-export async function copyObjectMultipart(client, { bucket, sourceKey, destKey, size, preferredPartBytes = COPY_PART_SIZE_DEFAULT }) {
+// onPartCopied(bytes) fires once per successfully copied part with that part's byte count,
+// so the caller can report real byte progress for a large single-file copy (which would
+// otherwise appear as one indivisible object until it finishes).
+export async function copyObjectMultipart(client, { bucket, sourceKey, destKey, size, preferredPartBytes = COPY_PART_SIZE_DEFAULT, onPartCopied }) {
   // Carry the source's metadata forward (UploadPartCopy would otherwise drop it).
   const head = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: sourceKey }));
 
@@ -45,6 +48,7 @@ export async function copyObjectMultipart(client, { bucket, sourceKey, destKey, 
       }), { retryOn: isRetryableUploadError });
       // Part ETag is nested under CopyPartResult (NOT resp.ETag, as with UploadPart).
       parts[partNumber - 1] = { PartNumber: partNumber, ETag: resp.CopyPartResult.ETag };
+      onPartCopied?.(end - start + 1);
     }, PART_CONCURRENCY);
 
     await client.send(new CompleteMultipartUploadCommand({

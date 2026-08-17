@@ -105,19 +105,21 @@ function TaskRow({ task, store, readZipDetail }) {
   const isZip        = task.delivery === 'zip';
   const isRunningZip = isZip && task.status === 'running';
 
-  // useRate no-ops (no interval) whenever its `active` arg is false, so it is cheap to
-  // call unconditionally for every task row rather than conditionally per delivery kind
-  // (conditional hooks would break across a task whose delivery/kind never actually
-  // changes, but there is no reason to risk it for a call this cheap).
-  const speed = useRate(isZip ? (task.bytesDone ?? 0) : 0, isRunningZip);
-
   const bytesDone  = task.bytesDone ?? 0;
   const bytesTotal = task.bytesTotal ?? 0;
-  // The byte line + bar render only while actually streaming, and only once the job
-  // knows its sendable bytes — never divide by a zero/missing bytesTotal.
-  const showZipProgress = isRunningZip && !!task.bytesTotal;
-  const barPct = showZipProgress ? Math.min(100, Math.max(0, (bytesDone / bytesTotal) * 100)) : 0;
-  const eta = showZipProgress && speed > 0 ? (bytesTotal - bytesDone) / speed : null;
+  // The byte line + bar + speed + ETA render for any running task that reports its sendable
+  // bytes — a zip download or a server-side move/copy alike. Delete reports no bytes and so
+  // keeps its count-only line. Render only while running and only once bytesTotal is known —
+  // never divide by a zero/missing bytesTotal.
+  const showBytesProgress = task.status === 'running' && !!task.bytesTotal;
+
+  // useRate no-ops (no interval) whenever its `active` arg is false, so it is cheap to
+  // call unconditionally for every task row rather than conditionally per kind (conditional
+  // hooks would break across a task whose kind never actually changes, but there is no
+  // reason to risk it for a call this cheap).
+  const speed = useRate(showBytesProgress ? bytesDone : 0, showBytesProgress);
+  const barPct = showBytesProgress ? Math.min(100, Math.max(0, (bytesDone / bytesTotal) * 100)) : 0;
+  const eta = showBytesProgress && speed > 0 ? (bytesTotal - bytesDone) / speed : null;
 
   // Zip tasks get the new active-focused detail (running, or settled with per-key
   // errors); every other task kind keeps the pre-existing settled+errors-only error list,
@@ -226,7 +228,7 @@ function TaskRow({ task, store, readZipDetail }) {
         )}
       </div>
 
-      {showZipProgress && (
+      {showBytesProgress && (
         <div class="queue-op-progress">
           <div class="progress-bar-wrap">
             <div class="progress-bar" data-testid="zip-progress-bar" style={{ width: `${barPct.toFixed(2)}%` }} />

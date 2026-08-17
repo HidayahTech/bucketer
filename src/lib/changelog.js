@@ -1,9 +1,15 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.51.1';
+export const CURRENT_VERSION = '1.52.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.52.0",
+    "date": "2026-08-16",
+    "title": "Moves show a real progress bar",
+    "changes": []
+  },
   {
     "version": "1.51.1",
     "date": "2026-08-16",

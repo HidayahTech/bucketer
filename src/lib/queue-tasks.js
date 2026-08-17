@@ -93,5 +93,7 @@ export function engineUpdateToPatch(update, countField) {
   if (update.total !== undefined) patch.total = update.total;
   if (update[countField] !== undefined) patch.current = update[countField];
   if (update.errors !== undefined) patch.errors = update.errors;
+  if (update.bytesDone !== undefined) patch.bytesDone = update.bytesDone;
+  if (update.bytesTotal !== undefined) patch.bytesTotal = update.bytesTotal;
   return patch;
 }

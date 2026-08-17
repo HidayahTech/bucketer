@@ -177,8 +177,13 @@ async function runTransfer(client, bucket, op, onProgress, mode, shouldCancel) {
     }
   }
 
-  onProgress({ phase: 'moving', total: work.length });
-  if (errors.length > 0) onProgress({ moved: 0, errors: [...errors], movedKeys: [] });
+  // Byte progress for the queue's bar/speed/ETA (uniform with the ZIP download). bytesTotal
+  // is the sum of every object's size; bytesDone accumulates as objects — and, for large
+  // objects, their individual parts — finish copying.
+  const bytesTotal = movable.reduce((sum, it) => sum + (it.size || 0), 0);
+  let bytesDone = 0;
+  onProgress({ phase: 'moving', total: work.length, bytesTotal, bytesDone });
+  if (errors.length > 0) onProgress({ moved: 0, errors: [...errors], movedKeys: [], bytesDone, bytesTotal });
 
   let moved = 0;
   let mi = 0;
@@ -190,12 +195,19 @@ async function runTransfer(client, bucket, op, onProgress, mode, shouldCancel) {
       const item = movable[mi++];
       try {
         if (item.size > COPY_MULTIPART_THRESHOLD) {
-          await copyObjectMultipart(client, { bucket, sourceKey: item.sourceKey, destKey: item.destKey, size: item.size });
+          await copyObjectMultipart(client, {
+            bucket, sourceKey: item.sourceKey, destKey: item.destKey, size: item.size,
+            onPartCopied: (bytes) => {
+              bytesDone += bytes;
+              onProgress({ moved, errors: [...errors], movedKeys: [], bytesDone, bytesTotal });
+            },
+          });
         } else {
           await sendWithRetry(client, () => new CopyObjectCommand({
             Bucket: bucket, CopySource: copySource(bucket, item.sourceKey),
             Key: item.destKey, MetadataDirective: 'COPY',
           }));
+          bytesDone += item.size || 0;
         }
       } catch (err) {
         errors.push({ key: item.sourceKey, message: err.message || String(err) });
@@ -218,7 +230,7 @@ async function runTransfer(client, bucket, op, onProgress, mode, shouldCancel) {
         movedKeySet.add(item.sourceKey);
       }
       moved++;
-      onProgress({ moved, errors: [...errors], movedKeys: mode !== 'copy' ? [item.sourceKey] : [] });
+      onProgress({ moved, errors: [...errors], movedKeys: mode !== 'copy' ? [item.sourceKey] : [], bytesDone, bytesTotal });
     }
   }
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, movable.length) }, worker));
@@ -230,5 +242,5 @@ async function runTransfer(client, bucket, op, onProgress, mode, shouldCancel) {
     ? prefixes.filter(pfx => (prefixObjects.get(pfx) || []).every(o => movedKeySet.has(o.key)))
     : [];
 
-  onProgress({ phase: 'done', moved, errors: [...errors], movedPrefixes, cancelled });
+  onProgress({ phase: 'done', moved, errors: [...errors], movedPrefixes, cancelled, bytesDone, bytesTotal });
 }

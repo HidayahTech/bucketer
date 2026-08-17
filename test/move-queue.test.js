@@ -470,3 +470,41 @@ describe('runRenameOperation — folder rename', () => {
     assert.match(done.errors[0].message, /already exists/i);
   });
 });
+
+// The master queue shows a byte-progress bar for a move (uniform with the ZIP download). The
+// engine reports bytesTotal (sum of object sizes) up front and accumulates bytesDone as
+// objects — and, for large objects, their individual parts — finish copying.
+describe('runMoveOperation — byte progress', () => {
+  test('reports bytesTotal and accumulates bytesDone up to the total', async () => {
+    const client = mockClient({ listPages: emptyDest('arch/') });
+    const updates = await runAndCollect(client, 'bk', {
+      files: [{ key: 'a.bin', size: 300 }, { key: 'b.bin', size: 700 }], dest: 'arch/',
+    });
+    const moving = updates.find(u => u.phase === 'moving');
+    assert.equal(moving.bytesTotal, 1000);
+    const seen = updates.filter(u => u.bytesDone !== undefined).map(u => u.bytesDone);
+    assert.equal(Math.max(...seen), 1000, 'bytesDone reaches the total');
+    for (let i = 1; i < seen.length; i++) assert.ok(seen[i] >= seen[i - 1], 'bytesDone is monotonic');
+  });
+
+  test('a multipart-copied object contributes its part bytes to bytesDone', async () => {
+    const client = mockClient({ multipart: true, listPages: emptyDest('arch/') });
+    const size = 6 * 1024 * 1024 * 1024; // > 5 GiB single-request cap → multipart copy
+    const updates = await runAndCollect(client, 'bk', { files: [{ key: 'big.bin', size }], dest: 'arch/' });
+    const seen = updates.filter(u => u.bytesDone !== undefined).map(u => u.bytesDone);
+    assert.equal(updates.find(u => u.phase === 'moving').bytesTotal, size);
+    assert.equal(Math.max(...seen), size, 'every part copied is counted');
+  });
+
+  test('a failed object does not add its bytes to bytesDone', async () => {
+    const client = mockClient({
+      listPages: emptyDest('arch/'),
+      copyReject: (input) => input.CopySource.endsWith('b.bin') ? new Error('AccessDenied') : undefined,
+    });
+    const updates = await runAndCollect(client, 'bk', {
+      files: [{ key: 'a.bin', size: 300 }, { key: 'b.bin', size: 700 }], dest: 'arch/',
+    });
+    const seen = updates.filter(u => u.bytesDone !== undefined).map(u => u.bytesDone);
+    assert.equal(Math.max(...seen), 300, 'only the succeeded object counts');
+  });
+});
