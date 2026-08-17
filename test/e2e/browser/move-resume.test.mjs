@@ -55,8 +55,13 @@ describe('move — resume after reload', () => {
       // the destination but never completes cleanly — the resumable record persists.
       ctx.mock.configure({ faults: [{ op: 'DeleteObject', method: 'DELETE', status: 403, code: 'AccessDenied', message: 'denied' }] });
 
-      await page.locator('[data-testid="file-row:a.txt"]').locator('td.col-check input[type="checkbox"]').check({ force: true });
-      await page.locator('[data-testid="file-row:b.txt"]').locator('td.col-check input[type="checkbox"]').check({ force: true });
+      // Select both files. Scroll each checkbox into view first — on a desktop firefox lane a
+      // lower row can sit below the fold, and check({force}) fails "outside of viewport".
+      for (const name of ['a.txt', 'b.txt']) {
+        const cb = page.locator(`[data-testid="file-row:${name}"]`).locator('td.col-check input[type="checkbox"]');
+        await cb.scrollIntoViewIfNeeded();
+        await cb.check({ force: true });
+      }
       await page.locator('.batch-bar button', { hasText: /^Move / }).click();
       await page.locator('.move-picker-folder', { hasText: 'dest' }).click();
       await page.locator('.move-here').click();
