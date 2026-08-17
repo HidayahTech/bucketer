@@ -61,6 +61,8 @@ import { taskStore } from '../lib/task-store.js';
 import { createDeleteTask, createTransferTask, createDownloadTask, createResumableMoveTask, engineUpdateToPatch } from '../lib/queue-tasks.js';
 import { loadAllMoveJobs, loadMoveJob, deleteMoveJob } from '../lib/move-jobs.js';
 import { abortMultipartSession } from '../lib/upload-cleanup.js';
+import { listIncompleteUploads, classifyIncompleteUploads } from '../lib/multipart-uploads.js';
+import { IncompleteUploadsModal } from './IncompleteUploadsModal.jsx';
 import { DownloadJobPanel } from './DownloadJobPanel.jsx';
 import {
   saveJob, loadJob, loadAllJobs, deleteJob, updateJob, countItemsByStatus,
@@ -161,6 +163,7 @@ export function App() {
   const [formResetKey, setFormResetKey] = useState(0);
   const [logKey, setLogKey] = useState(0);         // incremented to refresh upload log
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [incompleteOpen, setIncompleteOpen] = useState(false);
   const { changelogOpen, setChangelogOpen, aboutOpen, setAboutOpen, storageOpen, setStorageOpen, duplicatesOpen, setDuplicatesOpen, handoffOpen, setHandoffOpen, downloadOpen, setDownloadOpen } = useModalStates();
   // The scope the DownloadJobPanel was opened with (folder or a batch-bar selection),
   // and the prefix a "Use a transfer tool" handoff should target — see handleDownloadRequest.
@@ -983,6 +986,23 @@ export function App() {
     }
   }
 
+  // Incomplete-uploads panel. Scan lists the server's in-progress multipart uploads (scoped to
+  // the base folder) and drops the ones already tracked as resumable (they surface as paused
+  // rows) — leaving discard-only orphans. Discard aborts an upload to reclaim its storage.
+  async function scanIncompleteUploads() {
+    const [uploads, moveJobs] = await Promise.all([
+      listIncompleteUploads(client, credentials.bucket, credentials.basePrefix || ''),
+      loadAllMoveJobs(),
+    ]);
+    return classifyIncompleteUploads(uploads, moveJobs).filter((u) => !u.resumable);
+  }
+  async function discardIncompleteUpload(upload) {
+    await abortMultipartSession(client, {
+      bucket: credentials.bucket, key: upload.key, uploadId: upload.uploadId,
+      provider: credentials.provider, endpoint: credentials.endpoint,
+    });
+  }
+
   // Discard a paused move: abort any still-in-flight multipart uploads (reclaiming their
   // storage), forget the record, and drop the row.
   async function handleDiscardMove(task) {
@@ -1153,6 +1173,13 @@ export function App() {
           onClose={() => setDuplicatesOpen(false)}
         />
       )}
+      {incompleteOpen && session === 'connected' && (
+        <IncompleteUploadsModal
+          scan={scanIncompleteUploads}
+          discard={discardIncompleteUpload}
+          onClose={() => setIncompleteOpen(false)}
+        />
+      )}
       {pendingDelete && (
         <DeleteConfirmModal
           request={pendingDelete}
@@ -1189,6 +1216,18 @@ export function App() {
             title="Scan this bucket or folder for duplicate files"
           >
             Find duplicates
+          </button>
+        )}
+        {session === 'connected' && capabilities.list !== 'denied' && (
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            style={{ color: '#fff', borderColor: 'rgba(255,255,255,.4)' }}
+            data-testid="open-incomplete-uploads"
+            onClick={() => setIncompleteOpen(true)}
+            title="Find and clean up unfinished multipart uploads still using storage"
+          >
+            Incomplete uploads
           </button>
         )}
         {session === 'connected' && (

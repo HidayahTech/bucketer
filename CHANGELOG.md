@@ -7,6 +7,17 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.54.0] — 2026-08-16 — Clean up incomplete uploads
+
+A new **Incomplete uploads** button (next to Find duplicates) finds unfinished multipart
+uploads still sitting in your bucket and using storage — the leftovers of a move or upload
+that was interrupted before Bucketer could track it, including ones from older versions or
+other tools. Each is listed with when it started; **Discard** aborts it and reclaims the
+storage, one at a time or all at once. Uploads Bucketer can actually resume still appear in
+the operations queue as before — this panel is for the orphans it cannot. A note reminds you
+that some may belong to another tool, so discarding one that is still uploading elsewhere
+would interrupt it.
+
 ## [1.53.0] — 2026-08-16 — Resume an interrupted move
 
 A move that gets interrupted — you close the tab, reload, or lose your connection partway
