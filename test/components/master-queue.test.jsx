@@ -195,3 +195,24 @@ describe('MasterQueue — rename', () => {
     cleanup();
   });
 });
+
+describe('MasterQueue — move byte progress', () => {
+  test('a running move reporting bytes renders the progress bar and byte line', () => {
+    const store = makeStore();
+    const id = store.add(createTransferTask({ files: [{ key: 'a', size: 1000 }], prefixes: [], dest: 'd/', capturedPrefix: '', bucket: 'b', mode: 'move' }));
+    store.update(id, { subPhase: 'moving', current: 0, total: 1, bytesDone: 300, bytesTotal: 1000 }, true);
+    const { query, text, cleanup } = mount(h(MasterQueue, { store }));
+    assert.ok(query('.queue-op-progress'), 'byte-progress block renders for a move');
+    assert.ok(query('.progress-bar'), 'progress bar renders');
+    assert.ok(/\bof\b/.test(text()), 'byte line renders (e.g. "300 B of 1000 B")');
+    cleanup();
+  });
+
+  test('a delete (no byte info) renders no byte bar', () => {
+    const store = makeStore();
+    addDelete(store, { subPhase: 'deleting', current: 1, total: 3 });
+    const { query, cleanup } = mount(h(MasterQueue, { store }));
+    assert.equal(query('.queue-op-progress'), null);
+    cleanup();
+  });
+});

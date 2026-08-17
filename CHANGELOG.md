@@ -7,6 +7,16 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.52.0] — 2026-08-16 — Moves show a real progress bar
+
+A move or copy in the operations queue now shows a progress bar, transfer speed, and ETA —
+the same way a ZIP download does — instead of only a file count. The bar tracks bytes: for a
+large file copied in parts, it advances as each part finishes on the server, so a single big
+file no longer sits at "0 of 1" for the whole transfer. Small files and batches advance as
+each object completes. Deletes are unchanged (there are no bytes to report). The progress is
+the real server-side copy, reported at the granularity we actually have — per part for large
+files, per object for the rest.
+
 ## [1.51.1] — 2026-08-16 — Move files whose names have unusual characters
 
 Moving or renaming an object whose name contains a character outside the Latin-1 range —

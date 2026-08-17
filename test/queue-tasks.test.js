@@ -103,4 +103,13 @@ describe('engineUpdateToPatch', () => {
   test('done with cancelled → status cancelled', () => {
     assert.equal(engineUpdateToPatch({ phase: 'done', cancelled: true }, 'deleted').status, 'cancelled');
   });
+  test('passes byte progress through so the queue can render a bar', () => {
+    const p = engineUpdateToPatch({ moved: 1, bytesDone: 300, bytesTotal: 1000 }, 'moved');
+    assert.equal(p.bytesDone, 300);
+    assert.equal(p.bytesTotal, 1000);
+  });
+  test('omits byte fields when the engine does not report them (e.g. delete)', () => {
+    const p = engineUpdateToPatch({ deleted: 2 }, 'deleted');
+    assert.ok(!('bytesDone' in p) && !('bytesTotal' in p));
+  });
 });

@@ -178,6 +178,29 @@ describe('copyObjectMultipart — R2 uniform part size', () => {
   });
 });
 
+// The queue shows byte progress for a move; a large single-file copy would otherwise sit at
+// "0 of 1" for the whole transfer. copyObjectMultipart reports each copied part's byte count
+// so the bar advances at part granularity.
+describe('copyObjectMultipart — per-part progress', () => {
+  test('reports each copied part\'s byte count, summing to the object size', async () => {
+    const client = mockClient();
+    const chunks = [];
+    // 12 MB in 5 MB parts → 5,000,000 + 5,000,000 + 2,000,000.
+    await copyObjectMultipart(client, {
+      bucket: 'bk', sourceKey: 's', destKey: 'd', size: 12_000_000, preferredPartBytes: 5_000_000,
+      onPartCopied: (bytes) => chunks.push(bytes),
+    });
+    assert.deepEqual(chunks.slice().sort((a, b) => b - a), [5_000_000, 5_000_000, 2_000_000]);
+    assert.equal(chunks.reduce((a, b) => a + b, 0), 12_000_000);
+  });
+
+  test('is optional — a copy without the callback still completes', async () => {
+    const client = mockClient();
+    await copyObjectMultipart(client, { bucket: 'bk', sourceKey: 's', destKey: 'd', size: 12_000_000, preferredPartBytes: 5_000_000 });
+    assert.ok(client.calls.some(c => c.name === 'CompleteMultipartUploadCommand'));
+  });
+});
+
 // A 4 GB part holds its connection open far longer than a 5 MB one, so it is more exposed
 // to a transient network drop. The copy path must retry those (a dropped/reset connection),
 // not only server throttling — otherwise one blip aborts the entire large-file copy.
