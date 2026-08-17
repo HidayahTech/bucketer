@@ -7,6 +7,16 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.51.1] — 2026-08-16 — Move files whose names have unusual characters
+
+Moving or renaming an object whose name contains a character outside the Latin-1 range —
+for example the full-width vertical bar "｜" that yt-dlp substitutes for "|", or CJK
+characters in names from other sources — now works. Before, the move failed instantly with
+a "Headers constructor" error and the object stayed put, because the copy request built its
+source header from the raw key and the browser rejects header values with such characters.
+The source key is now correctly encoded, so any object name moves cleanly. Nothing was ever
+lost: these copies failed before sending, so the affected files simply hadn't moved.
+
 ## [1.51.0] — 2026-08-16 — Far fewer requests when moving very large files
 
 Moving or renaming a very large object no longer floods the provider with requests. A move

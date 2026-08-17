@@ -1,9 +1,15 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.51.0';
+export const CURRENT_VERSION = '1.51.1';
 
 export const CHANGELOG = [
+  {
+    "version": "1.51.1",
+    "date": "2026-08-16",
+    "title": "Move files whose names have unusual characters",
+    "changes": []
+  },
   {
     "version": "1.51.0",
     "date": "2026-08-16",
