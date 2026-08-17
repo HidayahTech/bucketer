@@ -67,6 +67,7 @@ function taskSummary(t) {
   const skippedText  = skipped > 0 ? ` · ${skipped} skipped` : '';
   const failedText   = failed > 0 ? ` · ${failed} error${failed !== 1 ? 's' : ''}` : '';
 
+  if (t.status === 'paused') return `Paused — move of ${t.subject} interrupted; resume to finish`;
   if (t.status === 'cancelled') {
     const ofText = t.total != null ? ` of ${t.total}` : '';
     return `Cancelled — ${verbs.done.toLowerCase()} ${t.current}${ofText}${skippedText}${failedText}`;
@@ -77,12 +78,14 @@ function taskSummary(t) {
   return `${verbs.active} ${t.subject}${progressText}${skippedText}${failedText}`;
 }
 
-export function MasterQueue({ store = taskStore, readZipDetail }) {
+export function MasterQueue({ store = taskStore, readZipDetail, onResumeMove, onDiscardMove }) {
   const [tasks, setTasks] = useState(store.get());
   useEffect(() => store.subscribe(setTasks), [store]);
   if (tasks.length === 0) return null;
 
-  const settled = tasks.filter(t => t.status !== 'running');
+  // A paused (resumable) task is neither running nor a dismissable result — it must not be
+  // swept by "Dismiss all finished" (that would orphan its record); it has its own Discard.
+  const settled = tasks.filter(t => t.status === 'done' || t.status === 'cancelled');
   return (
     <div class="queue-panel" data-testid="master-queue">
       {settled.length >= 2 && (
@@ -93,13 +96,17 @@ export function MasterQueue({ store = taskStore, readZipDetail }) {
           </button>
         </div>
       )}
-      {tasks.map(t => <TaskRow key={t.id} task={t} store={store} readZipDetail={readZipDetail} />)}
+      {tasks.map(t => (
+        <TaskRow key={t.id} task={t} store={store} readZipDetail={readZipDetail}
+          onResumeMove={onResumeMove} onDiscardMove={onDiscardMove} />
+      ))}
     </div>
   );
 }
 
-function TaskRow({ task, store, readZipDetail }) {
+function TaskRow({ task, store, readZipDetail, onResumeMove, onDiscardMove }) {
   const isSettled = task.status !== 'running';
+  const isPaused  = task.status === 'paused'; // a resumable, interrupted move
   const failed    = task.errors.filter(e => !e.skipped).length;
   const hasErrors = task.errors.length > 0;
   const isZip        = task.delivery === 'zip';
@@ -220,7 +227,19 @@ function TaskRow({ task, store, readZipDetail }) {
             {isOpen ? 'Hide' : 'Show details'}
           </button>
         )}
-        {isSettled && (
+        {isPaused && (
+          <>
+            <button type="button" class="btn btn-sm" style={{ flexShrink: 0 }}
+              data-testid="move-resume" onClick={() => onResumeMove?.(task)}>
+              Resume
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm" style={{ flexShrink: 0 }}
+              data-testid="move-discard" onClick={() => onDiscardMove?.(task)}>
+              Discard
+            </button>
+          </>
+        )}
+        {isSettled && !isPaused && (
           <button type="button" class="btn btn-ghost btn-sm" style={{ flexShrink: 0 }}
             onClick={() => store.remove(task.id)}>
             Dismiss

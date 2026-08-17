@@ -79,6 +79,26 @@ export function createDownloadTask({ fileCount, bucket, capturedPrefix, tier = T
   };
 }
 
+// A move that was interrupted (e.g. by a reload) and persisted (move-jobs.js). It renders in
+// the queue as a paused row offering Resume / Discard — status 'paused', neither running nor
+// a settled/dismissable result. The dest re-scan on resume reconciles what already landed, so
+// total/bytesTotal here are the whole job (an upper bound), not the remaining work.
+export function createResumableMoveTask(record) {
+  return {
+    kind: 'move',
+    status: 'paused',
+    subPhase: null,
+    subject: subjectLabel(record.items.length, 0),
+    files: [], prefixes: [], dest: record.dest, capturedPrefix: record.capturedPrefix ?? '', bucket: record.bucket,
+    current: 0, total: record.items.length,
+    errors: [],
+    collapsed: false,
+    cancelRequested: false,
+    moveJobId: record.id,
+    bytesTotal: record.items.reduce((sum, it) => sum + (it.size || 0), 0),
+  };
+}
+
 // Engine progress update → task-store patch. countField is 'deleted' (delete
 // engine) or 'moved' (move/copy engine). `cancelled: true` on a done update
 // marks a run that stopped early because cancellation was requested.

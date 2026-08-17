@@ -13,7 +13,7 @@ import { h } from 'preact';
 import { mount, fire } from '../helpers/render.js';
 import { MasterQueue } from '../../src/components/MasterQueue.jsx';
 import { createTaskStore } from '../../src/lib/task-store.js';
-import { createDeleteTask, createTransferTask } from '../../src/lib/queue-tasks.js';
+import { createDeleteTask, createTransferTask, createResumableMoveTask } from '../../src/lib/queue-tasks.js';
 
 // Urgent updates flush synchronously, so tests never need a frame to fire.
 const makeStore = () => createTaskStore(fn => setTimeout(fn, 0), clearTimeout);
@@ -213,6 +213,41 @@ describe('MasterQueue — move byte progress', () => {
     addDelete(store, { subPhase: 'deleting', current: 1, total: 3 });
     const { query, cleanup } = mount(h(MasterQueue, { store }));
     assert.equal(query('.queue-op-progress'), null);
+    cleanup();
+  });
+});
+
+describe('MasterQueue — resumable move', () => {
+  const rec = { id: 'mv-1', bucket: 'b', dest: 'arch/', capturedPrefix: '', items: [{ sourceKey: 'a', destKey: 'arch/a', size: 100 }] };
+
+  test('a paused move shows Resume and Discard (not Cancel/Dismiss)', () => {
+    const store = makeStore();
+    store.add(createResumableMoveTask(rec));
+    const { text, query, cleanup } = mount(h(MasterQueue, { store, onResumeMove: () => {}, onDiscardMove: () => {} }));
+    assert.ok(/Paused/i.test(text()), text());
+    assert.ok(query('[data-testid="move-resume"]'), 'Resume button');
+    assert.ok(query('[data-testid="move-discard"]'), 'Discard button');
+    assert.equal(query('[data-testid="task-cancel"]'), null, 'no Cancel on a paused task');
+    cleanup();
+  });
+
+  test('Resume fires onResumeMove with the task', () => {
+    const store = makeStore();
+    const id = store.add(createResumableMoveTask(rec));
+    let resumed = null;
+    const { query, cleanup } = mount(h(MasterQueue, { store, onResumeMove: (t) => { resumed = t; }, onDiscardMove: () => {} }));
+    fire(query('[data-testid="move-resume"]'), 'click');
+    assert.equal(resumed.id, id);
+    cleanup();
+  });
+
+  test('Discard fires onDiscardMove with the task', () => {
+    const store = makeStore();
+    const id = store.add(createResumableMoveTask(rec));
+    let discarded = null;
+    const { query, cleanup } = mount(h(MasterQueue, { store, onResumeMove: () => {}, onDiscardMove: (t) => { discarded = t; } }));
+    fire(query('[data-testid="move-discard"]'), 'click');
+    assert.equal(discarded.id, id);
     cleanup();
   });
 });

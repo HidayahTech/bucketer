@@ -56,9 +56,11 @@ import { UploadQueue } from './UploadQueue.jsx';
 import { DeleteConfirmModal } from './DeleteConfirmModal.jsx';
 import { MasterQueue } from './MasterQueue.jsx';
 import { runDeleteOperation } from '../lib/delete-queue.js';
-import { runMoveOperation, runCopyOperation, runRenameOperation } from '../lib/move-queue.js';
+import { runMoveOperation, runCopyOperation, runRenameOperation, resumeMoveOperation } from '../lib/move-queue.js';
 import { taskStore } from '../lib/task-store.js';
-import { createDeleteTask, createTransferTask, createDownloadTask, engineUpdateToPatch } from '../lib/queue-tasks.js';
+import { createDeleteTask, createTransferTask, createDownloadTask, createResumableMoveTask, engineUpdateToPatch } from '../lib/queue-tasks.js';
+import { loadAllMoveJobs, loadMoveJob, deleteMoveJob } from '../lib/move-jobs.js';
+import { abortMultipartSession } from '../lib/upload-cleanup.js';
 import { DownloadJobPanel } from './DownloadJobPanel.jsx';
 import {
   saveJob, loadJob, loadAllJobs, deleteJob, updateJob, countItemsByStatus,
@@ -578,6 +580,29 @@ export function App() {
   // download API is a stable memo and reads it at call time.
   const activeDownloadJobs = useRef(new Set());
 
+  // Move-job ids already surfaced (as a paused row) or currently running, so the connect-time
+  // load never adds a duplicate paused row for a move that is already on screen.
+  const loadedMovesRef = useRef(new Set());
+
+  // On connect, surface this bucket's interrupted moves as paused rows (Resume / Discard).
+  useEffect(() => {
+    if (session !== 'connected' || !credentials?.bucket) return undefined;
+    let cancelled = false;
+    (async () => {
+      const jobs = await loadAllMoveJobs();
+      if (cancelled) return;
+      const onScreen = taskStore.get();
+      for (const j of jobs) {
+        if (j.bucket !== credentials.bucket) continue;
+        if (loadedMovesRef.current.has(j.id)) continue;
+        if (onScreen.some(t => t.id === j.id)) continue; // a move already running this session
+        loadedMovesRef.current.add(j.id);
+        taskStore.add(createResumableMoveTask(j));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [session, credentials?.bucket]);
+
   // Record/enumeration wiring handed to DownloadJobPanel, which stays free of IndexedDB
   // and the SDK. Rebuilt only when the connection changes.
   const downloadApi = useMemo(() => ({
@@ -897,42 +922,79 @@ export function App() {
     }
   }
 
+  // Shared onProgress for a move/copy/rename run and for a resumed move: refresh views on
+  // each moved key, and on done refetch, unlock capabilities, and toast. Kept as one factory
+  // so a fresh run and a resume behave identically.
+  function moveProgress(id, { capturedPrefix, dest, mode }) {
+    return (update) => {
+      if (update.movedKeys?.length) browserActionsRef.current?.removeItems(update.movedKeys, []);
+      if (update.phase === 'done') {
+        if (update.movedPrefixes?.length) browserActionsRef.current?.removeItems([], update.movedPrefixes);
+        browserActionsRef.current?.invalidateCache(capturedPrefix);
+        browserActionsRef.current?.invalidateCache(dest);
+        if (update.moved > 0) {
+          handleCapabilityChange('upload', 'permitted');
+          if (mode !== 'copy') handleCapabilityChange('delete', 'permitted');
+        }
+        if (update.errors.length === 0 && !update.cancelled) {
+          const verb = mode === 'copy' ? 'Copied' : mode === 'rename' ? 'Renamed' : 'Moved';
+          showToast(`${verb} ${update.moved} item${update.moved === 1 ? '' : 's'}`);
+        }
+      }
+      taskStore.update(id, engineUpdateToPatch(update, 'moved'), !!update.phase);
+    };
+  }
+
   // The MovePickerModal is the confirmation step, so a move/copy request starts
-  // its task directly.
+  // its task directly. A move (only) persists a resumable job keyed by the task id.
   async function handleMoveRequest({ files, prefixes, dest, capturedPrefix, mode = 'move', renameTo }) {
     const task = createTransferTask({ files, prefixes, dest, capturedPrefix, bucket: credentials.bucket, mode, renameTo });
     const id = taskStore.add(task);
+    loadedMovesRef.current.add(id); // this job is already on screen — never re-surface it as paused
     const runOperation = mode === 'rename' ? runRenameOperation : mode === 'copy' ? runCopyOperation : runMoveOperation;
+    const op = { ...task, jobId: id, provider: credentials.provider, endpoint: credentials.endpoint };
     try {
-      await runOperation(client, task.bucket, task, (update) => {
-        // Remove moved source rows incrementally (copy+delete confirmed for those keys).
-        if (update.movedKeys?.length) {
-          browserActionsRef.current?.removeItems(update.movedKeys, []);
-        }
-        if (update.phase === 'done') {
-          if (update.movedPrefixes?.length) {
-            browserActionsRef.current?.removeItems([], update.movedPrefixes);
-          }
-          // Invalidate both the source view and the destination so each refetches.
-          browserActionsRef.current?.invalidateCache(task.capturedPrefix);
-          browserActionsRef.current?.invalidateCache(task.dest);
-          if (update.moved > 0) {
-            handleCapabilityChange('upload', 'permitted');
-            if (mode !== 'copy') handleCapabilityChange('delete', 'permitted');
-          }
-          if (update.errors.length === 0 && !update.cancelled) {
-            const verb = mode === 'copy' ? 'Copied' : mode === 'rename' ? 'Renamed' : 'Moved';
-            showToast(`${verb} ${update.moved} item${update.moved === 1 ? '' : 's'}`);
-          }
-        }
-        taskStore.update(id, engineUpdateToPatch(update, 'moved'), !!update.phase);
-      }, () => taskStore.isCancelRequested(id));
+      await runOperation(client, task.bucket, op, moveProgress(id, { capturedPrefix: task.capturedPrefix, dest: task.dest, mode }),
+        () => taskStore.isCancelRequested(id));
     } catch (err) {
       taskStore.update(id, {
         status: 'done', subPhase: null,
         errors: [{ key: '(unexpected)', message: err.message || String(err) }],
       }, true);
     }
+  }
+
+  // Resume a paused move: reload its record and run the resume engine, flipping the row back
+  // to running. On clean completion the engine deletes the record and the row settles as done.
+  async function handleResumeMove(task) {
+    const record = await loadMoveJob(task.moveJobId);
+    if (!record) { taskStore.remove(task.id); return; }
+    taskStore.update(task.id, { status: 'running', subPhase: 'moving' }, true);
+    try {
+      await resumeMoveOperation(client, record.bucket, record,
+        moveProgress(task.id, { capturedPrefix: record.capturedPrefix, dest: record.dest, mode: 'move' }),
+        () => taskStore.isCancelRequested(task.id));
+    } catch (err) {
+      taskStore.update(task.id, { status: 'done', subPhase: null,
+        errors: [{ key: '(unexpected)', message: err.message || String(err) }] }, true);
+    }
+  }
+
+  // Discard a paused move: abort any still-in-flight multipart uploads (reclaiming their
+  // storage), forget the record, and drop the row.
+  async function handleDiscardMove(task) {
+    const record = await loadMoveJob(task.moveJobId);
+    if (record) {
+      const destBySource = new Map(record.items.map(it => [it.sourceKey, it.destKey]));
+      for (const [sourceKey, info] of Object.entries(record.inflightUploads || {})) {
+        const key = destBySource.get(sourceKey);
+        if (key && info?.uploadId) {
+          await abortMultipartSession(client, { bucket: record.bucket, key, uploadId: info.uploadId, provider: record.provider, endpoint: record.endpoint }).catch(() => {});
+        }
+      }
+      await deleteMoveJob(task.moveJobId).catch(() => {});
+    }
+    taskStore.remove(task.id);
   }
 
   function handleSelectProfile(id) {
@@ -1302,6 +1364,8 @@ export function App() {
 
             <MasterQueue
               readZipDetail={(jobId) => loadZipDetail(jobId).catch(() => ({ done: [], failed: [], doneCount: 0, failedCount: 0 }))}
+              onResumeMove={handleResumeMove}
+              onDiscardMove={handleDiscardMove}
             />
 
             <UploadLog refreshKey={logKey} />
