@@ -204,3 +204,20 @@ build invariant: `build.mjs` (CHANGELOG⇄package.json lockstep, update-check by
 Per `hidayahtech-knowledge/hidayahtech/repo-baseline.md` §2. The hook is
 client-side (bypassable by design); the build invariants and BUG-LOG are the
 backstop.
+
+## HidayahTech knowledge repo & services
+
+Cross-project knowledge lives in `~/dev/hidayahtech-knowledge`
+(gitlab.com/hidayahtech), NOT here; engineering docs tied to this code stay
+next to the code.
+
+- **Read:** `pull --ff-only` first; find via domain READMEs + frontmatter
+  greps, don't scan the tree.
+- **Write:** read its `AGENTS.md` first and follow it exactly — it governs
+  all writes; none happen in the shared working copy.
+- **Never** copy `client-confidential` / `personal-data` content into this
+  repo's committed files.
+- **Services** (videolab: QA videos · doclab: branded PDFs + `doclab view`,
+  on request only, agents `--no-open`): pull + read their docs before use.
+- **Virtual team:** `hidayahtech/virtual-team-protocol.md` — EM session,
+  trigger-fired personas, §1a gate before every spawn.
