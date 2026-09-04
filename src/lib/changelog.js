@@ -1,9 +1,15 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.55.0';
+export const CURRENT_VERSION = '1.56.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.56.0",
+    "date": "2026-09-04",
+    "title": "Group saved buckets by account",
+    "changes": []
+  },
   {
     "version": "1.55.0",
     "date": "2026-08-17",

@@ -7,6 +7,14 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.56.0] — 2026-09-04 — Group saved buckets by account
+
+Saved connections now appear as an **account → buckets tree** instead of a flat list. Buckets that share one set of credentials — the same endpoint and access key — are grouped under a single account header (provider name plus a masked key tail), collapsed except for the account you're currently using. This makes it obvious which buckets belong together and stops one account with several buckets from reading as several unrelated entries.
+
+Selecting a bucket, deleting one, and saving the current form all work exactly as before — only the presentation changed. Vocabulary is standardized on **account** and **bucket**: the storage inspector's "Saved Profiles" section is now "Saved buckets".
+
+First slice of the multi-bucket & account-management redesign (`docs/superpowers/specs/2026-09-04-multi-bucket-account-management-design.md`). Quick-switch tabs, background transfers across switches, and the in-session multi-account secret model land in later slices; no data migration is required for this one — the grouping is a pure projection over connections that already carry their account id.
+
 ## [1.55.0] — 2026-08-17 — Resume a failed move without refreshing
 
 When a move stops partway — because of errors (a storage cap, a permission block) or a

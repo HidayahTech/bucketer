@@ -1124,6 +1124,40 @@ details[open] .sv-summary::before { transform: rotate(90deg); }
   margin-bottom: .75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
+/* AccountsManager — account → buckets tree (replaces the flat profile list). */
+.accounts-manager { margin-bottom: 1.25rem; }
+.account-group { margin-bottom: .5rem; }
+.account-header {
+  display: flex; align-items: center; gap: .4rem; cursor: pointer;
+  padding: .3rem .25rem; user-select: none;
+  font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--text-muted); transition: color var(--transition);
+}
+.account-header:hover { color: var(--text); }
+.account-disclosure { width: .9em; flex-shrink: 0; text-align: center; }
+.account-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bucket-list { list-style: none; padding: 0; margin: .1rem 0 .25rem .55rem; display: flex; flex-direction: column; gap: .25rem; }
+.bucket-row {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .4rem .6rem; border-radius: var(--radius);
+  border: 1px solid var(--border); background: var(--surface-raised);
+  cursor: pointer; font-size: .85rem; transition: background var(--transition);
+}
+.bucket-row:hover { background: var(--surface-hover, var(--border)); }
+.bucket-row-selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface-raised)); }
+.bucket-name { flex: 1; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bucket-row-delete {
+  background: none; border: none; cursor: pointer; padding: .1rem .3rem;
+  font-size: .8rem; color: var(--text-muted); border-radius: 3px; line-height: 1; flex-shrink: 0;
+}
+.bucket-row-delete:hover { color: var(--danger, #c0392b); background: color-mix(in srgb, var(--danger, #c0392b) 12%, transparent); }
+.bucket-delete-confirm { display: flex; align-items: center; gap: .4rem; font-size: .8rem; color: var(--text-muted); flex: 1; justify-content: flex-end; }
+.bucket-delete-confirm-yes { color: var(--danger, #c0392b); border-color: var(--danger, #c0392b); }
+.bucket-delete-confirm-yes:hover { background: color-mix(in srgb, var(--danger, #c0392b) 12%, transparent); }
+.bucket-save-trigger { font-size: .8rem; color: var(--text-muted); }
+.bucket-save-form { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.bucket-save-form .input { flex: 1; min-width: 140px; font-size: .85rem; padding: .3rem .5rem; }
+
 /* ── Toasts (#15) ─────────────────────────────────────────────────────────── */
 .toast-host {
   position: fixed; bottom: 1rem; right: 1rem; z-index: 1000;

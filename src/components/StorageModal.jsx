@@ -206,11 +206,11 @@ export function StorageModal({ onClose, isConnected }) {
 
             {/* ── Profiles ──────────────────────────────────────── */}
             <details class="sv-section" open>
-              <SectionHead title="Saved Profiles" badge={data.profiles.length} />
+              <SectionHead title="Saved buckets" badge={data.profiles.length} />
               <div class="sv-section-body">
                 <StoreLoc>localStorage · <KeyName name="s3b_connections" /> (JSON array) · <KeyName name="s3b_credentials" /> ({data.credentials.length} stored) · <KeyName name="s3b_last_profile_id" /> (selected)</StoreLoc>
                 {data.profiles.length === 0 ? (
-                  <Empty text="No saved profiles." />
+                  <Empty text="No saved buckets." />
                 ) : (
                   <table class="sv-table">
                     <thead>
@@ -232,15 +232,15 @@ export function StorageModal({ onClose, isConnected }) {
                           <td>
                             <button type="button" class="btn btn-ghost btn-sm sv-del-btn"
                               onClick={async () => { deleteConnectionRecord(p.id); await load(); }}
-                              title="Delete this profile">✕</button>
+                              title="Forget this bucket">✕</button>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 )}
-                <ConfirmDialog id="profiles" controller={controller} label="Delete all profiles"
-                  warning="All saved profiles and their stored credentials will be removed. Credentials on your storage provider are unaffected."
+                <ConfirmDialog id="profiles" controller={controller} label="Delete all saved buckets"
+                  warning="All saved buckets and their stored accounts will be removed. Credentials on your storage provider are unaffected."
                   danger />
               </div>
             </details>
@@ -427,7 +427,7 @@ export function StorageModal({ onClose, isConnected }) {
               </p>
               <ul class="sv-wipe-list">
                 <li>Connection details and credential fields</li>
-                <li>All saved profiles</li>
+                <li>All saved buckets</li>
                 <li>Vault-encrypted credential secrets</li>
                 <li>Upload history and resume records</li>
                 <li>All settings</li>

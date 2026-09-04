@@ -89,7 +89,7 @@ import { ErrorBlock } from './ErrorBlock.jsx';
 import { UpdateBanner } from './UpdateBanner.jsx';
 import { ChangelogModal } from './ChangelogModal.jsx';
 import { AboutModal } from './AboutModal.jsx';
-import { ProfilePicker } from './ProfilePicker.jsx';
+import { AccountsManager } from './AccountsManager.jsx';
 import { StorageModal } from './StorageModal.jsx';
 import { TransferHandoff } from './TransferHandoff.jsx';
 import { DuplicatesModal } from './DuplicatesModal.jsx';
@@ -1270,8 +1270,8 @@ export function App() {
               <VaultUnlock connections={connections} onUnlock={handleVaultUnlock} onReset={handleVaultReset} />
             ) : (
               <>
-                <ProfilePicker
-                  profiles={connections}
+                <AccountsManager
+                  connections={connections}
                   selectedId={selectedConnectionId}
                   onSelect={handleSelectProfile}
                   onDelete={handleDeleteProfile}

@@ -119,12 +119,12 @@ describe('App — saving a profile trims whitespace-padded fields', () => {
       setInput(query('#cred-bucket'), '  test-bucket  ');
       setInput(query('#cred-keyid'), '  AKIDEXAMPLE1234  ');
 
-      const saveTrigger = query('.profile-save-trigger');
+      const saveTrigger = query('.bucket-save-trigger');
       assert.ok(saveTrigger, '"Save as profile…" trigger must be present');
       assert.ok(!saveTrigger.disabled, 'trigger must be enabled once endpoint/bucket/keyId are valid (trimmed)');
       fire(saveTrigger, 'click');
 
-      const submitBtn = query('.profile-save-form button[type="submit"]');
+      const submitBtn = query('.bucket-save-form button[type="submit"]');
       assert.ok(submitBtn, 'save-form submit button must appear after clicking the trigger');
       fire(submitBtn, 'click');
 
@@ -156,8 +156,8 @@ describe('App — saving a profile does not clobber capabilities written directl
       setInput(query('#cred-endpoint'), 'https://s3.us-east-1.amazonaws.com');
       setInput(query('#cred-bucket'), 'test-bucket');
       setInput(query('#cred-keyid'), 'AKIDEXAMPLE1234');
-      fire(query('.profile-save-trigger'), 'click');
-      fire(query('.profile-save-form button[type="submit"]'), 'click');
+      fire(query('.bucket-save-trigger'), 'click');
+      fire(query('.bucket-save-form button[type="submit"]'), 'click');
 
       const beforeId = JSON.parse(localStorage.getItem('s3b_connections')).connections[0].id;
 
@@ -171,9 +171,9 @@ describe('App — saving a profile does not clobber capabilities written directl
 
       // Now save again against the same still-selected connection (e.g. a rename).
       // The button now reads "Update profile…" because a connection is selected.
-      fire(query('.profile-save-trigger'), 'click');
-      setInput(query('.profile-save-form input[type="text"]'), 'Renamed connection');
-      fire(query('.profile-save-form button[type="submit"]'), 'click');
+      fire(query('.bucket-save-trigger'), 'click');
+      setInput(query('.bucket-save-form input[type="text"]'), 'Renamed connection');
+      fire(query('.bucket-save-form button[type="submit"]'), 'click');
 
       const after = JSON.parse(localStorage.getItem('s3b_connections'));
       const conn = after.connections.find(c => c.id === beforeId);
@@ -229,7 +229,7 @@ describe('App — first load after migration pre-fills the form (regression)', (
         'bucket must be pre-filled from the migrated connection on first load');
       assert.equal(query('#cred-keyid')?.value, 'k1',
         'key ID must be pre-filled from the migrated connection on first load');
-      assert.ok(text().includes('Backups'), 'the migrated profile must still show in the picker');
+      assert.ok(text().includes('backups'), 'the migrated bucket must still show in the accounts manager');
     } finally {
       cleanup();
       clearAppStorage();
@@ -637,8 +637,8 @@ describe('App — a storage write that silently fails does not blank the form (B
       // which swallows exactly this.
       proto.setItem = function () { throw new Error('simulated storage failure'); };
 
-      fire(query('.profile-save-trigger'), 'click');
-      fire(query('.profile-save-form button[type="submit"]'), 'click');
+      fire(query('.bucket-save-trigger'), 'click');
+      fire(query('.bucket-save-form button[type="submit"]'), 'click');
 
       assert.equal(query('#cred-endpoint')?.value, 'https://s3.us-east-1.amazonaws.com',
         'endpoint must survive a save attempt that silently failed to persist');
@@ -1124,8 +1124,8 @@ describe('App — re-wrap on credential change while the vault is unlocked (Task
       setInput(query('#cred-keyid'), 'kNew');
       setInput(query('#cred-secretkey'), 'new-secret');
 
-      fire(query('.profile-save-trigger'), 'click');
-      fire(query('.profile-save-form button[type="submit"]'), 'click');
+      fire(query('.bucket-save-trigger'), 'click');
+      fire(query('.bucket-save-form button[type="submit"]'), 'click');
 
       const { credentials } = JSON.parse(localStorage.getItem('s3b_credentials'));
       const newCred = credentials.find(c => c.endpoint === 'https://s3.new.example.com');

@@ -260,7 +260,7 @@ export function findOrCreateCredential({ endpoint, keyId, provider, regionOverri
 }
 
 // Joins a connection to its credential. The returned shape is deliberately
-// field-compatible with the old profile object so existing UI (ProfilePicker,
+// field-compatible with the old profile object so existing UI (AccountsManager,
 // App's connect path) consumes it unchanged.
 //
 // Returns null when the connection is unknown OR its credential is missing. An
