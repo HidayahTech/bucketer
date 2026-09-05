@@ -1166,3 +1166,33 @@ describe('App — disconnect does not lock the vault (Task 6)', () => {
     } finally { cleanup(); clearAppStorage(); }
   });
 });
+
+// Slice 3: "+ bucket" on an account pre-fills the credential form from that account —
+// endpoint/key/provider/region come from the stored credential, so the user types only
+// the new bucket name (and their secret). Closes the "retype everything for a sibling
+// bucket" friction under the 1:1 (switch = saved connection) model.
+describe('App — "+ bucket" pre-fills the form from the account', () => {
+  test('endpoint and key ID come from the account; the bucket is left empty', () => {
+    clearAppStorage();
+    localStorage.setItem('s3b_credentials', JSON.stringify({
+      version: 1,
+      credentials: [{ id: 'credA', endpoint: 'https://s3.us-west-002.backblazeb2.com', keyId: 'K1ABCDEF', provider: 'b2', regionOverride: 'us-west-002', label: 'B2 — K1' }],
+    }));
+    localStorage.setItem('s3b_connections', JSON.stringify({
+      version: 2,
+      connections: [{ id: 1, name: 'B2 — photos', credentialId: 'credA', bucket: 'photos', capabilities: null }],
+    }));
+    localStorage.setItem('s3b_connections_migrated', '1');
+
+    const { query, cleanup } = mount(h(App, {}));
+    try {
+      const addBtn = query('.account-add-bucket');
+      assert.ok(addBtn, '+ bucket button should render for the saved account');
+      fire(addBtn, 'click');
+
+      assert.equal(query('#cred-endpoint').value, 'https://s3.us-west-002.backblazeb2.com', 'endpoint prefilled from the account');
+      assert.equal(query('#cred-keyid').value, 'K1ABCDEF', 'key ID prefilled from the account');
+      assert.equal(query('#cred-bucket').value, '', 'bucket is left empty for the user to fill');
+    } finally { cleanup(); clearAppStorage(); }
+  });
+});

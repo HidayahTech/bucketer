@@ -49,7 +49,7 @@ function defaultName(formData) {
   return bucket || '';
 }
 
-export function AccountsManager({ connections, selectedId, onSelect, onDelete, onSave, currentFormData }) {
+export function AccountsManager({ connections, selectedId, onSelect, onDelete, onSave, onAddBucket, currentFormData }) {
   const groups = groupByAccount(connections);
   // Explicit per-account expand/collapse overrides. Default (no override) expands an
   // account when nothing is selected or when it holds the active bucket, and collapses
@@ -92,6 +92,9 @@ export function AccountsManager({ connections, selectedId, onSelect, onDelete, o
             <div class="account-header" onClick={() => toggle(g)}>
               <span class="account-disclosure" aria-hidden="true">{expanded ? '▾' : '▸'}</span>
               <span class="account-name">{accountLabel(g.conns[0])}</span>
+              <button class="account-add-bucket btn-ghost" type="button"
+                title="Add a bucket to this account — you only enter the bucket name"
+                onClick={e => { e.stopPropagation(); onAddBucket(g.credentialId); }}>+ bucket</button>
             </div>
             {expanded && (
               <ul class="bucket-list">

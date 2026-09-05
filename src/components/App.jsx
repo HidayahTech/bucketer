@@ -40,7 +40,7 @@ import {
   listResolvedConnections, resolveConnection, findOrCreateCredential,
   saveConnectionRecord, deleteConnectionRecord, migrateProfilesToConnections,
   defaultCapabilities, loadConnectionCapabilities, saveConnectionCapabilities,
-  defaultConnectionName, hasMigratedConnections,
+  defaultConnectionName, hasMigratedConnections, loadCredentialRecords,
 } from '../lib/connections.js';
 import { readUrlParams, hasUrlParams, buildShareUrl } from '../lib/url-params.js';
 import { normalizeBasePrefix } from '../lib/base-prefix.js';
@@ -1135,6 +1135,32 @@ export function App() {
     setLiveFormData(creds);
   }
 
+  // "+ bucket" on an account: pre-fill the form with that account's credential so the
+  // user types only the new bucket name (and their secret), instead of re-entering
+  // endpoint/key/provider/region. Selection is cleared because this creates a NEW bucket
+  // under the account, not an edit of the currently-selected connection; the new
+  // (account, bucket) pairing is persisted by the normal save flow, which de-dupes the
+  // credential via findOrCreateCredential so the bucket lands under the same account.
+  function handleAddBucket(credentialId) {
+    const cred = loadCredentialRecords().credentials.find(c => c.id === credentialId);
+    if (!cred) return;
+    const prefill = {
+      endpoint:       cred.endpoint,
+      keyId:          cred.keyId,
+      provider:       cred.provider,
+      regionOverride: cred.regionOverride,
+      bucket:         '',
+      basePrefix:     '',
+      secretKey:      '',
+    };
+    setSelectedConnectionId(null);
+    saveLastProfileId(null);
+    setCapabilities(defaultCapabilities());
+    setCredentials(prefill);
+    setLiveFormData(prefill);
+    setFormResetKey(k => k + 1); // remount CredentialForm so it re-reads the prefilled `initial`
+  }
+
   function handleDeleteProfile(id) {
     deleteConnectionRecord(id);
     setConnections(listResolvedConnections());
@@ -1282,6 +1308,7 @@ export function App() {
                   onSelect={handleSelectProfile}
                   onDelete={handleDeleteProfile}
                   onSave={handleSaveProfile}
+                  onAddBucket={handleAddBucket}
                   currentFormData={liveFormData}
                 />
                 {urlParamsPresent && (

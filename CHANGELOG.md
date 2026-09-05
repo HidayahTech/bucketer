@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.57.0] — 2026-09-04 — Add a bucket to an account without retyping
+
+Each account in the accounts list now has a **"+ bucket"** button. Click it and the connection form is pre-filled with that account's endpoint, key, provider, and region — you type only the new bucket name (and your secret) to add another bucket under the same account, instead of re-entering everything. The new bucket appears grouped under its account.
+
 ## [1.56.1] — 2026-09-04 — Fix: a download job no longer surfaces under a different account with the same bucket name
 
 Download jobs are now matched to their **full origin** — bucket *and* provider *and* endpoint — not the bucket name alone. Before this, a saved download created for one account's bucket could appear, and be resumed or verified, while you were connected to a *different* account that happened to have a bucket with the same name (e.g. two accounts each with a `backups` bucket). Move jobs already guarded against this; download jobs now do too (BUG-061). Downloads created before this fix keep working — they fall back to a bucket-and-provider match.

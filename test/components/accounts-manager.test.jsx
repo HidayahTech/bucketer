@@ -17,7 +17,7 @@ const SAVEABLE_FORM = { endpoint: 'https://s3.us-west-002.backblazeb2.com', buck
 function defaultProps(overrides = {}) {
   return {
     connections: [], selectedId: null,
-    onSelect: () => {}, onDelete: () => {}, onSave: () => {},
+    onSelect: () => {}, onDelete: () => {}, onSave: () => {}, onAddBucket: () => {},
     currentFormData: SAVEABLE_FORM, ...overrides,
   };
 }
@@ -150,6 +150,30 @@ describe('AccountsManager — save current', () => {
     setInput(query('.bucket-save-form input[type="text"]'), '  My Bucket  ');
     fire(query('.bucket-save-form button[type="submit"]'), 'click');
     assert.equal(saved, 'My Bucket');
+    cleanup();
+  });
+});
+
+describe('AccountsManager — add bucket to an account', () => {
+  test('clicking "+ bucket" calls onAddBucket with the account credentialId', () => {
+    let added = null;
+    const { queryAll, cleanup } = mount(h(AccountsManager, defaultProps({
+      connections: [B2_PHOTOS, AWS_ASSETS],
+      onAddBucket: id => { added = id; },
+    })));
+    const b2Group = queryAll('.account-group').find(g => g.textContent.includes('Backblaze B2'));
+    fire(b2Group.querySelector('.account-add-bucket'), 'click');
+    assert.equal(added, 'credB2');
+    cleanup();
+  });
+
+  test('clicking "+ bucket" does not toggle the account collapse', () => {
+    const { queryAll, cleanup } = mount(h(AccountsManager, defaultProps({
+      connections: [B2_PHOTOS, B2_BACKUPS], selectedId: 1,
+    })));
+    assert.equal(queryAll('.account-group')[0].querySelectorAll('.bucket-row').length, 2, 'expanded before');
+    fire(queryAll('.account-group')[0].querySelector('.account-add-bucket'), 'click');
+    assert.equal(queryAll('.account-group')[0].querySelectorAll('.bucket-row').length, 2, 'still expanded (no toggle)');
     cleanup();
   });
 });
