@@ -32,6 +32,25 @@ export const JOB_STATUS = {
   CANCELLED:   'cancelled',
 };
 
+// True when a persisted job belongs to the given origin. A job record must match the
+// FULL origin — bucket AND provider AND endpoint — not the bucket name alone: two accounts
+// on the same provider can reuse a bucket name (backups/media/assets), and surfacing or
+// resuming one account's job under another's live credentials is the credential-confusion
+// class the move-jobs guard already blocks (App.jsx move-job filter).
+//
+// Legacy-tolerant: jobs created before `endpoint` (and, older still, `provider`) was
+// recorded carry only the fields they have. An absent field cannot exclude a match, so
+// those old jobs fall back to bucket+provider (or bucket alone) — the pre-fix behavior —
+// while every new job, which records the endpoint, is disambiguated exactly. No IndexedDB
+// version bump: the fields are additive and readers tolerate their absence.
+export function jobMatchesOrigin(job, { bucket, provider, endpoint }) {
+  if (!job) return false;
+  if (job.bucket !== bucket) return false;
+  if (job.endpoint != null && job.endpoint !== endpoint) return false;
+  if (job.provider != null && job.provider !== provider) return false;
+  return true;
+}
+
 const itemId = (jobId, key) => `${jobId}:${key}`;
 
 function txDone(tx) {

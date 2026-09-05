@@ -1495,7 +1495,7 @@ describe('source hygiene', () => {
 describe('App.jsx — a download job cannot run against another connection', () => {
   const source = src('components/App.jsx');
 
-  test('handleDownloadStart compares the job bucket to the live credentials', () => {
+  test('handleDownloadStart checks the job origin against the live credentials before presigning', () => {
     const start = source.indexOf('async function handleDownloadStart');
     assert.ok(start > -1, 'handleDownloadStart must exist');
 
@@ -1504,9 +1504,9 @@ describe('App.jsx — a download job cannot run against another connection', () 
 
     const preamble = source.slice(start, presign);
     assert.ok(
-      /fresh\.bucket\s*!==\s*credentials\.bucket/.test(preamble),
-      'handleDownloadStart must reject a job whose bucket differs from the connected one, ' +
-      'and must do so before any presigned URL is created'
+      /jobMatchesOrigin\(fresh/.test(preamble),
+      'handleDownloadStart must reject a job whose full origin (bucket+provider+endpoint) ' +
+      'differs from the connected one, and must do so before any presigned URL is created'
     );
   });
 });

@@ -4,6 +4,46 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-061 — A download job surfaces under a different account that shares its bucket name
+
+**Symptom.** A download job created for one account's bucket (say `backups` on a B2 account)
+would appear in the download panel — and could be resumed or verified — while connected to a
+*different* account that also has a bucket named `backups`. The manifest is durable
+(IndexedDB) and outlives the session that built it; reconnecting to a same-named bucket on
+another account (or another provider) surfaced the wrong account's job as if it were the
+current one. Reachable today via disconnect → reconnect; latent because it only bites when
+two accounts reuse a common bucket name (`backups`, `media`, `assets` are common).
+
+**Root cause.** Download jobs recorded `bucket` and `provider` but **not** `endpoint`, and
+every match site compared on the bucket name alone: `listJobs` filtered
+`j.bucket === credentials.bucket`, and `verify`/`handleDownloadStart`/`handleZipStart` each
+guarded with `fresh.bucket !== credentials.bucket`. Move jobs already avoid exactly this
+"credential confusion" by matching the **full origin** `{bucket, provider, endpoint}` (added
+in a commit security review); download jobs never got the same treatment. Two accounts on
+one provider with the same bucket name differ only by endpoint/key — invisible to a
+bucket-name comparison.
+
+**Fix.** A pure, legacy-tolerant `jobMatchesOrigin(job, {bucket, provider, endpoint})` in
+`download-records.js` matches the full origin. `startJob` now records `endpoint`. All four
+match sites route through the helper. Legacy tolerance: a job created before `endpoint` (or,
+older, `provider`) was recorded has that field absent, and an absent field cannot exclude a
+match — so old jobs fall back to bucket(+provider), preserving pre-fix behavior, while every
+new job is disambiguated exactly. Additive; no IndexedDB version bump. Mirrors the move-jobs
+origin-match precedent.
+
+**Why it wasn't caught earlier.** Move jobs earned full-origin matching from a security
+review; the download-job filter shipped earlier and was never revisited when the same class
+applied. No test exercised two accounts sharing a bucket name — the download e2e uses a
+single account/bucket. It surfaced in the multi-bucket redesign architecture review
+(2026-09-04), which is exactly when multi-account access becomes common.
+
+**Test case.** `download-records.test.js` → `jobMatchesOrigin`: rejects a same-bucket,
+same-provider job from a different endpoint (two B2 accounts both with `backups`); accepts an
+identical origin; rejects a different bucket or provider; legacy no-endpoint and no-provider
+fallbacks covered. `source-invariants.test.js` asserts `handleDownloadStart` guards via
+`jobMatchesOrigin` before presigning. No e2e coverage: harness cannot represent two accounts
+with same-named buckets and IndexedDB jobs persisting across a reconnect.
+
 ## BUG-060 — Moving an object whose key has a non-Latin-1 character fails ("Headers constructor")
 
 **Symptom.** Moving four objects (`Anwar al-Tafsir ｜ Week 1 [kPJPC9SbAjA].opus` and its

@@ -67,6 +67,7 @@ import { DownloadJobPanel } from './DownloadJobPanel.jsx';
 import {
   saveJob, loadJob, loadAllJobs, deleteJob, updateJob, countItemsByStatus,
   eachItemByStatus, resetFailedToPending, ITEM_STATUS, JOB_STATUS, loadZipDetail,
+  jobMatchesOrigin,
 } from '../lib/download-records.js';
 import { enumerateJob } from '../lib/download-manifest.js';
 import { runDownloadJob, jobOutcome } from '../lib/download-queue.js';
@@ -618,7 +619,8 @@ export function App() {
     // was permanent. classifyJob is total, so every job lands in exactly one section.
     listJobs: async () => {
       const jobs = await loadAllJobs();
-      const mine = jobs.filter(j => j.bucket === credentials.bucket && !activeDownloadJobs.current.has(j.id));
+      const origin = { bucket: credentials.bucket, provider: credentials.provider, endpoint: credentials.endpoint };
+      const mine = jobs.filter(j => jobMatchesOrigin(j, origin) && !activeDownloadJobs.current.has(j.id));
       return Promise.all(mine.map(async j => {
         // Jobs enumerated before the sendable counters existed self-heal on first sight:
         // SKIPPED rows are bounded by the archived count, so this walk is small.
@@ -650,6 +652,10 @@ export function App() {
         // check at enumeration is provider-specific. Jobs created before this field
         // existed have none, which correctly flags nothing rather than guessing AWS.
         provider: credentials.provider || detectProvider(credentials.endpoint),
+        // Recorded so the job is bound to its FULL origin, not just the bucket name:
+        // two accounts on one provider can reuse a bucket name, and matching on the name
+        // alone let one account's jobs surface under another's (jobMatchesOrigin).
+        endpoint: credentials.endpoint,
         status: JOB_STATUS.ENUMERATING,
         enumeration: {},
         counters: { total: 0, bytesTotal: 0, sendable: 0, bytesSendable: 0 },
@@ -665,7 +671,7 @@ export function App() {
     // bucket's job against another bucket's session.
     verify: async (jobId, dirHandle) => {
       const job = await loadJob(jobId);
-      if (!job || job.bucket !== credentials.bucket) {
+      if (!jobMatchesOrigin(job, { bucket: credentials.bucket, provider: credentials.provider, endpoint: credentials.endpoint })) {
         throw new Error('That download was created for a different bucket. Reconnect to it to check it.');
       }
       return verifyJob(jobId, dirHandle);
@@ -730,12 +736,12 @@ export function App() {
     if (!fresh) return;
 
     // A manifest outlives the session that built it. Nothing today can reach here with a
-    // job from another connection — listJobs() filters by bucket, and new jobs take
+    // job from another connection — listJobs() filters by full origin, and new jobs take
     // theirs from the live one — but the two are separate facts stored in separate places,
     // so the match is checked rather than assumed. Without this, a stale job would presign
     // its own recorded bucket using the *current* client, signing for a bucket the user is
     // not connected to.
-    if (fresh.bucket !== credentials.bucket) {
+    if (!jobMatchesOrigin(fresh, { bucket: credentials.bucket, provider: credentials.provider, endpoint: credentials.endpoint })) {
       showToast('That download was created for a different bucket. Reconnect to it to continue.');
       return;
     }
@@ -815,7 +821,7 @@ export function App() {
     if (!fresh) return;
 
     // See handleDownloadStart: a manifest outlives the session that built it.
-    if (fresh.bucket !== credentials.bucket) {
+    if (!jobMatchesOrigin(fresh, { bucket: credentials.bucket, provider: credentials.provider, endpoint: credentials.endpoint })) {
       showToast('That download was created for a different bucket. Reconnect to it to continue.');
       return;
     }

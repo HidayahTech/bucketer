@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.56.1] — 2026-09-04 — Fix: a download job no longer surfaces under a different account with the same bucket name
+
+Download jobs are now matched to their **full origin** — bucket *and* provider *and* endpoint — not the bucket name alone. Before this, a saved download created for one account's bucket could appear, and be resumed or verified, while you were connected to a *different* account that happened to have a bucket with the same name (e.g. two accounts each with a `backups` bucket). Move jobs already guarded against this; download jobs now do too (BUG-061). Downloads created before this fix keep working — they fall back to a bucket-and-provider match.
+
 ## [1.56.0] — 2026-09-04 — Group saved buckets by account
 
 Saved connections now appear as an **account → buckets tree** instead of a flat list. Buckets that share one set of credentials — the same endpoint and access key — are grouped under a single account header (provider name plus a masked key tail), collapsed except for the account you're currently using. This makes it obvious which buckets belong together and stops one account with several buckets from reading as several unrelated entries.

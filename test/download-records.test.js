@@ -20,6 +20,7 @@ import {
   saveJob, loadJob, loadAllJobs, deleteJob,
   appendManifestPage, updateItem, countItemsByStatus,
   eachItemByStatus, takeItemsByStatus, resetFailedToPending, ITEM_STATUS,
+  jobMatchesOrigin,
 } from '../src/lib/download-records.js';
 
 const job = (over = {}) => ({
@@ -195,5 +196,45 @@ describe('resetFailedToPending', () => {
 
     assert.equal(await resetFailedToPending('job-1'), 0);
     assert.equal(await countItemsByStatus('job-2', ITEM_STATUS.FAILED), 1);
+  });
+});
+
+// jobMatchesOrigin — a download job must belong to the FULL origin (bucket + provider +
+// endpoint), mirroring the move-jobs credential-confusion guard. Bucket-name-only matching
+// let two accounts that reuse a bucket name (backups/media/assets) cross-surface each
+// other's download jobs. Pure function; no IndexedDB.
+describe('download-records — jobMatchesOrigin', () => {
+  const ORIGIN = { bucket: 'backups', provider: 'b2', endpoint: 'https://s3.us-west-002.backblazeb2.com' };
+
+  test('matches a job with the identical full origin', () => {
+    assert.equal(jobMatchesOrigin({ bucket: 'backups', provider: 'b2', endpoint: ORIGIN.endpoint }, ORIGIN), true);
+  });
+
+  test('rejects a same-bucket same-provider job from a different endpoint (credential confusion)', () => {
+    const otherB2Account = { bucket: 'backups', provider: 'b2', endpoint: 'https://s3.eu-central-003.backblazeb2.com' };
+    assert.equal(jobMatchesOrigin(otherB2Account, ORIGIN), false);
+  });
+
+  test('rejects a job for a different bucket', () => {
+    assert.equal(jobMatchesOrigin({ bucket: 'photos', provider: 'b2', endpoint: ORIGIN.endpoint }, ORIGIN), false);
+  });
+
+  test('rejects a same-bucket job on a different provider', () => {
+    assert.equal(jobMatchesOrigin({ bucket: 'backups', provider: 'aws', endpoint: 'https://s3.amazonaws.com' }, ORIGIN), false);
+  });
+
+  test('legacy job without an endpoint falls back to bucket + provider', () => {
+    assert.equal(jobMatchesOrigin({ bucket: 'backups', provider: 'b2' }, ORIGIN), true);
+    assert.equal(jobMatchesOrigin({ bucket: 'backups', provider: 'aws' }, ORIGIN), false);
+  });
+
+  test('very old job without endpoint or provider matches on bucket alone', () => {
+    assert.equal(jobMatchesOrigin({ bucket: 'backups' }, ORIGIN), true);
+    assert.equal(jobMatchesOrigin({ bucket: 'other' }, ORIGIN), false);
+  });
+
+  test('returns false for a null/absent job', () => {
+    assert.equal(jobMatchesOrigin(null, ORIGIN), false);
+    assert.equal(jobMatchesOrigin(undefined, ORIGIN), false);
   });
 });
