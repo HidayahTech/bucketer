@@ -6,11 +6,12 @@
 // Notifies App when the initial listing probe fails via onInitialListFailed (§4.14).
 // Coordinates with UploadQueue via onUploadTargetChange (upload destination = current prefix).
 import { useState, useEffect, useRef } from 'preact/hooks';
-import { GetObjectCommand, HeadObjectCommand, PutObjectCommand, CopyObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { GetObjectCommand, HeadObjectCommand, CopyObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { listObjectsPage } from '../lib/list-objects.js';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { formatBytes, leafName, isPermissionError } from '../lib/format.js';
 import { usePreview } from '../lib/usePreview.js';
+import { useNewFolder } from '../lib/useNewFolder.js';
 import { presignGetParams, presignDownloadParams } from '../lib/presign-params.js';
 import { Modal } from './Modal.jsx';
 import { PreviewMedia } from './PreviewMedia.jsx';
@@ -94,10 +95,10 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const [renameValue, setRenameValue] = useState('');
   const [renameError, setRenameError] = useState(null);
   const [renameSaving, setRenameSaving] = useState(false);
-  const [newFolderOpen, setNewFolderOpen] = useState(false);
-  const [newFolderName, setNewFolderName] = useState('');
-  const [newFolderError, setNewFolderError] = useState(null);
-  const [newFolderSaving, setNewFolderSaving] = useState(false);
+  const {
+    newFolderOpen, newFolderName, setNewFolderName, newFolderError, setNewFolderError,
+    newFolderSaving, openNewFolder, closeNewFolder, handleCreateFolder,
+  } = useNewFolder({ client, bucket, prefix, commonPrefixes, setCommonPrefixes, invalidateCache });
   const [tableCopyKey, setTableCopyKey] = useState(null);
   const [tableCopied, setTableCopied] = useState(null);
   // Non-null while the move destination picker is open; holds the selection being moved
@@ -661,34 +662,6 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     fetchPage(prefix, null, true);
   }
 
-  function openNewFolder() {
-    setNewFolderName('');
-    setNewFolderError(null);
-    setNewFolderOpen(true);
-  }
-
-  async function handleCreateFolder() {
-    const name = newFolderName.trim();
-    const nameErr = validateObjectName(name);
-    if (nameErr) { setNewFolderError(nameErr); return; }
-    const key = prefix + name + '/';
-    if (commonPrefixes.includes(key)) { setNewFolderError('A folder with that name already exists.'); return; }
-    setNewFolderSaving(true);
-    setNewFolderError(null);
-    try {
-      await client.send(new PutObjectCommand({
-        Bucket: bucket, Key: key, Body: '', ContentType: 'application/x-directory',
-      }));
-      invalidateCache(prefix);
-      setCommonPrefixes(prev => [...prev, key].sort());
-      setNewFolderOpen(false);
-    } catch (err) {
-      setNewFolderError(err.message || String(err));
-    } finally {
-      setNewFolderSaving(false);
-    }
-  }
-
   const canDownload = capabilities.download !== 'denied';
   const canDelete   = capabilities.delete !== 'denied';
   const canList     = capabilities.list !== 'denied';
@@ -865,7 +838,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
         <div class="browser-drop-overlay">Drop files to upload to this folder</div>
       )}
       {newFolderOpen && (
-        <Modal onClose={() => setNewFolderOpen(false)}>
+        <Modal onClose={() => closeNewFolder()}>
             <div class="modal-title">New folder</div>
             <div class="modal-body">
               <input
@@ -874,13 +847,13 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                 placeholder="Folder name"
                 value={newFolderName}
                 onInput={e => { setNewFolderName(e.target.value); setNewFolderError(null); }}
-                onKeyDown={e => { if (e.key === 'Enter') handleCreateFolder(); if (e.key === 'Escape') setNewFolderOpen(false); }}
+                onKeyDown={e => { if (e.key === 'Enter') handleCreateFolder(); if (e.key === 'Escape') closeNewFolder(); }}
                 autoFocus
               />
               {newFolderError && <div class="modal-error">{newFolderError}</div>}
             </div>
             <div class="modal-actions">
-              <button class="btn btn-ghost btn-sm" onClick={() => setNewFolderOpen(false)} disabled={newFolderSaving}>Cancel</button>
+              <button class="btn btn-ghost btn-sm" onClick={() => closeNewFolder()} disabled={newFolderSaving}>Cancel</button>
               <button class="btn btn-primary btn-sm" onClick={handleCreateFolder} disabled={newFolderSaving}>
                 {newFolderSaving ? <span class="spinner" /> : 'Create'}
               </button>

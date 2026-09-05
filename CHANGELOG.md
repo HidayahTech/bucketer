@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.59.1] — 2026-09-04 — Internal: extract new-folder handling into a hook
+
+No user-facing change. The new-folder creation flow moved out of the large Browser component into a dedicated `useNewFolder` hook (following the existing `usePreview` pattern), shrinking the component and adding component-test coverage for folder creation. Groundwork for further Browser decomposition.
+
 ## [1.59.0] — 2026-09-04 — Header tabs for recently-used buckets
 
 The app header now shows a strip of the buckets you've used recently, most-recent first, with the current one highlighted. Click one to switch straight to it — instant when that account's secret is already held this session. It's a fast shortcut over the accounts tree in the sidebar, which remains the full list. On phones the strip is hidden in favor of the sidebar (which already lists every bucket).
