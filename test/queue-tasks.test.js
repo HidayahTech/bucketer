@@ -130,3 +130,30 @@ describe('createResumableMoveTask', () => {
     assert.equal(t.capturedPrefix, 'src/');
   });
 });
+
+// Origin tagging: every task carries the connection it was launched under, so a
+// background transfer's callbacks route to that connection, not the live foreground one.
+describe('task factories — origin tagging', () => {
+  const origin = { connectionId: 'c1', provider: 'b2', endpoint: 'https://e' };
+  const check = (t) => {
+    assert.equal(t.connectionId, 'c1');
+    assert.equal(t.provider, 'b2');
+    assert.equal(t.endpoint, 'https://e');
+  };
+
+  test('createDeleteTask carries the origin', () => {
+    check(createDeleteTask({ files: ['a'], prefixes: [], capturedPrefix: '', bucket: 'b', ...origin }));
+  });
+  test('createTransferTask (move) carries the origin', () => {
+    check(createTransferTask({ files: ['a'], prefixes: [], dest: 'd/', capturedPrefix: '', bucket: 'b', mode: 'move', ...origin }));
+  });
+  test('createTransferTask (rename) carries the origin', () => {
+    check(createTransferTask({ files: [], prefixes: ['photos/2024/'], renameTo: 'x', capturedPrefix: 'photos/', bucket: 'b', mode: 'rename', ...origin }));
+  });
+  test('createDownloadTask carries the origin', () => {
+    check(createDownloadTask({ fileCount: 2, capturedPrefix: '', bucket: 'b', ...origin }));
+  });
+  test('createResumableMoveTask reads the origin from the record', () => {
+    check(createResumableMoveTask({ id: 'm1', items: [{ size: 1 }], dest: 'd/', capturedPrefix: '', bucket: 'b', provider: 'b2', endpoint: 'https://e', connectionId: 'c1' }));
+  });
+});

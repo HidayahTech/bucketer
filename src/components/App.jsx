@@ -40,10 +40,12 @@ import {
   listResolvedConnections, resolveConnection, findOrCreateCredential,
   saveConnectionRecord, deleteConnectionRecord, migrateProfilesToConnections,
   defaultCapabilities, loadConnectionCapabilities, saveConnectionCapabilities,
-  defaultConnectionName, hasMigratedConnections, loadCredentialRecords,
+  defaultConnectionName, hasMigratedConnections, loadCredentialRecords, credentialFingerprint,
 } from '../lib/connections.js';
+import { cacheSecret, getCachedSecret } from '../lib/secret-cache.js';
 import { readUrlParams, hasUrlParams, buildShareUrl } from '../lib/url-params.js';
 import { normalizeBasePrefix } from '../lib/base-prefix.js';
+import { isForegroundTask } from '../lib/task-routing.js';
 import {
   vaultExists, isUnlocked, recallSecret, rememberSecret, createVault, VAULT_ENABLED,
 } from '../lib/vault.js';
@@ -211,6 +213,25 @@ export function App() {
     });
   }, [selectedConnectionId]);
 
+  // Live mirror of the selected connection id. Long-lived task callbacks (a move/delete
+  // still running after the user switches buckets) otherwise compare against the value
+  // captured when the run started; reading this ref gives them the CURRENT foreground so a
+  // background task's side effects route correctly.
+  const selectedConnectionIdRef = useRef(selectedConnectionId);
+  useEffect(() => { selectedConnectionIdRef.current = selectedConnectionId; }, [selectedConnectionId]);
+
+  // Apply a capability result to the connection a TASK belongs to, not the live selection.
+  // Foreground task → update the shown capabilities (handleCapabilityChange). Background
+  // task → persist to its own connection only, never disturbing the foreground's display.
+  const applyTaskCapability = useCallback((taskConnectionId, op, state) => {
+    if (isForegroundTask({ connectionId: taskConnectionId }, selectedConnectionIdRef.current)) {
+      handleCapabilityChange(op, state);
+    } else if (taskConnectionId != null) {
+      const caps = loadConnectionCapabilities(taskConnectionId);
+      if (caps[op] !== state) saveConnectionCapabilities(taskConnectionId, { ...caps, [op]: state });
+    }
+  }, [handleCapabilityChange]);
+
   // Resets all capabilities to 'unknown' and re-mounts Browser to trigger a fresh probe.
   function handleRefreshPermissions() {
     const fresh = defaultCapabilities();
@@ -258,6 +279,11 @@ export function App() {
       setClient(c);
       setSession('connected');
       setBrowserKey(k => k + 1);
+      // Hold this secret in memory (keyed by the credential's fingerprint) for the tab's
+      // life, so a quick-switch back to a bucket on this account doesn't re-prompt. Not
+      // persisted — dies with the tab (secret-cache.js). sessionStorage still holds the
+      // active secret for reload-survival (saveCredentials above).
+      if (fullCreds.secretKey) cacheSecret(credentialFingerprint(fullCreds), fullCreds.secretKey);
       // The post-connect vault offer (§ decisions: never gate first-run behind a
       // passphrase — offer only after the app has demonstrated it works). Gated on
       // both conditions so it never re-appears once accepted (vaultExists() becomes
@@ -544,21 +570,24 @@ export function App() {
   async function handleDeleteConfirm() {
     const req = pendingDelete;
     setPendingDelete(null);
-    const task = createDeleteTask({ ...req, bucket: credentials.bucket });
+    const task = createDeleteTask({ ...req, bucket: credentials.bucket, connectionId: selectedConnectionId, provider: credentials.provider, endpoint: credentials.endpoint });
     const id = taskStore.add(task);
     try {
       await runDeleteOperation(client, task.bucket, task, (update) => {
-        if (update.deletedKeys?.length) {
+        // A background task (the user switched buckets mid-run) must not touch the
+        // foreground Browser's listing; the next visit to its bucket re-lists anyway.
+        const fg = isForegroundTask(task, selectedConnectionIdRef.current);
+        if (fg && update.deletedKeys?.length) {
           browserActionsRef.current?.removeItems(update.deletedKeys, []);
         }
         if (update.phase === 'done') {
-          if (update.deletedPrefixes?.length) {
+          if (fg && update.deletedPrefixes?.length) {
             browserActionsRef.current?.removeItems([], update.deletedPrefixes);
           }
-          browserActionsRef.current?.invalidateCache(task.capturedPrefix);
+          if (fg) browserActionsRef.current?.invalidateCache(task.capturedPrefix);
           // A run cancelled before any request proves nothing about permissions.
           if (update.deleted > 0 || !update.cancelled) {
-            handleCapabilityChange('delete', 'permitted');
+            applyTaskCapability(task.connectionId, 'delete', 'permitted');
           }
           if (update.errors.length === 0 && !update.cancelled) {
             const n = req.files.length + req.prefixes.length;
@@ -756,7 +785,7 @@ export function App() {
     // (postmortem F5). Not counters.sendable either — a resume sends the remainder, and
     // "Sent 2 of 2" is what a completed 2-file resume looks like, not "Sent 2 of 3".
     const total = await countItemsByStatus(fresh.id, ITEM_STATUS.PENDING);
-    const task = createDownloadTask({ fileCount: total, bucket: fresh.bucket, capturedPrefix: fresh.prefix });
+    const task = createDownloadTask({ fileCount: total, bucket: fresh.bucket, capturedPrefix: fresh.prefix, connectionId: selectedConnectionId, provider: credentials.provider, endpoint: credentials.endpoint });
     const id = taskStore.add(task);
     taskStore.update(id, { subPhase: null, total }, true);
     activeDownloadJobs.current.add(fresh.id);
@@ -847,6 +876,7 @@ export function App() {
     const task = createDownloadTask({
       fileCount: total, bucket: fresh.bucket, capturedPrefix: fresh.prefix, delivery: 'zip',
       jobId: fresh.id, bytesTotal,
+      connectionId: selectedConnectionId, provider: credentials.provider, endpoint: credentials.endpoint,
     });
     const id = taskStore.add(task);
     taskStore.update(id, { subPhase: null, total }, true);
@@ -937,16 +967,21 @@ export function App() {
   // Shared onProgress for a move/copy/rename run and for a resumed move: refresh views on
   // each moved key, and on done refetch, unlock capabilities, and toast. Kept as one factory
   // so a fresh run and a resume behave identically.
-  function moveProgress(id, { capturedPrefix, dest, mode, moveJobId }) {
+  function moveProgress(id, { capturedPrefix, dest, mode, moveJobId, connectionId }) {
     return (update) => {
-      if (update.movedKeys?.length) browserActionsRef.current?.removeItems(update.movedKeys, []);
+      // Route by the task's origin, read against the CURRENT foreground: a move still
+      // running after a bucket switch must not mutate the now-foreground bucket's listing.
+      const fg = isForegroundTask({ connectionId }, selectedConnectionIdRef.current);
+      if (fg && update.movedKeys?.length) browserActionsRef.current?.removeItems(update.movedKeys, []);
       if (update.phase === 'done') {
-        if (update.movedPrefixes?.length) browserActionsRef.current?.removeItems([], update.movedPrefixes);
-        browserActionsRef.current?.invalidateCache(capturedPrefix);
-        browserActionsRef.current?.invalidateCache(dest);
+        if (fg && update.movedPrefixes?.length) browserActionsRef.current?.removeItems([], update.movedPrefixes);
+        if (fg) {
+          browserActionsRef.current?.invalidateCache(capturedPrefix);
+          browserActionsRef.current?.invalidateCache(dest);
+        }
         if (update.moved > 0) {
-          handleCapabilityChange('upload', 'permitted');
-          if (mode !== 'copy') handleCapabilityChange('delete', 'permitted');
+          applyTaskCapability(connectionId, 'upload', 'permitted');
+          if (mode !== 'copy') applyTaskCapability(connectionId, 'delete', 'permitted');
         }
         if (update.errors.length === 0 && !update.cancelled) {
           const verb = mode === 'copy' ? 'Copied' : mode === 'rename' ? 'Renamed' : 'Moved';
@@ -970,13 +1005,13 @@ export function App() {
   // The MovePickerModal is the confirmation step, so a move/copy request starts
   // its task directly. A move (only) persists a resumable job keyed by the task id.
   async function handleMoveRequest({ files, prefixes, dest, capturedPrefix, mode = 'move', renameTo }) {
-    const task = createTransferTask({ files, prefixes, dest, capturedPrefix, bucket: credentials.bucket, mode, renameTo });
+    const task = createTransferTask({ files, prefixes, dest, capturedPrefix, bucket: credentials.bucket, mode, renameTo, connectionId: selectedConnectionId, provider: credentials.provider, endpoint: credentials.endpoint });
     const id = taskStore.add(task);
     loadedMovesRef.current.add(id); // this job is already on screen — never re-surface it as paused
     const runOperation = mode === 'rename' ? runRenameOperation : mode === 'copy' ? runCopyOperation : runMoveOperation;
     const op = { ...task, jobId: id, provider: credentials.provider, endpoint: credentials.endpoint };
     try {
-      await runOperation(client, task.bucket, op, moveProgress(id, { capturedPrefix: task.capturedPrefix, dest: task.dest, mode, moveJobId: id }),
+      await runOperation(client, task.bucket, op, moveProgress(id, { capturedPrefix: task.capturedPrefix, dest: task.dest, mode, moveJobId: id, connectionId: task.connectionId }),
         () => taskStore.isCancelRequested(id));
     } catch (err) {
       taskStore.update(id, {
@@ -994,7 +1029,7 @@ export function App() {
     taskStore.update(task.id, { status: 'running', subPhase: 'moving' }, true);
     try {
       await resumeMoveOperation(client, record.bucket, record,
-        moveProgress(task.id, { capturedPrefix: record.capturedPrefix, dest: record.dest, mode: 'move', moveJobId: task.moveJobId }),
+        moveProgress(task.id, { capturedPrefix: record.capturedPrefix, dest: record.dest, mode: 'move', moveJobId: task.moveJobId, connectionId: selectedConnectionId }),
         () => taskStore.isCancelRequested(task.id));
     } catch (err) {
       taskStore.update(task.id, { status: 'done', subPhase: null,
@@ -1045,6 +1080,30 @@ export function App() {
     const creds = { ...conn, secretKey: '' };
     setCredentials(creds);
     setLiveFormData(creds);
+  }
+
+  // Quick-switch to a saved connection. If its secret is already held this session, connect
+  // instantly (re-deriving the full origin+secret atomically from the target record — never
+  // from stale live form state). Otherwise select it and drop to the prefilled form so the
+  // user supplies only the secret; instant switching resumes once entered.
+  function switchToConnection(id) {
+    const conn = resolveConnection(id);
+    if (!conn) return;
+    setSidebarOpen(false);
+    const secret = getCachedSecret(credentialFingerprint(conn));
+    if (secret) {
+      setSelectedConnectionId(id);
+      saveLastProfileId(id);
+      setCapabilities(loadConnectionCapabilities(id));
+      const creds = { ...conn, secretKey: secret };
+      setCredentials(creds);
+      setLiveFormData(creds);
+      handleConnect(creds, { reconnect: session === 'connected' });
+    } else {
+      handleSelectProfile(id);
+      if (session === 'connected') setSession('disconnected');
+      setFormResetKey(k => k + 1);
+    }
   }
 
   function handleSaveProfile(name) {
@@ -1283,7 +1342,7 @@ export function App() {
         )}
         {session === 'connected' && (
           <button type="button" class="btn btn-ghost btn-sm" style={{ color: '#fff', borderColor: 'rgba(255,255,255,.4)' }} onClick={handleDisconnect}>
-            Disconnect
+            Sign out
           </button>
         )}
         <ThemeToggle />
@@ -1388,10 +1447,20 @@ export function App() {
         <div class="app-body">
           {sidebarOpen && <div class="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
           <aside class={`sidebar${sidebarOpen ? ' sidebar-open' : ''}`}>
-            {selectedConnectionId && connections.find(p => p.id === selectedConnectionId) && (
-              <div class="profile-active-name">
-                {connections.find(p => p.id === selectedConnectionId).name}
-              </div>
+            {connections.length > 0 && (
+              <>
+                <div class="sidebar-heading">Accounts &amp; buckets</div>
+                <AccountsManager
+                  connections={connections}
+                  selectedId={selectedConnectionId}
+                  onSelect={switchToConnection}
+                  onDelete={handleDeleteProfile}
+                  onSave={handleSaveProfile}
+                  onAddBucket={handleAddBucket}
+                  currentFormData={liveFormData}
+                />
+                <hr style={{ border: 'none', borderTop: '1px solid var(--border)' }} />
+              </>
             )}
             <CredentialForm
               initial={credentials}

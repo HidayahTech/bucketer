@@ -48,7 +48,7 @@ describe('BUG-047 — a share link survives disconnect', () => {
       await page.locator('button[type="submit"]:has-text("Connect")').click();
       await page.locator('[data-testid="file-input"]').waitFor({ state: 'attached', timeout: 15000 });
 
-      await page.locator('button:has-text("Disconnect")').click();
+      await page.locator('button:has-text("Sign out")').click();
       await page.locator('input[type="url"]').waitFor({ timeout: 5000 });
 
       assert.equal(await page.locator('input[type="url"]').inputValue(), ctx.browserEndpoint,
@@ -126,7 +126,7 @@ describe('BUG-027 — post-disconnect form is populated', () => {
       await page.locator('[data-testid="file-input"]').waitFor({ state: 'attached', timeout: 15000 });
 
       // Disconnect → the splash returns with the profile's fields pre-filled (minus secret).
-      await page.locator('button:has-text("Disconnect")').click();
+      await page.locator('button:has-text("Sign out")').click();
       await page.locator('input[type="url"]').waitFor({ timeout: 5000 });
       assert.equal(await page.locator('input[type="url"]').inputValue(), ctx.browserEndpoint, 'endpoint pre-filled after disconnect (BUG-027)');
       assert.equal(await page.locator('input[placeholder="my-bucket"]').inputValue(), 'test-bucket', 'bucket pre-filled');

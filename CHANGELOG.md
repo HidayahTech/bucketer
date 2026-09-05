@@ -7,6 +7,14 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.58.0] — 2026-09-04 — Quick-switch between buckets and accounts
+
+While connected, the sidebar now carries your full accounts-and-buckets tree, so you can switch to another saved bucket **without returning to the connect screen**. Switching to a bucket on an account you've already used this session is instant — the secret you entered is held in memory for the tab's lifetime (never written to disk), so you aren't asked for it again. Switching to a new account still asks for its secret, once.
+
+Transfers keep running when you switch. Each queued operation is now labeled with the bucket it belongs to, and a move or download started under one connection finishes safely in the background against **that** connection even while you browse another — its results are attributed to the right bucket, never the one you happen to be looking at.
+
+The "Disconnect" button is now **"Sign out"** (leaving the app), distinct from switching buckets.
+
 ## [1.57.1] — 2026-09-04 — Fix: re-adding a bucket to an account no longer duplicates it
 
 Saving a bucket that is already saved under the same account — for example after using "+ bucket" and typing a bucket name you already have — now updates the existing entry in place instead of creating a duplicate row.

@@ -202,6 +202,7 @@ function TaskRow({ task, store, readZipDetail, onResumeMove, onDiscardMove }) {
         {task.status === 'done' && failed > 0 && <span class="queue-op-icon queue-op-err">✕</span>}
         {task.status === 'cancelled' && <span class="queue-op-icon queue-op-cancelled">⊘</span>}
         <span class="queue-op-summary">{taskSummary(task)}</span>
+        {task.bucket && <span class="queue-op-origin" title="The bucket this operation runs against">{task.bucket}</span>}
         {task.tier && (
           <span
             class="queue-op-badge"

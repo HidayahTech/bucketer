@@ -390,6 +390,11 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 .queue-op-expanded { padding-bottom: .5rem; }
 .queue-op-header { display: flex; align-items: center; gap: .5rem; }
 .queue-op-summary { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.queue-op-origin {
+  flex-shrink: 0; font-size: .7rem; color: var(--text-muted);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 3px;
+  padding: .05rem .35rem; max-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .queue-op-icon { font-size: .9rem; flex-shrink: 0; }
 /* Marks a row whose transfer the app does not control, so it can never be mistaken at a
    glance for one whose progress Bucketer actually knows. */
@@ -1125,6 +1130,7 @@ details[open] .sv-summary::before { transform: rotate(90deg); }
 }
 
 /* AccountsManager — account → buckets tree (replaces the flat profile list). */
+.sidebar-heading { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin-bottom: .5rem; }
 .accounts-manager { margin-bottom: 1.25rem; }
 .account-group { margin-bottom: .5rem; }
 .account-header {

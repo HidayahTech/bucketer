@@ -15,13 +15,13 @@ export function subjectLabel(fileCount, prefixCount) {
   ].filter(Boolean).join(' and ');
 }
 
-export function createDeleteTask({ files, prefixes, capturedPrefix, bucket }) {
+export function createDeleteTask({ files, prefixes, capturedPrefix, bucket, connectionId, provider, endpoint }) {
   return {
     kind: 'delete',
     status: 'running',
     subPhase: null,
     subject: subjectLabel(files.length, prefixes.length),
-    files, prefixes, capturedPrefix, bucket,
+    files, prefixes, capturedPrefix, bucket, connectionId, provider, endpoint,
     current: 0, total: null,
     errors: [],
     collapsed: false,
@@ -29,7 +29,7 @@ export function createDeleteTask({ files, prefixes, capturedPrefix, bucket }) {
   };
 }
 
-export function createTransferTask({ files, prefixes, dest, capturedPrefix, bucket, mode, renameTo }) {
+export function createTransferTask({ files, prefixes, dest, capturedPrefix, bucket, mode, renameTo, connectionId, provider, endpoint }) {
   if (mode === 'rename') {
     const oldLeaf = leafName(prefixes[0].slice(0, -1));
     return {
@@ -37,7 +37,7 @@ export function createTransferTask({ files, prefixes, dest, capturedPrefix, buck
       status: 'running',
       subPhase: 'checking',
       subject: `${oldLeaf} → ${renameTo}`,
-      files: [], prefixes, dest: capturedPrefix, renameTo, capturedPrefix, bucket,
+      files: [], prefixes, dest: capturedPrefix, renameTo, capturedPrefix, bucket, connectionId, provider, endpoint,
       current: 0, total: null,
       errors: [],
       collapsed: false,
@@ -49,7 +49,7 @@ export function createTransferTask({ files, prefixes, dest, capturedPrefix, buck
     status: 'running',
     subPhase: 'checking',
     subject: subjectLabel(files.length, prefixes.length),
-    files, prefixes, dest, capturedPrefix, bucket,
+    files, prefixes, dest, capturedPrefix, bucket, connectionId, provider, endpoint,
     current: 0, total: null,
     errors: [],
     collapsed: false,
@@ -61,7 +61,7 @@ export function createTransferTask({ files, prefixes, dest, capturedPrefix, buck
 // honest — a row whose progress the app cannot observe must not render like one whose it can.
 // The vocabulary is shared with browser-capability.js so the panel and the queue cannot
 // drift into describing the same download two different ways.
-export function createDownloadTask({ fileCount, bucket, capturedPrefix, tier = TIERS.HANDOFF, delivery, jobId, bytesTotal }) {
+export function createDownloadTask({ fileCount, bucket, capturedPrefix, tier = TIERS.HANDOFF, delivery, jobId, bytesTotal, connectionId, provider, endpoint }) {
   return {
     kind: 'download',
     tier,
@@ -69,7 +69,7 @@ export function createDownloadTask({ fileCount, bucket, capturedPrefix, tier = T
     status: 'running',
     subPhase: 'enumerating',
     subject: subjectLabel(fileCount, 0),
-    files: [], prefixes: [], capturedPrefix, bucket,
+    files: [], prefixes: [], capturedPrefix, bucket, connectionId, provider, endpoint,
     current: 0, total: fileCount || null,
     errors: [],
     collapsed: false,
@@ -90,6 +90,7 @@ export function createResumableMoveTask(record) {
     subPhase: null,
     subject: subjectLabel(record.items.length, 0),
     files: [], prefixes: [], dest: record.dest, capturedPrefix: record.capturedPrefix ?? '', bucket: record.bucket,
+    connectionId: record.connectionId ?? null, provider: record.provider, endpoint: record.endpoint,
     current: 0, total: record.items.length,
     errors: [],
     collapsed: false,

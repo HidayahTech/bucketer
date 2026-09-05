@@ -1158,8 +1158,8 @@ describe('App — disconnect does not lock the vault (Task 6)', () => {
       fire(query('button[type="submit"]'), 'click');
       assert.ok(isUnlocked(), 'precondition: the vault is unlocked while connected');
 
-      const disconnectBtn = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Disconnect');
-      assert.ok(disconnectBtn, 'the Disconnect button must be present once connected');
+      const disconnectBtn = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Sign out');
+      assert.ok(disconnectBtn, 'the Sign out button must be present once connected');
       fire(disconnectBtn, 'click');
 
       assert.ok(isUnlocked(), 'disconnecting must not lock the vault — only a tab close should end the session');
@@ -1222,6 +1222,38 @@ describe('App — re-adding a saved bucket does not duplicate it', () => {
 
       const { connections } = JSON.parse(localStorage.getItem('s3b_connections'));
       assert.equal(connections.length, 1, 're-adding the same bucket must not create a duplicate connection');
+    } finally { cleanup(); clearAppStorage(); }
+  });
+});
+
+// Slice 4B (quick-switch): once connected, the sidebar carries the accounts tree so a
+// bucket can be switched without returning to the splash, and the leave-the-app control
+// reads "Sign out". Switching to a bucket whose secret is held this session stays connected.
+describe('App — connected sidebar switcher (quick-switch)', () => {
+  test('sidebar shows the accounts tree + Sign out, and a cached-secret switch stays connected', () => {
+    clearAppStorage();
+    localStorage.setItem('s3b_credentials', JSON.stringify({
+      version: 1, credentials: [{ id: 'credA', endpoint: 'http://127.0.0.1:1', keyId: 'K1', provider: 'b2', regionOverride: '', label: 'B2 — K1' }],
+    }));
+    localStorage.setItem('s3b_connections', JSON.stringify({
+      version: 2, connections: [{ id: 1, name: 'B2 — photos', credentialId: 'credA', bucket: 'photos', capabilities: null }],
+    }));
+    localStorage.setItem('s3b_last_profile_id', '1');
+    localStorage.setItem('s3b_connections_migrated', '1');
+
+    const { query, cleanup } = mount(h(App, {}));
+    try {
+      setInput(query('#cred-secretkey'), 'sekret');
+      fire(query('button[type="submit"]'), 'click'); // connect (caches the secret)
+
+      const signOut = () => [...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'Sign out');
+      assert.ok(signOut(), 'Sign out button present when connected');
+      assert.ok([...document.querySelectorAll('.bucket-name')].some(n => n.textContent.includes('photos')),
+        'the sidebar accounts tree shows the connected bucket');
+
+      const row = [...document.querySelectorAll('.bucket-row')].find(r => r.textContent.includes('photos'));
+      fire(row, 'click'); // switch via the cached secret
+      assert.ok(signOut(), 'still connected after switching via the cached secret (no splash)');
     } finally { cleanup(); clearAppStorage(); }
   });
 });

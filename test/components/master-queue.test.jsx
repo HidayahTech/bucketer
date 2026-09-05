@@ -266,3 +266,15 @@ describe('MasterQueue — interrupted move surfaces inline', () => {
     cleanup();
   });
 });
+
+describe('MasterQueue — origin chip', () => {
+  test('a task row shows the bucket it belongs to as an origin chip', () => {
+    const store = makeStore();
+    store.add(createDeleteTask({ files: ['a.txt'], prefixes: [], capturedPrefix: '', bucket: 'photos', connectionId: 'c1', provider: 'b2', endpoint: 'https://e' }));
+    const { query, cleanup } = mount(h(MasterQueue, { store }));
+    const chip = query('.queue-op-origin');
+    assert.ok(chip, 'an origin chip should render for a task with a bucket');
+    assert.ok(chip.textContent.includes('photos'), 'the chip names the task bucket');
+    cleanup();
+  });
+});
