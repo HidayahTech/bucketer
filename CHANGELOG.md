@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.57.1] — 2026-09-04 — Fix: re-adding a bucket to an account no longer duplicates it
+
+Saving a bucket that is already saved under the same account — for example after using "+ bucket" and typing a bucket name you already have — now updates the existing entry in place instead of creating a duplicate row.
+
 ## [1.57.0] — 2026-09-04 — Add a bucket to an account without retyping
 
 Each account in the accounts list now has a **"+ bucket"** button. Click it and the connection form is pre-filled with that account's endpoint, key, provider, and region — you type only the new bucket name (and your secret) to add another bucket under the same account, instead of re-entering everything. The new bucket appears grouped under its account.

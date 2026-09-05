@@ -1059,9 +1059,8 @@ export function App() {
       : liveFormData.provider;
     const provider = providerSource || detectProvider(ep);
 
-    const existing = selectedConnectionId ? connections.find(c => c.id === selectedConnectionId) : null;
-    const id = existing ? existing.id : Date.now();
     const trimmedBucket = (liveFormData.bucket || '').trim();
+    const basePrefix = normalizeBasePrefix(liveFormData.basePrefix);
 
     const cred = findOrCreateCredential({
       endpoint:       ep,
@@ -1070,12 +1069,22 @@ export function App() {
       regionOverride: (liveFormData.regionOverride || '').trim(),
     });
 
+    // Update in place for the currently-selected connection, OR — the "+ bucket" re-add
+    // path — an already-saved bucket on this exact account + base folder, so re-adding the
+    // same bucket updates it rather than creating a duplicate row (there is no selected
+    // connection in that flow). Falls through to a fresh id for a genuinely new bucket.
+    const existing = selectedConnectionId
+      ? connections.find(c => c.id === selectedConnectionId)
+      : listResolvedConnections().find(c =>
+          c.credentialId === cred.id && c.bucket === trimmedBucket && (c.basePrefix || '') === basePrefix);
+    const id = existing ? existing.id : Date.now();
+
     const conn = {
       id,
       name:         name || defaultConnectionName({ provider, bucket: trimmedBucket }),
       credentialId: cred.id,
       bucket:       trimmedBucket,
-      basePrefix:   normalizeBasePrefix(liveFormData.basePrefix),
+      basePrefix,
     };
     // Only set capabilities when creating. On update, omit the key so
     // saveConnectionRecord's merge keeps what is in storage: capability changes are

@@ -1196,3 +1196,32 @@ describe('App — "+ bucket" pre-fills the form from the account', () => {
     } finally { cleanup(); clearAppStorage(); }
   });
 });
+
+// Slice 4A: "+ bucket" lets a user re-enter a bucket already saved under the account.
+// Saving it must update the existing connection in place, not create a duplicate row.
+describe('App — re-adding a saved bucket does not duplicate it', () => {
+  test('saving a bucket already present under the account keeps one connection', () => {
+    clearAppStorage();
+    localStorage.setItem('s3b_credentials', JSON.stringify({
+      version: 1,
+      credentials: [{ id: 'credA', endpoint: 'https://s3.us-west-002.backblazeb2.com', keyId: 'K1', provider: 'b2', regionOverride: 'us-west-002', label: 'B2 — K1' }],
+    }));
+    localStorage.setItem('s3b_connections', JSON.stringify({
+      version: 2,
+      connections: [{ id: 1, name: 'B2 — photos', credentialId: 'credA', bucket: 'photos', capabilities: null }],
+    }));
+    localStorage.setItem('s3b_connections_migrated', '1');
+
+    const { query, cleanup } = mount(h(App, {}));
+    try {
+      fire(query('.account-add-bucket'), 'click');
+      setInput(query('#cred-bucket'), 'photos');
+      setInput(query('#cred-secretkey'), 'sekret');
+      fire(query('.bucket-save-trigger'), 'click');
+      fire(query('.bucket-save-form button[type="submit"]'), 'click');
+
+      const { connections } = JSON.parse(localStorage.getItem('s3b_connections'));
+      assert.equal(connections.length, 1, 're-adding the same bucket must not create a duplicate connection');
+    } finally { cleanup(); clearAppStorage(); }
+  });
+});
