@@ -1,9 +1,15 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.58.0';
+export const CURRENT_VERSION = '1.59.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.59.0",
+    "date": "2026-09-04",
+    "title": "Header tabs for recently-used buckets",
+    "changes": []
+  },
   {
     "version": "1.58.0",
     "date": "2026-09-04",

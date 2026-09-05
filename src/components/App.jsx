@@ -93,6 +93,8 @@ import { UpdateBanner } from './UpdateBanner.jsx';
 import { ChangelogModal } from './ChangelogModal.jsx';
 import { AboutModal } from './AboutModal.jsx';
 import { AccountsManager } from './AccountsManager.jsx';
+import { ConnectionTabs } from './ConnectionTabs.jsx';
+import { useConnectionTabs } from '../hooks/useConnectionTabs.js';
 import { StorageModal } from './StorageModal.jsx';
 import { TransferHandoff } from './TransferHandoff.jsx';
 import { DuplicatesModal } from './DuplicatesModal.jsx';
@@ -231,6 +233,9 @@ export function App() {
       if (caps[op] !== state) saveConnectionCapabilities(taskConnectionId, { ...caps, [op]: state });
     }
   }, [handleCapabilityChange]);
+
+  // Recently-used buckets for the header quick-switch strip (MRU, capped).
+  const connectionTabs = useConnectionTabs(connections, selectedConnectionId);
 
   // Resets all capabilities to 'unknown' and re-mounts Browser to trigger a fresh probe.
   function handleRefreshPermissions() {
@@ -1309,6 +1314,9 @@ export function App() {
           </button>
         )}
         <BucketerLogo />
+        {session === 'connected' && (
+          <ConnectionTabs tabs={connectionTabs} selectedId={selectedConnectionId} onSelect={switchToConnection} />
+        )}
         <span class="spacer" />
         {providerLabel && session === 'connected' && (
           <span class="header-status">{providerLabel}</span>

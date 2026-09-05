@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.59.0] — 2026-09-04 — Header tabs for recently-used buckets
+
+The app header now shows a strip of the buckets you've used recently, most-recent first, with the current one highlighted. Click one to switch straight to it — instant when that account's secret is already held this session. It's a fast shortcut over the accounts tree in the sidebar, which remains the full list. On phones the strip is hidden in favor of the sidebar (which already lists every bucket).
+
 ## [1.58.0] — 2026-09-04 — Quick-switch between buckets and accounts
 
 While connected, the sidebar now carries your full accounts-and-buckets tree, so you can switch to another saved bucket **without returning to the connect screen**. Switching to a bucket on an account you've already used this session is instant — the secret you entered is held in memory for the tab's lifetime (never written to disk), so you aren't asked for it again. Switching to a new account still asks for its secret, once.

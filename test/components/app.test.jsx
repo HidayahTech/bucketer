@@ -1257,3 +1257,37 @@ describe('App — connected sidebar switcher (quick-switch)', () => {
     } finally { cleanup(); clearAppStorage(); }
   });
 });
+
+// Slice 4B (B6b): the header carries a quick-switch strip of recently-used buckets once
+// connected. Clicking a tab switches via the same cached-secret motion as the sidebar.
+describe('App — header quick-switch tab-strip', () => {
+  test('the connected bucket appears as a header tab and clicking it stays connected', async () => {
+    clearAppStorage();
+    localStorage.setItem('s3b_credentials', JSON.stringify({
+      version: 1, credentials: [{ id: 'credA', endpoint: 'http://127.0.0.1:1', keyId: 'K1', provider: 'b2', regionOverride: '', label: 'B2 — K1' }],
+    }));
+    localStorage.setItem('s3b_connections', JSON.stringify({
+      version: 2, connections: [{ id: 1, name: 'B2 — photos', credentialId: 'credA', bucket: 'photos', capabilities: null }],
+    }));
+    localStorage.setItem('s3b_last_profile_id', '1');
+    localStorage.setItem('s3b_connections_migrated', '1');
+
+    const { query, cleanup } = mount(h(App, {}));
+    try {
+      setInput(query('#cred-secretkey'), 'sekret');
+      fire(query('button[type="submit"]'), 'click');
+
+      // The MRU strip is seeded by an effect, so poll a few ticks for the tab to appear.
+      let tab;
+      for (let i = 0; i < 20 && !tab; i++) {
+        tab = [...document.querySelectorAll('.connection-tab')].find(t => t.textContent.includes('photos'));
+        if (!tab) await new Promise(r => setTimeout(r, 0));
+      }
+      assert.ok(tab, 'the connected bucket appears as a header tab');
+
+      fire(tab, 'click');
+      assert.ok([...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'Sign out'),
+        'still connected after clicking the header tab');
+    } finally { cleanup(); clearAppStorage(); }
+  });
+});
