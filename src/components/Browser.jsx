@@ -6,12 +6,13 @@
 // Notifies App when the initial listing probe fails via onInitialListFailed (§4.14).
 // Coordinates with UploadQueue via onUploadTargetChange (upload destination = current prefix).
 import { useState, useEffect, useRef } from 'preact/hooks';
-import { GetObjectCommand, HeadObjectCommand, CopyObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { GetObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { listObjectsPage } from '../lib/list-objects.js';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { formatBytes, leafName, isPermissionError } from '../lib/format.js';
 import { usePreview } from '../lib/usePreview.js';
 import { useNewFolder } from '../lib/useNewFolder.js';
+import { useRename } from '../lib/useRename.js';
 import { presignGetParams, presignDownloadParams } from '../lib/presign-params.js';
 import { Modal } from './Modal.jsx';
 import { PreviewMedia } from './PreviewMedia.jsx';
@@ -22,12 +23,10 @@ import { mediaKind, mimeType, mimeKind } from '../lib/media.js';
 import { resolveDroppedFiles } from '../lib/file-entries.js';
 import { PRESIGN_EXPIRES, DOWNLOAD_PRESIGN_EXPIRES, TEXT_PREVIEW_LIMIT, FILE_MTIME_KEY } from '../lib/constants.js';
 import { nameComparator, numericComparator } from '../lib/sort.js';
-import { validateObjectName } from '../lib/validate-object-name.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
 import { HiddenVersions } from './HiddenVersions.jsx';
 import { diagnosticsProps } from '../lib/connection-diagnostics.js';
 import { CopyLinkPopover } from './CopyLinkPopover.jsx';
-import { showToast } from '../lib/toast.js';
 import { resolveShortcut, isEditableTarget } from '../lib/keyboard-shortcuts.js';
 import { Breadcrumb } from './Breadcrumb.jsx';
 import { SortTh } from './SortTh.jsx';
@@ -91,10 +90,11 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const [metaData, setMetaData] = useState(null);
   const [metaLoading, setMetaLoading] = useState(false);
   const [metaError, setMetaError] = useState(null);
-  const [renamingKey, setRenamingKey] = useState(null);
-  const [renameValue, setRenameValue] = useState('');
-  const [renameError, setRenameError] = useState(null);
-  const [renameSaving, setRenameSaving] = useState(false);
+  const {
+    renamingKey, renameValue, renameError, renameSaving,
+    setRenameValue, setRenameError,
+    startRename, cancelRename, commitRename, startFolderRename, commitFolderRename,
+  } = useRename({ client, bucket, prefix, items, setItems, commonPrefixes, invalidateCache, onMoveRequest });
   const {
     newFolderOpen, newFolderName, setNewFolderName, newFolderError, setNewFolderError,
     newFolderSaving, openNewFolder, closeNewFolder, handleCreateFolder,
@@ -469,63 +469,6 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     } finally {
       setMetaLoading(false);
     }
-  }
-
-  function startRename(key) {
-    setRenamingKey(key);
-    setRenameValue(leafName(key));
-    setRenameError(null);
-  }
-
-  // S3 has no rename. Rename = CopyObject + DeleteObject.
-  // Copy FIRST: if copy fails, the original is untouched. MetadataDirective: 'COPY' preserves
-  // Content-Type and custom metadata — the default 'REPLACE' would strip them.
-  async function commitRename(oldKey) {
-    const newName = renameValue.trim();
-    const nameErr = validateObjectName(newName);
-    if (nameErr) { setRenameError(nameErr); return; }
-    const newKey = prefix + newName;
-    if (newKey === oldKey) { setRenamingKey(null); return; }
-    if (items.some(o => o.Key === newKey)) { setRenameError('A file with that name already exists.'); return; }
-    setRenameSaving(true);
-    setRenameError(null);
-    try {
-      await client.send(new CopyObjectCommand({
-        Bucket: bucket, CopySource: `${bucket}/${oldKey}`,
-        Key: newKey, MetadataDirective: 'COPY',
-      }));
-      await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: oldKey }));
-      invalidateCache(prefix);
-      setItems(prev => prev.map(o => o.Key === oldKey ? { ...o, Key: newKey } : o));
-      setRenamingKey(null);
-      showToast(`Renamed to "${newName}"`);
-    } catch (err) {
-      setRenameError(err.message || String(err));
-    } finally {
-      setRenameSaving(false);
-    }
-  }
-
-  function startFolderRename(cp) {
-    setRenamingKey(cp);
-    setRenameValue(leafName(cp.slice(0, -1)));
-    setRenameError(null);
-  }
-
-  // Folder rename dispatches to the move queue (a folder can hold many objects) rather
-  // than blocking inline. The queued task shows progress; the row is removed on success
-  // via the existing movedPrefixes handling.
-  function commitFolderRename(oldPrefix) {
-    const newName = renameValue.trim();
-    const nameErr = validateObjectName(newName);
-    if (nameErr) { setRenameError(nameErr); return; }
-    if (newName === leafName(oldPrefix.slice(0, -1))) { setRenamingKey(null); return; }
-    if (commonPrefixes.includes(prefix + newName + '/')) {
-      setRenameError('A folder with that name already exists.');
-      return;
-    }
-    setRenamingKey(null);
-    onMoveRequest?.({ prefixes: [oldPrefix], renameTo: newName, mode: 'rename', capturedPrefix: prefix });
   }
 
   function handleTableCopyLinkCopied(key) {
@@ -1177,14 +1120,14 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                             onInput={e => { setRenameValue(e.target.value); setRenameError(null); }}
                             onKeyDown={e => {
                               if (e.key === 'Enter') commitFolderRename(cp);
-                              if (e.key === 'Escape') setRenamingKey(null);
+                              if (e.key === 'Escape') cancelRename();
                             }}
                             autoFocus
                             onClick={e => e.stopPropagation()}
                           />
                           {renameError && <span class="rename-error">{renameError}</span>}
                           <button class="btn btn-ghost btn-sm" onClick={e => { e.stopPropagation(); commitFolderRename(cp); }}>✓</button>
-                          <button class="btn btn-ghost btn-sm" onClick={e => { e.stopPropagation(); setRenamingKey(null); }}>✕</button>
+                          <button class="btn btn-ghost btn-sm" onClick={e => { e.stopPropagation(); cancelRename(); }}>✕</button>
                         </span>
                       ) : (
                         <span class="file-dir">{cp.slice(prefix.length).replace(/\/$/, '')}</span>
@@ -1255,7 +1198,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                             onInput={e => { setRenameValue(e.target.value); setRenameError(null); }}
                             onKeyDown={e => {
                               if (e.key === 'Enter') commitRename(obj.Key);
-                              if (e.key === 'Escape') setRenamingKey(null);
+                              if (e.key === 'Escape') cancelRename();
                             }}
                             autoFocus
                             onClick={e => e.stopPropagation()}
@@ -1264,7 +1207,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                           <button class="btn btn-ghost btn-sm" onClick={e => { e.stopPropagation(); commitRename(obj.Key); }} disabled={renameSaving}>
                             {renameSaving ? <span class="spinner" /> : '✓'}
                           </button>
-                          <button class="btn btn-ghost btn-sm" onClick={e => { e.stopPropagation(); setRenamingKey(null); }} disabled={renameSaving}>✕</button>
+                          <button class="btn btn-ghost btn-sm" onClick={e => { e.stopPropagation(); cancelRename(); }} disabled={renameSaving}>✕</button>
                         </span>
                       ) : (
                         <span

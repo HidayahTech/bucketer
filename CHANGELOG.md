@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.59.2] — 2026-09-05 — Internal: extract rename handling into a hook
+
+No user-facing change. The file/folder rename cluster moved out of the large Browser component into a dedicated `useRename` hook (matching the `usePreview`/`useNewFolder` pattern), with the now-unused imports removed and a component characterization test added for file rename (previously covered only by e2e). Completes the Browser decomposition groundwork.
+
 ## [1.59.1] — 2026-09-04 — Internal: extract new-folder handling into a hook
 
 No user-facing change. The new-folder creation flow moved out of the large Browser component into a dedicated `useNewFolder` hook (following the existing `usePreview` pattern), shrinking the component and adding component-test coverage for folder creation. Groundwork for further Browser decomposition.

@@ -1060,10 +1060,19 @@ describe('Browser.jsx — uses shared utilities', () => {
     );
   });
 
-  test('imports validateObjectName (name validation not duplicated inline)', () => {
+  test('name validation uses the shared validateObjectName (not duplicated inline) in the extracted hooks', () => {
+    // The new-folder and rename clusters were extracted from Browser.jsx into hooks
+    // (useNewFolder.js, useRename.js); the shared validator moved with them, so the
+    // "not duplicated inline" guarantee now lives where the validation runs.
+    const useNewFolder = src('lib/useNewFolder.js');
+    const useRename = src('lib/useRename.js');
     assert.ok(
-      source.includes("from '../lib/validate-object-name.js'"),
-      'Browser.jsx must import validateObjectName from validate-object-name.js'
+      useNewFolder.includes("from './validate-object-name.js'"),
+      'useNewFolder.js must import validateObjectName from validate-object-name.js'
+    );
+    assert.ok(
+      useRename.includes("from './validate-object-name.js'"),
+      'useRename.js must import validateObjectName from validate-object-name.js'
     );
   });
 

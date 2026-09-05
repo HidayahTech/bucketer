@@ -1,9 +1,15 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.59.1';
+export const CURRENT_VERSION = '1.59.2';
 
 export const CHANGELOG = [
+  {
+    "version": "1.59.2",
+    "date": "2026-09-05",
+    "title": "Internal: extract rename handling into a hook",
+    "changes": []
+  },
   {
     "version": "1.59.1",
     "date": "2026-09-04",
