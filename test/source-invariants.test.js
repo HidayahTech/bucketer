@@ -1650,6 +1650,24 @@ describe('package-lock.json tracks package.json', () => {
   });
 });
 
+// Dead-code tooling (knip, purgecss) is pinned to an EXACT version, not a caret/tilde range —
+// a deliberate deviation from the repo's usual range style. Unused-code heuristics shift between
+// minor versions (new export patterns recognised, defaults changed), so a routine `npm update`
+// could silently start failing, or silently stop catching things, on unrelated commits. This
+// guard fails loudly if the pin ever regresses to a range. See
+// docs/superpowers/specs/2026-09-13-deadcode-tooling-design.md §4.
+describe('dead-code tooling is pinned exact', () => {
+  const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
+  for (const name of ['knip', 'purgecss']) {
+    test(`${name} devDependency is an exact version`, () => {
+      const spec = pkg.devDependencies?.[name];
+      assert.ok(spec, `${name} must be a devDependency`);
+      assert.ok(/^\d+\.\d+\.\d+$/.test(spec),
+        `${name} must be pinned exact (no ^/~), got "${spec}"`);
+    });
+  }
+});
+
 // A download job outlives the session that created it, and the archived-storage-class check
 // at enumeration is provider-specific. If startJob stops recording the provider, nothing
 // throws: isArchivedStorageClass simply flags nothing, and GLACIER objects are issued as
