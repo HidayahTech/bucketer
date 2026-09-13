@@ -1,0 +1,9 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "src/main.jsx!",
+    "src/worker/zip-assembler.worker.js!"
+  ],
+  "project": ["src/**/*.{js,jsx}"],
+  "ignoreBinaries": ["openssl"]
+}
