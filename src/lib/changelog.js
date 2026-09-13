@@ -1,9 +1,15 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.59.2';
+export const CURRENT_VERSION = '1.59.3';
 
 export const CHANGELOG = [
+  {
+    "version": "1.59.3",
+    "date": "2026-09-13",
+    "title": "Fix: renaming a file with a non-Latin-1 character in its name",
+    "changes": []
+  },
   {
     "version": "1.59.2",
     "date": "2026-09-05",

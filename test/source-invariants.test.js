@@ -1132,6 +1132,39 @@ describe('move-multipart.js — uses UploadPartCopy with CopySourceRange', () =>
   });
 });
 
+// ── CopySource must be built with copySource() — never raw interpolation (BUG-060/062) ──
+// A `CopySource: `${bucket}/${key}`` template carries the literal key bytes. The browser
+// Headers constructor is a Latin-1 ByteString and throws on any char > U+00FF, so a key
+// with e.g. U+FF5C ("｜", from yt-dlp) breaks the copy before it is sent. copySource()
+// (move-key.js) percent-encodes each path segment, which is both Latin-1 safe and what S3
+// URL-decodes back to the exact key. BUG-060 fixed this for MOVE; BUG-062 for inline file
+// rename. This guard stops a third occurrence: any CopySource value must be a call, not a
+// raw string/template.
+describe('CopySource is never built by raw interpolation (BUG-060/062)', () => {
+  function scanDir(rel) {
+    const dir = resolve(ROOT, 'src', rel);
+    const hits = [];
+    for (const name of readdirSync(dir)) {
+      if (!/\.(js|jsx)$/.test(name)) continue;
+      const text = readFileSync(resolve(dir, name), 'utf8');
+      // Forbid a template-literal or plain-string CopySource value; allow `copySource(`.
+      const re = /CopySource:\s*[`'"]/g;
+      if (re.test(text)) hits.push(`${rel}/${name}`);
+    }
+    return hits;
+  }
+
+  test('no src file assigns CopySource from a string/template literal', () => {
+    const hits = [...scanDir('lib'), ...scanDir('components')];
+    assert.deepEqual(
+      hits, [],
+      `CopySource must be built with copySource(bucket, key) from move-key.js — a raw ` +
+      `string/template is not percent-encoded and breaks keys with chars above U+00FF ` +
+      `(BUG-060/062). Offending file(s): ${hits.join(', ')}`
+    );
+  });
+});
+
 describe('constants.js — FILE_MTIME_KEY exported', () => {
   const source = src('lib/constants.js');
   test('exports FILE_MTIME_KEY', () => {

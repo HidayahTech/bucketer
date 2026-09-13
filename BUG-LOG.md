@@ -4,6 +4,49 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-062 — Renaming a file whose key has a non-Latin-1 character fails ("Headers constructor")
+
+**Symptom.** Inline-renaming a file whose key contains a character above U+00FF (e.g.
+`Anwar ｜ track.opus`, the full-width vertical bar `｜` = U+FF5C that yt-dlp substitutes for
+the illegal `|`) failed immediately with `Headers constructor: Cannot convert value in
+record<ByteString, ByteString> … value 65372 which is greater than 255`. The file was
+un-renameable; the original was left untouched (the throw happens before any request is sent).
+
+**Root cause.** Identical class to BUG-060, but at the inline **file-rename** site rather than
+the move queue. A rename is a server-side copy (`CopyObject` + `DeleteObject`); `commitRename`
+in `useRename.js` built its `CopySource` header by raw interpolation
+(`` CopySource: `${bucket}/${oldKey}` ``). That header is a ByteString (Latin-1, ≤255), so the
+browser's `Headers` constructor threw synchronously for any key with a character >255. BUG-060
+fixed this class for MOVE (`move-key.js` `copySource`) but inline rename was a separate copy
+site that never got the treatment — and a code comment in `useRename.js` explicitly flagged it
+as a known follow-up left unaddressed during the hook extraction (v1.59.2).
+
+**Fix.** Route the rename copy through the existing shared `copySource(bucket, key)` helper
+(`move-key.js`), which percent-encodes each path segment (Latin-1 safe, `/`-preserving,
+S3 URL-decodes back to the exact key). One-line change at the single copy site, plus removing
+the stale follow-up comment. Scope: the one `CopySource` construction; the destination key
+already rides in the URL path, which the SDK encodes correctly. Folder rename was never
+affected — it dispatches to the move queue, which already used `copySource`.
+
+**Why it wasn't caught earlier.** Same blind spot as BUG-060: every rename component test and
+e2e spec used ASCII keys, which encode to themselves, so the raw interpolation looked correct.
+The `Headers` ByteString check only fires in a real browser. The BUG-060 fix landed on the move
+path only; the identical rename site was noted but deferred rather than fixed, and no test
+exercised it with a >255 character.
+
+**Test case.** Component: `test/components/browser-file-rename.test.jsx` — a case renaming a
+key with U+FF5C asserts the `CopySource` passed to the mock is all-Latin-1
+(`charCodeAt(0) <= 255`); RED→GREEN across this fix. Class guard: `test/source-invariants.test.js`
+asserts no `src/` file constructs a `CopySource` from a string or template literal (covers the
+whole BUG-060/062 class against a third recurrence). E2E (real browser, the only place the
+throw occurs): `test/e2e/browser/file-rename.test.mjs` renames `Anwar ｜ track.opus` and asserts
+the real bucket relocates the key. Matched-pair, all three engines, container image
+`mcr.microsoft.com/playwright:v1.60.0-noble` (desktop): pre-fix RED for the right reason on
+chromium/firefox/webkit (only this spec fails, bucket keeps `Anwar ｜ track.opus`), post-fix
+all-green on all three. Device axis held at desktop deliberately — the bug is header-encoding,
+device-invariant (click+type only). Logs: `.claude-scratch/e2e-prefix-*.log` (pre-fix),
+`.claude-scratch/e2e-postfix-*.log` (post-fix).
+
 ## BUG-061 — A download job surfaces under a different account that shares its bucket name
 
 **Symptom.** A download job created for one account's bucket (say `backups` on a B2 account)

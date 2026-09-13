@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.59.3] — 2026-09-13 — Fix: renaming a file with a non-Latin-1 character in its name
+
+Renaming a file whose name contains a character outside Latin-1 — for example the full-width bar `｜` that some tools substitute for `|` — no longer fails silently. Before this, such a rename threw before any request was sent and left the file untouched. The rename copy now encodes the source key the same way moves already do (BUG-062, the same class as the earlier move fix BUG-060). Folder renames were never affected.
+
 ## [1.59.2] — 2026-09-05 — Internal: extract rename handling into a hook
 
 No user-facing change. The file/folder rename cluster moved out of the large Browser component into a dedicated `useRename` hook (matching the `usePreview`/`useNewFolder` pattern), with the now-unused imports removed and a component characterization test added for file rename (previously covered only by e2e). Completes the Browser decomposition groundwork.

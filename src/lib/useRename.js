@@ -6,16 +6,12 @@
 // Behavior is preserved exactly from the pre-extraction Browser component; the two
 // characterization tests (browser-file-rename, browser-folder-rename) pin it.
 //
-// NOTE (pre-existing, not changed here): commitRename builds CopySource by raw string
-// interpolation (`${bucket}/${oldKey}`), so a key with a character above U+00FF is not
-// percent-encoded — the same class as BUG-060, which was fixed for MOVE (move-key.js)
-// but not for inline file rename. Worth a follow-up; left as-is to keep this a pure
-// extraction.
 import { useState } from 'preact/hooks';
 import { CopyObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { showToast } from './toast.js';
 import { validateObjectName } from './validate-object-name.js';
 import { leafName } from './format.js';
+import { copySource } from './move-key.js';
 
 export function useRename({ client, bucket, prefix, items, setItems, commonPrefixes, invalidateCache, onMoveRequest }) {
   const [renamingKey, setRenamingKey] = useState(null);
@@ -47,7 +43,7 @@ export function useRename({ client, bucket, prefix, items, setItems, commonPrefi
     setRenameError(null);
     try {
       await client.send(new CopyObjectCommand({
-        Bucket: bucket, CopySource: `${bucket}/${oldKey}`,
+        Bucket: bucket, CopySource: copySource(bucket, oldKey),
         Key: newKey, MetadataDirective: 'COPY',
       }));
       await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: oldKey }));

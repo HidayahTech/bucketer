@@ -7,12 +7,12 @@ import { h } from 'preact';
 import { mount, fire, setInput } from '../helpers/render.js';
 import { Browser } from '../../src/components/Browser.jsx';
 
-function makeClient(log) {
+function makeClient(log, key = 'notes.txt') {
   return {
     send(cmd) {
       const n = cmd.constructor.name;
       if (n === 'ListObjectsV2Command') {
-        return Promise.resolve({ Contents: [{ Key: 'notes.txt', Size: 5, LastModified: new Date().toISOString() }], IsTruncated: false, CommonPrefixes: [] });
+        return Promise.resolve({ Contents: [{ Key: key, Size: 5, LastModified: new Date().toISOString() }], IsTruncated: false, CommonPrefixes: [] });
       }
       if (n === 'CopyObjectCommand') { log.push(['copy', cmd.input]); return Promise.resolve({}); }
       if (n === 'DeleteObjectCommand') { log.push(['delete', cmd.input]); return Promise.resolve({}); }
@@ -23,9 +23,9 @@ function makeClient(log) {
 
 const caps = { list: 'permitted', download: 'permitted', upload: 'permitted', delete: 'permitted' };
 
-function mountBrowser(log) {
+function mountBrowser(log, key) {
   return mount(h(Browser, {
-    client: makeClient(log), bucket: 'b', provider: 'generic', credentials: { bucket: 'b' },
+    client: makeClient(log, key), bucket: 'b', provider: 'generic', credentials: { bucket: 'b' },
     capabilities: caps, onCapabilityChange: () => {}, onMoveRequest: () => {},
     onDeleteRequest: () => {}, onUploadTargetChange: () => {}, onInitialListFailed: () => {},
   }));
@@ -46,6 +46,24 @@ describe('Browser — file rename', () => {
     assert.ok(copy && copy[1].Key === 'renamed.txt' && copy[1].CopySource === 'b/notes.txt', 'copies to the new key from the old');
     assert.ok(del && del[1].Key === 'notes.txt', 'deletes the old key');
     assert.ok(text().includes('renamed.txt'), 'the row shows the new name');
+    cleanup();
+  });
+
+  test('renaming a file whose key has a char above U+00FF percent-encodes CopySource (BUG-062)', async () => {
+    // A raw `${bucket}/${oldKey}` CopySource carries the literal U+FF5C, which the browser
+    // Headers constructor (Latin-1 ByteString) rejects > U+00FF — the rename throws before
+    // the request. copySource() from move-key.js percent-encodes each segment. Same class as
+    // BUG-060 (fixed for MOVE, missed for inline file rename).
+    const log = [];
+    const { query, queryAll, cleanup } = mountBrowser(log, 'Anwar ｜ x.opus');
+    await tick();
+    fire(queryAll('button').find(b => b.title === 'Rename'), 'click');
+    setInput(query('.rename-input'), 'renamed.opus');
+    fire(queryAll('.rename-inline button').find(b => b.textContent.includes('✓')), 'click');
+    await tick();
+    const copy = log.find(([op]) => op === 'copy');
+    assert.ok(copy, 'a copy is issued');
+    assert.equal(copy[1].CopySource, 'b/Anwar%20%EF%BD%9C%20x.opus', 'CopySource is percent-encoded and Latin-1 safe');
     cleanup();
   });
 
