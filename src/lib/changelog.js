@@ -1,9 +1,15 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.59.4';
+export const CURRENT_VERSION = '1.60.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.60.0",
+    "date": "2026-09-13",
+    "title": "Dead-code / unused-code gate (knip)",
+    "changes": []
+  },
   {
     "version": "1.59.4",
     "date": "2026-09-13",

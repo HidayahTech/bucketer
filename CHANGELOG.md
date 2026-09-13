@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.60.0] — 2026-09-13 — Dead-code / unused-code gate (knip)
+
+No user-facing change. Adds a deterministic dead-code gate to the quality pipeline: [knip](https://knip.dev/) (exact-pinned) detects unused files, exports, imports, and dependencies, gated by a bidirectional-ratchet wrapper against a committed `deadcode-baseline.json` — new findings fail, and baseline entries whose code was fixed also fail, so the list can't rot. It runs as a **blocking CI job** and a **warn-only pre-push step** (advisory during a bake-in period). A separate report-only PurgeCSS check surfaces unused CSS selectors (never wired into the build, so byte-reproducibility is untouched). The baseline ships **empty**: the tooling's first run surfaced 6 unused JS exports (3 de-exported, 3 removed) and 4 unused CSS selectors, all cleaned rather than suppressed. Tool versions are pinned exact and guarded against range-drift. See `docs/superpowers/specs/2026-09-13-deadcode-tooling-design.md`.
+
 ## [1.59.4] — 2026-09-13 — Internal: remove dead profile CSS
 
 No user-facing change. Removed CSS rules left orphaned when the flat profile-save/delete UI was replaced by the accounts→buckets tree (`.profile-active-name`, `.profile-save-*`, `.profile-delete-*`) — no component references them.
