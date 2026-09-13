@@ -25,7 +25,7 @@ const ALGORITHMS = [
 
 const GITLAB_PROJECT = 'hidayahtech%2Fbucketer';
 
-export function manifestUrlFor(version) {
+function manifestUrlFor(version) {
   return `https://gitlab.com/api/v4/projects/${GITLAB_PROJECT}` +
     `/packages/generic/bucketer/${version}/bucketer-v${version}.integrity.json`;
 }

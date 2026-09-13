@@ -12,7 +12,7 @@
 // configured CORS would surface even bad credentials as a readable 403.
 import { requiresPathStyle } from './provider.js';
 
-export const PROBE_TIMEOUT_MS = 5000;
+const PROBE_TIMEOUT_MS = 5000;
 
 export const VERDICT_MESSAGES = {
   'offline': 'Your browser reports no network connection. Reconnect and try again.',

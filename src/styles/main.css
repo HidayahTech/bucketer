@@ -1106,7 +1106,6 @@ details[open] .sv-summary::before { transform: rotate(90deg); }
 
 /* ── Profile picker (splash screen) ──────────────────────────────────────── */
 .profile-picker { margin-bottom: 1.25rem; }
-.profile-picker-empty { display: flex; justify-content: flex-end; }
 .profile-picker-heading { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin-bottom: .5rem; }
 .profile-list { list-style: none; padding: 0; margin: 0 0 .75rem 0; display: flex; flex-direction: column; gap: .25rem; }
 .profile-row {
@@ -1116,15 +1115,8 @@ details[open] .sv-summary::before { transform: rotate(90deg); }
   cursor: pointer; font-size: .85rem; transition: background var(--transition);
 }
 .profile-row:hover { background: var(--surface-hover, var(--border)); }
-.profile-row-selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface-raised)); }
 .profile-row-name { flex: 1; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .profile-row-hint { font-size: .75rem; color: var(--text-muted); white-space: nowrap; }
-.profile-row-delete {
-  background: none; border: none; cursor: pointer; padding: .1rem .3rem;
-  font-size: .8rem; color: var(--text-muted); border-radius: 3px; line-height: 1;
-  flex-shrink: 0;
-}
-.profile-row-delete:hover { color: var(--danger, #c0392b); background: color-mix(in srgb, var(--danger, #c0392b) 12%, transparent); }
 
 /* AccountsManager — account → buckets tree (replaces the flat profile list). */
 .sidebar-heading { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); margin-bottom: .5rem; }

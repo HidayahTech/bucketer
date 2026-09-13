@@ -11,9 +11,3 @@ export function makeAssemblerWorker() {
   if (!cachedUrl) cachedUrl = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' }));
   return new Worker(cachedUrl);
 }
-// A length check, not a literal comparison to the placeholder text: build.mjs's
-// substitution is a non-global String.replace() that only rewrites the first
-// quoted occurrence of the sentinel (the assignment above); a second quoted
-// copy here would survive substitution and remain in the built bundle forever,
-// defeating the "no unreplaced placeholder in dist" build invariant/test.
-export const workerInlined = () => WORKER_SRC.length > 100;

@@ -12,7 +12,7 @@
 // reads/writes a specific object store. Those belong in the domain modules.
 
 export const DB_NAME    = 's3browser';
-export const DB_VERSION = 6;
+const DB_VERSION = 6;
 
 export const STORE       = 's3browser_uploads';
 export const LOG_STORE   = 'bucketer_upload_log';

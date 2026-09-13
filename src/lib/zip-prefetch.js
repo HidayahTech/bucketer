@@ -7,7 +7,6 @@ import { crc32 } from './zip-writer.js';
 import { PROBE_KIND } from './download-preflight.js';
 
 export const CONCURRENCY = 4;        // default concurrent fetches
-export const MAX_CONCURRENCY = 8;    // ceiling
 export const TINY_MAX = 4 * 1024 * 1024;    // <= this: buffer in memory
 export const MEDIUM_MAX = 64 * 1024 * 1024; // <= this: buffer in an OPFS temp file; else stream solo
 

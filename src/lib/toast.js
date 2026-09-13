@@ -4,8 +4,7 @@
 // drilling or context. ToastHost.jsx subscribes and renders the active toasts.
 //
 // createToastStore() returns an isolated store (used by tests); the module also
-// exports a shared singleton plus showToast/dismissToast convenience wrappers
-// that the app uses.
+// exports a shared singleton plus a showToast convenience wrapper that the app uses.
 
 export function createToastStore() {
   let toasts = [];
@@ -37,4 +36,3 @@ export function createToastStore() {
 
 export const toastStore = createToastStore();
 export const showToast = (message, opts) => toastStore.show(message, opts);
-export const dismissToast = (id) => toastStore.dismiss(id);
