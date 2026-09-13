@@ -1668,6 +1668,29 @@ describe('dead-code tooling is pinned exact', () => {
   }
 });
 
+// The dead-code gate (scripts/deadcode-gate.mjs) accepts entries in deadcode-baseline.json as
+// suppressed findings. This guard keeps that file from becoming an unreviewable dumping ground:
+// every entry must name a file, an identifier, a human note, and a reason from a closed enum.
+// (The detection logic itself is NOT here — whole-import-graph reachability is knip's job, not
+// a point assertion. Design: docs/superpowers/specs/2026-09-13-deadcode-tooling-design.md §5.)
+describe('deadcode-baseline.json is well-formed', () => {
+  const REASONS = new Set(['dormant-feature', 'test-only', 'todo-remove']);
+  const rows = JSON.parse(readFileSync(resolve(ROOT, 'deadcode-baseline.json'), 'utf8'));
+
+  test('the baseline is a JSON array', () => {
+    assert.ok(Array.isArray(rows), 'deadcode-baseline.json must be a JSON array');
+  });
+
+  for (const [i, r] of rows.entries()) {
+    test(`entry ${i} (${r.file}:${r.identifier}) has required fields and a valid reason`, () => {
+      for (const k of ['file', 'identifier', 'note']) {
+        assert.ok(r[k] && String(r[k]).trim(), `entry ${i} missing "${k}": ${JSON.stringify(r)}`);
+      }
+      assert.ok(REASONS.has(r.reason), `entry ${i} has invalid reason "${r.reason}"`);
+    });
+  }
+});
+
 // A download job outlives the session that created it, and the archived-storage-class check
 // at enumeration is provider-specific. If startJob stops recording the provider, nothing
 // throws: isArchivedStorageClass simply flags nothing, and GLACIER objects are issued as
