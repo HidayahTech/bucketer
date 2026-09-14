@@ -12,6 +12,15 @@ import { chromium, firefox, webkit, devices } from 'playwright';
 import { test } from 'node:test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { applyEngineQuirks, skipReasonFor } from './engine-quirks.mjs';
+import { laneTimeoutFactor, scaleTimeout } from './lane-timeout.mjs';
+
+// Re-export so specs get per-lane timeout scaling from the same import they already use.
+export { laneTimeoutFactor, scaleTimeout };
+
+// Baseline Playwright default action/navigation timeout (its library default is 30 s). Set
+// per-page in newE2EPage, scaled by the lane factor, so implicit waits (locator clicks/waits
+// with no explicit timeout — e.g. the move-picker click) get more room on slow lanes.
+const DEFAULT_ACTION_TIMEOUT_MS = 30000;
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 export const BUCKET = 'test-bucket';
@@ -95,7 +104,7 @@ export async function connectApp(page, endpoint, bucket = BUCKET) {
   await region.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
   if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
   await page.locator('button[type="submit"]').click();
-  await page.locator('[data-testid="file-input"]').waitFor({ state: 'attached', timeout: 15000 });
+  await page.locator('[data-testid="file-input"]').waitFor({ state: 'attached', timeout: scaleTimeout(15000) });
 }
 
 // Download observation. Playwright fires 'download' when a navigation is taken over by
@@ -111,7 +120,7 @@ export function collectDownloads(page) {
     names: () => names.slice(),
     // Resolve once n downloads have been seen, or throw naming the shortfall — the
     // shortfall count IS the finding, so it belongs in the error message.
-    waitForCount(n, timeoutMs = 30000) {
+    waitForCount(n, timeoutMs = scaleTimeout(30000)) {
       const deadline = Date.now() + timeoutMs;
       return (async () => {
         while (names.length < n) {
@@ -172,6 +181,10 @@ let _activeLogs = [];
 // Create the page, register it as active for failure capture, and buffer console/page errors.
 export async function newE2EPage(context) {
   const page = await context.newPage();
+  // Scale implicit-wait deadlines by the lane factor: slow lanes (webkit, mobile) get
+  // proportionally longer before a wait with no explicit timeout gives up.
+  page.setDefaultTimeout(scaleTimeout(DEFAULT_ACTION_TIMEOUT_MS));
+  page.setDefaultNavigationTimeout(scaleTimeout(DEFAULT_ACTION_TIMEOUT_MS));
   const logs = [];
   page.on('console', (m) => logs.push(`[console:${m.type()}] ${m.text()}`));
   page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}`));

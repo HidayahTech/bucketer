@@ -5,7 +5,7 @@
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest } from '../harness.mjs';
+import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest, scaleTimeout } from '../harness.mjs';
 
 let ctx, app, browser, context, page;
 
@@ -27,7 +27,7 @@ async function bucketKeys() {
   return (r.Contents || []).map((o) => o.Key).sort();
 }
 // Poll bucket state until it matches (avoids racing the async S3 op behind a UI action).
-async function waitForKeys(expected, timeout = 10000) {
+async function waitForKeys(expected, timeout = scaleTimeout(10000)) {
   const want = JSON.stringify(expected);
   const deadline = Date.now() + timeout;
   let keys = await bucketKeys();

@@ -4,7 +4,7 @@
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest } from '../harness.mjs';
+import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest, scaleTimeout } from '../harness.mjs';
 
 let ctx, app, browser;
 before(async () => {
@@ -21,7 +21,7 @@ async function bucketKeys() {
 // Poll for the COMPLETE final bucket state. Move = copy-then-delete (per file, pool of
 // workers) — waiting for a single relocated key and then asserting the rest races a slow
 // runner that observes the copy before the delete (or a sibling file mid-move).
-async function waitForKeys(expected, timeout = 10000) {
+async function waitForKeys(expected, timeout = scaleTimeout(10000)) {
   const want = JSON.stringify(expected); const deadline = Date.now() + timeout;
   let keys = await bucketKeys();
   while (JSON.stringify(keys) !== want && Date.now() < deadline) { await new Promise((r) => setTimeout(r, 150)); keys = await bucketKeys(); }

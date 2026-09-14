@@ -3,7 +3,7 @@
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest } from '../harness.mjs';
+import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest, scaleTimeout } from '../harness.mjs';
 
 let ctx, app, browser;
 before(async () => {
@@ -33,7 +33,7 @@ async function uploadFiles(page, names) {
 // force: the post-upload re-render (listing refetch + BatchSummary auto-collapse) keeps rows
 // briefly "unstable" for Playwright; the checkboxes are functional.
 const selectRow = (page, name) => page.locator(`[data-testid="file-row:${name}"]`).locator('td.col-check input[type="checkbox"]').check({ force: true });
-async function waitForKeys(expected, timeout = 10000) {
+async function waitForKeys(expected, timeout = scaleTimeout(10000)) {
   const want = JSON.stringify(expected); const deadline = Date.now() + timeout;
   let keys = await bucketKeys();
   while (JSON.stringify(keys) !== want && Date.now() < deadline) { await new Promise((r) => setTimeout(r, 150)); keys = await bucketKeys(); }
@@ -122,7 +122,8 @@ describe('select-all, filter, sort', () => {
       const readOrder = () => page.locator('.file-table tbody tr.file-row')
         .evaluateAll((rows) => rows.map((r) => r.getAttribute('data-testid')));
       const expected = ['file-row:c.txt', 'file-row:b.txt', 'file-row:a.txt'];
-      const deadline = Date.now() + 5000;
+      // Scaled by lane: this exact 5 s poll blew on webkit-mobile (~7 s) in pipeline #308.
+      const deadline = Date.now() + scaleTimeout(5000);
       let order = await readOrder();
       while (JSON.stringify(order) !== JSON.stringify(expected) && Date.now() < deadline) {
         await page.waitForTimeout(100);

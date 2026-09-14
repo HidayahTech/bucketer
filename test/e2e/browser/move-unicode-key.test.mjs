@@ -8,7 +8,7 @@
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest } from '../harness.mjs';
+import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest, scaleTimeout } from '../harness.mjs';
 
 let ctx, app, browser;
 before(async () => {
@@ -22,7 +22,7 @@ async function bucketKeys() {
   const r = await ctx.client.send(new ListObjectsV2Command({ Bucket: BUCKET }));
   return (r.Contents || []).map((o) => o.Key).sort();
 }
-async function waitForKeys(expected, timeout = 12000) {
+async function waitForKeys(expected, timeout = scaleTimeout(12000)) {
   const want = JSON.stringify(expected); const deadline = Date.now() + timeout;
   let keys = await bucketKeys();
   while (JSON.stringify(keys) !== want && Date.now() < deadline) { await new Promise((r) => setTimeout(r, 150)); keys = await bucketKeys(); }
