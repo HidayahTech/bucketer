@@ -1,0 +1,889 @@
+{
+  "chromium": {
+    "ua": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/148.0.7778.96 Safari/537.36",
+    "presence": {
+      "showSaveFilePicker": true,
+      "showOpenFilePicker": true,
+      "showDirectoryPicker": true,
+      "createWritable": true,
+      "createSyncAccessHandle": false,
+      "handleMove": false,
+      "opfs": true,
+      "storageEstimate": true,
+      "storagePersist": true,
+      "backgroundFetch": true,
+      "serviceWorker": true,
+      "responseBodyStream": true,
+      "createObjectURL": true,
+      "performanceMemory": true
+    },
+    "quota": {
+      "ok": true,
+      "quotaMiB": 10240,
+      "usageMiB": 0
+    },
+    "sizes": {
+      "64": {
+        "opfsWrite": {
+          "ok": true,
+          "ms": 219,
+          "fileSizeMiB": 64
+        },
+        "opfsExport": {
+          "ok": true,
+          "ms": 4,
+          "exportedMiB": 64,
+          "readBack": true
+        },
+        "blob": {
+          "ok": true,
+          "ms": 89,
+          "blobSizeMiB": 64,
+          "readBack": true
+        },
+        "idb": {
+          "ok": true,
+          "ms": 155,
+          "assembledMiB": 64,
+          "assembleMs": 0,
+          "readBack": true
+        }
+      },
+      "256": {
+        "opfsWrite": {
+          "ok": true,
+          "ms": 574,
+          "fileSizeMiB": 256
+        },
+        "opfsExport": {
+          "ok": true,
+          "ms": 3,
+          "exportedMiB": 256,
+          "readBack": true
+        },
+        "blob": {
+          "ok": true,
+          "ms": 329,
+          "blobSizeMiB": 256,
+          "readBack": true
+        },
+        "idb": {
+          "ok": true,
+          "ms": 427,
+          "assembledMiB": 256,
+          "assembleMs": 1,
+          "readBack": true
+        }
+      },
+      "512": {
+        "opfsWrite": {
+          "ok": true,
+          "ms": 1169,
+          "fileSizeMiB": 512
+        },
+        "opfsExport": {
+          "ok": true,
+          "ms": 5,
+          "exportedMiB": 512,
+          "readBack": true
+        },
+        "blob": {
+          "ok": true,
+          "ms": 619,
+          "blobSizeMiB": 512,
+          "readBack": true
+        },
+        "idb": {
+          "ok": true,
+          "ms": 802,
+          "assembledMiB": 512,
+          "assembleMs": 2,
+          "readBack": true
+        }
+      },
+      "1024": {
+        "opfsWrite": {
+          "ok": true,
+          "ms": 2462,
+          "fileSizeMiB": 1024
+        },
+        "opfsExport": {
+          "ok": true,
+          "ms": 4,
+          "exportedMiB": 1024,
+          "readBack": true
+        },
+        "blob": {
+          "ok": true,
+          "ms": 1267,
+          "blobSizeMiB": 1024,
+          "readBack": true
+        },
+        "idb": {
+          "ok": true,
+          "ms": 2101,
+          "assembledMiB": 1024,
+          "assembleMs": 4,
+          "readBack": true
+        }
+      },
+      "2048": {
+        "opfsWrite": {
+          "ok": true,
+          "ms": 5170,
+          "fileSizeMiB": 2048
+        },
+        "opfsExport": {
+          "ok": true,
+          "ms": 4,
+          "exportedMiB": 2048,
+          "readBack": true
+        },
+        "blob": {
+          "ok": true,
+          "ms": 2793,
+          "blobSizeMiB": 2048,
+          "readBack": true
+        },
+        "idb": {
+          "ok": true,
+          "ms": 3887,
+          "assembledMiB": 2048,
+          "assembleMs": 10,
+          "readBack": true
+        }
+      }
+    },
+    "baselineRssMiB": 437,
+    "peakRssMiB": 2617,
+    "phases": {
+      "opfsWrite-64": {
+        "preRssMiB": 503,
+        "peakRssMiB": 516,
+        "peakDeltaMiB": 13,
+        "settledDeltaMiB": 7,
+        "samples": 4
+      },
+      "opfsExport-64": {
+        "preRssMiB": 515,
+        "peakRssMiB": null,
+        "peakDeltaMiB": null,
+        "settledDeltaMiB": 1,
+        "samples": 0
+      },
+      "blob-64": {
+        "preRssMiB": 516,
+        "peakRssMiB": 570,
+        "peakDeltaMiB": 54,
+        "settledDeltaMiB": 65,
+        "samples": 2
+      },
+      "idb-64": {
+        "preRssMiB": 583,
+        "peakRssMiB": 650,
+        "peakDeltaMiB": 67,
+        "settledDeltaMiB": 67,
+        "samples": 3
+      },
+      "opfsWrite-256": {
+        "preRssMiB": 650,
+        "peakRssMiB": 664,
+        "peakDeltaMiB": 14,
+        "settledDeltaMiB": 4,
+        "samples": 12
+      },
+      "opfsExport-256": {
+        "preRssMiB": 654,
+        "peakRssMiB": null,
+        "peakDeltaMiB": null,
+        "settledDeltaMiB": 0,
+        "samples": 0
+      },
+      "blob-256": {
+        "preRssMiB": 654,
+        "peakRssMiB": 918,
+        "peakDeltaMiB": 264,
+        "settledDeltaMiB": 256,
+        "samples": 7
+      },
+      "idb-256": {
+        "preRssMiB": 911,
+        "peakRssMiB": 1174,
+        "peakDeltaMiB": 263,
+        "settledDeltaMiB": 257,
+        "samples": 9
+      },
+      "opfsWrite-512": {
+        "preRssMiB": 1169,
+        "peakRssMiB": 1188,
+        "peakDeltaMiB": 19,
+        "settledDeltaMiB": 7,
+        "samples": 24
+      },
+      "opfsExport-512": {
+        "preRssMiB": 1176,
+        "peakRssMiB": 1176,
+        "peakDeltaMiB": 0,
+        "settledDeltaMiB": -2,
+        "samples": 1
+      },
+      "blob-512": {
+        "preRssMiB": 1174,
+        "peakRssMiB": 1687,
+        "peakDeltaMiB": 513,
+        "settledDeltaMiB": 514,
+        "samples": 13
+      },
+      "idb-512": {
+        "preRssMiB": 1688,
+        "peakRssMiB": 2207,
+        "peakDeltaMiB": 519,
+        "settledDeltaMiB": -1154,
+        "samples": 16
+      },
+      "opfsWrite-1024": {
+        "preRssMiB": 534,
+        "peakRssMiB": 560,
+        "peakDeltaMiB": 26,
+        "settledDeltaMiB": 4,
+        "samples": 49
+      },
+      "opfsExport-1024": {
+        "preRssMiB": 538,
+        "peakRssMiB": null,
+        "peakDeltaMiB": null,
+        "settledDeltaMiB": 1,
+        "samples": 0
+      },
+      "blob-1024": {
+        "preRssMiB": 541,
+        "peakRssMiB": 1564,
+        "peakDeltaMiB": 1023,
+        "settledDeltaMiB": 1023,
+        "samples": 25
+      },
+      "idb-1024": {
+        "preRssMiB": 1564,
+        "peakRssMiB": 2588,
+        "peakDeltaMiB": 1024,
+        "settledDeltaMiB": -1004,
+        "samples": 42
+      },
+      "opfsWrite-2048": {
+        "preRssMiB": 560,
+        "peakRssMiB": 587,
+        "peakDeltaMiB": 27,
+        "settledDeltaMiB": 11,
+        "samples": 103
+      },
+      "opfsExport-2048": {
+        "preRssMiB": 571,
+        "peakRssMiB": null,
+        "peakDeltaMiB": null,
+        "settledDeltaMiB": -7,
+        "samples": 0
+      },
+      "blob-2048": {
+        "preRssMiB": 564,
+        "peakRssMiB": 2608,
+        "peakDeltaMiB": 2044,
+        "settledDeltaMiB": 19,
+        "samples": 56
+      },
+      "idb-2048": {
+        "preRssMiB": 584,
+        "peakRssMiB": 2617,
+        "peakDeltaMiB": 2033,
+        "settledDeltaMiB": 23,
+        "samples": 76
+      }
+    },
+    "pageErrors": []
+  },
+  "firefox": {
+    "ua": "Mozilla/5.0 (X11; Linux x86_64; rv:150.0) Gecko/20100101 Firefox/150.0",
+    "presence": {
+      "showSaveFilePicker": false,
+      "showOpenFilePicker": false,
+      "showDirectoryPicker": false,
+      "createWritable": true,
+      "createSyncAccessHandle": false,
+      "handleMove": true,
+      "opfs": true,
+      "storageEstimate": true,
+      "storagePersist": true,
+      "backgroundFetch": false,
+      "serviceWorker": true,
+      "responseBodyStream": true,
+      "createObjectURL": true,
+      "performanceMemory": false
+    },
+    "quota": {
+      "ok": true,
+      "quotaMiB": 10240,
+      "usageMiB": 0
+    },
+    "sizes": {
+      "64": {
+        "opfsWrite": {
+          "ok": true,
+          "ms": 313,
+          "fileSizeMiB": 64
+        },
+        "opfsExport": {
+          "ok": true,
+          "ms": 67,
+          "exportedMiB": 64,
+          "readBack": true
+        },
+        "blob": {
+          "ok": true,
+          "ms": 38,
+          "blobSizeMiB": 64,
+          "readBack": true
+        },
+        "idb": {
+          "ok": true,
+          "ms": 291,
+          "assembledMiB": 64,
+          "assembleMs": 0,
+          "readBack": true
+        }
+      },
+      "256": {
+        "opfsWrite": {
+          "ok": true,
+          "ms": 500,
+          "fileSizeMiB": 256
+        },
+        "opfsExport": {
+          "ok": true,
+          "ms": 84,
+          "exportedMiB": 256,
+          "readBack": true
+        },
+        "blob": {
+          "ok": true,
+          "ms": 154,
+          "blobSizeMiB": 256,
+          "readBack": true
+        },
+        "idb": {
+          "ok": true,
+          "ms": 734,
+          "assembledMiB": 256,
+          "assembleMs": 0,
+          "readBack": true
+        }
+      },
+      "512": {
+        "opfsWrite": {
+          "ok": true,
+          "ms": 854,
+          "fileSizeMiB": 512
+        },
+        "opfsExport": {
+          "ok": true,
+          "ms": 135,
+          "exportedMiB": 512,
+          "readBack": true
+        },
+        "blob": {
+          "ok": true,
+          "ms": 271,
+          "blobSizeMiB": 512,
+          "readBack": true
+        },
+        "idb": {
+          "ok": true,
+          "ms": 1347,
+          "assembledMiB": 512,
+          "assembleMs": 0,
+          "readBack": true
+        }
+      },
+      "1024": {
+        "opfsWrite": {
+          "ok": true,
+          "ms": 1586,
+          "fileSizeMiB": 1024
+        },
+        "opfsExport": {
+          "ok": true,
+          "ms": 199,
+          "exportedMiB": 1024,
+          "readBack": true
+        },
+        "blob": {
+          "ok": true,
+          "ms": 636,
+          "blobSizeMiB": 1024,
+          "readBack": true
+        },
+        "idb": {
+          "ok": true,
+          "ms": 2534,
+          "assembledMiB": 1024,
+          "assembleMs": 1,
+          "readBack": true
+        }
+      },
+      "2048": {
+        "opfsWrite": {
+          "ok": true,
+          "ms": 3155,
+          "fileSizeMiB": 2048
+        },
+        "opfsExport": {
+          "ok": true,
+          "ms": 329,
+          "exportedMiB": 2048,
+          "readBack": true
+        },
+        "blob": {
+          "ok": true,
+          "ms": 1098,
+          "blobSizeMiB": 2048,
+          "readBack": true
+        },
+        "idb": {
+          "ok": true,
+          "ms": 5907,
+          "assembledMiB": 2048,
+          "assembleMs": 1,
+          "readBack": true
+        }
+      }
+    },
+    "baselineRssMiB": 647,
+    "peakRssMiB": 6774,
+    "phases": {
+      "opfsWrite-64": {
+        "preRssMiB": 756,
+        "peakRssMiB": 804,
+        "peakDeltaMiB": 48,
+        "settledDeltaMiB": 40,
+        "samples": 7
+      },
+      "opfsExport-64": {
+        "preRssMiB": 798,
+        "peakRssMiB": 799,
+        "peakDeltaMiB": 1,
+        "settledDeltaMiB": 1,
+        "samples": 1
+      },
+      "blob-64": {
+        "preRssMiB": 802,
+        "peakRssMiB": 850,
+        "peakDeltaMiB": 48,
+        "settledDeltaMiB": 93,
+        "samples": 1
+      },
+      "idb-64": {
+        "preRssMiB": 911,
+        "peakRssMiB": 1021,
+        "peakDeltaMiB": 110,
+        "settledDeltaMiB": -1,
+        "samples": 6
+      },
+      "opfsWrite-256": {
+        "preRssMiB": 909,
+        "peakRssMiB": 918,
+        "peakDeltaMiB": 9,
+        "settledDeltaMiB": -6,
+        "samples": 10
+      },
+      "opfsExport-256": {
+        "preRssMiB": 902,
+        "peakRssMiB": 902,
+        "peakDeltaMiB": 0,
+        "settledDeltaMiB": 0,
+        "samples": 2
+      },
+      "blob-256": {
+        "preRssMiB": 902,
+        "peakRssMiB": 1144,
+        "peakDeltaMiB": 242,
+        "settledDeltaMiB": 154,
+        "samples": 3
+      },
+      "idb-256": {
+        "preRssMiB": 1287,
+        "peakRssMiB": 1692,
+        "peakDeltaMiB": 405,
+        "settledDeltaMiB": -459,
+        "samples": 14
+      },
+      "opfsWrite-512": {
+        "preRssMiB": 827,
+        "peakRssMiB": 835,
+        "peakDeltaMiB": 8,
+        "settledDeltaMiB": -18,
+        "samples": 17
+      },
+      "opfsExport-512": {
+        "preRssMiB": 810,
+        "peakRssMiB": 810,
+        "peakDeltaMiB": 0,
+        "settledDeltaMiB": -2,
+        "samples": 2
+      },
+      "blob-512": {
+        "preRssMiB": 808,
+        "peakRssMiB": 1318,
+        "peakDeltaMiB": 510,
+        "settledDeltaMiB": 518,
+        "samples": 6
+      },
+      "idb-512": {
+        "preRssMiB": 1805,
+        "peakRssMiB": 2688,
+        "peakDeltaMiB": 883,
+        "settledDeltaMiB": 18,
+        "samples": 27
+      },
+      "opfsWrite-1024": {
+        "preRssMiB": 1822,
+        "peakRssMiB": 1830,
+        "peakDeltaMiB": 8,
+        "settledDeltaMiB": -21,
+        "samples": 32
+      },
+      "opfsExport-1024": {
+        "preRssMiB": 1802,
+        "peakRssMiB": 1802,
+        "peakDeltaMiB": 0,
+        "settledDeltaMiB": 0,
+        "samples": 4
+      },
+      "blob-1024": {
+        "preRssMiB": 1802,
+        "peakRssMiB": 2802,
+        "peakDeltaMiB": 1000,
+        "settledDeltaMiB": 37,
+        "samples": 13
+      },
+      "idb-1024": {
+        "preRssMiB": 2836,
+        "peakRssMiB": 4580,
+        "peakDeltaMiB": 1744,
+        "settledDeltaMiB": 7,
+        "samples": 50
+      },
+      "opfsWrite-2048": {
+        "preRssMiB": 2843,
+        "peakRssMiB": 2854,
+        "peakDeltaMiB": 11,
+        "settledDeltaMiB": -13,
+        "samples": 63
+      },
+      "opfsExport-2048": {
+        "preRssMiB": 2830,
+        "peakRssMiB": 2830,
+        "peakDeltaMiB": 0,
+        "settledDeltaMiB": -2048,
+        "samples": 6
+      },
+      "blob-2048": {
+        "preRssMiB": 781,
+        "peakRssMiB": 2843,
+        "peakDeltaMiB": 2062,
+        "settledDeltaMiB": 2087,
+        "samples": 22
+      },
+      "idb-2048": {
+        "preRssMiB": 4739,
+        "peakRssMiB": 6774,
+        "peakDeltaMiB": 2035,
+        "settledDeltaMiB": 133,
+        "samples": 117
+      }
+    },
+    "pageErrors": []
+  },
+  "webkit": {
+    "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.4 Safari/605.1.15",
+    "presence": {
+      "showSaveFilePicker": false,
+      "showOpenFilePicker": false,
+      "showDirectoryPicker": false,
+      "createWritable": false,
+      "createSyncAccessHandle": false,
+      "handleMove": false,
+      "opfs": false,
+      "storageEstimate": false,
+      "storagePersist": false,
+      "backgroundFetch": false,
+      "serviceWorker": true,
+      "responseBodyStream": true,
+      "createObjectURL": true,
+      "performanceMemory": false
+    },
+    "quota": {
+      "ok": false,
+      "error": "no estimate()"
+    },
+    "sizes": {
+      "64": {
+        "opfsWrite": {
+          "ok": false,
+          "error": "no OPFS"
+        },
+        "opfsExport": {
+          "ok": false,
+          "error": "write failed"
+        },
+        "blob": {
+          "ok": true,
+          "ms": 89,
+          "blobSizeMiB": 64,
+          "readBack": true
+        },
+        "idb": {
+          "ok": true,
+          "ms": 459,
+          "assembledMiB": 64,
+          "assembleMs": 0,
+          "readBack": true
+        }
+      },
+      "256": {
+        "opfsWrite": {
+          "ok": false,
+          "error": "no OPFS"
+        },
+        "opfsExport": {
+          "ok": false,
+          "error": "write failed"
+        },
+        "blob": {
+          "ok": true,
+          "ms": 289,
+          "blobSizeMiB": 256,
+          "readBack": true
+        },
+        "idb": {
+          "ok": true,
+          "ms": 1193,
+          "assembledMiB": 256,
+          "assembleMs": 0,
+          "readBack": true
+        }
+      },
+      "512": {
+        "opfsWrite": {
+          "ok": false,
+          "error": "no OPFS"
+        },
+        "opfsExport": {
+          "ok": false,
+          "error": "write failed"
+        },
+        "blob": {
+          "ok": true,
+          "ms": 512,
+          "blobSizeMiB": 512,
+          "readBack": true
+        },
+        "idb": {
+          "ok": true,
+          "ms": 2174,
+          "assembledMiB": 512,
+          "assembleMs": 0,
+          "readBack": true
+        }
+      },
+      "1024": {
+        "opfsWrite": {
+          "ok": false,
+          "error": "no OPFS"
+        },
+        "opfsExport": {
+          "ok": false,
+          "error": "write failed"
+        },
+        "blob": {
+          "ok": true,
+          "ms": 1013,
+          "blobSizeMiB": 1024,
+          "readBack": true
+        },
+        "idb": {
+          "ok": true,
+          "ms": 4187,
+          "assembledMiB": 1024,
+          "assembleMs": 0,
+          "readBack": true
+        }
+      },
+      "2048": {
+        "opfsWrite": {
+          "ok": false,
+          "error": "no OPFS"
+        },
+        "opfsExport": {
+          "ok": false,
+          "error": "write failed"
+        },
+        "blob": {
+          "ok": true,
+          "ms": 1987,
+          "blobSizeMiB": 2048,
+          "readBack": true
+        },
+        "idb": {
+          "ok": true,
+          "ms": 9073,
+          "assembledMiB": 2048,
+          "assembleMs": 0,
+          "readBack": true
+        }
+      }
+    },
+    "baselineRssMiB": 499,
+    "peakRssMiB": 4881,
+    "phases": {
+      "opfsWrite-64": {
+        "preRssMiB": 664,
+        "peakRssMiB": null,
+        "peakDeltaMiB": null,
+        "settledDeltaMiB": 81,
+        "samples": 0
+      },
+      "opfsExport-64": {
+        "preRssMiB": 745,
+        "peakRssMiB": null,
+        "peakDeltaMiB": null,
+        "settledDeltaMiB": 0,
+        "samples": 0
+      },
+      "blob-64": {
+        "preRssMiB": 745,
+        "peakRssMiB": 850,
+        "peakDeltaMiB": 105,
+        "settledDeltaMiB": 62,
+        "samples": 2
+      },
+      "idb-64": {
+        "preRssMiB": 743,
+        "peakRssMiB": 834,
+        "peakDeltaMiB": 91,
+        "settledDeltaMiB": 19,
+        "samples": 9
+      },
+      "opfsWrite-256": {
+        "preRssMiB": 764,
+        "peakRssMiB": null,
+        "peakDeltaMiB": null,
+        "settledDeltaMiB": 0,
+        "samples": 0
+      },
+      "opfsExport-256": {
+        "preRssMiB": 765,
+        "peakRssMiB": null,
+        "peakDeltaMiB": null,
+        "settledDeltaMiB": 1,
+        "samples": 0
+      },
+      "blob-256": {
+        "preRssMiB": 766,
+        "peakRssMiB": 1156,
+        "peakDeltaMiB": 390,
+        "settledDeltaMiB": 255,
+        "samples": 6
+      },
+      "idb-256": {
+        "preRssMiB": 1021,
+        "peakRssMiB": 1202,
+        "peakDeltaMiB": 181,
+        "settledDeltaMiB": -263,
+        "samples": 24
+      },
+      "opfsWrite-512": {
+        "preRssMiB": 758,
+        "peakRssMiB": null,
+        "peakDeltaMiB": null,
+        "settledDeltaMiB": 1,
+        "samples": 0
+      },
+      "opfsExport-512": {
+        "preRssMiB": 759,
+        "peakRssMiB": null,
+        "peakDeltaMiB": null,
+        "settledDeltaMiB": 6,
+        "samples": 0
+      },
+      "blob-512": {
+        "preRssMiB": 766,
+        "peakRssMiB": 1462,
+        "peakDeltaMiB": 696,
+        "settledDeltaMiB": -9,
+        "samples": 11
+      },
+      "idb-512": {
+        "preRssMiB": 757,
+        "peakRssMiB": 1294,
+        "peakDeltaMiB": 537,
+        "settledDeltaMiB": 9,
+        "samples": 44
+      },
+      "opfsWrite-1024": {
+        "preRssMiB": 766,
+        "peakRssMiB": null,
+        "peakDeltaMiB": null,
+        "settledDeltaMiB": 0,
+        "samples": 0
+      },
+      "opfsExport-1024": {
+        "preRssMiB": 766,
+        "peakRssMiB": null,
+        "peakDeltaMiB": null,
+        "settledDeltaMiB": 0,
+        "samples": 0
+      },
+      "blob-1024": {
+        "preRssMiB": 766,
+        "peakRssMiB": 2144,
+        "peakDeltaMiB": 1378,
+        "settledDeltaMiB": -7,
+        "samples": 20
+      },
+      "idb-1024": {
+        "preRssMiB": 759,
+        "peakRssMiB": 1807,
+        "peakDeltaMiB": 1048,
+        "settledDeltaMiB": 8,
+        "samples": 83
+      },
+      "opfsWrite-2048": {
+        "preRssMiB": 767,
+        "peakRssMiB": null,
+        "peakDeltaMiB": null,
+        "settledDeltaMiB": 0,
+        "samples": 0
+      },
+      "opfsExport-2048": {
+        "preRssMiB": 767,
+        "peakRssMiB": null,
+        "peakDeltaMiB": null,
+        "settledDeltaMiB": 0,
+        "samples": 0
+      },
+      "blob-2048": {
+        "preRssMiB": 768,
+        "peakRssMiB": 3281,
+        "peakDeltaMiB": 2513,
+        "settledDeltaMiB": 2040,
+        "samples": 39
+      },
+      "idb-2048": {
+        "preRssMiB": 2808,
+        "peakRssMiB": 4881,
+        "peakDeltaMiB": 2073,
+        "settledDeltaMiB": -2047,
+        "samples": 181
+      }
+    },
+    "pageErrors": []
+  }
+}
