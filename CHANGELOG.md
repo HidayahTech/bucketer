@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.60.1] — 2026-09-13 — E2E flake hardening (CI retry + per-lane timeout scaling)
+
+No user-facing change. Makes the cross-engine e2e matrix consistent under shared-runner CPU load, where the slow lanes (WebKit, mobile-device emulation) intermittently blew fixed deadlines that the fast lanes cleared — a different timing-sensitive spec each run (sort re-render, move picker, batch state), which reddened otherwise-passing pipelines. Two fixes: (1) the two browser-e2e CI jobs now `retry` once on flake-shaped failures, so a single flaked lane auto-heals instead of failing the pipeline (deterministic jobs — unit/structural/build, dead-code, node-integration — do **not** retry, so real regressions still fail hard); (2) a single per-lane timeout factor (`test/e2e/lane-timeout.mjs`: WebKit ×2, mobile ×1.5 → WebKit-mobile ×3, desktop ×1) scales every e2e deadline — Playwright's default timeout, the harness's wait helpers, and the poll deadlines in the specs — so slow lanes get proportionally more time. Test-infra and CI only; the shipped bundle is unchanged.
+
 ## [1.60.0] — 2026-09-13 — Dead-code / unused-code gate (knip)
 
 No user-facing change. Adds a deterministic dead-code gate to the quality pipeline: [knip](https://knip.dev/) (exact-pinned) detects unused files, exports, imports, and dependencies, gated by a bidirectional-ratchet wrapper against a committed `deadcode-baseline.json` — new findings fail, and baseline entries whose code was fixed also fail, so the list can't rot. It runs as a **blocking CI job** and a **warn-only pre-push step** (advisory during a bake-in period). A separate report-only PurgeCSS check surfaces unused CSS selectors (never wired into the build, so byte-reproducibility is untouched). The baseline ships **empty**: the tooling's first run surfaced 6 unused JS exports (3 de-exported, 3 removed) and 4 unused CSS selectors, all cleaned rather than suppressed. Tool versions are pinned exact and guarded against range-drift. See `docs/superpowers/specs/2026-09-13-deadcode-tooling-design.md`.

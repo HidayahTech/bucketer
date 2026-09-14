@@ -1,9 +1,15 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.60.0';
+export const CURRENT_VERSION = '1.60.1';
 
 export const CHANGELOG = [
+  {
+    "version": "1.60.1",
+    "date": "2026-09-13",
+    "title": "E2E flake hardening (CI retry + per-lane timeout scaling)",
+    "changes": []
+  },
   {
     "version": "1.60.0",
     "date": "2026-09-13",
