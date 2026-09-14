@@ -1650,15 +1650,16 @@ describe('package-lock.json tracks package.json', () => {
   });
 });
 
-// Dead-code tooling (knip, purgecss) is pinned to an EXACT version, not a caret/tilde range —
-// a deliberate deviation from the repo's usual range style. Unused-code heuristics shift between
-// minor versions (new export patterns recognised, defaults changed), so a routine `npm update`
-// could silently start failing, or silently stop catching things, on unrelated commits. This
-// guard fails loudly if the pin ever regresses to a range. See
-// docs/superpowers/specs/2026-09-13-deadcode-tooling-design.md §4.
-describe('dead-code tooling is pinned exact', () => {
+// Static-analysis tooling (knip, purgecss, oxlint) is pinned to an EXACT version, not a
+// caret/tilde range — a deliberate deviation from the repo's usual range style. Their
+// heuristics/rule sets shift between minor versions (new patterns recognised, defaults changed),
+// so a routine `npm update` could silently start failing, or silently stop catching things, on
+// unrelated commits. This guard fails loudly if any pin ever regresses to a range. See
+// docs/superpowers/specs/2026-09-13-deadcode-tooling-design.md §4 and
+// docs/superpowers/plans/correctness-lint-execution-plan-2026-09-13.md.
+describe('static-analysis tooling is pinned exact', () => {
   const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
-  for (const name of ['knip', 'purgecss']) {
+  for (const name of ['knip', 'purgecss', 'oxlint']) {
     test(`${name} devDependency is an exact version`, () => {
       const spec = pkg.devDependencies?.[name];
       assert.ok(spec, `${name} must be a devDependency`);

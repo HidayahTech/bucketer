@@ -16,7 +16,7 @@
 // When window.location.protocol === 'file:', the guide uses wildcard origin "*" and warns
 // that users must re-run CORS setup with a real origin after deploying to a domain.
 import { useState } from 'preact/hooks';
-import { PROVIDERS, extractRegion, needsCorsConfig } from '../lib/provider.js';
+import { PROVIDERS, extractRegion } from '../lib/provider.js';
 import { corsJson, shellQuote } from '../lib/cors-config.js';
 
 const isFileProtocol = typeof window !== 'undefined' && window.location.protocol === 'file:';
@@ -211,8 +211,7 @@ brew install awscli`}</Code>
   );
 }
 
-function GuideWasabi({ endpoint, bucket, keyId }) {
-  const ep = endpoint || 'https://s3.<region>.wasabisys.com';
+function GuideWasabi({ keyId }) {
 
   return (
     <div class="setup-steps">
@@ -247,8 +246,7 @@ function GuideWasabi({ endpoint, bucket, keyId }) {
   );
 }
 
-function GuideAWS({ endpoint, bucket, keyId }) {
-  const ep = endpoint || 'https://s3.<region>.amazonaws.com';
+function GuideAWS({ bucket, keyId }) {
   const origin = currentOrigin();
   const bkt = bucket || '<your-bucket>';
 

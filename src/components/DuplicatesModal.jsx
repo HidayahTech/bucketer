@@ -185,7 +185,9 @@ function progressLabel(p) {
   return 'Scanning…';
 }
 
-export function DuplicatesModal({ client, bucket, endpoint, currentPrefix, basePrefix, provider, capabilities, onDeleteRequest, onClose, scan, verify, load, save, del }) {
+// onDeleteRequest is offered by App but not consumed yet: dedup Delete is disabled in
+// iteration 1 (see dedup-safety model). Re-add it to the destructure when wiring iteration 2.
+export function DuplicatesModal({ client, bucket, endpoint, currentPrefix, basePrefix, provider, capabilities, onClose, scan, verify, load, save, del }) {
   const [scope, setScope] = useState('prefix');
   const [status, setStatus] = useState('idle');
   const [groups, setGroups] = useState([]);

@@ -11,7 +11,7 @@ export function createRateTracker({ windowMs = 6000, minSpanMs = 500 } = {}) {
       const cutoff = t - windowMs;
       while (samples.length && samples[0].t < cutoff) samples.shift();
     },
-    rate(t) {
+    rate() {
       if (samples.length < 2) return null;
       const first = samples[0];
       const last = samples[samples.length - 1];

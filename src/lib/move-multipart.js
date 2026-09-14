@@ -52,7 +52,7 @@ export async function copyObjectMultipart(client, { bucket, sourceKey, destKey, 
   try {
     const partCount = Math.ceil(size / partSize);
     const partNumbers = Array.from({ length: partCount }, (_, i) => i + 1);
-    const parts = new Array(partCount);
+    const parts = Array.from({ length: partCount });
 
     await uploadPartsWithPool(partNumbers, async (partNumber) => {
       const start = (partNumber - 1) * partSize;

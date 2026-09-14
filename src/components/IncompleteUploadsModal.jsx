@@ -44,7 +44,7 @@ export function IncompleteUploadsModal({ scan, discard, onClose }) {
   }
 
   async function handleDiscardAll() {
-    for (const u of [...state.uploads]) await handleDiscard(u);
+    for (const u of state.uploads) await handleDiscard(u);
   }
 
   return (

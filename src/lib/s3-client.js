@@ -2,9 +2,9 @@
 // S3Client factory (§4.3). Called once per credential set; the returned client is
 // stateless and reused for all operations until the user disconnects.
 import { S3Client } from '@aws-sdk/client-s3';
-import { requiresPathStyle, extractRegion, PROVIDERS } from './provider.js';
+import { requiresPathStyle, extractRegion } from './provider.js';
 
-export function createS3Client({ endpoint, bucket, keyId, secretKey, provider, regionOverride }, { forcePathStyle } = {}) {
+export function createS3Client({ endpoint, keyId, secretKey, provider, regionOverride }, { forcePathStyle } = {}) {
   // Region resolution order (first non-null wins):
   //   1. regionOverride — user's explicit input from CredentialForm
   //   2. extractRegion() — auto-extracted from the endpoint URL structure (§5 Group B)

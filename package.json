@@ -16,6 +16,8 @@
     "perftest": "node perf/run.mjs",
     "deadcode": "node scripts/deadcode-gate.mjs",
     "deadcode:css": "node scripts/check-unused-css.mjs",
+    "lint": "oxlint src/",
+    "lint:fix": "oxlint --fix src/",
     "prepare": "git config core.hooksPath .githooks 2>/dev/null; git config push.followTags true 2>/dev/null; true"
   },
   "engines": {
@@ -31,6 +33,7 @@
     "fake-indexeddb": "^6.2.5",
     "jsdom": "^29.1.1",
     "knip": "6.35.1",
+    "oxlint": "1.82.0",
     "playwright": "^1.60.0",
     "purgecss": "8.0.0"
   }

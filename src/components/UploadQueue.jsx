@@ -24,7 +24,6 @@ import { isPermissionError, parentPrefix } from '../lib/format.js';
 import {
   saveResumeRecord, loadResumeRecord, deleteResumeRecord,
   buildFileIdentity, fileIdentityMatches, computeFileHash,
-  uploadExpiryWarningMs,
   markUploadActive, markUploadInactive, isUploadActiveElsewhere,
   saveUploadLogEntry,
 } from '../lib/indexeddb.js';
@@ -41,7 +40,6 @@ import { withUploadRetry } from '../lib/s3-retry.js';
 import { isActive as itemIsActive, isFailed as itemIsFailed, isPaused as itemIsPaused } from '../lib/upload-status.js';
 import { abortMultipartSession } from '../lib/upload-cleanup.js';
 import { useDoubleClickSafety } from '../hooks/useDoubleClickSafety.js';
-import { ErrorBlock } from './ErrorBlock.jsx';
 import { BatchSummary } from './BatchSummary.jsx';
 import { createUpdateBatcher } from '../lib/update-batcher.js';
 import { normalizeBasePrefix, withinFloor } from '../lib/base-prefix.js';
@@ -413,7 +411,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       });
     } catch { /* IDB may be unavailable */ }
 
-    const parts = new Array(totalParts);
+    const parts = Array.from({ length: totalParts });
     const allPartNumbers = Array.from({ length: totalParts }, (_, i) => i + 1);
     let bytesUploaded = 0;
 

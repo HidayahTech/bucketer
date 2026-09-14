@@ -13,7 +13,7 @@ export function useRate(bytes, active, { now = () => Date.now(), intervalMs = 25
   useEffect(() => {
     if (!active) { setSpeed(null); return undefined; }
     const tracker = createRateTracker();
-    const tick = () => { const t = now(); tracker.sample(t, bytesRef.current); setSpeed(tracker.rate(t)); };
+    const tick = () => { const t = now(); tracker.sample(t, bytesRef.current); setSpeed(tracker.rate()); };
     tick();
     const h = setInterval(tick, intervalMs);
     return () => clearInterval(h);

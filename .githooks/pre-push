@@ -29,6 +29,12 @@ if [ "$branch_refs" -gt 0 ]; then
   echo "Checking for dead code (advisory during bake-in)..."
   npm run deadcode || echo "  dead-code findings above (advisory — not blocking yet)"
 
+  # Correctness-lint — ADVISORY here during bake-in (prints, never aborts). Blocking enforcement
+  # is the CI `lint` job; flip this to blocking once a clean streak is established. Fast static
+  # scan (oxlint, seconds). See docs/superpowers/plans/correctness-lint-execution-plan-2026-09-13.md.
+  echo "Linting for correctness (advisory during bake-in)..."
+  npm run lint || echo "  correctness-lint findings above (advisory — not blocking yet)"
+
   echo "Building..."
   npm run build
 
