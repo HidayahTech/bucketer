@@ -67,6 +67,42 @@ describe('imageTagFromLock', () => {
   });
 });
 
+// The two browser-e2e matrix jobs (e2e-browser, e2e-browser-webkit) extend .e2e-browser-base,
+// which carries `retry: max 2` so a flaky mobile/webkit lane auto-heals instead of reddening
+// the pipeline. This guard locks that in AND keeps it scoped: the node-integration lane
+// (e2e-node, deterministic) and the non-e2e jobs must NOT retry, so a real regression there
+// fails hard. Paired with per-lane timeout scaling in test/e2e/harness.mjs. The retry auto-heal
+// is a GitLab-runtime behaviour the local harness cannot represent — this config guard is its
+// durable substitute (harness-fidelity rule).
+describe('e2e browser lanes retry flaky failures (CI)', () => {
+  function section(ci, header) {
+    const lines = ci.split('\n');
+    const start = lines.findIndex((l) => l.startsWith(header));
+    if (start < 0) return '';
+    let end = start + 1;
+    while (end < lines.length && !/^\S/.test(lines[end])) end++;
+    return lines.slice(start, end).join('\n');
+  }
+
+  test('.e2e-browser-base declares retry max 2 on flake-shaped failures', async () => {
+    const { readFileSync } = await import('node:fs');
+    const ci = readFileSync(new URL('../.gitlab-ci.yml', import.meta.url), 'utf8');
+    const block = section(ci, '.e2e-browser-base:');
+    assert.match(block, /retry:/, '.e2e-browser-base must declare retry');
+    assert.match(block, /max:\s*2/, 'browser-lane retry must be max: 2');
+    for (const reason of ['script_failure', 'stuck_or_timeout_failure', 'runner_system_failure']) {
+      assert.ok(block.includes(reason), `browser-lane retry when: must include ${reason}`);
+    }
+  });
+
+  test('the deterministic e2e-node lane does NOT retry', async () => {
+    const { readFileSync } = await import('node:fs');
+    const ci = readFileSync(new URL('../.gitlab-ci.yml', import.meta.url), 'utf8');
+    assert.ok(!section(ci, 'e2e-node:').includes('retry'),
+      'e2e-node is deterministic — a failure there is real and must not be retried');
+  });
+});
+
 describe('pickRuntime', () => {
   test('prefers podman over docker', () => {
     assert.equal(pickRuntime(['docker', 'podman']), 'podman');

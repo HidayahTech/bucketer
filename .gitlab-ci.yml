@@ -92,6 +92,19 @@ e2e-node:
 
 .e2e-browser-base:
   extends: .e2e-base
+  # Browser lanes only (NOT e2e-node, test, deadcode, reproducibility): retry once on a
+  # flaky failure. The mobile/webkit lanes chronically flake on timing-sensitive UI specs
+  # under shared-runner CPU load — a DIFFERENT spec each run (sort, batch-move, batch-delete)
+  # — so a single flaked lane must not red the whole pipeline (was manually retried 3× when
+  # v1.60.0 shipped). A genuine deterministic regression still fails all attempts. Paired with
+  # the per-lane timeout scaling in test/e2e/harness.mjs (scaleTimeout). when: is scoped so
+  # only flake-shaped failures retry, not e.g. a config/quota error.
+  retry:
+    max: 2
+    when:
+      - script_failure
+      - stuck_or_timeout_failure
+      - runner_system_failure
   script:
     - npm run test:e2e browser
   artifacts:
