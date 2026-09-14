@@ -1,9 +1,15 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.61.0';
+export const CURRENT_VERSION = '1.61.1';
 
 export const CHANGELOG = [
+  {
+    "version": "1.61.1",
+    "date": "2026-09-14",
+    "title": "Dependency-audit advisory + lint guardrails",
+    "changes": []
+  },
   {
     "version": "1.61.0",
     "date": "2026-09-13",

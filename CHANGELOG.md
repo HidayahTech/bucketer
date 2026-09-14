@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.61.1] — 2026-09-14 — Dependency-audit advisory + lint guardrails
+
+No user-facing change. Two small quality-pipeline additions (③a of the code-cleanup ladder), CI and config only. (1) A **non-blocking `npm audit` CI job** (`allow_failure`, production scope) surfaces known-CVE production dependencies as an ongoing security signal without ever blocking a push — a fresh transitive advisory is triaged, not force-fixed under push pressure (a guard test keeps it advisory). (2) Five genuine bug-catcher rules enabled in oxlint beyond the correctness category — `no-self-compare`, `no-template-curly-in-string`, `no-constant-binary-expression`, `no-unsafe-negation`, `no-unreachable-loop` — all with zero findings today, so they add forward protection with no churn. oxlint's full `suspicious` category was investigated and deliberately **not** adopted (103 findings, no real bugs — dominated by naming style, plus false positives on Web Worker `postMessage`).
+
 ## [1.61.0] — 2026-09-13 — Correctness-lint gate (oxlint)
 
 No user-facing change. Adds a correctness-only linter to the quality pipeline — degree ② of the code-cleanup ladder after the v1.60.0 dead-code gate. [oxlint](https://oxc.rs/docs/guide/usage/linter) (exact-pinned) runs its **correctness** category over `src/` — real bug-catchers (unused/undeclared variables, unreachable code, invalid regex, and similar), deliberately **not** style, formatting, or complexity rules. It runs as a **blocking CI job** and a **warn-only pre-push step** (advisory during a bake-in period), mirroring the dead-code gate; the tool version is pinned exact and guarded against range-drift. The gate ships with an **empty baseline**: the first run surfaced 18 findings, all fixed (unused imports/params/vars removed, a ternary-statement clarified to `if/else`, two `new Array(n)` → `Array.from({length})`, an unnecessary array copy removed) rather than suppressed. Configuration is in `.oxlintrc.json`. See `docs/superpowers/plans/correctness-lint-execution-plan-2026-09-13.md`.
