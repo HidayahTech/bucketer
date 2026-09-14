@@ -18,6 +18,7 @@
     "deadcode:css": "node scripts/check-unused-css.mjs",
     "lint": "oxlint src/",
     "lint:fix": "oxlint --fix src/",
+    "audit": "npm audit --omit=dev",
     "prepare": "git config core.hooksPath .githooks 2>/dev/null; git config push.followTags true 2>/dev/null; true"
   },
   "engines": {

@@ -70,6 +70,23 @@ lint:
     - npm ci
     - npm run lint
 
+# Dependency CVE advisory — ADVISORY, non-blocking (`allow_failure`). A known vulnerability in a
+# production dependency shows up here (yellow) as a security signal, but must NOT red the pipeline
+# or block a push: a fresh transitive CVE is triaged deliberately, not force-fixed under push
+# pressure. Prod scope (`--omit=dev`) so dev-tool advisories don't add noise. Reads package-lock
+# directly — no `npm ci`. CI-only (not in the pre-push hook: no network call on every push).
+# Design: docs/superpowers/plans/suspicious-lint-audit-execution-plan-2026-09-13.md.
+audit:
+  stage: test
+  image: node:20-alpine
+  allow_failure: true
+  rules:
+    - if: '$RELOCK_MIRROR == "true"'
+      when: never
+    - when: on_success
+  script:
+    - npm run audit
+
 # End-to-end tests against the in-repo stateful mock S3. Split into the engine-agnostic
 # node-integration layer and a cross-engine + mobile browser matrix. The Playwright image
 # ships chromium+firefox+webkit with their deps, so all three run in CI (WebKit cannot run on

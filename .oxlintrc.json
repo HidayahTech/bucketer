@@ -2,6 +2,11 @@
   "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxlint/configuration_schema.json",
   "categories": { "correctness": "error" },
   "rules": {
-    "no-unused-vars": ["error", { "ignoreRestSiblings": true }]
+    "no-unused-vars": ["error", { "ignoreRestSiblings": true }],
+    "no-self-compare": "error",
+    "no-template-curly-in-string": "error",
+    "no-constant-binary-expression": "error",
+    "no-unsafe-negation": "error",
+    "no-unreachable-loop": "error"
   }
 }

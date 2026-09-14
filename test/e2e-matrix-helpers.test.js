@@ -101,6 +101,17 @@ describe('e2e browser lanes retry flaky failures (CI)', () => {
     assert.ok(!section(ci, 'e2e-node:').includes('retry'),
       'e2e-node is deterministic — a failure there is real and must not be retried');
   });
+
+  // The npm-audit CVE check is deliberately ADVISORY: a fresh transitive vulnerability must
+  // surface as a signal, never block a push. This guard keeps it non-blocking — if someone
+  // later drops allow_failure, a single new advisory would red every pipeline until fixed.
+  test('the npm-audit job stays advisory (allow_failure)', async () => {
+    const { readFileSync } = await import('node:fs');
+    const ci = readFileSync(new URL('../.gitlab-ci.yml', import.meta.url), 'utf8');
+    const block = section(ci, 'audit:');
+    assert.ok(block, '.gitlab-ci.yml must define an audit job');
+    assert.match(block, /allow_failure:\s*true/, 'the audit job must be non-blocking (allow_failure: true)');
+  });
 });
 
 describe('pickRuntime', () => {
