@@ -1659,7 +1659,7 @@ describe('package-lock.json tracks package.json', () => {
 // docs/superpowers/plans/correctness-lint-execution-plan-2026-09-13.md.
 describe('static-analysis tooling is pinned exact', () => {
   const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
-  for (const name of ['knip', 'purgecss', 'oxlint']) {
+  for (const name of ['knip', 'purgecss', 'oxlint', 'prettier']) {
     test(`${name} devDependency is an exact version`, () => {
       const spec = pkg.devDependencies?.[name];
       assert.ok(spec, `${name} must be a devDependency`);

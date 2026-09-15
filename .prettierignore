@@ -1,0 +1,8 @@
+# Built / generated — never format (esbuild output + generated changelog); formatting these
+# would fight the generators and threaten the byte-reproducible bundle.
+dist/
+perf/
+node_modules/
+src/lib/changelog.js
+package-lock.json
+.claude-scratch/

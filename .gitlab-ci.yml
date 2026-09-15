@@ -70,6 +70,22 @@ lint:
     - npm ci
     - npm run lint
 
+# Formatting gate — BLOCKING. `prettier --check` over first-party JS/JSX/mjs (config .prettierrc.json,
+# ignore .prettierignore excludes built/generated files incl. the generated src/lib/changelog.js).
+# Source-only, no build. prettier is pure JS so it runs on node:20-alpine. The whole codebase was
+# reformatted once (see .git-blame-ignore-revs); this keeps it formatted. Own pipeline dot.
+# Design: docs/superpowers/plans/formatter-execution-plan-2026-09-15.md.
+format:
+  stage: test
+  image: node:20-alpine
+  rules:
+    - if: '$RELOCK_MIRROR == "true"'
+      when: never
+    - when: on_success
+  script:
+    - npm ci
+    - npm run format:check
+
 # Dependency CVE advisory — ADVISORY, non-blocking (`allow_failure`). A known vulnerability in a
 # production dependency shows up here (yellow) as a security signal, but must NOT red the pipeline
 # or block a push: a fresh transitive CVE is triaged deliberately, not force-fixed under push

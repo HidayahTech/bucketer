@@ -19,6 +19,8 @@
     "lint": "oxlint src/",
     "lint:fix": "oxlint --fix src/",
     "audit": "npm audit --omit=dev",
+    "format": "prettier --write \"src/**/*.{js,jsx}\" \"test/**/*.{js,jsx,mjs}\" \"scripts/**/*.mjs\" \"*.mjs\"",
+    "format:check": "prettier --check \"src/**/*.{js,jsx}\" \"test/**/*.{js,jsx,mjs}\" \"scripts/**/*.mjs\" \"*.mjs\"",
     "prepare": "git config core.hooksPath .githooks 2>/dev/null; git config push.followTags true 2>/dev/null; true"
   },
   "engines": {
@@ -36,6 +38,7 @@
     "knip": "6.35.1",
     "oxlint": "1.82.0",
     "playwright": "^1.60.0",
+    "prettier": "3.9.6",
     "purgecss": "8.0.0"
   }
 }

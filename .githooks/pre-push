@@ -35,6 +35,12 @@ if [ "$branch_refs" -gt 0 ]; then
   echo "Linting for correctness (advisory during bake-in)..."
   npm run lint || echo "  correctness-lint findings above (advisory — not blocking yet)"
 
+  # Formatting — ADVISORY here (prints unformatted files, never aborts). Blocking enforcement is
+  # the CI `format` job. Fast (prettier --check, seconds).
+  # See docs/superpowers/plans/formatter-execution-plan-2026-09-15.md.
+  echo "Checking formatting (advisory)..."
+  npm run format:check || echo "  formatting issues above (advisory — CI format job blocks)"
+
   echo "Building..."
   npm run build
 
