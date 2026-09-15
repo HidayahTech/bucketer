@@ -19,6 +19,7 @@
     "lint": "oxlint src/",
     "lint:fix": "oxlint --fix src/",
     "audit": "npm audit --omit=dev",
+    "complexity": "oxlint src/ -c .oxlintrc.complexity.json",
     "format": "prettier --write \"src/**/*.{js,jsx}\" \"test/**/*.{js,jsx,mjs}\" \"scripts/**/*.mjs\" \"*.mjs\"",
     "format:check": "prettier --check \"src/**/*.{js,jsx}\" \"test/**/*.{js,jsx,mjs}\" \"scripts/**/*.mjs\" \"*.mjs\"",
     "prepare": "git config core.hooksPath .githooks 2>/dev/null; git config push.followTags true 2>/dev/null; true"

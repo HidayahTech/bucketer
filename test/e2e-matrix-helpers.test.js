@@ -127,6 +127,18 @@ describe('e2e browser lanes retry flaky failures (CI)', () => {
     assert.ok(block, '.gitlab-ci.yml must define an audit job');
     assert.match(block, /allow_failure:\s*true/, 'the audit job must be non-blocking (allow_failure: true)');
   });
+
+  // The complexity job is a refactor-candidate SIGNAL, never a gate: there are always functions
+  // over threshold until the big components are refactored, so it must never block a push. This
+  // guard keeps it non-blocking — if someone removes allow_failure (or bumps the rule to error),
+  // a future stricter run must still not red every pipeline.
+  test('the complexity job stays advisory (allow_failure)', async () => {
+    const { readFileSync } = await import('node:fs');
+    const ci = readFileSync(new URL('../.gitlab-ci.yml', import.meta.url), 'utf8');
+    const block = section(ci, 'complexity:');
+    assert.ok(block, '.gitlab-ci.yml must define a complexity job');
+    assert.match(block, /allow_failure:\s*true/, 'the complexity job must be non-blocking (allow_failure: true)');
+  });
 });
 
 describe('pickRuntime', () => {
