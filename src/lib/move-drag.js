@@ -9,9 +9,7 @@ import { validateMove } from './move-guards.js';
 // selection: { files: [{key, size}], prefixes: [pfx] }.
 //   dragged: { fileKey, fileSize } for a file row, or { prefix } for a folder row.
 export function dragPayload({ fileKey, fileSize, prefix }, selection) {
-  const inSelection = fileKey
-    ? selection.files.some(f => f.key === fileKey)
-    : selection.prefixes.includes(prefix);
+  const inSelection = fileKey ? selection.files.some((f) => f.key === fileKey) : selection.prefixes.includes(prefix);
 
   if (inSelection) {
     return { files: selection.files, prefixes: selection.prefixes, fromSelection: true };
@@ -24,9 +22,11 @@ export function dragPayload({ fileKey, fileSize, prefix }, selection) {
 // Whether a drop onto `dest` is structurally allowed (not a folder-into-itself/descendant or
 // a no-op). The runtime collision/never-overwrite concern is handled later by runMoveOperation.
 export function dropAccepted(payload, dest) {
-  return validateMove({
-    files: payload.files.map(f => f.key),
-    prefixes: payload.prefixes,
-    dest,
-  }) === null;
+  return (
+    validateMove({
+      files: payload.files.map((f) => f.key),
+      prefixes: payload.prefixes,
+      dest,
+    }) === null
+  );
 }

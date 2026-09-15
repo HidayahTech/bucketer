@@ -9,7 +9,17 @@
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest, scaleTimeout } from '../harness.mjs';
+import {
+  startMock,
+  startAppServer,
+  connectApp,
+  BUCKET,
+  launchBrowser,
+  newE2EContext,
+  newE2EPage,
+  e2eTest,
+  scaleTimeout,
+} from '../harness.mjs';
 
 let ctx, app, browser;
 before(async () => {
@@ -17,16 +27,24 @@ before(async () => {
   app = await startAppServer();
   browser = await launchBrowser();
 });
-after(async () => { await browser?.close(); await app?.close(); await ctx?.mock.close(); });
+after(async () => {
+  await browser?.close();
+  await app?.close();
+  await ctx?.mock.close();
+});
 
 async function bucketKeys() {
   const r = await ctx.client.send(new ListObjectsV2Command({ Bucket: BUCKET }));
   return (r.Contents || []).map((o) => o.Key).sort();
 }
 async function waitForKeys(expected, timeout = scaleTimeout(12000)) {
-  const want = JSON.stringify(expected); const deadline = Date.now() + timeout;
+  const want = JSON.stringify(expected);
+  const deadline = Date.now() + timeout;
   let keys = await bucketKeys();
-  while (JSON.stringify(keys) !== want && Date.now() < deadline) { await new Promise((r) => setTimeout(r, 150)); keys = await bucketKeys(); }
+  while (JSON.stringify(keys) !== want && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 150));
+    keys = await bucketKeys();
+  }
   assert.deepEqual(keys, expected);
 }
 
@@ -42,7 +60,9 @@ describe('move — resume after reload', () => {
       // Destination folder + two files.
       await page.locator('button[title="Create a new folder"]').click();
       const ni = page.locator('.modal-overlay input.form-input');
-      await ni.waitFor({ timeout: 5000 }); await ni.fill('dest'); await ni.press('Enter');
+      await ni.waitFor({ timeout: 5000 });
+      await ni.fill('dest');
+      await ni.press('Enter');
       await page.locator('[data-testid="folder-row:dest"]').waitFor({ timeout: 5000 });
       await page.locator('[data-testid="file-input"]').setInputFiles([
         { name: 'a.txt', mimeType: 'text/plain', buffer: Buffer.from('aaa') },
@@ -53,7 +73,9 @@ describe('move — resume after reload', () => {
 
       // Interrupt deterministically: fail the source deletes so the move copies each object to
       // the destination but never completes cleanly — the resumable record persists.
-      ctx.mock.configure({ faults: [{ op: 'DeleteObject', method: 'DELETE', status: 403, code: 'AccessDenied', message: 'denied' }] });
+      ctx.mock.configure({
+        faults: [{ op: 'DeleteObject', method: 'DELETE', status: 403, code: 'AccessDenied', message: 'denied' }],
+      });
 
       // Select both files. Scroll each checkbox into view first — on a desktop firefox lane a
       // lower row can sit below the fold, and check({force}) fails "outside of viewport".
@@ -85,7 +107,9 @@ describe('move — resume after reload', () => {
 
       // Resume finishes the move: the sources are gone, only the destination copies remain.
       await waitForKeys(['dest/', 'dest/a.txt', 'dest/b.txt']);
-    } finally { await context.close(); }
+    } finally {
+      await context.close();
+    }
   });
 });
 
@@ -100,7 +124,9 @@ describe('move — resume inline after errors (no reload)', () => {
 
       await page.locator('button[title="Create a new folder"]').click();
       const ni = page.locator('.modal-overlay input.form-input');
-      await ni.waitFor({ timeout: 5000 }); await ni.fill('dest'); await ni.press('Enter');
+      await ni.waitFor({ timeout: 5000 });
+      await ni.fill('dest');
+      await ni.press('Enter');
       await page.locator('[data-testid="folder-row:dest"]').waitFor({ timeout: 5000 });
       await page.locator('[data-testid="file-input"]').setInputFiles([
         { name: 'a.txt', mimeType: 'text/plain', buffer: Buffer.from('aaa') },
@@ -110,7 +136,11 @@ describe('move — resume inline after errors (no reload)', () => {
       await page.locator('[data-testid="file-row:a.txt"]').waitFor({ timeout: 10000 });
 
       // Every copy fails, as a storage-cap block would, so the move ends with errors.
-      ctx.mock.configure({ faults: [{ op: 'CopyObject', method: 'PUT', status: 403, code: 'CapExceeded', message: 'storage cap exceeded' }] });
+      ctx.mock.configure({
+        faults: [
+          { op: 'CopyObject', method: 'PUT', status: 403, code: 'CapExceeded', message: 'storage cap exceeded' },
+        ],
+      });
 
       for (const name of ['a.txt', 'b.txt']) {
         const cb = page.locator(`[data-testid="file-row:${name}"]`).locator('td.col-check input[type="checkbox"]');
@@ -129,6 +159,8 @@ describe('move — resume inline after errors (no reload)', () => {
       ctx.mock.configure({ faults: [] });
       await resume.click();
       await waitForKeys(['dest/', 'dest/a.txt', 'dest/b.txt']);
-    } finally { await context.close(); }
+    } finally {
+      await context.close();
+    }
   });
 });

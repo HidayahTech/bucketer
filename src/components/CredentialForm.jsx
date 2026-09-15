@@ -31,12 +31,8 @@ export function CredentialForm({ initial, onSave, onFormChange, loading, autoFoc
   // Only treat stored provider as an explicit override if it differs from what
   // auto-detection returns for the stored endpoint. Auto-detected providers should
   // leave the dropdown at "Auto-detect from endpoint".
-  const _autoDetected = initial.provider && initial.endpoint
-    ? detectProvider(initial.endpoint)
-    : null;
-  const _initProviderOverride = (initial.provider && initial.provider !== _autoDetected)
-    ? initial.provider
-    : '';
+  const _autoDetected = initial.provider && initial.endpoint ? detectProvider(initial.endpoint) : null;
+  const _initProviderOverride = initial.provider && initial.provider !== _autoDetected ? initial.provider : '';
 
   // Compute what the endpoint would give for a region, regardless of whether a
   // regionOverride is already stored. This lets the userEditedRef initializer below
@@ -60,16 +56,18 @@ export function CredentialForm({ initial, onSave, onFormChange, loading, autoFoc
   });
 
   const [form, setForm] = useState({
-    endpoint:         initial.endpoint || '',
-    bucket:           initial.bucket || '',
-    basePrefix:       initial.basePrefix || '',
-    keyId:            initial.keyId || '',
-    secretKey:        initial.secretKey || '',
+    endpoint: initial.endpoint || '',
+    bucket: initial.bucket || '',
+    basePrefix: initial.basePrefix || '',
+    keyId: initial.keyId || '',
+    secretKey: initial.secretKey || '',
     providerOverride: _initProviderOverride,
-    regionOverride:   initial.regionOverride || _initExtractedRegion || '',
-    _infEndpoint:     false,
-    _infRegion:       !!(_initExtractedRegion &&
-                        (!initial.regionOverride || initial.regionOverride === _initExtractedRegion)),
+    regionOverride: initial.regionOverride || _initExtractedRegion || '',
+    _infEndpoint: false,
+    _infRegion: !!(
+      _initExtractedRegion &&
+      (!initial.regionOverride || initial.regionOverride === _initExtractedRegion)
+    ),
   });
 
   // When a shared link pre-filled the key ID, focus the Secret Key field on mount so
@@ -87,8 +85,8 @@ export function CredentialForm({ initial, onSave, onFormChange, loading, autoFoc
     const next = { ...prev, [k]: value };
 
     // Editing a field removes its own inferred marker.
-    if (k === 'endpoint')       next._infEndpoint = false;
-    if (k === 'regionOverride') next._infRegion   = false;
+    if (k === 'endpoint') next._infEndpoint = false;
+    if (k === 'regionOverride') next._infRegion = false;
 
     // ── Endpoint → region ──────────────────────────────────────────────────────
     if (k === 'endpoint' && !ue.region) {
@@ -106,9 +104,8 @@ export function CredentialForm({ initial, onSave, onFormChange, loading, autoFoc
 
     // ── Region → endpoint ──────────────────────────────────────────────────────
     if (k === 'regionOverride' && !ue.endpoint) {
-      const prov = next.providerOverride
-        || (next.endpoint ? detectProvider(next.endpoint) : null);
-      const built = (prov && value) ? buildEndpoint(prov, value) : null;
+      const prov = next.providerOverride || (next.endpoint ? detectProvider(next.endpoint) : null);
+      const built = prov && value ? buildEndpoint(prov, value) : null;
       if (built) {
         next.endpoint = built;
         next._infEndpoint = true;
@@ -173,9 +170,9 @@ export function CredentialForm({ initial, onSave, onFormChange, loading, autoFoc
   // inside the synchronous updater callback — inference direction depends on
   // which fields are user-owned vs inferred at the moment of each change.
   const set = (k) => (e) => {
-    if (k === 'endpoint')       userEditedRef.current.endpoint = true;
-    if (k === 'regionOverride') userEditedRef.current.region   = true;
-    setForm(prev => {
+    if (k === 'endpoint') userEditedRef.current.endpoint = true;
+    if (k === 'regionOverride') userEditedRef.current.region = true;
+    setForm((prev) => {
       const next = applyChange(prev, k, e.target.value);
       onFormChange?.(next);
       return next;
@@ -191,11 +188,11 @@ export function CredentialForm({ initial, onSave, onFormChange, loading, autoFoc
     const trimmed = text.trim();
     const el = e.currentTarget;
     const start = el.selectionStart ?? 0;
-    const end   = el.selectionEnd   ?? el.value.length;
-    if (k === 'endpoint')       userEditedRef.current.endpoint = true;
-    if (k === 'regionOverride') userEditedRef.current.region   = true;
-    setForm(prev => {
-      const cur  = prev[k] || '';
+    const end = el.selectionEnd ?? el.value.length;
+    if (k === 'endpoint') userEditedRef.current.endpoint = true;
+    if (k === 'regionOverride') userEditedRef.current.region = true;
+    setForm((prev) => {
+      const cur = prev[k] || '';
       const next = applyChange(prev, k, cur.slice(0, start) + trimmed + cur.slice(end));
       onFormChange?.(next);
       return next;
@@ -241,12 +238,8 @@ export function CredentialForm({ initial, onSave, onFormChange, loading, autoFoc
           autocomplete="off"
           spellcheck={false}
         />
-        {form._infEndpoint && (
-          <span class="hint">Auto-filled from provider and region</span>
-        )}
-        {detectedLabel && !form.providerOverride && (
-          <span class="hint">Detected: {detectedLabel}</span>
-        )}
+        {form._infEndpoint && <span class="hint">Auto-filled from provider and region</span>}
+        {detectedLabel && !form.providerOverride && <span class="hint">Detected: {detectedLabel}</span>}
       </div>
 
       <div class="form-group">
@@ -323,8 +316,10 @@ export function CredentialForm({ initial, onSave, onFormChange, loading, autoFoc
       <div class="form-group">
         <label htmlFor="cred-provider">Provider Override</label>
         <select id="cred-provider" value={form.providerOverride} onChange={set('providerOverride')}>
-          {PROVIDER_OPTIONS.map(o => (
-            <option key={o.value} value={o.value}>{o.label}</option>
+          {PROVIDER_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
           ))}
         </select>
         {form.providerOverride === PROVIDERS.MINIO && (
@@ -361,7 +356,8 @@ export function CredentialForm({ initial, onSave, onFormChange, loading, autoFoc
       <div class="form-group">
         <span class="hint" style={{ color: 'var(--text-warn)' }}>
           Use a bucket-scoped application key with minimum required permissions.
-          {detected === PROVIDERS.B2 && ' B2: do not use the master application key with the S3 API. If your key is limited to a Name Prefix, enter that folder above as Base folder.'}
+          {detected === PROVIDERS.B2 &&
+            ' B2: do not use the master application key with the S3 API. If your key is limited to a Name Prefix, enter that folder above as Base folder.'}
         </span>
       </div>
 
@@ -374,7 +370,13 @@ export function CredentialForm({ initial, onSave, onFormChange, loading, autoFoc
 
       <div class="btn-row">
         <button type="submit" class="btn btn-primary" disabled={loading || hasErrors}>
-          {loading ? <><span class="spinner" /> Connecting…</> : 'Connect'}
+          {loading ? (
+            <>
+              <span class="spinner" /> Connecting…
+            </>
+          ) : (
+            'Connect'
+          )}
         </button>
       </div>
     </form>

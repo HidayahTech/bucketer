@@ -5,7 +5,7 @@
 import { PROVIDER_LABELS } from '../lib/provider.js';
 
 function tabLabel({ provider, bucket }) {
-  const p = provider ? (PROVIDER_LABELS[provider] || provider.toUpperCase()) : null;
+  const p = provider ? PROVIDER_LABELS[provider] || provider.toUpperCase() : null;
   return p ? `${p} · ${bucket}` : bucket;
 }
 
@@ -13,13 +13,16 @@ export function ConnectionTabs({ tabs, selectedId, onSelect }) {
   if (!tabs.length) return null;
   return (
     <div class="connection-tabs" role="tablist" aria-label="Recent buckets">
-      {tabs.map(t => (
-        <button key={t.id} type="button"
+      {tabs.map((t) => (
+        <button
+          key={t.id}
+          type="button"
           role="tab"
           aria-selected={t.id === selectedId}
           class={'connection-tab' + (t.id === selectedId ? ' connection-tab-active' : '')}
           title={tabLabel(t)}
-          onClick={() => onSelect(t.id)}>
+          onClick={() => onSelect(t.id)}
+        >
           {tabLabel(t)}
         </button>
       ))}

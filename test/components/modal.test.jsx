@@ -10,7 +10,7 @@ describe('Modal', () => {
     const { query, cleanup } = mount(
       <Modal onClose={() => {}}>
         <span id="child">hello</span>
-      </Modal>
+      </Modal>,
     );
     assert.ok(query('#child'), 'child content must be rendered');
     cleanup();
@@ -36,7 +36,13 @@ describe('Modal', () => {
 
   test('calls onClose when overlay is clicked', () => {
     let called = false;
-    const { query, cleanup } = mount(<Modal onClose={() => { called = true; }} />);
+    const { query, cleanup } = mount(
+      <Modal
+        onClose={() => {
+          called = true;
+        }}
+      />,
+    );
     fire(query('.modal-overlay'), 'click');
     assert.ok(called, 'onClose must fire when overlay is clicked');
     cleanup();
@@ -44,7 +50,13 @@ describe('Modal', () => {
 
   test('does not call onClose when dialog is clicked', () => {
     let called = false;
-    const { query, cleanup } = mount(<Modal onClose={() => { called = true; }} />);
+    const { query, cleanup } = mount(
+      <Modal
+        onClose={() => {
+          called = true;
+        }}
+      />,
+    );
     fire(query('.modal-dialog'), 'click');
     assert.equal(called, false, 'clicking the dialog must not bubble to the overlay');
     cleanup();

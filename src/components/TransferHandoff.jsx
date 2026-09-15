@@ -19,7 +19,10 @@ function CodeBlock({ label, value, hint }) {
 
   const copy = () => {
     navigator.clipboard?.writeText(value).then(
-      () => { setCopied(true); setTimeout(() => setCopied(false), 1500); },
+      () => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      },
       () => {},
     );
   };
@@ -43,13 +46,13 @@ export function TransferHandoff({ credentials, currentPrefix = '', onClose }) {
 
   const region = credentials.regionOverride || extractRegion(credentials.endpoint, credentials.provider);
   const recipe = buildTransferRecipe({
-    provider:   credentials.provider,
-    endpoint:   credentials.endpoint,
+    provider: credentials.provider,
+    endpoint: credentials.endpoint,
     region,
-    bucket:     credentials.bucket,
-    prefix:     currentPrefix,
-    keyId:      credentials.keyId,
-    secretKey:  credentials.secretKey,
+    bucket: credentials.bucket,
+    prefix: currentPrefix,
+    keyId: credentials.keyId,
+    secretKey: credentials.secretKey,
     includeSecret,
   });
 
@@ -67,9 +70,9 @@ export function TransferHandoff({ credentials, currentPrefix = '', onClose }) {
 
       <div class="handoff-body">
         <p class="handoff-intro">
-          For very large downloads, a dedicated transfer tool is more reliable than any browser.
-          It survives reboots, retries indefinitely, and can run unattended — none of which a
-          browser tab can do. Below is a ready-to-run job for <code>{scope}</code> on {providerLabel}.
+          For very large downloads, a dedicated transfer tool is more reliable than any browser. It survives reboots,
+          retries indefinitely, and can run unattended — none of which a browser tab can do. Below is a ready-to-run job
+          for <code>{scope}</code> on {providerLabel}.
         </p>
 
         <div class="handoff-secret-toggle">
@@ -78,7 +81,7 @@ export function TransferHandoff({ credentials, currentPrefix = '', onClose }) {
             class={includeSecret ? 'btn btn-sm' : 'btn btn-ghost btn-sm'}
             data-testid="include-secret"
             aria-pressed={includeSecret ? 'true' : 'false'}
-            onClick={() => setIncludeSecret(v => !v)}
+            onClick={() => setIncludeSecret((v) => !v)}
           >
             {includeSecret ? 'Hide secret key' : 'Include secret key'}
           </button>
@@ -91,9 +94,9 @@ export function TransferHandoff({ credentials, currentPrefix = '', onClose }) {
 
         {includeSecret && (
           <p class="handoff-warning" data-testid="secret-warning">
-            This config now contains your secret key. Anyone who reads the file it lands in has
-            the same access to this bucket that you do. Store it with the permissions you would
-            give a password, and rotate the key if it is exposed.
+            This config now contains your secret key. Anyone who reads the file it lands in has the same access to this
+            bucket that you do. Store it with the permissions you would give a password, and rotate the key if it is
+            exposed.
           </p>
         )}
 

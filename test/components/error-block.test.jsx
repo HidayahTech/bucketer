@@ -1,6 +1,6 @@
 // Component tests for ErrorBlock.
 // Requires the JSX loader: run via `npm run test:ui`, not `npm test`.
-import '../helpers/with-dom.js';       // must be first — installs DOM globals
+import '../helpers/with-dom.js'; // must be first — installs DOM globals
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { h, render } from 'preact';
@@ -47,19 +47,23 @@ describe('ErrorBlock', () => {
   });
 
   test('renders consequence text when provided', () => {
-    const { text, cleanup } = mount(h(ErrorBlock, {
-      error: new Error('oops'),
-      consequence: 'Files may not have uploaded.',
-    }));
+    const { text, cleanup } = mount(
+      h(ErrorBlock, {
+        error: new Error('oops'),
+        consequence: 'Files may not have uploaded.',
+      }),
+    );
     assert.ok(text().includes('Files may not have uploaded.'));
     cleanup();
   });
 
   test('renders guidance text when provided', () => {
-    const { text, cleanup } = mount(h(ErrorBlock, {
-      error: new Error('oops'),
-      guidance: 'Check your key has GetObject permission.',
-    }));
+    const { text, cleanup } = mount(
+      h(ErrorBlock, {
+        error: new Error('oops'),
+        guidance: 'Check your key has GetObject permission.',
+      }),
+    );
     assert.ok(text().includes('Check your key has GetObject permission.'));
     cleanup();
   });
@@ -68,7 +72,12 @@ describe('ErrorBlock', () => {
   // recovery hint naming the field. Gated on basePrefixUnset so the hint never
   // shows once a base folder exists (the restriction is already declared).
   test('shows the Base folder hint on a 403 when no base folder is set', () => {
-    const denied = { name: 'AccessDenied', Code: 'AccessDenied', message: 'Access Denied', $metadata: { httpStatusCode: 403 } };
+    const denied = {
+      name: 'AccessDenied',
+      Code: 'AccessDenied',
+      message: 'Access Denied',
+      $metadata: { httpStatusCode: 403 },
+    };
     const { text, cleanup } = mount(h(ErrorBlock, { error: denied, basePrefixUnset: true }));
     assert.ok(text().includes('Base folder'), 'the hint must name the field');
     assert.ok(text().includes('Name Prefix'), 'the hint must bridge B2 vocabulary');
@@ -76,14 +85,24 @@ describe('ErrorBlock', () => {
   });
 
   test('no Base folder hint when a base folder is already set', () => {
-    const denied = { name: 'AccessDenied', Code: 'AccessDenied', message: 'Access Denied', $metadata: { httpStatusCode: 403 } };
+    const denied = {
+      name: 'AccessDenied',
+      Code: 'AccessDenied',
+      message: 'Access Denied',
+      $metadata: { httpStatusCode: 403 },
+    };
     const { text, cleanup } = mount(h(ErrorBlock, { error: denied }));
     assert.ok(!text().includes('Base folder'));
     cleanup();
   });
 
   test('no Base folder hint on a non-permission error', () => {
-    const notFound = { name: 'NoSuchBucket', Code: 'NoSuchBucket', message: 'not here', $metadata: { httpStatusCode: 404 } };
+    const notFound = {
+      name: 'NoSuchBucket',
+      Code: 'NoSuchBucket',
+      message: 'not here',
+      $metadata: { httpStatusCode: 404 },
+    };
     const { text, cleanup } = mount(h(ErrorBlock, { error: notFound, basePrefixUnset: true }));
     assert.ok(!text().includes('Base folder'));
     cleanup();
@@ -91,8 +110,10 @@ describe('ErrorBlock', () => {
 
   test('the CORS note mentions prefix-restricted keys when no base folder is set', () => {
     const { text, cleanup } = mount(h(ErrorBlock, { error: new Error('Failed to fetch'), basePrefixUnset: true }));
-    assert.ok(text().includes('restricted to a folder'),
-      'a real B2 denial can present as a CORS-shaped failure — the note must mention the folder-restriction cause');
+    assert.ok(
+      text().includes('restricted to a folder'),
+      'a real B2 denial can present as a CORS-shaped failure — the note must mention the folder-restriction cause',
+    );
     cleanup();
   });
 
@@ -116,7 +137,10 @@ describe('ErrorBlock', () => {
   });
 
   test('renders provider response details section for S3 errors with a code', () => {
-    const s3Error = Object.assign(new Error('Access Denied'), { Code: 'AccessDenied', $metadata: { httpStatusCode: 403 } });
+    const s3Error = Object.assign(new Error('Access Denied'), {
+      Code: 'AccessDenied',
+      $metadata: { httpStatusCode: 403 },
+    });
     const { query, cleanup } = mount(h(ErrorBlock, { error: s3Error }));
     assert.ok(query('details'), 'should render a details element for S3 errors with metadata');
     cleanup();
@@ -124,7 +148,7 @@ describe('ErrorBlock', () => {
 
   test('no diagnostics button without the diagnostics prop', () => {
     const { queryAll, cleanup } = mount(h(ErrorBlock, { error: new Error('Failed to fetch') }));
-    assert.ok(!queryAll('button').some(b => b.textContent.includes('Run diagnostics')));
+    assert.ok(!queryAll('button').some((b) => b.textContent.includes('Run diagnostics')));
     cleanup();
   });
 
@@ -133,44 +157,49 @@ describe('ErrorBlock', () => {
       Code: 'AccessDenied',
       $metadata: { httpStatusCode: 403 },
     });
-    const { queryAll, cleanup } = mount(h(ErrorBlock, {
-      error: s3Error,
-      diagnostics: { endpoint: 'https://s3.example.com', bucket: 'b', forcePathStyle: false },
-    }));
-    assert.ok(!queryAll('button').some(b => b.textContent.includes('Run diagnostics')));
+    const { queryAll, cleanup } = mount(
+      h(ErrorBlock, {
+        error: s3Error,
+        diagnostics: { endpoint: 'https://s3.example.com', bucket: 'b', forcePathStyle: false },
+      }),
+    );
+    assert.ok(!queryAll('button').some((b) => b.textContent.includes('Run diagnostics')));
     cleanup();
   });
 
   test('diagnostics button renders for CORS-like errors with the prop', () => {
-    const { queryAll, cleanup } = mount(h(ErrorBlock, {
-      error: new Error('Failed to fetch'),
-      diagnostics: { endpoint: 'https://s3.example.com', bucket: 'b', forcePathStyle: false },
-    }));
-    const btn = queryAll('button').find(b => b.textContent.includes('Run diagnostics'));
+    const { queryAll, cleanup } = mount(
+      h(ErrorBlock, {
+        error: new Error('Failed to fetch'),
+        diagnostics: { endpoint: 'https://s3.example.com', bucket: 'b', forcePathStyle: false },
+      }),
+    );
+    const btn = queryAll('button').find((b) => b.textContent.includes('Run diagnostics'));
     assert.ok(btn, 'button should be present');
     assert.equal(btn.getAttribute('type'), 'button');
     cleanup();
   });
 
   test('clicking the button runs diagnostics and shows the verdict', async () => {
-    const { queryAll, text, cleanup } = mount(h(ErrorBlock, {
-      error: new Error('Failed to fetch'),
-      diagnostics: {
-        endpoint: 'https://s3.example.com',
-        bucket: 'b',
-        forcePathStyle: false,
-        pageProtocol: 'https:',
-        onLine: true,
-        fetchFn: async () => ({ type: 'opaque' }),
-      },
-    }));
-    const btn = queryAll('button').find(b => b.textContent.includes('Run diagnostics'));
+    const { queryAll, text, cleanup } = mount(
+      h(ErrorBlock, {
+        error: new Error('Failed to fetch'),
+        diagnostics: {
+          endpoint: 'https://s3.example.com',
+          bucket: 'b',
+          forcePathStyle: false,
+          pageProtocol: 'https:',
+          onLine: true,
+          fetchFn: async () => ({ type: 'opaque' }),
+        },
+      }),
+    );
+    const btn = queryAll('button').find((b) => b.textContent.includes('Run diagnostics'));
     fire(btn, 'click');
     // flush the async runDiagnostics → setState round-trips
-    await new Promise(r => setTimeout(r, 0));
-    await new Promise(r => setTimeout(r, 0));
-    assert.ok(text().includes('almost certainly missing or incorrect CORS'),
-      'cors-blocked verdict should be shown');
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
+    assert.ok(text().includes('almost certainly missing or incorrect CORS'), 'cors-blocked verdict should be shown');
     assert.ok(text().includes('Endpoint host responds'), 'check list should be shown');
     cleanup();
   });
@@ -186,23 +215,35 @@ describe('ErrorBlock', () => {
       onLine: true,
       fetchFn: async () => ({ type: 'opaque' }),
     };
-    const { queryAll, text, container, cleanup } = mount(h(ErrorBlock, {
-      error: new Error('Failed to fetch'),
-      diagnostics,
-    }));
-    fire(queryAll('button').find(b => b.textContent.includes('Run diagnostics')), 'click');
-    await new Promise(r => setTimeout(r, 0));
-    await new Promise(r => setTimeout(r, 0));
+    const { queryAll, text, container, cleanup } = mount(
+      h(ErrorBlock, {
+        error: new Error('Failed to fetch'),
+        diagnostics,
+      }),
+    );
+    fire(
+      queryAll('button').find((b) => b.textContent.includes('Run diagnostics')),
+      'click',
+    );
+    await new Promise((r) => setTimeout(r, 0));
+    await new Promise((r) => setTimeout(r, 0));
     assert.ok(text().includes('Browser is online'), 'precondition: results are showing');
 
-    act(() => render(h(ErrorBlock, {
-      error: new Error('NetworkError when attempting to fetch resource.'),
-      diagnostics,
-    }), container));
+    act(() =>
+      render(
+        h(ErrorBlock, {
+          error: new Error('NetworkError when attempting to fetch resource.'),
+          diagnostics,
+        }),
+        container,
+      ),
+    );
 
     assert.ok(!text().includes('Browser is online'), 'old check list must be cleared for the new error');
-    assert.ok(queryAll('button').some(b => b.textContent.includes('Run diagnostics')),
-      'Run diagnostics button must return for the new error');
+    assert.ok(
+      queryAll('button').some((b) => b.textContent.includes('Run diagnostics')),
+      'Run diagnostics button must return for the new error',
+    );
     cleanup();
   });
 });

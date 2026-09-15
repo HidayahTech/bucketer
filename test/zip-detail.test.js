@@ -13,15 +13,24 @@ import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  saveJob, loadAllJobs, deleteJob, appendManifestPage,
-  ITEM_STATUS, loadZipDetail,
+  saveJob,
+  loadAllJobs,
+  deleteJob,
+  appendManifestPage,
+  ITEM_STATUS,
+  loadZipDetail,
 } from '../src/lib/download-records.js';
 
 const JOB_ID = 'zjob-detail';
 
 const job = (over = {}) => ({
-  id: JOB_ID, bucket: 'bkt', prefix: 'videos/', status: 'running',
-  enumeration: { done: true }, counters: {}, ...over,
+  id: JOB_ID,
+  bucket: 'bkt',
+  prefix: 'videos/',
+  status: 'running',
+  enumeration: { done: true },
+  counters: {},
+  ...over,
 });
 
 async function reset() {
@@ -38,15 +47,21 @@ describe('loadZipDetail', () => {
     const doneItems = Array.from({ length: 25 }, (_, idx) => {
       const n = idx + 1;
       return {
-        key: `videos/done-${n}.txt`, size: n * 111, zipEnd: n * 1000,
+        key: `videos/done-${n}.txt`,
+        size: n * 111,
+        zipEnd: n * 1000,
         status: ITEM_STATUS.DONE,
       };
     });
-    const failedItems = [1, 2, 3].map(n => ({
-      key: `videos/failed-${n}.txt`, size: 50, status: ITEM_STATUS.FAILED,
+    const failedItems = [1, 2, 3].map((n) => ({
+      key: `videos/failed-${n}.txt`,
+      size: 50,
+      status: ITEM_STATUS.FAILED,
     }));
-    const pendingItems = [1, 2, 3, 4, 5].map(n => ({
-      key: `videos/pending-${n}.txt`, size: 10, status: ITEM_STATUS.PENDING,
+    const pendingItems = [1, 2, 3, 4, 5].map((n) => ({
+      key: `videos/pending-${n}.txt`,
+      size: 10,
+      status: ITEM_STATUS.PENDING,
     }));
 
     await appendManifestPage(JOB_ID, [...doneItems, ...failedItems, ...pendingItems], {});
@@ -77,10 +92,15 @@ describe('loadZipDetail', () => {
   test('respects custom doneCap/failedCap and honors default caps of 20', async () => {
     await saveJob(job());
     const doneItems = Array.from({ length: 5 }, (_, idx) => ({
-      key: `videos/d${idx}.txt`, size: 1, zipEnd: idx + 1, status: ITEM_STATUS.DONE,
+      key: `videos/d${idx}.txt`,
+      size: 1,
+      zipEnd: idx + 1,
+      status: ITEM_STATUS.DONE,
     }));
     const failedItems = Array.from({ length: 5 }, (_, idx) => ({
-      key: `videos/f${idx}.txt`, size: 1, status: ITEM_STATUS.FAILED,
+      key: `videos/f${idx}.txt`,
+      size: 1,
+      status: ITEM_STATUS.FAILED,
     }));
     await appendManifestPage(JOB_ID, [...doneItems, ...failedItems], {});
 

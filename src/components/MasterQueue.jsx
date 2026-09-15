@@ -15,8 +15,8 @@ import { useRate } from '../hooks/useRate.js';
 
 const VERBS = {
   delete: { active: 'Deleting', done: 'Deleted' },
-  move:   { active: 'Moving',   done: 'Moved' },
-  copy:   { active: 'Copying',  done: 'Copied' },
+  move: { active: 'Moving', done: 'Moved' },
+  copy: { active: 'Copying', done: 'Copied' },
   rename: { active: 'Renaming', done: 'Renamed' },
 };
 
@@ -61,11 +61,11 @@ function downloadSummary(t) {
 function taskSummary(t) {
   if (t.kind === 'download') return downloadSummary(t);
   const verbs = VERBS[t.kind];
-  const skipped = t.errors.filter(e => e.skipped).length;
-  const failed  = t.errors.length - skipped;
+  const skipped = t.errors.filter((e) => e.skipped).length;
+  const failed = t.errors.length - skipped;
   const progressText = t.total != null ? ` · ${t.current} / ${t.total}` : '';
-  const skippedText  = skipped > 0 ? ` · ${skipped} skipped` : '';
-  const failedText   = failed > 0 ? ` · ${failed} error${failed !== 1 ? 's' : ''}` : '';
+  const skippedText = skipped > 0 ? ` · ${skipped} skipped` : '';
+  const failedText = failed > 0 ? ` · ${failed} error${failed !== 1 ? 's' : ''}` : '';
 
   if (t.status === 'paused') return `Paused — move of ${t.subject} interrupted${failedText} — Resume or Discard`;
   if (t.status === 'cancelled') {
@@ -85,20 +85,25 @@ export function MasterQueue({ store = taskStore, readZipDetail, onResumeMove, on
 
   // A paused (resumable) task is neither running nor a dismissable result — it must not be
   // swept by "Dismiss all finished" (that would orphan its record); it has its own Discard.
-  const settled = tasks.filter(t => t.status === 'done' || t.status === 'cancelled');
+  const settled = tasks.filter((t) => t.status === 'done' || t.status === 'cancelled');
   return (
     <div class="queue-panel" data-testid="master-queue">
       {settled.length >= 2 && (
         <div class="queue-panel-actions">
-          <button type="button" class="btn btn-ghost btn-sm"
-            onClick={() => settled.forEach(t => store.remove(t.id))}>
+          <button type="button" class="btn btn-ghost btn-sm" onClick={() => settled.forEach((t) => store.remove(t.id))}>
             Dismiss all finished
           </button>
         </div>
       )}
-      {tasks.map(t => (
-        <TaskRow key={t.id} task={t} store={store} readZipDetail={readZipDetail}
-          onResumeMove={onResumeMove} onDiscardMove={onDiscardMove} />
+      {tasks.map((t) => (
+        <TaskRow
+          key={t.id}
+          task={t}
+          store={store}
+          readZipDetail={readZipDetail}
+          onResumeMove={onResumeMove}
+          onDiscardMove={onDiscardMove}
+        />
       ))}
     </div>
   );
@@ -106,13 +111,13 @@ export function MasterQueue({ store = taskStore, readZipDetail, onResumeMove, on
 
 function TaskRow({ task, store, readZipDetail, onResumeMove, onDiscardMove }) {
   const isSettled = task.status !== 'running';
-  const isPaused  = task.status === 'paused'; // a resumable, interrupted move
-  const failed    = task.errors.filter(e => !e.skipped).length;
+  const isPaused = task.status === 'paused'; // a resumable, interrupted move
+  const failed = task.errors.filter((e) => !e.skipped).length;
   const hasErrors = task.errors.length > 0;
-  const isZip        = task.delivery === 'zip';
+  const isZip = task.delivery === 'zip';
   const isRunningZip = isZip && task.status === 'running';
 
-  const bytesDone  = task.bytesDone ?? 0;
+  const bytesDone = task.bytesDone ?? 0;
   const bytesTotal = task.bytesTotal ?? 0;
   // The byte line + bar + speed + ETA render for any running task that reports its sendable
   // bytes — a zip download or a server-side move/copy alike. Delete reports no bytes and so
@@ -131,9 +136,9 @@ function TaskRow({ task, store, readZipDetail, onResumeMove, onDiscardMove }) {
   // Zip tasks get the new active-focused detail (running, or settled with per-key
   // errors); every other task kind keeps the pre-existing settled+errors-only error list,
   // untouched.
-  const canExpandZip     = isZip && (isRunningZip || (isSettled && hasErrors));
+  const canExpandZip = isZip && (isRunningZip || (isSettled && hasErrors));
   const canExpandGeneric = !isZip && isSettled && hasErrors;
-  const canExpand         = canExpandZip || canExpandGeneric;
+  const canExpand = canExpandZip || canExpandGeneric;
 
   // A running zip's detail panel is opt-in, gated on local component state rather than
   // task.collapsed: task.collapsed defaults false, and reusing it here would auto-expand
@@ -142,12 +147,12 @@ function TaskRow({ task, store, readZipDetail, onResumeMove, onDiscardMove }) {
   // job settles, expand reverts to the pre-existing task.collapsed-driven behavior
   // (auto-expanded by default when there are errors) — unchanged from before this task.
   const [runningDetailOpen, setRunningDetailOpen] = useState(false);
-  const isOpen    = isRunningZip ? runningDetailOpen : !task.collapsed;
-  const expanded  = canExpand && isOpen;
-  const expandedZip     = expanded && isZip;
+  const isOpen = isRunningZip ? runningDetailOpen : !task.collapsed;
+  const expanded = canExpand && isOpen;
+  const expandedZip = expanded && isZip;
   const expandedGeneric = expanded && !isZip;
   const toggleOpen = () => {
-    if (isRunningZip) setRunningDetailOpen(o => !o);
+    if (isRunningZip) setRunningDetailOpen((o) => !o);
     else store.update(task.id, { collapsed: !task.collapsed }, true);
   };
 
@@ -171,17 +176,25 @@ function TaskRow({ task, store, readZipDetail, onResumeMove, onDiscardMove }) {
     const read = () => {
       const fn = readZipDetailRef.current;
       if (!fn) return;
-      fn(task.jobId).then(d => { if (!cancelled) setZipDetail(d); });
+      fn(task.jobId).then((d) => {
+        if (!cancelled) setZipDetail(d);
+      });
     };
     read();
-    if (!isRunningZip) return () => { cancelled = true; };
+    if (!isRunningZip)
+      return () => {
+        cancelled = true;
+      };
     const h = setInterval(read, 1000);
-    return () => { cancelled = true; clearInterval(h); };
+    return () => {
+      cancelled = true;
+      clearInterval(h);
+    };
   }, [expandedZip, isRunningZip, task.jobId]);
 
-  const doneList    = zipDetail?.done ?? [];
-  const failedList  = zipDetail?.failed ?? [];
-  const doneCount   = zipDetail?.doneCount ?? 0;
+  const doneList = zipDetail?.done ?? [];
+  const failedList = zipDetail?.failed ?? [];
+  const doneCount = zipDetail?.doneCount ?? 0;
   const failedCount = zipDetail?.failedCount ?? 0;
   const queuedCount = Math.max(0, (task.total ?? 0) - doneCount - failedCount);
   const doneOverflow = doneCount - doneList.length;
@@ -189,10 +202,10 @@ function TaskRow({ task, store, readZipDetail, onResumeMove, onDiscardMove }) {
   // against a legacy/stray single-object value (wrap it) or an absent value (empty) — an
   // empty array is truthy in JS, so `task.active && ...` alone would still render a broken
   // row with no entries; mapping over this list instead renders zero rows for zero entries.
-  const activeList = Array.isArray(task.active) ? task.active : (task.active ? [task.active] : []);
+  const activeList = Array.isArray(task.active) ? task.active : task.active ? [task.active] : [];
   // failed items from readZipDetail carry only {key} — the failure reason lives on
   // task.errors ({key, message}), already on the task, no extra IndexedDB read.
-  const errorMessageByKey = new Map(task.errors.map(e => [e.key, e.message]));
+  const errorMessageByKey = new Map(task.errors.map((e) => [e.key, e.message]));
 
   return (
     <div class={`queue-op${expanded ? ' queue-op-expanded' : ''}`}>
@@ -202,47 +215,76 @@ function TaskRow({ task, store, readZipDetail, onResumeMove, onDiscardMove }) {
         {task.status === 'done' && failed > 0 && <span class="queue-op-icon queue-op-err">✕</span>}
         {task.status === 'cancelled' && <span class="queue-op-icon queue-op-cancelled">⊘</span>}
         <span class="queue-op-summary">{taskSummary(task)}</span>
-        {task.bucket && <span class="queue-op-origin" title="The bucket this operation runs against">{task.bucket}</span>}
+        {task.bucket && (
+          <span class="queue-op-origin" title="The bucket this operation runs against">
+            {task.bucket}
+          </span>
+        )}
         {task.tier && (
           <span
             class="queue-op-badge"
             data-testid="task-badge"
-            title={task.tier === TIERS.HANDOFF
-              ? 'Your browser is doing the transfer. Bucketer can see which files it handed over, but not their progress.'
-              : 'Bucketer is performing this transfer and can report its real progress.'}
+            title={
+              task.tier === TIERS.HANDOFF
+                ? 'Your browser is doing the transfer. Bucketer can see which files it handed over, but not their progress.'
+                : 'Bucketer is performing this transfer and can report its real progress.'
+            }
           >
             {tierLabel(task.tier)}
           </span>
         )}
         {!isSettled && (
-          <button type="button" class="btn btn-ghost btn-sm" style={{ flexShrink: 0 }}
-            data-testid="task-cancel" disabled={task.cancelRequested}
-            onClick={() => store.requestCancel(task.id)}>
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            style={{ flexShrink: 0 }}
+            data-testid="task-cancel"
+            disabled={task.cancelRequested}
+            onClick={() => store.requestCancel(task.id)}
+          >
             {task.cancelRequested ? 'Cancelling…' : 'Cancel'}
           </button>
         )}
         {canExpand && (
-          <button type="button" class="btn btn-ghost btn-sm" style={{ flexShrink: 0 }}
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            style={{ flexShrink: 0 }}
             data-testid="task-expand-toggle"
-            onClick={toggleOpen}>
+            onClick={toggleOpen}
+          >
             {isOpen ? 'Hide' : 'Show details'}
           </button>
         )}
         {isPaused && (
           <>
-            <button type="button" class="btn btn-sm" style={{ flexShrink: 0 }}
-              data-testid="move-resume" onClick={() => onResumeMove?.(task)}>
+            <button
+              type="button"
+              class="btn btn-sm"
+              style={{ flexShrink: 0 }}
+              data-testid="move-resume"
+              onClick={() => onResumeMove?.(task)}
+            >
               Resume
             </button>
-            <button type="button" class="btn btn-ghost btn-sm" style={{ flexShrink: 0 }}
-              data-testid="move-discard" onClick={() => onDiscardMove?.(task)}>
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              style={{ flexShrink: 0 }}
+              data-testid="move-discard"
+              onClick={() => onDiscardMove?.(task)}
+            >
               Discard
             </button>
           </>
         )}
         {isSettled && !isPaused && (
-          <button type="button" class="btn btn-ghost btn-sm" style={{ flexShrink: 0 }}
-            onClick={() => store.remove(task.id)}>
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            style={{ flexShrink: 0 }}
+            onClick={() => store.remove(task.id)}
+          >
             Dismiss
           </button>
         )}
@@ -262,24 +304,27 @@ function TaskRow({ task, store, readZipDetail, onResumeMove, onDiscardMove }) {
 
       {expandedZip && (
         <div class="queue-op-zip-detail" data-testid="zip-detail">
-          {activeList.map(a => {
+          {activeList.map((a) => {
             const pct = a.size ? Math.round((a.bytes / a.size) * 100) : 0;
             return (
               <div key={a.key} class="queue-op-zip-row queue-op-zip-active">
-                ▶ {a.key}  {formatBytes(a.bytes)} / {formatBytes(a.size)}  ({pct}%)
+                ▶ {a.key} {formatBytes(a.bytes)} / {formatBytes(a.size)} ({pct}%)
               </div>
             );
           })}
-          {doneList.map(d => (
-            <div key={d.key} class="queue-op-zip-row queue-op-zip-done">✓ {d.key}  {formatBytes(d.size)}</div>
+          {doneList.map((d) => (
+            <div key={d.key} class="queue-op-zip-row queue-op-zip-done">
+              ✓ {d.key} {formatBytes(d.size)}
+            </div>
           ))}
-          {failedList.map(f => (
+          {failedList.map((f) => (
             <div key={f.key} class="queue-op-zip-row queue-op-zip-failed">
               ✗ {f.key} — {errorMessageByKey.get(f.key) || 'failed'}
             </div>
           ))}
           <div class="queue-op-zip-row queue-op-zip-footer">
-            …and {queuedCount.toLocaleString()} queued{doneOverflow > 0 ? ` · ${doneOverflow.toLocaleString()} more done` : ''}
+            …and {queuedCount.toLocaleString()} queued
+            {doneOverflow > 0 ? ` · ${doneOverflow.toLocaleString()} more done` : ''}
           </div>
         </div>
       )}
@@ -288,14 +333,14 @@ function TaskRow({ task, store, readZipDetail, onResumeMove, onDiscardMove }) {
         <div class="queue-op-errors">
           {task.errors.slice(0, 10).map((e, i) => (
             <div key={i} class="queue-op-error-row">
-              <span class="queue-op-error-key" title={e.key}>{leafName(e.key) || e.key}</span>
+              <span class="queue-op-error-key" title={e.key}>
+                {leafName(e.key) || e.key}
+              </span>
               <span class={e.skipped ? 'queue-op-error-skip' : 'queue-op-error-msg'}>{e.message}</span>
             </div>
           ))}
           {task.errors.length > 10 && (
-            <div class="queue-op-error-row queue-op-error-more">
-              …and {task.errors.length - 10} more
-            </div>
+            <div class="queue-op-error-row queue-op-error-more">…and {task.errors.length - 10} more</div>
           )}
         </div>
       )}

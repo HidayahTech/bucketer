@@ -36,14 +36,34 @@ import { normalizeBasePrefix, withinFloor, clampToFloor } from '../lib/base-pref
 
 function formatDate(dateStr) {
   if (!dateStr) return '';
-  try { return new Date(dateStr).toLocaleDateString(); } catch { return ''; }
+  try {
+    return new Date(dateStr).toLocaleDateString();
+  } catch {
+    return '';
+  }
 }
 
 // State is organized by concern — each interactive feature has its own slice.
 // selectedKeys and selectedPrefixes are Sets for O(1) has() checks per row.
 // Delete operations are owned by App.jsx (via onDeleteRequest) so they survive navigation.
 // cacheRef and abortRef are Refs (not state) to avoid triggering re-renders.
-export function Browser({ client, bucket, provider, credentials, onCapabilityChange, capabilities, onUploadTargetChange, onInitialListFailed, onExternalDrop, onDeleteRequest, onMoveRequest, onDownloadRequest, onMount, prefetchSizeLimit, isFirstMount }) {
+export function Browser({
+  client,
+  bucket,
+  provider,
+  credentials,
+  onCapabilityChange,
+  capabilities,
+  onUploadTargetChange,
+  onInitialListFailed,
+  onExternalDrop,
+  onDeleteRequest,
+  onMoveRequest,
+  onDownloadRequest,
+  onMount,
+  prefetchSizeLimit,
+  isFirstMount,
+}) {
   // The connection's floor (#60): every navigation entry point clamps to it, so a
   // prefix-scoped key never sees a request above its base prefix. '' = unscoped.
   const basePrefix = normalizeBasePrefix(credentials?.basePrefix);
@@ -73,12 +93,24 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const [sortDir, setSortDir] = useState('asc');
   const [selectedPrefixes, setSelectedPrefixes] = useState(new Set());
   const {
-    previewItem, previewUrl, previewError,
-    resolvedKind, notPreviewable, detectedContentType,
-    previewText, previewTruncated, previewPixelated, setPreviewPixelated,
-    previewCopyOpen, setPreviewCopyOpen, previewCopied, setPreviewCopied,
-    previewUrlCacheRef, previewCopyWrapRef,
-    handlePreview, closePreview,
+    previewItem,
+    previewUrl,
+    previewError,
+    resolvedKind,
+    notPreviewable,
+    detectedContentType,
+    previewText,
+    previewTruncated,
+    previewPixelated,
+    setPreviewPixelated,
+    previewCopyOpen,
+    setPreviewCopyOpen,
+    previewCopied,
+    setPreviewCopied,
+    previewUrlCacheRef,
+    previewCopyWrapRef,
+    handlePreview,
+    closePreview,
   } = usePreview(client, bucket);
   const [filterQuery, setFilterQuery] = useState('');
   const [selectedKeys, setSelectedKeys] = useState(new Set());
@@ -91,13 +123,28 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const [metaLoading, setMetaLoading] = useState(false);
   const [metaError, setMetaError] = useState(null);
   const {
-    renamingKey, renameValue, renameError, renameSaving,
-    setRenameValue, setRenameError,
-    startRename, cancelRename, commitRename, startFolderRename, commitFolderRename,
+    renamingKey,
+    renameValue,
+    renameError,
+    renameSaving,
+    setRenameValue,
+    setRenameError,
+    startRename,
+    cancelRename,
+    commitRename,
+    startFolderRename,
+    commitFolderRename,
   } = useRename({ client, bucket, prefix, items, setItems, commonPrefixes, invalidateCache, onMoveRequest });
   const {
-    newFolderOpen, newFolderName, setNewFolderName, newFolderError, setNewFolderError,
-    newFolderSaving, openNewFolder, closeNewFolder, handleCreateFolder,
+    newFolderOpen,
+    newFolderName,
+    setNewFolderName,
+    newFolderError,
+    setNewFolderError,
+    newFolderSaving,
+    openNewFolder,
+    closeNewFolder,
+    handleCreateFolder,
   } = useNewFolder({ client, bucket, prefix, commonPrefixes, setCommonPrefixes, invalidateCache });
   const [tableCopyKey, setTableCopyKey] = useState(null);
   const [tableCopied, setTableCopied] = useState(null);
@@ -113,7 +160,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   const abortRef = useRef(null);
   const cacheRef = useRef(new Map());
   const prefetchGenRef = useRef(0); // incremented on each prefetch call to abandon stale runs
-  const prevNextRef    = useRef({ prev: null, next: null }); // kept current during render for the prefetch effect
+  const prevNextRef = useRef({ prev: null, next: null }); // kept current during render for the prefetch effect
   const tableCopyWrapRef = useRef(null);
   const batchCopyWrapRef = useRef(null);
   // Always-current reference to navigateTo for the popstate handler (which has [] deps)
@@ -139,14 +186,16 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
 
   function toggleSort(col) {
     if (sortCol === col) {
-      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     } else {
       setSortCol(col);
       setSortDir('asc');
     }
   }
 
-  useEffect(() => { onMount?.({ removeItems, invalidateCache, onUploadsDrained }); }, []);
+  useEffect(() => {
+    onMount?.({ removeItems, invalidateCache, onUploadsDrained });
+  }, []);
 
   // Called by App when an upload batch fully drains. prefixSet is the set of
   // parent prefixes that received at least one successful upload. We invalidate
@@ -164,7 +213,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     // stayed invisible until a manual reload (GitLab #4 / BUG-032). `startsWith` covers both. The
     // current prefix's own cache may still be valid, so invalidate it before refetching.
     const cur = prefixRef.current;
-    if ([...prefixSet].some(p => p.startsWith(cur))) {
+    if ([...prefixSet].some((p) => p.startsWith(cur))) {
       invalidateCache(cur);
       fetchPage(cur, null, true);
     }
@@ -197,21 +246,26 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
       while (queue.length && active < 3) {
         const { Key, cacheKey } = queue.shift();
         active++;
-        client.send(new HeadObjectCommand({ Bucket: bucket, Key }))
-          .then(head => {
+        client
+          .send(new HeadObjectCommand({ Bucket: bucket, Key }))
+          .then((head) => {
             const mtime = head.Metadata?.[FILE_MTIME_KEY] ?? null;
             fileMtimeCacheRef.current.set(cacheKey, mtime);
-            try { localStorage.setItem('bucketer:mtime:' + cacheKey, mtime ?? ''); } catch {}
+            try {
+              localStorage.setItem('bucketer:mtime:' + cacheKey, mtime ?? '');
+            } catch {}
           })
           .catch(() => {
             fileMtimeCacheRef.current.set(cacheKey, null);
-            try { localStorage.setItem('bucketer:mtime:' + cacheKey, ''); } catch {}
+            try {
+              localStorage.setItem('bucketer:mtime:' + cacheKey, '');
+            } catch {}
           })
           .finally(() => {
             active--;
             if (!cancelled) {
               flush();
-              setMtimeCacheVer(v => v + 1);
+              setMtimeCacheVer((v) => v + 1);
               if (active === 0 && queue.length === 0) setIsMtimeLoading(false);
             }
           });
@@ -222,30 +276,35 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
       const cacheKey = `${bucket}:${Key}:${lastModifiedMs}`;
       if (fileMtimeCacheRef.current.has(cacheKey)) return; // L1 hit
       let stored = null;
-      try { stored = localStorage.getItem('bucketer:mtime:' + cacheKey); } catch {}
+      try {
+        stored = localStorage.getItem('bucketer:mtime:' + cacheKey);
+      } catch {}
       if (stored !== null) {
         // L2 hit — warm L1 and trigger a re-render without a HeadObject call
         fileMtimeCacheRef.current.set(cacheKey, stored === '' ? null : stored);
-        setMtimeCacheVer(v => v + 1);
+        setMtimeCacheVer((v) => v + 1);
         return;
       }
-      if (!queue.some(e => e.cacheKey === cacheKey)) {
+      if (!queue.some((e) => e.cacheKey === cacheKey)) {
         queue.push({ Key, cacheKey });
         if (active === 0 && queue.length === 1) setIsMtimeLoading(true);
         flush();
       }
     }
 
-    const observer = new IntersectionObserver(entries => {
-      for (const entry of entries) {
-        if (!entry.isIntersecting) continue;
-        const Key = entry.target.dataset.mtimeKey;
-        const lastModifiedMs = Number(entry.target.dataset.mtimeLm);
-        if (Key && lastModifiedMs) enqueue(Key, lastModifiedMs);
-      }
-    }, { rootMargin: '100px 0px' });
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const Key = entry.target.dataset.mtimeKey;
+          const lastModifiedMs = Number(entry.target.dataset.mtimeLm);
+          if (Key && lastModifiedMs) enqueue(Key, lastModifiedMs);
+        }
+      },
+      { rootMargin: '100px 0px' },
+    );
 
-    document.querySelectorAll('[data-mtime-key]').forEach(el => observer.observe(el));
+    document.querySelectorAll('[data-mtime-key]').forEach((el) => observer.observe(el));
 
     return () => {
       cancelled = true;
@@ -263,7 +322,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     if (cacheTTL > 0 && historyMode !== 'replace' && (items.length > 0 || commonPrefixes.length > 0)) {
       cacheRef.current.set(prefix, { items, commonPrefixes, isTruncated, continuationToken, timestamp: Date.now() });
     }
-    if (historyMode === 'push')    pushPrefixHistory(newPrefix, false);
+    if (historyMode === 'push') pushPrefixHistory(newPrefix, false);
     if (historyMode === 'replace') pushPrefixHistory(newPrefix, true);
     setPrefix(newPrefix);
     setItems([]);
@@ -293,7 +352,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     // Serve from cache on initial navigation (not pagination)
     if (replace && !token && cacheTTL > 0) {
       const cached = cacheRef.current.get(targetPrefix);
-      if (cached && (Date.now() - cached.timestamp) < cacheTTL * 1000) {
+      if (cached && Date.now() - cached.timestamp < cacheTTL * 1000) {
         setItems(cached.items);
         setCommonPrefixes(cached.commonPrefixes);
         setContinuationToken(cached.continuationToken);
@@ -325,14 +384,14 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
       isInitialProbeRef.current = false;
 
       const newItems = resp.Contents || [];
-      const newPrefixes = (resp.CommonPrefixes || []).map(cp => cp.Prefix);
+      const newPrefixes = (resp.CommonPrefixes || []).map((cp) => cp.Prefix);
 
       if (replace) {
         setItems(newItems);
         setCommonPrefixes(newPrefixes);
       } else {
-        setItems(prev => [...prev, ...newItems]);
-        setCommonPrefixes(prev => [...prev, ...newPrefixes]);
+        setItems((prev) => [...prev, ...newItems]);
+        setCommonPrefixes((prev) => [...prev, ...newPrefixes]);
       }
       setContinuationToken(resp.NextContinuationToken || null);
       setIsTruncated(!!resp.IsTruncated);
@@ -354,15 +413,18 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   // Initial load — use replaceState so the initial prefix doesn't add a history entry
   useEffect(() => {
     navigateTo(initialPrefixRef.current, { historyMode: 'replace' });
-    return () => { if (abortRef.current) abortRef.current.abort(); };
+    return () => {
+      if (abortRef.current) abortRef.current.abort();
+    };
   }, [client, bucket]);
 
   // Back / forward button support — restore prefix from history state
   useEffect(() => {
     function onPopState(e) {
-      const newPrefix = e.state?.prefix !== undefined
-        ? e.state.prefix
-        : (new URLSearchParams(window.location.hash.slice(1)).get('prefix') || '');
+      const newPrefix =
+        e.state?.prefix !== undefined
+          ? e.state.prefix
+          : new URLSearchParams(window.location.hash.slice(1)).get('prefix') || '';
       navigateRef.current(newPrefix, { historyMode: 'none' });
     }
     window.addEventListener('popstate', onPopState);
@@ -389,9 +451,10 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
 
   function toggleSelect(key, e) {
     e.stopPropagation();
-    setSelectedKeys(prev => {
+    setSelectedKeys((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   }
@@ -399,33 +462,35 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   function toggleSelectAll(visFolders, visFiles) {
     const allSelected =
       (visFiles.length > 0 || visFolders.length > 0) &&
-      visFiles.every(o => selectedKeys.has(o.Key)) &&
-      visFolders.every(cp => selectedPrefixes.has(cp));
+      visFiles.every((o) => selectedKeys.has(o.Key)) &&
+      visFolders.every((cp) => selectedPrefixes.has(cp));
     if (allSelected) {
       setSelectedKeys(new Set());
       setSelectedPrefixes(new Set());
     } else {
-      setSelectedKeys(new Set(visFiles.map(o => o.Key)));
+      setSelectedKeys(new Set(visFiles.map((o) => o.Key)));
       setSelectedPrefixes(new Set(visFolders));
     }
   }
 
   function toggleSelectPrefix(cp, e) {
     e.stopPropagation();
-    setSelectedPrefixes(prev => {
+    setSelectedPrefixes((prev) => {
       const next = new Set(prev);
-      if (next.has(cp)) next.delete(cp); else next.add(cp);
+      if (next.has(cp)) next.delete(cp);
+      else next.add(cp);
       return next;
     });
   }
 
   function removeItems(keys, prefixes) {
-    const keySet    = new Set(keys);
+    const keySet = new Set(keys);
     const prefixSet = new Set(prefixes);
-    if (keySet.size)    setItems(prev => prev.filter(o => !keySet.has(o.Key)));
-    if (prefixSet.size) setCommonPrefixes(prev => prev.filter(p => !prefixSet.has(p)));
-    if (keySet.size)    setSelectedKeys(prev => prev.size ? new Set([...prev].filter(k => !keySet.has(k))) : prev);
-    if (prefixSet.size) setSelectedPrefixes(prev => prev.size ? new Set([...prev].filter(p => !prefixSet.has(p))) : prev);
+    if (keySet.size) setItems((prev) => prev.filter((o) => !keySet.has(o.Key)));
+    if (prefixSet.size) setCommonPrefixes((prev) => prev.filter((p) => !prefixSet.has(p)));
+    if (keySet.size) setSelectedKeys((prev) => (prev.size ? new Set([...prev].filter((k) => !keySet.has(k))) : prev));
+    if (prefixSet.size)
+      setSelectedPrefixes((prev) => (prev.size ? new Set([...prev].filter((p) => !prefixSet.has(p))) : prev));
   }
 
   // dragCounterRef debounces nested dragenter/dragleave. The HTML5 spec fires dragenter for
@@ -451,9 +516,11 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     dragCounterRef.current = 0;
     setTableDragOver(false);
     if (!onExternalDrop) return;
-    resolveDroppedFiles(e.dataTransfer).then(fileEntries => {
-      if (fileEntries.length) onExternalDrop(fileEntries);
-    }).catch(() => {});
+    resolveDroppedFiles(e.dataTransfer)
+      .then((fileEntries) => {
+        if (fileEntries.length) onExternalDrop(fileEntries);
+      })
+      .catch(() => {});
   }
 
   async function handleShowMeta(obj) {
@@ -473,7 +540,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
 
   function handleTableCopyLinkCopied(key) {
     setTableCopied(key);
-    setTimeout(() => setTableCopied(k => k === key ? null : k), 2000);
+    setTimeout(() => setTableCopied((k) => (k === key ? null : k)), 2000);
   }
 
   // Download via presigned URL — transfers entirely via browser's download manager with no
@@ -486,7 +553,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
       const url = await getSignedUrl(
         client,
         new GetObjectCommand(presignDownloadParams({ Bucket: bucket, Key: key, filename: leafName(key) })),
-        { expiresIn: DOWNLOAD_PRESIGN_EXPIRES }
+        { expiresIn: DOWNLOAD_PRESIGN_EXPIRES },
       );
       const a = document.createElement('a');
       a.href = url;
@@ -506,8 +573,8 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   useEffect(() => {
     if (!previewItem) return;
     function onKey(e) {
-      if (e.key === 'Escape')     closePreview();
-      if (e.key === 'ArrowLeft')  navigatePreviewRef.current?.(-1);
+      if (e.key === 'Escape') closePreview();
+      if (e.key === 'ArrowLeft') navigatePreviewRef.current?.(-1);
       if (e.key === 'ArrowRight') navigatePreviewRef.current?.(1);
     }
     window.addEventListener('keydown', onKey);
@@ -544,14 +611,14 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
       let kind, contentType, contentLength;
       try {
         const head = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: item.Key }));
-        contentType  = head.ContentType || '';
+        contentType = head.ContentType || '';
         contentLength = head.ContentLength ?? null;
         kind = mimeKind(contentType) || mediaKind(item.Key);
         if (!mimeKind(contentType) && mediaKind(item.Key)) contentType = mimeType(item.Key) || contentType;
       } catch {
-        contentType   = mimeType(item.Key) || '';
+        contentType = mimeType(item.Key) || '';
         contentLength = null;
-        kind          = mediaKind(item.Key);
+        kind = mediaKind(item.Key);
       }
       if (!kind) continue;
       if (gen !== prefetchGenRef.current) return;
@@ -561,7 +628,14 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
       if (kind === 'text') {
         const url = await getSignedUrl(
           client,
-          new GetObjectCommand(presignGetParams({ Bucket: bucket, Key: item.Key, ResponseContentDisposition: 'inline', ResponseContentType: 'text/plain; charset=utf-8' })),
+          new GetObjectCommand(
+            presignGetParams({
+              Bucket: bucket,
+              Key: item.Key,
+              ResponseContentDisposition: 'inline',
+              ResponseContentType: 'text/plain; charset=utf-8',
+            }),
+          ),
           { expiresIn: PRESIGN_EXPIRES },
         );
         const entry = { url, expiresAt, kind, contentType };
@@ -571,17 +645,34 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
         try {
           const resp = await fetch(url, { headers: { Range: `bytes=0-${TEXT_PREVIEW_LIMIT - 1}` } });
           if (gen !== prefetchGenRef.current) return;
-          previewUrlCacheRef.current.set(item.Key, { ...entry, text: await resp.text(), truncated: resp.status === 206 });
-        } catch { /* silent — cache hit already has the URL */ }
+          previewUrlCacheRef.current.set(item.Key, {
+            ...entry,
+            text: await resp.text(),
+            truncated: resp.status === 206,
+          });
+        } catch {
+          /* silent — cache hit already has the URL */
+        }
       } else {
         const url = await getSignedUrl(
           client,
-          new GetObjectCommand(presignGetParams({ Bucket: bucket, Key: item.Key, ResponseContentDisposition: 'inline', ...(contentType ? { ResponseContentType: contentType } : {}) })),
+          new GetObjectCommand(
+            presignGetParams({
+              Bucket: bucket,
+              Key: item.Key,
+              ResponseContentDisposition: 'inline',
+              ...(contentType ? { ResponseContentType: contentType } : {}),
+            }),
+          ),
           { expiresIn: PRESIGN_EXPIRES },
         );
         previewUrlCacheRef.current.set(item.Key, { url, expiresAt, kind, contentType });
         // Level 2: trigger image download if within size limit
-        if (kind === 'image' && prefetchSizeLimit > 0 && (contentLength === null || contentLength <= prefetchSizeLimit)) {
+        if (
+          kind === 'image' &&
+          prefetchSizeLimit > 0 &&
+          (contentLength === null || contentLength <= prefetchSizeLimit)
+        ) {
           if (gen !== prefetchGenRef.current) return;
           const img = new Image();
           img.src = url;
@@ -606,29 +697,35 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   }
 
   const canDownload = capabilities.download !== 'denied';
-  const canDelete   = capabilities.delete !== 'denied';
-  const canList     = capabilities.list !== 'denied';
+  const canDelete = capabilities.delete !== 'denied';
+  const canList = capabilities.list !== 'denied';
   // A move is a copy (write) + delete, so it needs both capabilities.
-  const canMove     = capabilities.upload !== 'denied' && capabilities.delete !== 'denied';
-  const canCopy     = capabilities.upload !== 'denied';
+  const canMove = capabilities.upload !== 'denied' && capabilities.delete !== 'denied';
+  const canCopy = capabilities.upload !== 'denied';
 
   // Build the {key, size} list for the selected files from the current listing (Browser
   // already holds each object's Size). Used to open the move picker for the batch selection.
   function selectedFilesWithSize() {
-    return [...selectedKeys].map(k => ({ key: k, size: items.find(o => o.Key === k)?.Size ?? 0 }));
+    return [...selectedKeys].map((k) => ({ key: k, size: items.find((o) => o.Key === k)?.Size ?? 0 }));
   }
 
   // Raw listing objects for the ticked files — fileRoot() needs ETag/LastModified/
   // StorageClass, which selectedFilesWithSize() discards.
   function selectedFileObjects() {
-    return [...selectedKeys].map(k => items.find(o => o.Key === k)).filter(Boolean);
+    return [...selectedKeys].map((k) => items.find((o) => o.Key === k)).filter(Boolean);
   }
 
   function handleMoveHere(dest) {
     const sel = moveSel;
     setMoveSel(null);
     if (!sel) return;
-    onMoveRequest?.({ files: sel.files, prefixes: sel.prefixes, dest, capturedPrefix: prefix, mode: sel.mode || 'move' });
+    onMoveRequest?.({
+      files: sel.files,
+      prefixes: sel.prefixes,
+      dest,
+      capturedPrefix: prefix,
+      mode: sel.mode || 'move',
+    });
     // Clear the multi-select once a move is underway (matches delete's row removal flow).
     setSelectedKeys(new Set());
     setSelectedPrefixes(new Set());
@@ -643,7 +740,9 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
     try {
       e.dataTransfer.setData('application/x-bucketer-move', '1');
       e.dataTransfer.effectAllowed = 'move';
-    } catch { /* dataTransfer unavailable (older engines) */ }
+    } catch {
+      /* dataTransfer unavailable (older engines) */
+    }
   }
 
   function handleRowDragEnd() {
@@ -666,7 +765,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   }
 
   function handleTargetDragLeave(dest) {
-    setDndHoverTarget(t => (t === dest ? null : t));
+    setDndHoverTarget((t) => (t === dest ? null : t));
   }
 
   function handleInternalDrop(dest, e) {
@@ -685,48 +784,50 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
   }
 
   // Sort folders by name only (no size/date available)
-  const cmpName    = nameComparator(sortDir);
+  const cmpName = nameComparator(sortDir);
   const cmpNumeric = numericComparator(sortDir);
   const sortedFolders = [...commonPrefixes].sort((a, b) =>
-    cmpName(a.slice(prefix.length).replace(/\/$/, ''), b.slice(prefix.length).replace(/\/$/, ''))
+    cmpName(a.slice(prefix.length).replace(/\/$/, ''), b.slice(prefix.length).replace(/\/$/, '')),
   );
 
   // Sort files by the selected column
-  const sortedItems = items.filter(obj => !!obj.Key.slice(prefix.length)).sort((a, b) => {
-    if (sortCol === 'name')     return cmpName(a.Key.slice(prefix.length), b.Key.slice(prefix.length));
-    if (sortCol === 'size')     return cmpNumeric(a.Size || 0, b.Size || 0);
-    if (sortCol === 'modified') {
-      const tA = a.LastModified ? new Date(a.LastModified).getTime() : 0;
-      const tB = b.LastModified ? new Date(b.LastModified).getTime() : 0;
-      return cmpNumeric(tA, tB);
-    }
-    return 0;
-  });
+  const sortedItems = items
+    .filter((obj) => !!obj.Key.slice(prefix.length))
+    .sort((a, b) => {
+      if (sortCol === 'name') return cmpName(a.Key.slice(prefix.length), b.Key.slice(prefix.length));
+      if (sortCol === 'size') return cmpNumeric(a.Size || 0, b.Size || 0);
+      if (sortCol === 'modified') {
+        const tA = a.LastModified ? new Date(a.LastModified).getTime() : 0;
+        const tB = b.LastModified ? new Date(b.LastModified).getTime() : 0;
+        return cmpNumeric(tA, tB);
+      }
+      return 0;
+    });
 
   const filterQ = filterQuery.trim().toLowerCase();
   const visibleFolders = filterQ
-    ? sortedFolders.filter(cp => cp.slice(prefix.length).replace(/\/$/, '').toLowerCase().includes(filterQ))
+    ? sortedFolders.filter((cp) => cp.slice(prefix.length).replace(/\/$/, '').toLowerCase().includes(filterQ))
     : sortedFolders;
   const visibleItems = filterQ
-    ? sortedItems.filter(obj => obj.Key.slice(prefix.length).toLowerCase().includes(filterQ))
+    ? sortedItems.filter((obj) => obj.Key.slice(prefix.length).toLowerCase().includes(filterQ))
     : sortedItems;
 
   const isEmpty = !listing && visibleItems.length === 0 && visibleFolders.length === 0 && !listError;
   const allVisibleSelected =
     (visibleItems.length > 0 || visibleFolders.length > 0) &&
-    visibleItems.every(o => selectedKeys.has(o.Key)) &&
-    visibleFolders.every(cp => selectedPrefixes.has(cp));
-  const someVisibleSelected = !allVisibleSelected && (
-    visibleItems.some(o => selectedKeys.has(o.Key)) ||
-    visibleFolders.some(cp => selectedPrefixes.has(cp))
-  );
+    visibleItems.every((o) => selectedKeys.has(o.Key)) &&
+    visibleFolders.every((cp) => selectedPrefixes.has(cp));
+  const someVisibleSelected =
+    !allVisibleSelected &&
+    (visibleItems.some((o) => selectedKeys.has(o.Key)) || visibleFolders.some((cp) => selectedPrefixes.has(cp)));
 
   // Preview navigation — ordered to match the current display sort.
   // Includes extension-less files since they may have a previewable ContentType.
-  const previewableItems = visibleItems.filter(obj => mediaKind(obj.Key) || !leafName(obj.Key).includes('.'));
-  const previewIdx = previewItem ? previewableItems.findIndex(o => o.Key === previewItem.Key) : -1;
+  const previewableItems = visibleItems.filter((obj) => mediaKind(obj.Key) || !leafName(obj.Key).includes('.'));
+  const previewIdx = previewItem ? previewableItems.findIndex((o) => o.Key === previewItem.Key) : -1;
   const prevPreviewItem = previewIdx > 0 ? previewableItems[previewIdx - 1] : null;
-  const nextPreviewItem = previewIdx >= 0 && previewIdx < previewableItems.length - 1 ? previewableItems[previewIdx + 1] : null;
+  const nextPreviewItem =
+    previewIdx >= 0 && previewIdx < previewableItems.length - 1 ? previewableItems[previewIdx + 1] : null;
   prevNextRef.current = { prev: prevPreviewItem, next: nextPreviewItem };
   navigatePreviewRef.current = (delta) => {
     const target = delta < 0 ? prevPreviewItem : nextPreviewItem;
@@ -772,35 +873,43 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
       class={tableDragOver ? 'browser-drop-active' : undefined}
       data-testid="browser-drop"
       onDragEnter={handleTableDragEnter}
-      onDragOver={e => { if (e.dataTransfer?.types?.includes('Files')) e.preventDefault(); }}
+      onDragOver={(e) => {
+        if (e.dataTransfer?.types?.includes('Files')) e.preventDefault();
+      }}
       onDragLeave={handleTableDragLeave}
       onDrop={handleTableDrop}
       style={{ position: 'relative' }}
     >
-      {tableDragOver && (
-        <div class="browser-drop-overlay">Drop files to upload to this folder</div>
-      )}
+      {tableDragOver && <div class="browser-drop-overlay">Drop files to upload to this folder</div>}
       {newFolderOpen && (
         <Modal onClose={() => closeNewFolder()}>
-            <div class="modal-title">New folder</div>
-            <div class="modal-body">
-              <input
-                class="form-input"
-                type="text"
-                placeholder="Folder name"
-                value={newFolderName}
-                onInput={e => { setNewFolderName(e.target.value); setNewFolderError(null); }}
-                onKeyDown={e => { if (e.key === 'Enter') handleCreateFolder(); if (e.key === 'Escape') closeNewFolder(); }}
-                autoFocus
-              />
-              {newFolderError && <div class="modal-error">{newFolderError}</div>}
-            </div>
-            <div class="modal-actions">
-              <button class="btn btn-ghost btn-sm" onClick={() => closeNewFolder()} disabled={newFolderSaving}>Cancel</button>
-              <button class="btn btn-primary btn-sm" onClick={handleCreateFolder} disabled={newFolderSaving}>
-                {newFolderSaving ? <span class="spinner" /> : 'Create'}
-              </button>
-            </div>
+          <div class="modal-title">New folder</div>
+          <div class="modal-body">
+            <input
+              class="form-input"
+              type="text"
+              placeholder="Folder name"
+              value={newFolderName}
+              onInput={(e) => {
+                setNewFolderName(e.target.value);
+                setNewFolderError(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleCreateFolder();
+                if (e.key === 'Escape') closeNewFolder();
+              }}
+              autoFocus
+            />
+            {newFolderError && <div class="modal-error">{newFolderError}</div>}
+          </div>
+          <div class="modal-actions">
+            <button class="btn btn-ghost btn-sm" onClick={() => closeNewFolder()} disabled={newFolderSaving}>
+              Cancel
+            </button>
+            <button class="btn btn-primary btn-sm" onClick={handleCreateFolder} disabled={newFolderSaving}>
+              {newFolderSaving ? <span class="spinner" /> : 'Create'}
+            </button>
+          </div>
         </Modal>
       )}
 
@@ -818,70 +927,149 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
 
       {metaItem && (
         <Modal onClose={() => setMetaItem(null)} class="meta-dialog">
-            <div class="modal-title" data-testid="properties-modal">File properties</div>
-            <div class="modal-body">
-              <p class="modal-filename" title={metaItem.Key}>{leafName(metaItem.Key)}</p>
-              {metaLoading && <div class="empty-state"><span class="spinner" style={{ marginRight: '.4rem' }} />Loading…</div>}
-              {metaError && <div class="modal-error">{metaError}</div>}
-              {metaData && (() => {
+          <div class="modal-title" data-testid="properties-modal">
+            File properties
+          </div>
+          <div class="modal-body">
+            <p class="modal-filename" title={metaItem.Key}>
+              {leafName(metaItem.Key)}
+            </p>
+            {metaLoading && (
+              <div class="empty-state">
+                <span class="spinner" style={{ marginRight: '.4rem' }} />
+                Loading…
+              </div>
+            )}
+            {metaError && <div class="modal-error">{metaError}</div>}
+            {metaData &&
+              (() => {
                 const fileMtime = metaData.Metadata?.[FILE_MTIME_KEY];
                 const custom = Object.entries(metaData.Metadata || {}).filter(([k]) => k !== FILE_MTIME_KEY);
                 return (
                   <table class="meta-table">
                     <tbody>
-                      {metaData.ContentType && <tr><td class="meta-key">Content-Type</td><td class="meta-val">{metaData.ContentType}</td></tr>}
-                      {metaData.ContentLength != null && <tr><td class="meta-key">Size</td><td class="meta-val">{formatBytes(metaData.ContentLength)}</td></tr>}
-                      {fileMtime && <tr data-testid="meta-file-modified"><td class="meta-key">File Modified</td><td class="meta-val">{new Date(fileMtime).toLocaleString()}</td></tr>}
-                      {metaData.LastModified && <tr><td class="meta-key">Last Modified</td><td class="meta-val">{new Date(metaData.LastModified).toLocaleString()}</td></tr>}
-                      {metaData.ETag && <tr><td class="meta-key">ETag</td><td class="meta-val meta-mono">{metaData.ETag}</td></tr>}
-                      {metaData.StorageClass && <tr><td class="meta-key">Storage Class</td><td class="meta-val">{metaData.StorageClass}</td></tr>}
-                      {metaData.VersionId && <tr><td class="meta-key">Version ID</td><td class="meta-val meta-mono">{metaData.VersionId}</td></tr>}
+                      {metaData.ContentType && (
+                        <tr>
+                          <td class="meta-key">Content-Type</td>
+                          <td class="meta-val">{metaData.ContentType}</td>
+                        </tr>
+                      )}
+                      {metaData.ContentLength != null && (
+                        <tr>
+                          <td class="meta-key">Size</td>
+                          <td class="meta-val">{formatBytes(metaData.ContentLength)}</td>
+                        </tr>
+                      )}
+                      {fileMtime && (
+                        <tr data-testid="meta-file-modified">
+                          <td class="meta-key">File Modified</td>
+                          <td class="meta-val">{new Date(fileMtime).toLocaleString()}</td>
+                        </tr>
+                      )}
+                      {metaData.LastModified && (
+                        <tr>
+                          <td class="meta-key">Last Modified</td>
+                          <td class="meta-val">{new Date(metaData.LastModified).toLocaleString()}</td>
+                        </tr>
+                      )}
+                      {metaData.ETag && (
+                        <tr>
+                          <td class="meta-key">ETag</td>
+                          <td class="meta-val meta-mono">{metaData.ETag}</td>
+                        </tr>
+                      )}
+                      {metaData.StorageClass && (
+                        <tr>
+                          <td class="meta-key">Storage Class</td>
+                          <td class="meta-val">{metaData.StorageClass}</td>
+                        </tr>
+                      )}
+                      {metaData.VersionId && (
+                        <tr>
+                          <td class="meta-key">Version ID</td>
+                          <td class="meta-val meta-mono">{metaData.VersionId}</td>
+                        </tr>
+                      )}
                       {custom.map(([k, v]) => (
-                        <tr key={k}><td class="meta-key">x-amz-meta-{k}</td><td class="meta-val">{v}</td></tr>
+                        <tr key={k}>
+                          <td class="meta-key">x-amz-meta-{k}</td>
+                          <td class="meta-val">{v}</td>
+                        </tr>
                       ))}
                     </tbody>
                   </table>
                 );
               })()}
-            </div>
-            <div class="modal-actions">
-              <button class="btn btn-ghost btn-sm" onClick={() => setMetaItem(null)}>Close</button>
-            </div>
+          </div>
+          <div class="modal-actions">
+            <button class="btn btn-ghost btn-sm" onClick={() => setMetaItem(null)}>
+              Close
+            </button>
+          </div>
         </Modal>
       )}
 
-      {previewItem && (() => {
-        const kind = resolvedKind ?? mediaKind(previewItem.Key);
-        return (
-          <Modal onClose={closePreview} class="preview-dialog">
+      {previewItem &&
+        (() => {
+          const kind = resolvedKind ?? mediaKind(previewItem.Key);
+          return (
+            <Modal onClose={closePreview} class="preview-dialog">
               <div class="modal-title preview-title">
-                <span class="preview-filename" title={previewItem.Key}>{leafName(previewItem.Key)}</span>
+                <span class="preview-filename" title={previewItem.Key}>
+                  {leafName(previewItem.Key)}
+                </span>
                 {previewableItems.length > 1 && previewIdx !== -1 && (
-                  <span class="preview-counter">{previewIdx + 1} / {previewableItems.length}</span>
+                  <span class="preview-counter">
+                    {previewIdx + 1} / {previewableItems.length}
+                  </span>
                 )}
-                <button class="preview-close" onClick={closePreview} aria-label="Close">✕</button>
+                <button class="preview-close" onClick={closePreview} aria-label="Close">
+                  ✕
+                </button>
               </div>
               <div class="preview-body">
                 {/* Buttons only for non-image media (audio, video) */}
                 {previewableItems.length > 1 && previewIdx !== -1 && kind !== 'image' && (
-                  <button class="preview-nav" onClick={() => navigatePreviewRef.current(-1)} disabled={!prevPreviewItem} aria-label="Previous">‹</button>
+                  <button
+                    class="preview-nav"
+                    onClick={() => navigatePreviewRef.current(-1)}
+                    disabled={!prevPreviewItem}
+                    aria-label="Previous"
+                  >
+                    ‹
+                  </button>
                 )}
                 <div class={`preview-content${kind === 'audio' ? ' preview-content--audio' : ''}`}>
                   {/* Transparent tap zones for image navigation (left/right half) */}
                   {previewableItems.length > 1 && previewIdx !== -1 && kind === 'image' && previewUrl && (
                     <>
-                      <div class="preview-tap-zone preview-tap-prev" onClick={() => navigatePreviewRef.current(-1)} style={!prevPreviewItem ? { pointerEvents: 'none' } : undefined} aria-label="Previous" />
-                      <div class="preview-tap-zone preview-tap-next" onClick={() => navigatePreviewRef.current(1)} style={!nextPreviewItem ? { pointerEvents: 'none' } : undefined} aria-label="Next" />
+                      <div
+                        class="preview-tap-zone preview-tap-prev"
+                        onClick={() => navigatePreviewRef.current(-1)}
+                        style={!prevPreviewItem ? { pointerEvents: 'none' } : undefined}
+                        aria-label="Previous"
+                      />
+                      <div
+                        class="preview-tap-zone preview-tap-next"
+                        onClick={() => navigatePreviewRef.current(1)}
+                        style={!nextPreviewItem ? { pointerEvents: 'none' } : undefined}
+                        aria-label="Next"
+                      />
                     </>
                   )}
                   {!previewUrl && !previewText && !previewError && !notPreviewable && (
-                    <div class="empty-state"><span class="spinner" style={{ marginRight: '.5rem' }} />Loading…</div>
+                    <div class="empty-state">
+                      <span class="spinner" style={{ marginRight: '.5rem' }} />
+                      Loading…
+                    </div>
                   )}
                   {notPreviewable && (
                     <div class="preview-unavailable">
                       <p>This file can't be previewed in the browser.</p>
                       {detectedContentType && (
-                        <p class="preview-unavailable-type">Content-Type: <code>{detectedContentType}</code></p>
+                        <p class="preview-unavailable-type">
+                          Content-Type: <code>{detectedContentType}</code>
+                        </p>
                       )}
                       <button
                         class="btn btn-ghost"
@@ -902,41 +1090,70 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                     truncated={previewTruncated}
                     alt={leafName(previewItem.Key)}
                     pixelated={previewPixelated}
-                    onLoad={e => setPreviewPixelated(e.target.naturalWidth < 128 && e.target.naturalHeight < 128)}
+                    onLoad={(e) => setPreviewPixelated(e.target.naturalWidth < 128 && e.target.naturalHeight < 128)}
                   />
                 </div>
                 {previewableItems.length > 1 && previewIdx !== -1 && kind !== 'image' && (
-                  <button class="preview-nav" onClick={() => navigatePreviewRef.current(1)} disabled={!nextPreviewItem} aria-label="Next">›</button>
+                  <button
+                    class="preview-nav"
+                    onClick={() => navigatePreviewRef.current(1)}
+                    disabled={!nextPreviewItem}
+                    aria-label="Next"
+                  >
+                    ›
+                  </button>
                 )}
               </div>
               <div class="modal-actions">
-                <button class="btn btn-ghost btn-sm" onClick={closePreview}>Close</button>
+                <button class="btn btn-ghost btn-sm" onClick={closePreview}>
+                  Close
+                </button>
                 <div class="copy-link-wrap" ref={previewCopyOpen ? previewCopyWrapRef : undefined}>
-                  <button class="btn btn-ghost btn-sm" onClick={() => setPreviewCopyOpen(v => !v)} disabled={!canDownload}>
+                  <button
+                    class="btn btn-ghost btn-sm"
+                    onClick={() => setPreviewCopyOpen((v) => !v)}
+                    disabled={!canDownload}
+                  >
                     {previewCopied ? '✓ Copied' : 'Copy link'}
                   </button>
                   {previewCopyOpen && (
                     <CopyLinkPopover
-                      client={client} bucket={bucket} fileKey={previewItem.Key}
+                      client={client}
+                      bucket={bucket}
+                      fileKey={previewItem.Key}
                       onClose={() => setPreviewCopyOpen(false)}
-                      onCopied={() => { setPreviewCopied(true); setTimeout(() => setPreviewCopied(false), 2000); }}
+                      onCopied={() => {
+                        setPreviewCopied(true);
+                        setTimeout(() => setPreviewCopied(false), 2000);
+                      }}
                       direction="up"
                     />
                   )}
                 </div>
-                <button class="btn btn-ghost btn-sm" onClick={() => handleDownload(previewItem.Key)} disabled={!canDownload || downloadingKey === previewItem.Key}>
+                <button
+                  class="btn btn-ghost btn-sm"
+                  onClick={() => handleDownload(previewItem.Key)}
+                  disabled={!canDownload || downloadingKey === previewItem.Key}
+                >
                   {downloadingKey === previewItem.Key ? <span class="spinner" /> : 'Download'}
                 </button>
               </div>
-          </Modal>
-        );
-      })()}
+            </Modal>
+          );
+        })()}
 
       {clampNotice && (
         <div class="banner banner-info" style={{ marginBottom: '.5rem' }}>
           <div class="banner-body">
             This link pointed to a folder outside this connection’s base folder — showing {basePrefix} instead.
-            <button type="button" class="btn btn-ghost btn-sm" style={{ marginLeft: '.5rem' }} onClick={() => setClampNotice(false)}>Dismiss</button>
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              style={{ marginLeft: '.5rem' }}
+              onClick={() => setClampNotice(false)}
+            >
+              Dismiss
+            </button>
           </div>
         </div>
       )}
@@ -959,7 +1176,7 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
               type="search"
               placeholder="Filter by name…  ( / )"
               value={filterQuery}
-              onInput={e => setFilterQuery(e.target.value)}
+              onInput={(e) => setFilterQuery(e.target.value)}
             />
             {filterQ && (
               <span class="filter-count">
@@ -969,12 +1186,22 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
           </div>
         )}
         <div class="browser-toolbar-actions">
-          <button class="btn btn-ghost btn-sm" data-testid="refresh-listing" onClick={handleRefresh} title="Refresh listing (pull changes uploaded from other devices)" style={{ marginRight: '.25rem' }}>
+          <button
+            class="btn btn-ghost btn-sm"
+            data-testid="refresh-listing"
+            onClick={handleRefresh}
+            title="Refresh listing (pull changes uploaded from other devices)"
+            style={{ marginRight: '.25rem' }}
+          >
             ↺ Refresh
           </button>
-          <button class="btn btn-ghost btn-sm" data-testid="open-download-job" style={{ marginRight: '.25rem' }}
+          <button
+            class="btn btn-ghost btn-sm"
+            data-testid="open-download-job"
+            style={{ marginRight: '.25rem' }}
             onClick={() => onDownloadRequest?.({ kind: 'folder', prefix })}
-            title="Download this folder">
+            title="Download this folder"
+          >
             ⤓ Download
           </button>
           <button class="btn btn-ghost btn-sm" onClick={openNewFolder} title="Create a new folder">
@@ -989,19 +1216,40 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
             {[
               selectedKeys.size > 0 && `${selectedKeys.size} file${selectedKeys.size !== 1 ? 's' : ''}`,
               selectedPrefixes.size > 0 && `${selectedPrefixes.size} folder${selectedPrefixes.size !== 1 ? 's' : ''}`,
-            ].filter(Boolean).join(', ')} selected
+            ]
+              .filter(Boolean)
+              .join(', ')}{' '}
+            selected
           </span>
-          <button class="btn btn-ghost btn-sm" onClick={() => { setSelectedKeys(new Set()); setSelectedPrefixes(new Set()); }}>Clear</button>
+          <button
+            class="btn btn-ghost btn-sm"
+            onClick={() => {
+              setSelectedKeys(new Set());
+              setSelectedPrefixes(new Set());
+            }}
+          >
+            Clear
+          </button>
           {selectedKeys.size > 0 && (
-            <div class="copy-link-wrap" ref={batchCopyOpen ? batchCopyWrapRef : undefined} style={{ marginLeft: 'auto' }}>
-              <button class="btn btn-ghost btn-sm" onClick={() => setBatchCopyOpen(v => !v)} disabled={!canDownload}>
+            <div
+              class="copy-link-wrap"
+              ref={batchCopyOpen ? batchCopyWrapRef : undefined}
+              style={{ marginLeft: 'auto' }}
+            >
+              <button class="btn btn-ghost btn-sm" onClick={() => setBatchCopyOpen((v) => !v)} disabled={!canDownload}>
                 {batchCopied !== null ? `✓ ${batchCopied} link${batchCopied !== 1 ? 's' : ''} copied` : 'Copy links'}
               </button>
               {batchCopyOpen && (
                 <CopyLinkPopover
-                  client={client} bucket={bucket} fileKeys={[...selectedKeys]} direction="up"
+                  client={client}
+                  bucket={bucket}
+                  fileKeys={[...selectedKeys]}
+                  direction="up"
                   onClose={() => setBatchCopyOpen(false)}
-                  onCopied={(count) => { setBatchCopied(count); setTimeout(() => setBatchCopied(null), 2000); }}
+                  onCopied={(count) => {
+                    setBatchCopied(count);
+                    setTimeout(() => setBatchCopied(null), 2000);
+                  }}
                 />
               )}
             </div>
@@ -1009,9 +1257,20 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
           <button
             class="btn btn-ghost btn-sm"
             style={selectedKeys.size === 0 ? { marginLeft: 'auto' } : undefined}
-            onClick={() => onDownloadRequest?.({ kind: 'selection', files: selectedFileObjects(), prefixes: [...selectedPrefixes], capturedPrefix: prefix })}
+            onClick={() =>
+              onDownloadRequest?.({
+                kind: 'selection',
+                files: selectedFileObjects(),
+                prefixes: [...selectedPrefixes],
+                capturedPrefix: prefix,
+              })
+            }
             disabled={!canDownload}
-            title={!canDownload ? 'Download not permitted with current credentials' : 'Download the selected files and folders'}
+            title={
+              !canDownload
+                ? 'Download not permitted with current credentials'
+                : 'Download the selected files and folders'
+            }
           >
             Download {selectedKeys.size + selectedPrefixes.size}
           </button>
@@ -1025,7 +1284,9 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
           </button>
           <button
             class="btn btn-ghost btn-sm"
-            onClick={() => setMoveSel({ files: selectedFilesWithSize(), prefixes: [...selectedPrefixes], mode: 'copy' })}
+            onClick={() =>
+              setMoveSel({ files: selectedFilesWithSize(), prefixes: [...selectedPrefixes], mode: 'copy' })
+            }
             disabled={!canCopy}
             title={!canCopy ? 'Copy needs write permission' : 'Copy to another folder (keeps the originals)'}
           >
@@ -1033,7 +1294,9 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
           </button>
           <button
             class="btn btn-danger btn-sm"
-            onClick={() => onDeleteRequest({ files: [...selectedKeys], prefixes: [...selectedPrefixes], capturedPrefix: prefix })}
+            onClick={() =>
+              onDeleteRequest({ files: [...selectedKeys], prefixes: [...selectedPrefixes], capturedPrefix: prefix })
+            }
             disabled={!canDelete}
           >
             Delete {selectedKeys.size + selectedPrefixes.size}
@@ -1059,183 +1322,273 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
         />
       )}
 
-      {isEmpty
-        ? <div class="empty-state">{filterQ ? 'No files match the filter.' : !prefix ? 'This bucket is empty. Upload files to get started.' : 'This prefix is empty.'}</div>
-        : (
-          <table class="file-table">
-            <thead>
-              <tr>
-                <th class="col-check">
-                  <input
-                    type="checkbox"
-                    checked={allVisibleSelected}
-                    ref={el => { if (el) el.indeterminate = someVisibleSelected; }}
-                    onChange={() => toggleSelectAll(visibleFolders, visibleItems)}
-                    title="Select all"
-                  />
-                </th>
-                <SortTh col="name" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort}>Name</SortTh>
-                <SortTh col="size" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort}>Size</SortTh>
-                <SortTh col="modified" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort} colClass="col-modified">Modified</SortTh>
-                <th
-                  class="col-file-modified"
-                  onClick={!mtimeLoadEnabled ? () => setMtimeLoadEnabled(true) : undefined}
-                  title={!mtimeLoadEnabled ? 'Click to load file modification times' : undefined}
-                  style={!mtimeLoadEnabled ? { cursor: 'pointer' } : undefined}
+      {isEmpty ? (
+        <div class="empty-state">
+          {filterQ
+            ? 'No files match the filter.'
+            : !prefix
+              ? 'This bucket is empty. Upload files to get started.'
+              : 'This prefix is empty.'}
+        </div>
+      ) : (
+        <table class="file-table">
+          <thead>
+            <tr>
+              <th class="col-check">
+                <input
+                  type="checkbox"
+                  checked={allVisibleSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = someVisibleSelected;
+                  }}
+                  onChange={() => toggleSelectAll(visibleFolders, visibleItems)}
+                  title="Select all"
+                />
+              </th>
+              <SortTh col="name" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort}>
+                Name
+              </SortTh>
+              <SortTh col="size" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort}>
+                Size
+              </SortTh>
+              <SortTh col="modified" sortCol={sortCol} sortDir={sortDir} onSort={toggleSort} colClass="col-modified">
+                Modified
+              </SortTh>
+              <th
+                class="col-file-modified"
+                onClick={!mtimeLoadEnabled ? () => setMtimeLoadEnabled(true) : undefined}
+                title={!mtimeLoadEnabled ? 'Click to load file modification times' : undefined}
+                style={!mtimeLoadEnabled ? { cursor: 'pointer' } : undefined}
+              >
+                File Modified
+                {!mtimeLoadEnabled && <span style={{ opacity: 0.5, marginLeft: '.3rem' }}>↓</span>}
+                {mtimeLoadEnabled && isMtimeLoading && <span class="spinner" style={{ marginLeft: '.4rem' }} />}
+              </th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {visibleFolders.map((cp) => {
+              const isFolderSelected = selectedPrefixes.has(cp);
+              return (
+                <tr
+                  key={cp}
+                  class={`file-row${isFolderSelected ? ' file-row-selected' : ''}${dndHoverTarget === cp ? ' drop-target-active' : ''}`}
+                  data-testid={`folder-row:${cp.slice(prefix.length).replace(/\/$/, '')}`}
+                  onClick={() => navigateTo(cp)}
+                  style={{ cursor: 'pointer' }}
+                  draggable={canMove && renamingKey !== cp}
+                  onDragStart={(e) => handleRowDragStart({ prefix: cp }, e)}
+                  onDragEnd={handleRowDragEnd}
+                  onDragOver={(e) => handleTargetDragOver(cp, e)}
+                  onDragLeave={() => handleTargetDragLeave(cp)}
+                  onDrop={(e) => handleInternalDrop(cp, e)}
                 >
-                  File Modified
-                  {!mtimeLoadEnabled && <span style={{ opacity: .5, marginLeft: '.3rem' }}>↓</span>}
-                  {mtimeLoadEnabled && isMtimeLoading && <span class="spinner" style={{ marginLeft: '.4rem' }} />}
-                </th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {visibleFolders.map(cp => {
-                const isFolderSelected = selectedPrefixes.has(cp);
-                return (
-                  <tr
-                    key={cp}
-                    class={`file-row${isFolderSelected ? ' file-row-selected' : ''}${dndHoverTarget === cp ? ' drop-target-active' : ''}`}
-                    data-testid={`folder-row:${cp.slice(prefix.length).replace(/\/$/, '')}`}
-                    onClick={() => navigateTo(cp)}
-                    style={{ cursor: 'pointer' }}
-                    draggable={canMove && renamingKey !== cp}
-                    onDragStart={e => handleRowDragStart({ prefix: cp }, e)}
-                    onDragEnd={handleRowDragEnd}
-                    onDragOver={e => handleTargetDragOver(cp, e)}
-                    onDragLeave={() => handleTargetDragLeave(cp)}
-                    onDrop={e => handleInternalDrop(cp, e)}
-                  >
-                    <td class="col-check" onClick={e => toggleSelectPrefix(cp, e)}>
-                      <input type="checkbox" checked={isFolderSelected} onChange={e => toggleSelectPrefix(cp, e)} onClick={e => e.stopPropagation()} />
-                    </td>
-                    <td class="col-name">
-                      <span class="file-icon">📁</span>
-                      {renamingKey === cp ? (
-                        <span class="rename-inline">
-                          <input
-                            class="rename-input"
-                            value={renameValue}
-                            onInput={e => { setRenameValue(e.target.value); setRenameError(null); }}
-                            onKeyDown={e => {
-                              if (e.key === 'Enter') commitFolderRename(cp);
-                              if (e.key === 'Escape') cancelRename();
-                            }}
-                            autoFocus
-                            onClick={e => e.stopPropagation()}
-                          />
-                          {renameError && <span class="rename-error">{renameError}</span>}
-                          <button class="btn btn-ghost btn-sm" onClick={e => { e.stopPropagation(); commitFolderRename(cp); }}>✓</button>
-                          <button class="btn btn-ghost btn-sm" onClick={e => { e.stopPropagation(); cancelRename(); }}>✕</button>
-                        </span>
-                      ) : (
-                        <span class="file-dir">{cp.slice(prefix.length).replace(/\/$/, '')}</span>
-                      )}
-                    </td>
-                    <td class="col-size">—</td>
-                    <td class="col-modified"></td>
-                    <td class="col-file-modified"></td>
-                    <td class="col-actions">
-                      <span class="row-actions">
+                  <td class="col-check" onClick={(e) => toggleSelectPrefix(cp, e)}>
+                    <input
+                      type="checkbox"
+                      checked={isFolderSelected}
+                      onChange={(e) => toggleSelectPrefix(cp, e)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </td>
+                  <td class="col-name">
+                    <span class="file-icon">📁</span>
+                    {renamingKey === cp ? (
+                      <span class="rename-inline">
+                        <input
+                          class="rename-input"
+                          value={renameValue}
+                          onInput={(e) => {
+                            setRenameValue(e.target.value);
+                            setRenameError(null);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') commitFolderRename(cp);
+                            if (e.key === 'Escape') cancelRename();
+                          }}
+                          autoFocus
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        {renameError && <span class="rename-error">{renameError}</span>}
+                        <button
+                          class="btn btn-ghost btn-sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            commitFolderRename(cp);
+                          }}
+                        >
+                          ✓
+                        </button>
+                        <button
+                          class="btn btn-ghost btn-sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            cancelRename();
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ) : (
+                      <span class="file-dir">{cp.slice(prefix.length).replace(/\/$/, '')}</span>
+                    )}
+                  </td>
+                  <td class="col-size">—</td>
+                  <td class="col-modified"></td>
+                  <td class="col-file-modified"></td>
+                  <td class="col-actions">
+                    <span class="row-actions">
                       <button
                         class="btn btn-ghost btn-sm"
                         style={{ marginRight: '.25rem' }}
                         data-testid={`download-folder:${cp}`}
-                        onClick={e => { e.stopPropagation(); onDownloadRequest?.({ kind: 'folder', prefix: cp }); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDownloadRequest?.({ kind: 'folder', prefix: cp });
+                        }}
                         title="Download this folder"
-                      >⤓</button>
+                      >
+                        ⤓
+                      </button>
                       <button
                         class="btn btn-ghost btn-sm"
                         style={{ marginRight: '.25rem' }}
-                        onClick={e => { e.stopPropagation(); startFolderRename(cp); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startFolderRename(cp);
+                        }}
                         disabled={!canMove}
                         title={!canMove ? 'Rename not permitted with current credentials' : 'Rename folder'}
-                      >✎</button>
+                      >
+                        ✎
+                      </button>
                       <button
                         class="btn btn-ghost btn-sm"
                         style={{ marginRight: '.25rem' }}
-                        onClick={e => { e.stopPropagation(); setMoveSel({ files: [], prefixes: [cp] }); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMoveSel({ files: [], prefixes: [cp] });
+                        }}
                         disabled={!canMove}
-                        title={!canMove ? 'Move not permitted with current credentials' : 'Move folder to another folder'}
-                      >↪</button>
+                        title={
+                          !canMove ? 'Move not permitted with current credentials' : 'Move folder to another folder'
+                        }
+                      >
+                        ↪
+                      </button>
                       <button
                         class="btn btn-ghost btn-sm"
                         style={{ color: 'var(--text-danger)', borderColor: 'transparent' }}
-                        onClick={e => { e.stopPropagation(); onDeleteRequest({ files: [], prefixes: [cp], capturedPrefix: prefix }); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onDeleteRequest({ files: [], prefixes: [cp], capturedPrefix: prefix });
+                        }}
                         disabled={!canDelete}
-                        title={!canDelete ? 'Delete not permitted with current credentials' : 'Delete folder and all contents'}
-                      >✕</button>
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
+                        title={
+                          !canDelete
+                            ? 'Delete not permitted with current credentials'
+                            : 'Delete folder and all contents'
+                        }
+                      >
+                        ✕
+                      </button>
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
 
-              {visibleItems.map(obj => {
-                const display = obj.Key.slice(prefix.length);
-                const isDownloading = downloadingKey === obj.Key;
-                const isSelected = selectedKeys.has(obj.Key);
-                return (
-                  <tr
-                    key={obj.Key}
-                    class={`file-row${isSelected ? ' file-row-selected' : ''}`}
-                    data-testid={`file-row:${obj.Key.slice(prefix.length)}`}
-                    draggable={canMove && renamingKey !== obj.Key}
-                    onDragStart={e => handleRowDragStart({ fileKey: obj.Key, fileSize: obj.Size }, e)}
-                    onDragEnd={handleRowDragEnd}
+            {visibleItems.map((obj) => {
+              const display = obj.Key.slice(prefix.length);
+              const isDownloading = downloadingKey === obj.Key;
+              const isSelected = selectedKeys.has(obj.Key);
+              return (
+                <tr
+                  key={obj.Key}
+                  class={`file-row${isSelected ? ' file-row-selected' : ''}`}
+                  data-testid={`file-row:${obj.Key.slice(prefix.length)}`}
+                  draggable={canMove && renamingKey !== obj.Key}
+                  onDragStart={(e) => handleRowDragStart({ fileKey: obj.Key, fileSize: obj.Size }, e)}
+                  onDragEnd={handleRowDragEnd}
+                >
+                  <td class="col-check" onClick={(e) => toggleSelect(obj.Key, e)}>
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={(e) => toggleSelect(obj.Key, e)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </td>
+                  <td class="col-name">
+                    <span class="file-icon">📄</span>
+                    {renamingKey === obj.Key ? (
+                      <span class="rename-inline">
+                        <input
+                          class="rename-input"
+                          value={renameValue}
+                          onInput={(e) => {
+                            setRenameValue(e.target.value);
+                            setRenameError(null);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') commitRename(obj.Key);
+                            if (e.key === 'Escape') cancelRename();
+                          }}
+                          autoFocus
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        {renameError && <span class="rename-error">{renameError}</span>}
+                        <button
+                          class="btn btn-ghost btn-sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            commitRename(obj.Key);
+                          }}
+                          disabled={renameSaving}
+                        >
+                          {renameSaving ? <span class="spinner" /> : '✓'}
+                        </button>
+                        <button
+                          class="btn btn-ghost btn-sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            cancelRename();
+                          }}
+                          disabled={renameSaving}
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ) : (
+                      <span class="file-name file-name-previewable" title={obj.Key} onClick={() => handlePreview(obj)}>
+                        {display}
+                      </span>
+                    )}
+                  </td>
+                  <td class="col-size">{formatBytes(obj.Size)}</td>
+                  <td class="col-modified">{formatDate(obj.LastModified)}</td>
+                  <td
+                    class="col-file-modified"
+                    data-mtime-key={obj.Key}
+                    data-mtime-lm={new Date(obj.LastModified).getTime()}
                   >
-                    <td class="col-check" onClick={e => toggleSelect(obj.Key, e)}>
-                      <input type="checkbox" checked={isSelected} onChange={e => toggleSelect(obj.Key, e)} onClick={e => e.stopPropagation()} />
-                    </td>
-                    <td class="col-name">
-                      <span class="file-icon">📄</span>
-                      {renamingKey === obj.Key ? (
-                        <span class="rename-inline">
-                          <input
-                            class="rename-input"
-                            value={renameValue}
-                            onInput={e => { setRenameValue(e.target.value); setRenameError(null); }}
-                            onKeyDown={e => {
-                              if (e.key === 'Enter') commitRename(obj.Key);
-                              if (e.key === 'Escape') cancelRename();
-                            }}
-                            autoFocus
-                            onClick={e => e.stopPropagation()}
-                          />
-                          {renameError && <span class="rename-error">{renameError}</span>}
-                          <button class="btn btn-ghost btn-sm" onClick={e => { e.stopPropagation(); commitRename(obj.Key); }} disabled={renameSaving}>
-                            {renameSaving ? <span class="spinner" /> : '✓'}
-                          </button>
-                          <button class="btn btn-ghost btn-sm" onClick={e => { e.stopPropagation(); cancelRename(); }} disabled={renameSaving}>✕</button>
-                        </span>
-                      ) : (
-                        <span
-                          class="file-name file-name-previewable"
-                          title={obj.Key}
-                          onClick={() => handlePreview(obj)}
-                        >{display}</span>
-                      )}
-                    </td>
-                    <td class="col-size">{formatBytes(obj.Size)}</td>
-                    <td class="col-modified">{formatDate(obj.LastModified)}</td>
-                    <td
-                      class="col-file-modified"
-                      data-mtime-key={obj.Key}
-                      data-mtime-lm={new Date(obj.LastModified).getTime()}
-                    >
-                      {mtimeLoadEnabled && (() => {
+                    {mtimeLoadEnabled &&
+                      (() => {
                         const cacheKey = `${bucket}:${obj.Key}:${new Date(obj.LastModified).getTime()}`;
                         const cached = fileMtimeCacheRef.current.get(cacheKey);
                         if (cached === undefined) return null;
                         return cached ? formatDate(cached) : '—';
                       })()}
-                    </td>
-                    <td class="col-actions">
-                      <span class="row-actions">
+                  </td>
+                  <td class="col-actions">
+                    <span class="row-actions">
                       <button
                         class="btn btn-ghost btn-sm"
-                        onClick={e => { e.stopPropagation(); handleShowMeta(obj); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleShowMeta(obj);
+                        }}
                         title="Properties"
                         style={{ marginRight: '.25rem' }}
                       >
@@ -1243,7 +1596,10 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                       </button>
                       <button
                         class="btn btn-ghost btn-sm"
-                        onClick={e => { e.stopPropagation(); startRename(obj.Key); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startRename(obj.Key);
+                        }}
                         title="Rename"
                         style={{ marginRight: '.25rem' }}
                       >
@@ -1258,13 +1614,10 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                       >
                         {isDownloading ? <span class="spinner" /> : '↓'}
                       </button>
-                      <div
-                        class="copy-link-wrap"
-                        ref={tableCopyKey === obj.Key ? tableCopyWrapRef : undefined}
-                      >
+                      <div class="copy-link-wrap" ref={tableCopyKey === obj.Key ? tableCopyWrapRef : undefined}>
                         <button
                           class="btn btn-ghost btn-sm"
-                          onClick={() => setTableCopyKey(k => k === obj.Key ? null : obj.Key)}
+                          onClick={() => setTableCopyKey((k) => (k === obj.Key ? null : obj.Key))}
                           disabled={!canDownload}
                           title="Copy link"
                         >
@@ -1272,7 +1625,9 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                         </button>
                         {tableCopyKey === obj.Key && (
                           <CopyLinkPopover
-                            client={client} bucket={bucket} fileKey={obj.Key}
+                            client={client}
+                            bucket={bucket}
+                            fileKey={obj.Key}
                             onClose={() => setTableCopyKey(null)}
                             onCopied={() => handleTableCopyLinkCopied(obj.Key)}
                           />
@@ -1281,7 +1636,10 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                       <button
                         class="btn btn-ghost btn-sm"
                         style={{ marginLeft: '.25rem' }}
-                        onClick={e => { e.stopPropagation(); setMoveSel({ files: [{ key: obj.Key, size: obj.Size ?? 0 }], prefixes: [] }); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMoveSel({ files: [{ key: obj.Key, size: obj.Size ?? 0 }], prefixes: [] });
+                        }}
                         disabled={!canMove}
                         title={!canMove ? 'Move not permitted with current credentials' : 'Move to another folder'}
                       >
@@ -1296,18 +1654,20 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
                       >
                         ✕
                       </button>
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )
-      }
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
 
       {listing && (
-        <div class="empty-state"><span class="spinner" style={{ marginRight: '.5rem' }} />Loading…</div>
+        <div class="empty-state">
+          <span class="spinner" style={{ marginRight: '.5rem' }} />
+          Loading…
+        </div>
       )}
 
       {isTruncated && !listing && (
@@ -1318,7 +1678,14 @@ export function Browser({ client, bucket, provider, credentials, onCapabilityCha
         </div>
       )}
 
-      <HiddenVersions key={prefix} client={client} bucket={bucket} prefix={prefix} provider={provider} diagnostics={diagnosticsProps(credentials, true)} />
+      <HiddenVersions
+        key={prefix}
+        client={client}
+        bucket={bucket}
+        prefix={prefix}
+        provider={provider}
+        diagnostics={diagnosticsProps(credentials, true)}
+      />
     </div>
   );
 }

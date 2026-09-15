@@ -8,7 +8,10 @@ import { dragPayload, dropAccepted } from '../src/lib/move-drag.js';
 // tested directly. The Browser wiring is a thin shell over these.
 
 const selection = {
-  files: [{ key: 'reports/a.txt', size: 10 }, { key: 'reports/b.txt', size: 20 }],
+  files: [
+    { key: 'reports/a.txt', size: 10 },
+    { key: 'reports/b.txt', size: 20 },
+  ],
   prefixes: ['photos/2024/'],
 };
 

@@ -27,17 +27,17 @@ export async function saveUploadLogEntry(entry) {
     const tx = db.transaction(LOG_STORE, 'readwrite');
     tx.objectStore(LOG_STORE).add(entry);
     tx.oncomplete = resolve;
-    tx.onerror    = () => reject(tx.error);
+    tx.onerror = () => reject(tx.error);
   });
 }
 
 export async function loadUploadLog() {
   const db = await openDB();
   return new Promise((resolve, reject) => {
-    const tx  = db.transaction(LOG_STORE, 'readonly');
+    const tx = db.transaction(LOG_STORE, 'readonly');
     const req = tx.objectStore(LOG_STORE).getAll();
     req.onsuccess = () => resolve((req.result ?? []).reverse()); // newest first
-    req.onerror   = () => reject(req.error);
+    req.onerror = () => reject(req.error);
   });
 }
 
@@ -47,6 +47,6 @@ export async function clearUploadLog() {
     const tx = db.transaction(LOG_STORE, 'readwrite');
     tx.objectStore(LOG_STORE).clear();
     tx.oncomplete = resolve;
-    tx.onerror    = () => reject(tx.error);
+    tx.onerror = () => reject(tx.error);
   });
 }

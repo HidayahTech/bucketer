@@ -17,19 +17,19 @@
 import { openDB, DL_JOB_STORE, DL_ITEM_STORE } from './indexeddb-core.js';
 
 export const ITEM_STATUS = {
-  PENDING:  'pending',
-  ISSUED:   'issued',
-  DONE:     'done',
-  FAILED:   'failed',
-  SKIPPED:  'skipped',
+  PENDING: 'pending',
+  ISSUED: 'issued',
+  DONE: 'done',
+  FAILED: 'failed',
+  SKIPPED: 'skipped',
 };
 
 export const JOB_STATUS = {
   ENUMERATING: 'enumerating',
-  RUNNING:     'running',
-  PAUSED:      'paused',
-  DONE:        'done',
-  CANCELLED:   'cancelled',
+  RUNNING: 'running',
+  PAUSED: 'paused',
+  DONE: 'done',
+  CANCELLED: 'cancelled',
 };
 
 // True when a persisted job belongs to the given origin. A job record must match the
@@ -56,15 +56,15 @@ const itemId = (jobId, key) => `${jobId}:${key}`;
 function txDone(tx) {
   return new Promise((resolve, reject) => {
     tx.oncomplete = () => resolve();
-    tx.onerror    = () => reject(tx.error);
-    tx.onabort    = () => reject(tx.error || new Error('transaction aborted'));
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error('transaction aborted'));
   });
 }
 
 function reqResult(req) {
   return new Promise((resolve, reject) => {
     req.onsuccess = () => resolve(req.result);
-    req.onerror   = () => reject(req.error);
+    req.onerror = () => reject(req.error);
   });
 }
 
@@ -130,27 +130,35 @@ export async function appendManifestPage(jobId, items, enumeration = {}) {
       // Re-appending a page must not double-count, so only unseen ids move the counters.
       const existing = await reqResult(store.get(id));
       if (!existing) {
-        added += 1; bytes += it.size || 0;
+        added += 1;
+        bytes += it.size || 0;
         // SKIPPED rows (archived objects) are recorded but can never be issued. Keeping
         // them out of the sendable counters is what lets the offer button and the task
         // row describe the same set of files ("Sent 400 of 400", not "of 412") — the
         // total/bytesTotal pair stays as manifest truth for everything enumerated.
-        if (it.status !== ITEM_STATUS.SKIPPED) { addedSendable += 1; bytesSendable += it.size || 0; }
+        if (it.status !== ITEM_STATUS.SKIPPED) {
+          addedSendable += 1;
+          bytesSendable += it.size || 0;
+        }
       }
       store.put({ ...it, id, jobId });
     }
 
     job.counters = {
       ...job.counters,
-      total:         (job.counters?.total ?? 0) + added,
-      bytesTotal:    (job.counters?.bytesTotal ?? 0) + bytes,
-      sendable:      (job.counters?.sendable ?? 0) + addedSendable,
+      total: (job.counters?.total ?? 0) + added,
+      bytesTotal: (job.counters?.bytesTotal ?? 0) + bytes,
+      sendable: (job.counters?.sendable ?? 0) + addedSendable,
       bytesSendable: (job.counters?.bytesSendable ?? 0) + bytesSendable,
     };
     job.enumeration = { ...job.enumeration, ...enumeration };
     jobs.put(job);
   } catch (err) {
-    try { tx.abort(); } catch { /* already aborting */ }
+    try {
+      tx.abort();
+    } catch {
+      /* already aborting */
+    }
     throw err;
   }
 
@@ -195,7 +203,7 @@ export async function resetFailedToPending(jobId) {
     req.onsuccess = () => {
       const cursor = req.result;
       if (!cursor) return resolve();
-      const { error, ...rest } = cursor.value;   // drop the stale failure reason
+      const { error, ...rest } = cursor.value; // drop the stale failure reason
       cursor.update({ ...rest, status: ITEM_STATUS.PENDING });
       reset += 1;
       cursor.continue();
@@ -278,18 +286,22 @@ export async function takeItemsByStatus(jobId, status, limit) {
 // jobs are the only caller and this is read once per detail-view expand, not per poll.
 export async function loadZipDetail(jobId, { doneCap = 20, failedCap = 20 } = {}) {
   const doneItems = [];
-  await eachItemByStatus(jobId, ITEM_STATUS.DONE, (it) => { doneItems.push(it); });
-  const cappedDone = doneItems.some(it => it.zipEnd != null)
+  await eachItemByStatus(jobId, ITEM_STATUS.DONE, (it) => {
+    doneItems.push(it);
+  });
+  const cappedDone = doneItems.some((it) => it.zipEnd != null)
     ? [...doneItems].sort((a, b) => (b.zipEnd ?? 0) - (a.zipEnd ?? 0)).slice(0, doneCap)
     : doneItems.slice(-doneCap);
 
   const failedItems = [];
-  await eachItemByStatus(jobId, ITEM_STATUS.FAILED, (it) => { failedItems.push(it); });
+  await eachItemByStatus(jobId, ITEM_STATUS.FAILED, (it) => {
+    failedItems.push(it);
+  });
 
   return {
-    done:        cappedDone.map(it => ({ key: it.key, size: it.size })),
-    failed:      failedItems.slice(0, failedCap).map(it => ({ key: it.key })),
-    doneCount:   doneItems.length,
+    done: cappedDone.map((it) => ({ key: it.key, size: it.size })),
+    failed: failedItems.slice(0, failedCap).map((it) => ({ key: it.key })),
+    doneCount: doneItems.length,
     failedCount: failedItems.length,
   };
 }

@@ -3,17 +3,31 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  ROOT_TYPES, fileRoot, prefixRoot, normalizeRoots, rootsOfJob, selectionLabel,
+  ROOT_TYPES,
+  fileRoot,
+  prefixRoot,
+  normalizeRoots,
+  rootsOfJob,
+  selectionLabel,
 } from '../src/lib/download-roots.js';
 
-const obj = (Key, Size = 10, StorageClass = null) =>
-  ({ Key, Size, ETag: `"${Key}"`, LastModified: new Date(1700000000000), StorageClass });
+const obj = (Key, Size = 10, StorageClass = null) => ({
+  Key,
+  Size,
+  ETag: `"${Key}"`,
+  LastModified: new Date(1700000000000),
+  StorageClass,
+});
 
 describe('fileRoot', () => {
   test('captures everything the listing row knew', () => {
     assert.deepEqual(fileRoot(obj('a/b.txt', 42, 'GLACIER')), {
-      type: ROOT_TYPES.FILE, key: 'a/b.txt', size: 42, etag: '"a/b.txt"',
-      lastModified: 1700000000000, storageClass: 'GLACIER',
+      type: ROOT_TYPES.FILE,
+      key: 'a/b.txt',
+      size: 42,
+      etag: '"a/b.txt"',
+      lastModified: 1700000000000,
+      storageClass: 'GLACIER',
     });
   });
   test('tolerates missing size, date and class', () => {
@@ -27,13 +41,17 @@ describe('fileRoot', () => {
 describe('normalizeRoots', () => {
   test('prefixes come first, then files, order preserved', () => {
     const roots = normalizeRoots({ files: [obj('z.txt'), obj('a.txt')], prefixes: ['p2/', 'p1/'] });
-    assert.deepEqual(roots.map(r => r.type === 'prefix' ? r.prefix : r.key),
-      ['p2/', 'p1/', 'z.txt', 'a.txt']);
+    assert.deepEqual(
+      roots.map((r) => (r.type === 'prefix' ? r.prefix : r.key)),
+      ['p2/', 'p1/', 'z.txt', 'a.txt'],
+    );
   });
   test('a file under a selected prefix is dropped — the crawl will produce it', () => {
     const roots = normalizeRoots({ files: [obj('photos/x.jpg'), obj('other.txt')], prefixes: ['photos/'] });
-    assert.deepEqual(roots.map(r => r.type === 'prefix' ? r.prefix : r.key),
-      ['photos/', 'other.txt']);
+    assert.deepEqual(
+      roots.map((r) => (r.type === 'prefix' ? r.prefix : r.key)),
+      ['photos/', 'other.txt'],
+    );
   });
   test('empty selection normalizes to no roots', () => {
     assert.deepEqual(normalizeRoots({ files: [], prefixes: [] }), []);

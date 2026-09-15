@@ -6,7 +6,7 @@
 import { localHeaderBytes, dosDateTime } from './zip-writer.js';
 import { zipEntryPath } from './zip-naming.js';
 
-export function computeZipLayout(items, prefix = '', { zip64Limit = 0xFFFFFFFF, startOffset = 0 } = {}) {
+export function computeZipLayout(items, prefix = '', { zip64Limit = 0xffffffff, startOffset = 0 } = {}) {
   const entries = [];
   let offset = startOffset;
   for (const it of items) {
@@ -20,7 +20,20 @@ export function computeZipLayout(items, prefix = '', { zip64Limit = 0xFFFFFFFF, 
     const dataOffset = headerOffset + headerBytes;
     const descriptorOffset = dataOffset + declaredSize;
     const entryEnd = descriptorOffset + descriptorBytes;
-    entries.push({ key: it.key, path, headerOffset, headerBytes, dataOffset, declaredSize, descriptorOffset, descriptorBytes, entryEnd, zip64, time, date });
+    entries.push({
+      key: it.key,
+      path,
+      headerOffset,
+      headerBytes,
+      dataOffset,
+      declaredSize,
+      descriptorOffset,
+      descriptorBytes,
+      entryEnd,
+      zip64,
+      time,
+      date,
+    });
     offset = entryEnd;
   }
   return { entries, centralDirOffset: offset, totalDataEnd: offset };

@@ -1,17 +1,28 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { detectProvider, extractRegion, requiresPathStyle, defaultMaxKeys, needsCorsConfig, buildEndpoint, PROVIDERS } from '../src/lib/provider.js';
+import {
+  detectProvider,
+  extractRegion,
+  requiresPathStyle,
+  defaultMaxKeys,
+  needsCorsConfig,
+  buildEndpoint,
+  PROVIDERS,
+} from '../src/lib/provider.js';
 
 describe('detectProvider', () => {
   test('Backblaze B2', () => assert.equal(detectProvider('https://s3.us-west-004.backblazeb2.com'), PROVIDERS.B2));
   test('Cloudflare R2', () => assert.equal(detectProvider('https://abc123.r2.cloudflarestorage.com'), PROVIDERS.R2));
   test('Wasabi', () => assert.equal(detectProvider('https://s3.us-east-1.wasabisys.com'), PROVIDERS.WASABI));
   test('AWS S3', () => assert.equal(detectProvider('https://s3.eu-west-1.amazonaws.com'), PROVIDERS.AWS));
-  test('DigitalOcean Spaces', () => assert.equal(detectProvider('https://nyc3.digitaloceanspaces.com'), PROVIDERS.DO_SPACES));
-  test('unknown endpoint → generic', () => assert.equal(detectProvider('https://minio.example.com'), PROVIDERS.GENERIC));
+  test('DigitalOcean Spaces', () =>
+    assert.equal(detectProvider('https://nyc3.digitaloceanspaces.com'), PROVIDERS.DO_SPACES));
+  test('unknown endpoint → generic', () =>
+    assert.equal(detectProvider('https://minio.example.com'), PROVIDERS.GENERIC));
   test('empty string → generic', () => assert.equal(detectProvider(''), PROVIDERS.GENERIC));
   // MinIO has no detectable pattern — must use manual override (spec §4.8)
-  test('MinIO-style URL → generic (not detectable)', () => assert.equal(detectProvider('https://play.min.io'), PROVIDERS.GENERIC));
+  test('MinIO-style URL → generic (not detectable)', () =>
+    assert.equal(detectProvider('https://play.min.io'), PROVIDERS.GENERIC));
 
   // Hostname-anchoring: provider domain in path or as a suffix must NOT match.
   // Detection tests against hostname only; $ anchor prevents suffix-based false positives.
@@ -131,24 +142,33 @@ describe('extractRegion — Wasabi legacy alias endpoints (T5-14)', () => {
 describe('buildEndpoint', () => {
   // B2 — template https://s3.{region}.backblazeb2.com, no exceptions
   // Source: https://www.backblaze.com/docs/cloud-storage-data-regions (fetched 2026-06-04)
-  test('B2 us-west-004', () => assert.equal(buildEndpoint('b2', 'us-west-004'), 'https://s3.us-west-004.backblazeb2.com'));
-  test('B2 eu-central-003', () => assert.equal(buildEndpoint('b2', 'eu-central-003'), 'https://s3.eu-central-003.backblazeb2.com'));
-  test('B2 us-east-005', () => assert.equal(buildEndpoint('b2', 'us-east-005'), 'https://s3.us-east-005.backblazeb2.com'));
+  test('B2 us-west-004', () =>
+    assert.equal(buildEndpoint('b2', 'us-west-004'), 'https://s3.us-west-004.backblazeb2.com'));
+  test('B2 eu-central-003', () =>
+    assert.equal(buildEndpoint('b2', 'eu-central-003'), 'https://s3.eu-central-003.backblazeb2.com'));
+  test('B2 us-east-005', () =>
+    assert.equal(buildEndpoint('b2', 'us-east-005'), 'https://s3.us-east-005.backblazeb2.com'));
 
   // Wasabi — legacy us-east-1 exception (bare hostname, no region segment)
   // Source: https://docs.wasabi.com/docs/what-are-the-service-urls-for-wasabi-s-different-storage-regions (fetched 2026-06-04, 2026-06-07)
-  test('Wasabi us-east-1 legacy endpoint', () => assert.equal(buildEndpoint('wasabi', 'us-east-1'), 'https://s3.wasabisys.com'));
-  test('Wasabi us-east-2 regional', () => assert.equal(buildEndpoint('wasabi', 'us-east-2'), 'https://s3.us-east-2.wasabisys.com'));
-  test('Wasabi eu-central-1 regional', () => assert.equal(buildEndpoint('wasabi', 'eu-central-1'), 'https://s3.eu-central-1.wasabisys.com'));
-  test('Wasabi ap-southeast-2 regional', () => assert.equal(buildEndpoint('wasabi', 'ap-southeast-2'), 'https://s3.ap-southeast-2.wasabisys.com'));
+  test('Wasabi us-east-1 legacy endpoint', () =>
+    assert.equal(buildEndpoint('wasabi', 'us-east-1'), 'https://s3.wasabisys.com'));
+  test('Wasabi us-east-2 regional', () =>
+    assert.equal(buildEndpoint('wasabi', 'us-east-2'), 'https://s3.us-east-2.wasabisys.com'));
+  test('Wasabi eu-central-1 regional', () =>
+    assert.equal(buildEndpoint('wasabi', 'eu-central-1'), 'https://s3.eu-central-1.wasabisys.com'));
+  test('Wasabi ap-southeast-2 regional', () =>
+    assert.equal(buildEndpoint('wasabi', 'ap-southeast-2'), 'https://s3.ap-southeast-2.wasabisys.com'));
   // Legacy alias slug — builds alias URL (valid; extractRegion maps nl-1→eu-central-1 for signing)
-  test('Wasabi nl-1 alias builds alias URL', () => assert.equal(buildEndpoint('wasabi', 'nl-1'), 'https://s3.nl-1.wasabisys.com'));
+  test('Wasabi nl-1 alias builds alias URL', () =>
+    assert.equal(buildEndpoint('wasabi', 'nl-1'), 'https://s3.nl-1.wasabisys.com'));
 
   // AWS — template https://s3.{region}.amazonaws.com, no exceptions
   // Source: https://docs.aws.amazon.com/general/latest/gr/s3.html (fetched 2026-06-04)
   test('AWS us-east-1', () => assert.equal(buildEndpoint('aws', 'us-east-1'), 'https://s3.us-east-1.amazonaws.com'));
   test('AWS eu-west-2', () => assert.equal(buildEndpoint('aws', 'eu-west-2'), 'https://s3.eu-west-2.amazonaws.com'));
-  test('AWS ap-southeast-1', () => assert.equal(buildEndpoint('aws', 'ap-southeast-1'), 'https://s3.ap-southeast-1.amazonaws.com'));
+  test('AWS ap-southeast-1', () =>
+    assert.equal(buildEndpoint('aws', 'ap-southeast-1'), 'https://s3.ap-southeast-1.amazonaws.com'));
 
   // DO Spaces — template https://{region}.digitaloceanspaces.com, no exceptions
   // Source: https://docs.digitalocean.com/products/spaces/details/availability/ (fetched 2026-06-04)

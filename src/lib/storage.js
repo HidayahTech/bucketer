@@ -22,28 +22,28 @@ import { VAULT_STORAGE_KEYS, clearVaultEntries } from './vault.js';
 
 // Credential fields — wiped by clearCredentials() on disconnect.
 const CREDENTIAL_KEYS = {
-  endpoint:       's3b_endpoint',
-  bucket:         's3b_bucket',
-  keyId:          's3b_key_id',
-  provider:       's3b_provider',
+  endpoint: 's3b_endpoint',
+  bucket: 's3b_bucket',
+  keyId: 's3b_key_id',
+  provider: 's3b_provider',
   regionOverride: 's3b_region_override',
-  basePrefix:     's3b_base_prefix',
+  basePrefix: 's3b_base_prefix',
 };
 
 // Settings fields — user preferences that survive disconnect. Only wiped by resetSettings().
 const SETTINGS_KEYS = {
-  maxKeys:               's3b_max_keys',
-  partConcurrency:       's3b_part_concurrency',
-  partSizeMB:            's3b_part_size_mb',
-  uploadMemoryMB:        's3b_upload_memory_mb',
-  multiOriginUpload:     's3b_multi_origin_upload',
-  fileConcurrency:       's3b_file_concurrency',
-  listingCacheTTL:       's3b_listing_cache_ttl',
-  updateCheckEnabled:    's3b_update_check_enabled',
-  prefetchSizeLimit:     's3b_prefetch_size_limit',
+  maxKeys: 's3b_max_keys',
+  partConcurrency: 's3b_part_concurrency',
+  partSizeMB: 's3b_part_size_mb',
+  uploadMemoryMB: 's3b_upload_memory_mb',
+  multiOriginUpload: 's3b_multi_origin_upload',
+  fileConcurrency: 's3b_file_concurrency',
+  listingCacheTTL: 's3b_listing_cache_ttl',
+  updateCheckEnabled: 's3b_update_check_enabled',
+  prefetchSizeLimit: 's3b_prefetch_size_limit',
   uploadExpandThreshold: 's3b_upload_expand_threshold',
-  adaptiveMode:          's3b_adaptive_mode',
-  fileMtimeAutoLoad:     's3b_file_mtime_auto_load',
+  adaptiveMode: 's3b_adaptive_mode',
+  fileMtimeAutoLoad: 's3b_file_mtime_auto_load',
 };
 
 // Convenience: all keyed storage keys. Capability state now lives on the
@@ -61,25 +61,37 @@ const LEGACY_KEY_CAPABILITIES = 's3b_capabilities';
 // Wrap storage access — private browsing throws on every read/write.
 // Returns empty string rather than null so falsy checks work consistently.
 function safeGet(storage, key) {
-  try { return storage.getItem(key) ?? ''; } catch { return ''; }
+  try {
+    return storage.getItem(key) ?? '';
+  } catch {
+    return '';
+  }
 }
 function safeSet(storage, key, value) {
-  try { storage.setItem(key, value); } catch { /* private mode — in-memory state continues */ }
+  try {
+    storage.setItem(key, value);
+  } catch {
+    /* private mode — in-memory state continues */
+  }
 }
 function safeRemove(storage, key) {
-  try { storage.removeItem(key); } catch { /* */ }
+  try {
+    storage.removeItem(key);
+  } catch {
+    /* */
+  }
 }
 
 export function loadCredentials() {
   const rawProvider = safeGet(localStorage, LS_KEYS.provider);
   return {
-    endpoint:       safeGet(localStorage, LS_KEYS.endpoint),
-    bucket:         safeGet(localStorage, LS_KEYS.bucket),
-    keyId:          safeGet(localStorage, LS_KEYS.keyId),
-    secretKey:      safeGet(sessionStorage, SS_KEY_SECRET),
-    provider:       (rawProvider && isValidProvider(rawProvider)) ? rawProvider : null,
+    endpoint: safeGet(localStorage, LS_KEYS.endpoint),
+    bucket: safeGet(localStorage, LS_KEYS.bucket),
+    keyId: safeGet(localStorage, LS_KEYS.keyId),
+    secretKey: safeGet(sessionStorage, SS_KEY_SECRET),
+    provider: rawProvider && isValidProvider(rawProvider) ? rawProvider : null,
     regionOverride: safeGet(localStorage, LS_KEYS.regionOverride),
-    basePrefix:     safeGet(localStorage, LS_KEYS.basePrefix),
+    basePrefix: safeGet(localStorage, LS_KEYS.basePrefix),
   };
 }
 
@@ -97,7 +109,7 @@ export function saveCredentials({ endpoint, bucket, keyId, secretKey, provider, 
 // settings survive so the user's preferences are intact after reconnect.
 // Capability state lives on the connection record and is not touched here.
 export function clearCredentials() {
-  Object.values(CREDENTIAL_KEYS).forEach(k => safeRemove(localStorage, k));
+  Object.values(CREDENTIAL_KEYS).forEach((k) => safeRemove(localStorage, k));
   safeRemove(sessionStorage, SS_KEY_SECRET);
 }
 
@@ -122,78 +134,77 @@ function makeSettingAccessors(key, parser, serializer = String) {
 
 const _maxKeys = makeSettingAccessors(
   LS_KEYS.maxKeys,
-  v => v ? parseInt(v, 10) : null,          // null → use provider default
+  (v) => (v ? parseInt(v, 10) : null), // null → use provider default
 );
-const _partConcurrency = makeSettingAccessors(
-  LS_KEYS.partConcurrency,
-  v => v ? parseInt(v, 10) : null,
-);
-const _partSizeMB = makeSettingAccessors(
-  LS_KEYS.partSizeMB,
-  v => v ? parseInt(v, 10) : null,
-);
+const _partConcurrency = makeSettingAccessors(LS_KEYS.partConcurrency, (v) => (v ? parseInt(v, 10) : null));
+const _partSizeMB = makeSettingAccessors(LS_KEYS.partSizeMB, (v) => (v ? parseInt(v, 10) : null));
 const _uploadMemoryMB = makeSettingAccessors(
   LS_KEYS.uploadMemoryMB,
-  v => v ? parseInt(v, 10) : null,        // null → caller uses DEFAULT_UPLOAD_MEMORY_MB
+  (v) => (v ? parseInt(v, 10) : null), // null → caller uses DEFAULT_UPLOAD_MEMORY_MB
 );
-const _fileConcurrency = makeSettingAccessors(
-  LS_KEYS.fileConcurrency,
-  v => v ? parseInt(v, 10) : null,
-);
+const _fileConcurrency = makeSettingAccessors(LS_KEYS.fileConcurrency, (v) => (v ? parseInt(v, 10) : null));
 const _listingCacheTTL = makeSettingAccessors(
   LS_KEYS.listingCacheTTL,
   // 0 is valid ("disable cache"), so check !== '' rather than !v
-  v => v !== '' ? parseInt(v, 10) : null,   // null → caller uses default (120 s)
+  (v) => (v !== '' ? parseInt(v, 10) : null), // null → caller uses default (120 s)
 );
 const _prefetchSizeLimit = makeSettingAccessors(
   LS_KEYS.prefetchSizeLimit,
-  v => { if (v === '') return 5 * 1024 * 1024; const n = parseInt(v, 10); return isNaN(n) || n < 0 ? 5 * 1024 * 1024 : n; }, // default 5 MB; 0 = off
+  (v) => {
+    if (v === '') return 5 * 1024 * 1024;
+    const n = parseInt(v, 10);
+    return isNaN(n) || n < 0 ? 5 * 1024 * 1024 : n;
+  }, // default 5 MB; 0 = off
 );
 const _uploadExpandThreshold = makeSettingAccessors(
   LS_KEYS.uploadExpandThreshold,
-  v => { if (v === '') return 5; const n = parseInt(v, 10); return isNaN(n) || n < 0 ? 5 : n; }, // default 5
+  (v) => {
+    if (v === '') return 5;
+    const n = parseInt(v, 10);
+    return isNaN(n) || n < 0 ? 5 : n;
+  }, // default 5
 );
 const _updateCheckEnabled = makeSettingAccessors(
   LS_KEYS.updateCheckEnabled,
-  v => v === '' ? true : v === 'true',       // default true
+  (v) => (v === '' ? true : v === 'true'), // default true
 );
 const _adaptiveMode = makeSettingAccessors(
   LS_KEYS.adaptiveMode,
-  v => v === '' ? true : v === 'true',       // default true
+  (v) => (v === '' ? true : v === 'true'), // default true
 );
 const _fileMtimeAutoLoad = makeSettingAccessors(
   LS_KEYS.fileMtimeAutoLoad,
-  v => v === '' ? false : v === 'true',      // default false
+  (v) => (v === '' ? false : v === 'true'), // default false
 );
 const _multiOriginUpload = makeSettingAccessors(
   LS_KEYS.multiOriginUpload,
-  v => v === '' ? true : v === 'true',       // default ON (only acts on capable providers, e.g. B2)
+  (v) => (v === '' ? true : v === 'true'), // default ON (only acts on capable providers, e.g. B2)
 );
 
-export const loadMaxKeys               = _maxKeys.load;
-export const saveMaxKeys               = _maxKeys.save;
-export const loadPartConcurrency       = _partConcurrency.load;
-export const savePartConcurrency       = _partConcurrency.save;
-export const loadPartSizeMB            = _partSizeMB.load;
-export const savePartSizeMB            = _partSizeMB.save;
-export const loadUploadMemoryMB        = _uploadMemoryMB.load;
-export const saveUploadMemoryMB        = _uploadMemoryMB.save;
-export const loadFileConcurrency       = _fileConcurrency.load;
-export const saveFileConcurrency       = _fileConcurrency.save;
-export const loadListingCacheTTL       = _listingCacheTTL.load;
-export const saveListingCacheTTL       = _listingCacheTTL.save;
-export const loadPrefetchSizeLimit     = _prefetchSizeLimit.load;
-export const savePrefetchSizeLimit     = _prefetchSizeLimit.save;
+export const loadMaxKeys = _maxKeys.load;
+export const saveMaxKeys = _maxKeys.save;
+export const loadPartConcurrency = _partConcurrency.load;
+export const savePartConcurrency = _partConcurrency.save;
+export const loadPartSizeMB = _partSizeMB.load;
+export const savePartSizeMB = _partSizeMB.save;
+export const loadUploadMemoryMB = _uploadMemoryMB.load;
+export const saveUploadMemoryMB = _uploadMemoryMB.save;
+export const loadFileConcurrency = _fileConcurrency.load;
+export const saveFileConcurrency = _fileConcurrency.save;
+export const loadListingCacheTTL = _listingCacheTTL.load;
+export const saveListingCacheTTL = _listingCacheTTL.save;
+export const loadPrefetchSizeLimit = _prefetchSizeLimit.load;
+export const savePrefetchSizeLimit = _prefetchSizeLimit.save;
 export const loadUploadExpandThreshold = _uploadExpandThreshold.load;
 export const saveUploadExpandThreshold = _uploadExpandThreshold.save;
-export const loadUpdateCheckEnabled    = _updateCheckEnabled.load;
-export const saveUpdateCheckEnabled    = _updateCheckEnabled.save;
-export const loadAdaptiveMode          = _adaptiveMode.load;
-export const saveAdaptiveMode          = _adaptiveMode.save;
-export const loadFileMtimeAutoLoad     = _fileMtimeAutoLoad.load;
-export const saveFileMtimeAutoLoad     = _fileMtimeAutoLoad.save;
-export const loadMultiOriginUpload     = _multiOriginUpload.load;
-export const saveMultiOriginUpload     = _multiOriginUpload.save;
+export const loadUpdateCheckEnabled = _updateCheckEnabled.load;
+export const saveUpdateCheckEnabled = _updateCheckEnabled.save;
+export const loadAdaptiveMode = _adaptiveMode.load;
+export const saveAdaptiveMode = _adaptiveMode.save;
+export const loadFileMtimeAutoLoad = _fileMtimeAutoLoad.load;
+export const saveFileMtimeAutoLoad = _fileMtimeAutoLoad.save;
+export const loadMultiOriginUpload = _multiOriginUpload.load;
+export const saveMultiOriginUpload = _multiOriginUpload.save;
 
 // Valid providers are short alphanumeric identifiers. The longest known value is
 // 'do_spaces' (9 chars); 20 is a safe ceiling. Anything with whitespace or beyond
@@ -251,7 +262,7 @@ export function saveThemePref(pref) {
 }
 
 // Profile storage — keys are OUTSIDE LS_KEYS so clearCredentials() does not wipe them.
-const LS_KEY_PROFILES        = 's3b_profiles';
+const LS_KEY_PROFILES = 's3b_profiles';
 const LS_KEY_LAST_PROFILE_ID = 's3b_last_profile_id';
 const PROFILES_VERSION = 1;
 
@@ -282,7 +293,7 @@ export function saveProfile(profile) {
   // eslint-disable-next-line no-unused-vars
   const { secretKey: _dropped, ...safeProfile } = profile;
   const data = loadProfiles();
-  const idx = data.profiles.findIndex(p => p.id === safeProfile.id);
+  const idx = data.profiles.findIndex((p) => p.id === safeProfile.id);
   if (idx >= 0) {
     data.profiles[idx] = { ...data.profiles[idx], ...safeProfile };
   } else {
@@ -293,7 +304,7 @@ export function saveProfile(profile) {
 
 export function deleteProfile(id) {
   const data = loadProfiles();
-  data.profiles = data.profiles.filter(p => p.id !== id);
+  data.profiles = data.profiles.filter((p) => p.id !== id);
   saveProfilesData(data);
 }
 
@@ -320,10 +331,10 @@ export function wipeAllAppData() {
     LS_KEY_LAST_PROFILE_ID,
     ...CONNECTION_STORAGE_KEYS,
     ...VAULT_STORAGE_KEYS,
-    LEGACY_KEY_CAPABILITIES,   // retired v1.39.0 — cleared so an upgrade leaves nothing behind
+    LEGACY_KEY_CAPABILITIES, // retired v1.39.0 — cleared so an upgrade leaves nothing behind
     's3b_active_uploads',
   ];
-  allLSKeys.forEach(k => safeRemove(localStorage, k));
+  allLSKeys.forEach((k) => safeRemove(localStorage, k));
   safeRemove(sessionStorage, SS_KEY_SECRET);
   safeRemove(sessionStorage, 's3b_file_banner_dismissed');
 }
@@ -331,7 +342,7 @@ export function wipeAllAppData() {
 // Removes all user-configurable settings keys. Credentials and profiles are left intact.
 // Settings revert to their defaults on the next render.
 export function resetSettings() {
-  Object.values(SETTINGS_KEYS).forEach(k => safeRemove(localStorage, k));
+  Object.values(SETTINGS_KEYS).forEach((k) => safeRemove(localStorage, k));
 }
 
 // Removes all saved connections, credentials, legacy profiles, and the
@@ -355,10 +366,10 @@ export function migrateProfilesFromLegacy() {
   const data = loadProfiles();
   if (data.profiles.length > 0) return; // already migrated
 
-  const endpoint       = safeGet(localStorage, LS_KEYS.endpoint);
-  const bucket         = safeGet(localStorage, LS_KEYS.bucket);
-  const keyId          = safeGet(localStorage, LS_KEYS.keyId);
-  const provider       = safeGet(localStorage, LS_KEYS.provider) || null;
+  const endpoint = safeGet(localStorage, LS_KEYS.endpoint);
+  const bucket = safeGet(localStorage, LS_KEYS.bucket);
+  const keyId = safeGet(localStorage, LS_KEYS.keyId);
+  const provider = safeGet(localStorage, LS_KEYS.provider) || null;
   const regionOverride = safeGet(localStorage, LS_KEYS.regionOverride);
 
   if (!endpoint && !bucket && !keyId) return; // nothing to migrate
@@ -369,9 +380,7 @@ export function migrateProfilesFromLegacy() {
   if (bucket.length > 63) return;
 
   const providerLabel = provider ? provider.toUpperCase() : '';
-  const name = providerLabel && bucket
-    ? `${providerLabel} — ${bucket}`
-    : bucket || 'Default';
+  const name = providerLabel && bucket ? `${providerLabel} — ${bucket}` : bucket || 'Default';
 
   const profile = {
     id: Date.now(),

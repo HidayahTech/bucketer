@@ -14,21 +14,21 @@ const PRESIGN_EXPIRES = 3600;
 const TEXT_PREVIEW_LIMIT = 100 * 1024;
 
 export function usePreview(client, bucket) {
-  const [previewItem,          setPreviewItem]          = useState(null);
-  const [previewUrl,           setPreviewUrl]           = useState(null);
-  const [previewError,         setPreviewError]         = useState(null);
-  const [resolvedKind,         setResolvedKind]         = useState(null);
-  const [notPreviewable,       setNotPreviewable]       = useState(false);
-  const [detectedContentType,  setDetectedContentType]  = useState(null);
-  const [previewText,          setPreviewText]          = useState(null);
-  const [previewTruncated,     setPreviewTruncated]     = useState(false);
-  const [previewPixelated,     setPreviewPixelated]     = useState(false);
-  const [previewCopyOpen,      setPreviewCopyOpen]      = useState(false);
-  const [previewCopied,        setPreviewCopied]        = useState(false);
+  const [previewItem, setPreviewItem] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [previewError, setPreviewError] = useState(null);
+  const [resolvedKind, setResolvedKind] = useState(null);
+  const [notPreviewable, setNotPreviewable] = useState(false);
+  const [detectedContentType, setDetectedContentType] = useState(null);
+  const [previewText, setPreviewText] = useState(null);
+  const [previewTruncated, setPreviewTruncated] = useState(false);
+  const [previewPixelated, setPreviewPixelated] = useState(false);
+  const [previewCopyOpen, setPreviewCopyOpen] = useState(false);
+  const [previewCopied, setPreviewCopied] = useState(false);
 
   const previewUrlCacheRef = useRef(new Map()); // key → { url, expiresAt, kind, contentType, text?, truncated? }
   const previewCopyWrapRef = useRef(null);
-  const genRef             = useRef(0);         // incremented per handlePreview call; cancels stale async callbacks
+  const genRef = useRef(0); // incremented per handlePreview call; cancels stale async callbacks
 
   useEffect(() => {
     if (!previewCopyOpen) return;
@@ -106,11 +106,14 @@ export function usePreview(client, bucket) {
       if (kind === 'text') {
         const url = await getSignedUrl(
           client,
-          new GetObjectCommand(presignGetParams({
-            Bucket: bucket, Key: obj.Key,
-            ResponseContentDisposition: 'inline',
-            ResponseContentType: 'text/plain; charset=utf-8',
-          })),
+          new GetObjectCommand(
+            presignGetParams({
+              Bucket: bucket,
+              Key: obj.Key,
+              ResponseContentDisposition: 'inline',
+              ResponseContentType: 'text/plain; charset=utf-8',
+            }),
+          ),
           { expiresIn: PRESIGN_EXPIRES },
         );
         previewUrlCacheRef.current.set(obj.Key, { url, expiresAt, kind, contentType });
@@ -122,11 +125,14 @@ export function usePreview(client, bucket) {
       } else {
         const url = await getSignedUrl(
           client,
-          new GetObjectCommand(presignGetParams({
-            Bucket: bucket, Key: obj.Key,
-            ResponseContentDisposition: 'inline',
-            ...(contentType ? { ResponseContentType: contentType } : {}),
-          })),
+          new GetObjectCommand(
+            presignGetParams({
+              Bucket: bucket,
+              Key: obj.Key,
+              ResponseContentDisposition: 'inline',
+              ...(contentType ? { ResponseContentType: contentType } : {}),
+            }),
+          ),
           { expiresIn: PRESIGN_EXPIRES },
         );
         previewUrlCacheRef.current.set(obj.Key, { url, expiresAt, kind, contentType });
@@ -162,9 +168,12 @@ export function usePreview(client, bucket) {
     detectedContentType,
     previewText,
     previewTruncated,
-    previewPixelated,    setPreviewPixelated,
-    previewCopyOpen,     setPreviewCopyOpen,
-    previewCopied,       setPreviewCopied,
+    previewPixelated,
+    setPreviewPixelated,
+    previewCopyOpen,
+    setPreviewCopyOpen,
+    previewCopied,
+    setPreviewCopied,
     previewUrlCacheRef,
     previewCopyWrapRef,
     handlePreview,

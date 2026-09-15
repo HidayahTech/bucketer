@@ -1,6 +1,12 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { isVhostShardable, uploadPartsAcrossLanes, shouldFallbackFromVhost, uploadPartsSharded, isShardCapableProvider } from '../src/lib/upload-sharding.js';
+import {
+  isVhostShardable,
+  uploadPartsAcrossLanes,
+  shouldFallbackFromVhost,
+  uploadPartsSharded,
+  isShardCapableProvider,
+} from '../src/lib/upload-sharding.js';
 
 // ── isVhostShardable ──────────────────────────────────────────────────────────
 // Multi-origin sharding routes some parts via virtual-hosted addressing
@@ -69,43 +75,64 @@ describe('isShardCapableProvider', () => {
 describe('uploadPartsAcrossLanes', () => {
   test('processes all parts exactly once across lanes', async () => {
     const seen = new Set();
-    const A = { id: 'A' }, B = { id: 'B' };
+    const A = { id: 'A' },
+      B = { id: 'B' };
     await uploadPartsAcrossLanes(
       [1, 2, 3, 4, 5, 6],
-      [{ client: A, concurrency: 2 }, { client: B, concurrency: 2 }],
-      async (n) => { seen.add(n); },
+      [
+        { client: A, concurrency: 2 },
+        { client: B, concurrency: 2 },
+      ],
+      async (n) => {
+        seen.add(n);
+      },
     );
-    assert.deepEqual([...seen].sort((a, b) => a - b), [1, 2, 3, 4, 5, 6]);
+    assert.deepEqual(
+      [...seen].sort((a, b) => a - b),
+      [1, 2, 3, 4, 5, 6],
+    );
   });
 
   test('distributes work across both lane clients', async () => {
     const byClient = new Map();
-    const A = { id: 'A' }, B = { id: 'B' };
+    const A = { id: 'A' },
+      B = { id: 'B' };
     await uploadPartsAcrossLanes(
       Array.from({ length: 20 }, (_, i) => i + 1),
-      [{ client: A, concurrency: 2 }, { client: B, concurrency: 2 }],
+      [
+        { client: A, concurrency: 2 },
+        { client: B, concurrency: 2 },
+      ],
       async (n, client) => {
         byClient.set(client.id, (byClient.get(client.id) || 0) + 1);
-        await new Promise(r => setTimeout(r, 2));
+        await new Promise((r) => setTimeout(r, 2));
       },
     );
     assert.ok(byClient.get('A') > 0 && byClient.get('B') > 0, 'both lanes must do work');
   });
 
   test('respects per-lane concurrency; total peak equals sum of lanes', async () => {
-    const inFlight = new Map(), peak = new Map();
-    let total = 0, peakTotal = 0;
-    const A = { id: 'A' }, B = { id: 'B' };
+    const inFlight = new Map(),
+      peak = new Map();
+    let total = 0,
+      peakTotal = 0;
+    const A = { id: 'A' },
+      B = { id: 'B' };
     await uploadPartsAcrossLanes(
       Array.from({ length: 30 }, (_, i) => i + 1),
-      [{ client: A, concurrency: 3 }, { client: B, concurrency: 2 }],
+      [
+        { client: A, concurrency: 3 },
+        { client: B, concurrency: 2 },
+      ],
       async (n, client) => {
         const c = (inFlight.get(client.id) || 0) + 1;
         inFlight.set(client.id, c);
         peak.set(client.id, Math.max(peak.get(client.id) || 0, c));
-        total++; peakTotal = Math.max(peakTotal, total);
-        await new Promise(r => setTimeout(r, 5));
-        inFlight.set(client.id, inFlight.get(client.id) - 1); total--;
+        total++;
+        peakTotal = Math.max(peakTotal, total);
+        await new Promise((r) => setTimeout(r, 5));
+        inFlight.set(client.id, inFlight.get(client.id) - 1);
+        total--;
       },
     );
     assert.ok(peak.get('A') <= 3, `lane A peak ${peak.get('A')} must be <= 3`);
@@ -117,7 +144,9 @@ describe('uploadPartsAcrossLanes', () => {
   test('propagates errors from workFn', async () => {
     const A = { id: 'A' };
     await assert.rejects(
-      uploadPartsAcrossLanes([1], [{ client: A, concurrency: 1 }], async () => { throw new Error('lane fail'); }),
+      uploadPartsAcrossLanes([1], [{ client: A, concurrency: 1 }], async () => {
+        throw new Error('lane fail');
+      }),
       { message: 'lane fail' },
     );
   });
@@ -125,8 +154,13 @@ describe('uploadPartsAcrossLanes', () => {
   test('treats concurrency < 1 as 1', async () => {
     const seen = [];
     const A = { id: 'A' };
-    await uploadPartsAcrossLanes([1, 2, 3], [{ client: A, concurrency: 0 }], async (n) => { seen.push(n); });
-    assert.deepEqual(seen.sort((a, b) => a - b), [1, 2, 3]);
+    await uploadPartsAcrossLanes([1, 2, 3], [{ client: A, concurrency: 0 }], async (n) => {
+      seen.push(n);
+    });
+    assert.deepEqual(
+      seen.sort((a, b) => a - b),
+      [1, 2, 3],
+    );
   });
 });
 
@@ -141,7 +175,8 @@ describe('shouldFallbackFromVhost', () => {
   });
 
   test('does NOT fall back on an AbortError (must propagate)', () => {
-    const e = new Error('aborted'); e.name = 'AbortError';
+    const e = new Error('aborted');
+    e.name = 'AbortError';
     assert.equal(shouldFallbackFromVhost(e), false);
   });
 
@@ -160,50 +195,85 @@ describe('uploadPartsSharded', () => {
   // fallbackClient = the provider's DEFAULT origin (always works); probeClient = the ADDED
   // second origin (uncertain). The probe tests the added origin and falls back to the default.
   const mkOpts = (over = {}) => ({
-    fallbackClient: { id: 'fallback' }, probeClient: { id: 'probe' },
-    shardConcurrency: 2, poolConcurrency: 2, ...over,
+    fallbackClient: { id: 'fallback' },
+    probeClient: { id: 'probe' },
+    shardConcurrency: 2,
+    poolConcurrency: 2,
+    ...over,
   });
 
   test('probe succeeds → shards across both origins, all parts once', async () => {
     const opts = mkOpts();
-    const byClient = new Map(); const seen = new Set(); let firstClient = null;
-    const { sharded } = await uploadPartsSharded([1, 2, 3, 4, 5, 6], async (n, client) => {
-      if (n === 1) firstClient = client.id;
-      byClient.set(client.id, (byClient.get(client.id) || 0) + 1);
-      seen.add(n);
-    }, opts);
+    const byClient = new Map();
+    const seen = new Set();
+    let firstClient = null;
+    const { sharded } = await uploadPartsSharded(
+      [1, 2, 3, 4, 5, 6],
+      async (n, client) => {
+        if (n === 1) firstClient = client.id;
+        byClient.set(client.id, (byClient.get(client.id) || 0) + 1);
+        seen.add(n);
+      },
+      opts,
+    );
     assert.equal(sharded, true);
     assert.equal(firstClient, 'probe', 'part 1 must probe the added (second) origin');
-    assert.deepEqual([...seen].sort((a, b) => a - b), [1, 2, 3, 4, 5, 6]);
+    assert.deepEqual(
+      [...seen].sort((a, b) => a - b),
+      [1, 2, 3, 4, 5, 6],
+    );
     assert.ok(byClient.get('probe') > 1 && byClient.get('fallback') > 0, 'both origins used');
   });
 
   test('probe fails (non-abort) → falls back to the default origin only', async () => {
     const opts = mkOpts();
-    const usedClients = new Set(); const seen = [];
-    const { sharded } = await uploadPartsSharded([1, 2, 3, 4], async (n, client) => {
-      if (n === 1 && client.id === 'probe') throw new Error('SignatureDoesNotMatch'); // added origin rejects
-      usedClients.add(client.id);
-      seen.push(n);
-    }, opts);
+    const usedClients = new Set();
+    const seen = [];
+    const { sharded } = await uploadPartsSharded(
+      [1, 2, 3, 4],
+      async (n, client) => {
+        if (n === 1 && client.id === 'probe') throw new Error('SignatureDoesNotMatch'); // added origin rejects
+        usedClients.add(client.id);
+        seen.push(n);
+      },
+      opts,
+    );
     assert.equal(sharded, false, 'must report single-origin after fallback');
-    assert.deepEqual(seen.sort((a, b) => a - b), [1, 2, 3, 4], 'all parts still uploaded');
+    assert.deepEqual(
+      seen.sort((a, b) => a - b),
+      [1, 2, 3, 4],
+      'all parts still uploaded',
+    );
     assert.deepEqual([...usedClients], ['fallback'], 'only the default origin used after fallback');
   });
 
   test('probe abort propagates (no fallback)', async () => {
     const opts = mkOpts();
     await assert.rejects(
-      uploadPartsSharded([1, 2, 3], async (n, client) => {
-        if (client.id === 'probe') { const e = new Error('aborted'); e.name = 'AbortError'; throw e; }
-      }, opts),
+      uploadPartsSharded(
+        [1, 2, 3],
+        async (n, client) => {
+          if (client.id === 'probe') {
+            const e = new Error('aborted');
+            e.name = 'AbortError';
+            throw e;
+          }
+        },
+        opts,
+      ),
       { name: 'AbortError' },
     );
   });
 
   test('empty part list does nothing', async () => {
     let calls = 0;
-    const { sharded } = await uploadPartsSharded([], async () => { calls++; }, mkOpts());
+    const { sharded } = await uploadPartsSharded(
+      [],
+      async () => {
+        calls++;
+      },
+      mkOpts(),
+    );
     assert.equal(sharded, false);
     assert.equal(calls, 0);
   });

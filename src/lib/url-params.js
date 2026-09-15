@@ -26,7 +26,9 @@ export function readUrlParams() {
     try {
       const u = new URL(v);
       if (u.protocol === 'https:' || u.protocol === 'http:') out.endpoint = v;
-    } catch { /* unparseable — ignore */ }
+    } catch {
+      /* unparseable — ignore */
+    }
   }
   if (p.has('bucket')) {
     const v = p.get('bucket');
@@ -46,13 +48,13 @@ export function readUrlParams() {
     // whitespace-bearing values so a crafted link cannot inject free text into the form.
     if (v && v.length <= 128 && !/\s/.test(v)) out.keyId = v;
   }
-  if (p.has('region'))   out.regionOverride = p.get('region');
+  if (p.has('region')) out.regionOverride = p.get('region');
   if (p.has('basePrefix')) {
     const v = p.get('basePrefix');
     // Same defensive posture as bucket: reject traversal and Windows-path pastes,
     // cap length. Prefixes legitimately contain most other characters (spaces
     // included), so normalization is the only other treatment (#60).
-    if (v && v.length <= 1024 && !v.includes('\\') && !v.split('/').some(s => s === '..')) {
+    if (v && v.length <= 1024 && !v.includes('\\') && !v.split('/').some((s) => s === '..')) {
       const normalized = normalizeBasePrefix(v);
       if (normalized) out.basePrefix = normalized;
     }
@@ -63,7 +65,7 @@ export function readUrlParams() {
 // True when at least one config param is present in the current hash.
 export function hasUrlParams() {
   const p = hashParams();
-  return ['endpoint', 'bucket', 'provider', 'region', 'keyId', 'basePrefix'].some(k => p.has(k));
+  return ['endpoint', 'bucket', 'provider', 'region', 'keyId', 'basePrefix'].some((k) => p.has(k));
 }
 
 // Build a shareable URL with the connection config in the hash. The secret key is
@@ -73,12 +75,12 @@ export function hasUrlParams() {
 export function buildShareUrl(credentials, { includeKeyId = false } = {}) {
   if (window.location.protocol === 'file:') return null;
   const p = new URLSearchParams();
-  if (credentials.endpoint)               p.set('endpoint', credentials.endpoint);
-  if (credentials.bucket)                 p.set('bucket',   credentials.bucket);
-  if (credentials.provider)               p.set('provider', credentials.provider);
-  if (credentials.regionOverride)         p.set('region',   credentials.regionOverride);
-  if (credentials.basePrefix)             p.set('basePrefix', credentials.basePrefix);
-  if (includeKeyId && credentials.keyId)  p.set('keyId',    credentials.keyId);
+  if (credentials.endpoint) p.set('endpoint', credentials.endpoint);
+  if (credentials.bucket) p.set('bucket', credentials.bucket);
+  if (credentials.provider) p.set('provider', credentials.provider);
+  if (credentials.regionOverride) p.set('region', credentials.regionOverride);
+  if (credentials.basePrefix) p.set('basePrefix', credentials.basePrefix);
+  if (includeKeyId && credentials.keyId) p.set('keyId', credentials.keyId);
   const hash = p.toString();
   const base = window.location.origin + window.location.pathname;
   return hash ? `${base}#${hash}` : base;
@@ -93,10 +95,12 @@ export function pushPrefixHistory(prefix, replace = false) {
   try {
     const p = hashParams();
     if (prefix) p.set('prefix', prefix);
-    else        p.delete('prefix');
+    else p.delete('prefix');
     const hash = p.toString();
     const url = window.location.pathname + (hash ? '#' + hash : '');
     if (replace) window.history.replaceState({ prefix }, '', url);
-    else         window.history.pushState({ prefix }, '', url);
-  } catch { /* file:// */ }
+    else window.history.pushState({ prefix }, '', url);
+  } catch {
+    /* file:// */
+  }
 }

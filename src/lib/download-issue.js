@@ -65,7 +65,7 @@ export function issueBrowserDownload(url, filename) {
     // recycled, its navigation has had pool × pacing-gap (plus the probe round trip) to
     // get there.
     frame = container.firstElementChild;
-    container.appendChild(frame);   // move to the back of the recycling order
+    container.appendChild(frame); // move to the back of the recycling order
   } else {
     frame = document.createElement('iframe');
     container.appendChild(frame);

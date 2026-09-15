@@ -6,8 +6,8 @@ import { runPool } from './upload-queue.js';
 import { crc32 } from './zip-writer.js';
 import { PROBE_KIND } from './download-preflight.js';
 
-export const CONCURRENCY = 4;        // default concurrent fetches
-export const TINY_MAX = 4 * 1024 * 1024;    // <= this: buffer in memory
+export const CONCURRENCY = 4; // default concurrent fetches
+export const TINY_MAX = 4 * 1024 * 1024; // <= this: buffer in memory
 export const MEDIUM_MAX = 64 * 1024 * 1024; // <= this: buffer in an OPFS temp file; else stream solo
 
 export function classifyTier(size) {
@@ -70,13 +70,21 @@ export function createTempStore(root) {
 
     async remove(name) {
       const fname = tempName(name);
-      try { await root.removeEntry(fname); } catch { /* best effort */ }
+      try {
+        await root.removeEntry(fname);
+      } catch {
+        /* best effort */
+      }
       created.delete(fname);
     },
 
     async removeAll() {
       for (const fname of created) {
-        try { await root.removeEntry(fname); } catch { /* best effort */ }
+        try {
+          await root.removeEntry(fname);
+        } catch {
+          /* best effort */
+        }
       }
       created.clear();
     },
@@ -125,16 +133,10 @@ const DENIED_BLOCK_STREAK = 3;
 // (not on every non-DENIED probe result, unlike the sequential engine) — this is the
 // simplification the design's D4 rolling-count directive calls for, made explicit here
 // because the two behave differently for interleaved MISSING/TRANSIENT results.
-export async function runPrefetch(items, {
-  fetchImpl,
-  presign,
-  probe,
-  root,
-  concurrency = CONCURRENCY,
-  onReady,
-  onProgress,
-  shouldCancel = () => false,
-} = {}) {
+export async function runPrefetch(
+  items,
+  { fetchImpl, presign, probe, root, concurrency = CONCURRENCY, onReady, onProgress, shouldCancel = () => false } = {},
+) {
   const tempStore = createTempStore(root);
 
   const failed = [];
@@ -156,7 +158,13 @@ export async function runPrefetch(items, {
   const emitProgress = () => onProgress?.({ active: snapshotActive(), bytesDone });
 
   const abortAllInFlight = () => {
-    for (const c of inFlightControllers) { try { c.abort(); } catch { /* already settled */ } }
+    for (const c of inFlightControllers) {
+      try {
+        c.abort();
+      } catch {
+        /* already settled */
+      }
+    }
   };
 
   // Checked at item-pickup and right after each onReady settles — both are the points at
@@ -177,13 +185,17 @@ export async function runPrefetch(items, {
   let writerTail = Promise.resolve();
   const withWriterLock = (fn) => {
     const run = writerTail.then(fn);
-    writerTail = run.then(() => {}, () => {});
+    writerTail = run.then(
+      () => {},
+      () => {},
+    );
     return run;
   };
 
-  const arrayToAsyncIterable = (chunks) => (async function* () {
-    for (const c of chunks) yield c;
-  })();
+  const arrayToAsyncIterable = (chunks) =>
+    (async function* () {
+      for (const c of chunks) yield c;
+    })();
 
   async function processItem(item) {
     noteCancelIfRequested();
@@ -245,7 +257,8 @@ export async function runPrefetch(items, {
       if (tier === 'memory') {
         const reader = res.body.getReader();
         const chunks = [];
-        let crc = 0, size = 0;
+        let crc = 0,
+          size = 0;
         for (;;) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -260,7 +273,8 @@ export async function runPrefetch(items, {
       } else if (tier === 'temp') {
         tempName = `p${tempSeq++}`;
         const reader = res.body.getReader();
-        let crc = 0, size = 0;
+        let crc = 0,
+          size = 0;
         async function* source() {
           for (;;) {
             const { done, value } = await reader.read();
@@ -282,7 +296,10 @@ export async function runPrefetch(items, {
         // fully drained it (bytes are still being downloaded for the whole onReady call).
         const reader = res.body.getReader();
         entry = {
-          item, tier, crc: null, size: item.size ?? 0,
+          item,
+          tier,
+          crc: null,
+          size: item.size ?? 0,
           chunks: (async function* () {
             try {
               for (;;) {
@@ -388,7 +405,11 @@ export async function sweepOrphanTemps(root, { now = () => Date.now(), maxAgeMs 
         const handle = await root.getFileHandle(name);
         const file = await handle.getFile();
         if (now() - file.lastModified >= maxAgeMs) await root.removeEntry(name);
-      } catch { /* best effort — this entry only */ }
+      } catch {
+        /* best effort — this entry only */
+      }
     }
-  } catch { /* best effort — OPFS unsupported, keys() unavailable, etc. */ }
+  } catch {
+    /* best effort — OPFS unsupported, keys() unavailable, etc. */
+  }
 }

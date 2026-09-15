@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 
 import { calcPartSize, preparePutBody } from '../src/lib/upload-queue.js';
 
-const MB  = 1_000_000;       // decimal MB (S3 spec uses decimal)
-const MiB = 1024 * 1024;     // binary MiB
+const MB = 1_000_000; // decimal MB (S3 spec uses decimal)
+const MiB = 1024 * 1024; // binary MiB
 
 describe('calcPartSize', () => {
   // ── 5 MB floor ──────────────────────────────────────────────────────────────

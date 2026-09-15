@@ -27,7 +27,7 @@ describe('ConnectionTabs', () => {
 
   test('marks the active tab', () => {
     const { queryAll, cleanup } = mount(h(ConnectionTabs, props({ selectedId: 2 })));
-    const active = queryAll('.connection-tab').filter(t => t.classList.contains('connection-tab-active'));
+    const active = queryAll('.connection-tab').filter((t) => t.classList.contains('connection-tab-active'));
     assert.equal(active.length, 1);
     assert.ok(active[0].textContent.includes('backups'));
     cleanup();
@@ -35,7 +35,16 @@ describe('ConnectionTabs', () => {
 
   test('clicking a tab calls onSelect with its connection id', () => {
     let picked = null;
-    const { queryAll, cleanup } = mount(h(ConnectionTabs, props({ onSelect: id => { picked = id; } })));
+    const { queryAll, cleanup } = mount(
+      h(
+        ConnectionTabs,
+        props({
+          onSelect: (id) => {
+            picked = id;
+          },
+        }),
+      ),
+    );
     fire(queryAll('.connection-tab')[2], 'click'); // client-assets (id=3)
     assert.equal(picked, 3);
     cleanup();

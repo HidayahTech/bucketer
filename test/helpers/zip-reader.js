@@ -11,12 +11,12 @@ import assert from 'node:assert/strict';
 
 // Independent bitwise CRC-32 (reflected, poly 0xEDB88320) — no table.
 export function refCrc(bytes) {
-  let crc = 0xFFFFFFFF;
+  let crc = 0xffffffff;
   for (const b of bytes) {
     crc ^= b;
-    for (let i = 0; i < 8; i++) crc = (crc >>> 1) ^ (0xEDB88320 & -(crc & 1));
+    for (let i = 0; i < 8; i++) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
   }
-  return (crc ^ 0xFFFFFFFF) >>> 0;
+  return (crc ^ 0xffffffff) >>> 0;
 }
 
 const dv = (u8) => new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
@@ -26,13 +26,16 @@ export function readZip(u8) {
   const d = dv(u8);
   let eocd = -1;
   for (let i = u8.length - 22; i >= 0; i--) {
-    if (d.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+    if (d.getUint32(i, true) === 0x06054b50) {
+      eocd = i;
+      break;
+    }
   }
   assert.notEqual(eocd, -1, 'EOCD signature present');
   let count = d.getUint16(eocd + 10, true);
   let cdSize = d.getUint32(eocd + 12, true);
   let cdOff = d.getUint32(eocd + 16, true);
-  if (count === 0xFFFF || cdOff === 0xFFFFFFFF || cdSize === 0xFFFFFFFF) {
+  if (count === 0xffff || cdOff === 0xffffffff || cdSize === 0xffffffff) {
     const locOff = eocd - 20;
     assert.equal(d.getUint32(locOff, true), 0x07064b50, 'ZIP64 EOCD locator present');
     const z64Off = Number(d.getBigUint64(locOff + 8, true));
@@ -60,12 +63,22 @@ export function readZip(u8) {
     let q = p + 46 + nameLen;
     const extraEnd = q + extraLen;
     while (q < extraEnd) {
-      const id = d.getUint16(q, true), sz = d.getUint16(q + 2, true);
+      const id = d.getUint16(q, true),
+        sz = d.getUint16(q + 2, true);
       if (id === 0x0001) {
         let r = q + 4;
-        if (usize === 0xFFFFFFFF) { usize = Number(d.getBigUint64(r, true)); r += 8; }
-        if (csize === 0xFFFFFFFF) { csize = Number(d.getBigUint64(r, true)); r += 8; }
-        if (lho === 0xFFFFFFFF) { lho = Number(d.getBigUint64(r, true)); r += 8; }
+        if (usize === 0xffffffff) {
+          usize = Number(d.getBigUint64(r, true));
+          r += 8;
+        }
+        if (csize === 0xffffffff) {
+          csize = Number(d.getBigUint64(r, true));
+          r += 8;
+        }
+        if (lho === 0xffffffff) {
+          lho = Number(d.getBigUint64(r, true));
+          r += 8;
+        }
       }
       q += 4 + sz;
     }

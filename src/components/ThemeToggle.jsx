@@ -9,8 +9,8 @@ import { nextThemePref, applyThemeToRoot } from '../lib/theme.js';
 
 const META = {
   system: { icon: '🖥', title: 'Theme: System (click for Light)' },
-  light:  { icon: '☀', title: 'Theme: Light (click for Dark)' },
-  dark:   { icon: '🌙', title: 'Theme: Dark (click for System)' },
+  light: { icon: '☀', title: 'Theme: Light (click for Dark)' },
+  dark: { icon: '🌙', title: 'Theme: Dark (click for System)' },
 };
 
 export function ThemeToggle() {

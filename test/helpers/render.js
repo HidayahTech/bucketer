@@ -31,21 +31,23 @@ export function mount(vnode) {
   document.body.appendChild(container);
   act(() => render(vnode, container));
   return {
-    text:      ()    => container.textContent,
-    html:      ()    => container.innerHTML,
-    query:     (sel) => container.querySelector(sel),
-    queryAll:  (sel) => [...container.querySelectorAll(sel)],
+    text: () => container.textContent,
+    html: () => container.innerHTML,
+    query: (sel) => container.querySelector(sel),
+    queryAll: (sel) => [...container.querySelectorAll(sel)],
     container,
-    cleanup:   ()    => { act(() => render(null, container)); container.remove(); },
+    cleanup: () => {
+      act(() => render(null, container));
+      container.remove();
+    },
   };
 }
 
 // Dispatch a real DOM event and flush Preact's state synchronously.
 // Use this for click, input, change, keydown, etc.
 export function fire(element, eventName, init = {}) {
-  const Ctor = eventName === 'click'   ? MouseEvent
-             : eventName === 'keydown' || eventName === 'keyup' ? KeyboardEvent
-             : Event;
+  const Ctor =
+    eventName === 'click' ? MouseEvent : eventName === 'keydown' || eventName === 'keyup' ? KeyboardEvent : Event;
   act(() => element.dispatchEvent(new Ctor(eventName, { bubbles: true, cancelable: true, ...init })));
 }
 

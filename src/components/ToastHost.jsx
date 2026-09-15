@@ -12,7 +12,7 @@ export function ToastHost() {
 
   return (
     <div class="toast-host" role="status" aria-live="polite" aria-atomic="false">
-      {toasts.map(t => (
+      {toasts.map((t) => (
         <button
           type="button"
           key={t.id}

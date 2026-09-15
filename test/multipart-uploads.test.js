@@ -19,16 +19,26 @@ function mockClient(pages) {
 describe('listIncompleteUploads', () => {
   test('returns key/uploadId/initiated for a single page', async () => {
     const client = mockClient([{ Uploads: [{ Key: 'a.bin', UploadId: 'u1', Initiated: 't1' }], IsTruncated: false }]);
-    assert.deepEqual(await listIncompleteUploads(client, 'bk', ''), [{ key: 'a.bin', uploadId: 'u1', initiated: 't1' }]);
+    assert.deepEqual(await listIncompleteUploads(client, 'bk', ''), [
+      { key: 'a.bin', uploadId: 'u1', initiated: 't1' },
+    ]);
   });
 
   test('paginates via KeyMarker/UploadIdMarker and passes the prefix', async () => {
     const client = mockClient([
-      { Uploads: [{ Key: 'a', UploadId: 'u1', Initiated: 't1' }], IsTruncated: true, NextKeyMarker: 'a', NextUploadIdMarker: 'u1' },
+      {
+        Uploads: [{ Key: 'a', UploadId: 'u1', Initiated: 't1' }],
+        IsTruncated: true,
+        NextKeyMarker: 'a',
+        NextUploadIdMarker: 'u1',
+      },
       { Uploads: [{ Key: 'b', UploadId: 'u2', Initiated: 't2' }], IsTruncated: false },
     ]);
     const out = await listIncompleteUploads(client, 'bk', 'p/');
-    assert.deepEqual(out.map((u) => u.uploadId), ['u1', 'u2']);
+    assert.deepEqual(
+      out.map((u) => u.uploadId),
+      ['u1', 'u2'],
+    );
     assert.equal(client.calls[0].input.Prefix, 'p/');
     assert.equal(client.calls[1].input.KeyMarker, 'a');
     assert.equal(client.calls[1].input.UploadIdMarker, 'u1');

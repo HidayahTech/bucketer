@@ -3,7 +3,16 @@
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { PutObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest } from '../harness.mjs';
+import {
+  startMock,
+  startAppServer,
+  connectApp,
+  BUCKET,
+  launchBrowser,
+  newE2EContext,
+  newE2EPage,
+  e2eTest,
+} from '../harness.mjs';
 
 let ctx, app, browser, context, page;
 before(async () => {
@@ -13,11 +22,15 @@ before(async () => {
   context = await newE2EContext(browser);
   page = await newE2EPage(context);
 });
-after(async () => { await browser?.close(); await app?.close(); await ctx?.mock.close(); });
+after(async () => {
+  await browser?.close();
+  await app?.close();
+  await ctx?.mock.close();
+});
 
 async function keys() {
   const r = await ctx.client.send(new ListObjectsV2Command({ Bucket: BUCKET }));
-  return (r.Contents || []).map(o => o.Key).sort();
+  return (r.Contents || []).map((o) => o.Key).sort();
 }
 
 describe('browser e2e — folder rename', () => {
@@ -38,7 +51,8 @@ describe('browser e2e — folder rename', () => {
     const deadline = Date.now() + 15000;
     let k = await keys();
     while (JSON.stringify(k) !== JSON.stringify(['guides/a.txt', 'guides/sub/b.txt']) && Date.now() < deadline) {
-      await new Promise(r => setTimeout(r, 200)); k = await keys();
+      await new Promise((r) => setTimeout(r, 200));
+      k = await keys();
     }
     assert.deepEqual(k, ['guides/a.txt', 'guides/sub/b.txt']);
     // DOM: the old folder row is gone.

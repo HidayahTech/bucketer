@@ -22,5 +22,5 @@ export function nameComparator(sortDir) {
 
 // Returns a comparator for numeric values (file size, timestamps).
 export function numericComparator(sortDir) {
-  return (a, b) => sortDir === 'asc' ? a - b : b - a;
+  return (a, b) => (sortDir === 'asc' ? a - b : b - a);
 }

@@ -17,8 +17,8 @@ import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 
 const PROJECT_PATH = 'hidayahtech%2Fbucketer';
-const API_BASE     = `https://gitlab.com/api/v4/projects/${PROJECT_PATH}`;
-const PKG_BASE     = `${API_BASE}/packages/generic/bucketer`;
+const API_BASE = `https://gitlab.com/api/v4/projects/${PROJECT_PATH}`;
+const PKG_BASE = `${API_BASE}/packages/generic/bucketer`;
 
 const DRY_RUN = process.argv.includes('--dry-run');
 
@@ -41,7 +41,8 @@ function semverCompare(a, b) {
   const pa = a.split('.').map(Number);
   const pb = b.split('.').map(Number);
   for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const x = pa[i] || 0, y = pb[i] || 0;
+    const x = pa[i] || 0,
+      y = pb[i] || 0;
     if (x !== y) return x - y;
   }
   return 0;
@@ -69,10 +70,11 @@ async function uploadManifest(version, manifest) {
     const proc = spawn('glab', ['api', '--method', 'PUT', '--input', '-', path], {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
-    let stdout = '', stderr = '';
-    proc.stdout.on('data', d => stdout += d);
-    proc.stderr.on('data', d => stderr += d);
-    proc.on('close', code => {
+    let stdout = '',
+      stderr = '';
+    proc.stdout.on('data', (d) => (stdout += d));
+    proc.stderr.on('data', (d) => (stderr += d));
+    proc.on('close', (code) => {
       if (code === 0) resolve();
       else reject(new Error(`glab api exited ${code}: ${(stderr || stdout).slice(0, 200)}`));
     });
@@ -114,8 +116,13 @@ async function main() {
     }
   }
 
-  console.log(`\nDone. Skipped: ${results.skipped}  ${DRY_RUN ? 'Would-upload' : 'Uploaded'}: ${results.processed}  Failed: ${results.failed}`);
+  console.log(
+    `\nDone. Skipped: ${results.skipped}  ${DRY_RUN ? 'Would-upload' : 'Uploaded'}: ${results.processed}  Failed: ${results.failed}`,
+  );
   if (results.failed > 0) process.exit(1);
 }
 
-main().catch(err => { console.error(err); process.exit(1); });
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

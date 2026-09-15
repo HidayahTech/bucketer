@@ -5,8 +5,16 @@ import { describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import {
-  startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage,
-  collectDownloads, e2eTest, e2eEngineName,
+  startMock,
+  startAppServer,
+  connectApp,
+  BUCKET,
+  launchBrowser,
+  newE2EContext,
+  newE2EPage,
+  collectDownloads,
+  e2eTest,
+  e2eEngineName,
 } from '../harness.mjs';
 
 let ctx, app, browser, context, page, downloads;
@@ -17,8 +25,10 @@ before(async () => {
   browser = await launchBrowser();
   // Two loose files + a folder of two, plus one file that must NOT download.
   for (const [key, body] of [
-    ['sel/a.txt', 'aaa'], ['sel/b.txt', 'bbb'],
-    ['sel/sub/c.txt', 'ccc'], ['sel/sub/d.txt', 'ddd'],
+    ['sel/a.txt', 'aaa'],
+    ['sel/b.txt', 'bbb'],
+    ['sel/sub/c.txt', 'ccc'],
+    ['sel/sub/d.txt', 'ddd'],
     ['sel/untouched.txt', 'nope'],
   ]) {
     await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: key, Body: body }));
@@ -39,7 +49,13 @@ beforeEach(async () => {
   ctx.mock.requestLog.reset();
 });
 
-const navGetPaths = () => new Set(ctx.mock.requestLog.list().filter(r => r.isNavGet).map(r => r.path));
+const navGetPaths = () =>
+  new Set(
+    ctx.mock.requestLog
+      .list()
+      .filter((r) => r.isNavGet)
+      .map((r) => r.path),
+  );
 const isWebKit = () => e2eEngineName() === 'webkit';
 
 describe('browser e2e — selection download', () => {
@@ -57,7 +73,10 @@ describe('browser e2e — selection download', () => {
     await page.locator('[data-testid="scan"]').click();
     await page.locator('[data-testid="start"]').waitFor({ timeout: 30000 });
     await page.locator('[data-testid="start"]').click();
-    await page.getByText(/Sent 4 of 4/).first().waitFor({ timeout: 60000 });
+    await page
+      .getByText(/Sent 4 of 4/)
+      .first()
+      .waitFor({ timeout: 60000 });
 
     if (isWebKit()) {
       await downloads.settle(4000);
@@ -70,9 +89,12 @@ describe('browser e2e — selection download', () => {
     // count) fails.
     assert.equal(paths.size, 4, 'exactly the four selected files must be requested');
     for (const expected of ['a.txt', 'b.txt', 'sub/c.txt', 'sub/d.txt']) {
-      assert.ok([...paths].some(p => p.includes(expected)), `${expected} must be requested`);
+      assert.ok(
+        [...paths].some((p) => p.includes(expected)),
+        `${expected} must be requested`,
+      );
     }
-    assert.ok(![...paths].some(p => p.includes('untouched')), 'the unticked file must never be requested');
+    assert.ok(![...paths].some((p) => p.includes('untouched')), 'the unticked file must never be requested');
   });
 
   e2eTest('the folder-row entry downloads that subfolder without navigating into it', async () => {
@@ -91,16 +113,31 @@ describe('browser e2e — selection download', () => {
     await page.locator('[data-testid="scan"]').click();
     await page.locator('[data-testid="start"]').waitFor({ timeout: 30000 });
     await page.locator('[data-testid="start"]').click();
-    await page.getByText(/Sent 2 of 2/).first().waitFor({ timeout: 60000 });
+    await page
+      .getByText(/Sent 2 of 2/)
+      .first()
+      .waitFor({ timeout: 60000 });
 
-    if (isWebKit()) { await downloads.settle(4000); } else { await downloads.waitForCount(2, 30000); }
+    if (isWebKit()) {
+      await downloads.settle(4000);
+    } else {
+      await downloads.waitForCount(2, 30000);
+    }
     const paths = navGetPaths();
     // Identity, not just count: pin down that the two requests are specifically sub/c.txt
     // and sub/d.txt, so a scope bug that grabbed a.txt/b.txt instead (same count) fails.
     assert.equal(paths.size, 2, 'exactly the two subfolder files must be requested');
-    assert.ok([...paths].some(p => p.includes('sub/c.txt')), 'sel/sub/c.txt must be requested');
-    assert.ok([...paths].some(p => p.includes('sub/d.txt')), 'sel/sub/d.txt must be requested');
-    assert.ok(![...paths].some(p => p.includes('a.txt') || p.includes('b.txt') || p.includes('untouched')),
-      'the loose files and the untouched file must never be requested');
+    assert.ok(
+      [...paths].some((p) => p.includes('sub/c.txt')),
+      'sel/sub/c.txt must be requested',
+    );
+    assert.ok(
+      [...paths].some((p) => p.includes('sub/d.txt')),
+      'sel/sub/d.txt must be requested',
+    );
+    assert.ok(
+      ![...paths].some((p) => p.includes('a.txt') || p.includes('b.txt') || p.includes('untouched')),
+      'the loose files and the untouched file must never be requested',
+    );
   });
 });

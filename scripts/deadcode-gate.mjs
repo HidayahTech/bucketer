@@ -9,7 +9,7 @@
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 
-export const findingKey = f => JSON.stringify([f.file, f.identifier, f.kind]);
+export const findingKey = (f) => JSON.stringify([f.file, f.identifier, f.kind]);
 
 // knip --reporter json → { issues: [ { file, exports:[{name}], types:[], files:[],
 // dependencies:[...], devDependencies:[...], unlisted:[], ... } ] }. Each per-file issue
@@ -33,8 +33,8 @@ export function normalizeKnip(json) {
 export function diffFindings(current, baseline) {
   const curKeys = new Set(current.map(findingKey));
   const baseKeys = new Set(baseline.map(findingKey));
-  const unexpected = current.filter(f => !baseKeys.has(findingKey(f)));
-  const stale = baseline.filter(f => !curKeys.has(findingKey(f)));
+  const unexpected = current.filter((f) => !baseKeys.has(findingKey(f)));
+  const stale = baseline.filter((f) => !curKeys.has(findingKey(f)));
   return { unexpected, stale };
 }
 
@@ -52,15 +52,17 @@ function main() {
   const current = normalizeKnip(JSON.parse(runKnipJson()));
   const baseline = JSON.parse(readFileSync(new URL('../deadcode-baseline.json', import.meta.url), 'utf8'));
   const { unexpected, stale } = diffFindings(current, baseline);
-  const show = f => `${f.file} ${f.identifier} ${f.kind}`;
+  const show = (f) => `${f.file} ${f.identifier} ${f.kind}`;
   if (unexpected.length) {
     console.error(`\nNew dead-code findings not in deadcode-baseline.json (${unexpected.length}):`);
-    unexpected.forEach(f => console.error('  + ' + show(f)));
+    unexpected.forEach((f) => console.error('  + ' + show(f)));
     console.error('Fix the code, or (for test-only/dormant code) add a baseline entry with a reason.');
   }
   if (stale.length) {
-    console.error(`\nStale deadcode-baseline.json entries — code no longer flagged, delete these rows (${stale.length}):`);
-    stale.forEach(f => console.error('  - ' + show(f)));
+    console.error(
+      `\nStale deadcode-baseline.json entries — code no longer flagged, delete these rows (${stale.length}):`,
+    );
+    stale.forEach((f) => console.error('  - ' + show(f)));
   }
   if (!unexpected.length && !stale.length) console.log('deadcode gate: clean (findings match baseline).');
   process.exit(unexpected.length || stale.length ? 1 : 0);

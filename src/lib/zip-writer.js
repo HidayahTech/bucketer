@@ -24,16 +24,16 @@ const CRC_TABLE = (() => {
   const t = new Uint32Array(256);
   for (let n = 0; n < 256; n++) {
     let c = n;
-    for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xEDB88320 & -(c & 1));
+    for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1));
     t[n] = c >>> 0;
   }
   return t;
 })();
 
 export function crc32(bytes, seed = 0) {
-  let crc = (seed ^ 0xFFFFFFFF) >>> 0;
-  for (let i = 0; i < bytes.length; i++) crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ bytes[i]) & 0xFF];
-  return (crc ^ 0xFFFFFFFF) >>> 0;
+  let crc = (seed ^ 0xffffffff) >>> 0;
+  for (let i = 0; i < bytes.length; i++) crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ bytes[i]) & 0xff];
+  return (crc ^ 0xffffffff) >>> 0;
 }
 
 // DOS timestamps cannot express pre-1980; clamp rather than wrap.
@@ -46,14 +46,36 @@ export function dosDateTime(mtime) {
 }
 
 class ByteBuilder {
-  constructor() { this.parts = []; this.len = 0; }
-  u16(v) { const b = new Uint8Array(2); new DataView(b.buffer).setUint16(0, v, true); this.push(b); }
-  u32(v) { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, v >>> 0, true); this.push(b); }
-  u64(v) { const b = new Uint8Array(8); new DataView(b.buffer).setBigUint64(0, BigInt(v), true); this.push(b); }
-  push(u8) { this.parts.push(u8); this.len += u8.length; }
+  constructor() {
+    this.parts = [];
+    this.len = 0;
+  }
+  u16(v) {
+    const b = new Uint8Array(2);
+    new DataView(b.buffer).setUint16(0, v, true);
+    this.push(b);
+  }
+  u32(v) {
+    const b = new Uint8Array(4);
+    new DataView(b.buffer).setUint32(0, v >>> 0, true);
+    this.push(b);
+  }
+  u64(v) {
+    const b = new Uint8Array(8);
+    new DataView(b.buffer).setBigUint64(0, BigInt(v), true);
+    this.push(b);
+  }
+  push(u8) {
+    this.parts.push(u8);
+    this.len += u8.length;
+  }
   bytes() {
-    const out = new Uint8Array(this.len); let o = 0;
-    for (const p of this.parts) { out.set(p, o); o += p.length; }
+    const out = new Uint8Array(this.len);
+    let o = 0;
+    for (const p of this.parts) {
+      out.set(p, o);
+      o += p.length;
+    }
     return out;
   }
 }
@@ -65,13 +87,16 @@ export function localHeaderBytes(path, { time, date, zip64 = false }) {
   const nameBytes = new TextEncoder().encode(path);
   const b = new ByteBuilder();
   b.u32(SIG_LOCAL);
-  b.u16(zip64 ? 45 : 20);          // version needed
+  b.u16(zip64 ? 45 : 20); // version needed
   b.u16(FLAGS);
-  b.u16(0);                        // method: store
-  b.u16(time); b.u16(date);
-  b.u32(0); b.u32(0); b.u32(0);    // crc, csize, usize: in the descriptor
+  b.u16(0); // method: store
+  b.u16(time);
+  b.u16(date);
+  b.u32(0);
+  b.u32(0);
+  b.u32(0); // crc, csize, usize: in the descriptor
   b.u16(nameBytes.length);
-  b.u16(0);                        // no local extra: descriptor carries the truth
+  b.u16(0); // no local extra: descriptor carries the truth
   b.push(nameBytes);
   return b.bytes();
 }
@@ -80,32 +105,50 @@ export function dataDescriptorBytes({ crc, size, zip64 }) {
   const b = new ByteBuilder();
   b.u32(SIG_DESC);
   b.u32(crc);
-  if (zip64) { b.u64(size); b.u64(size); } else { b.u32(size); b.u32(size); }
+  if (zip64) {
+    b.u64(size);
+    b.u64(size);
+  } else {
+    b.u32(size);
+    b.u32(size);
+  }
   return b.bytes();
 }
 
-export function centralDirectoryBytes(entries, { zip64Limit = 0xFFFFFFFF, maxEntries = 0xFFFF, cdStart }) {
+export function centralDirectoryBytes(entries, { zip64Limit = 0xffffffff, maxEntries = 0xffff, cdStart }) {
   const b = new ByteBuilder();
   for (const e of entries) {
     const nameBytes = new TextEncoder().encode(e.path);
-    const sizeMark = e.size >= zip64Limit ? 0xFFFFFFFF : e.size;
-    const offMark = e.zipOffset >= zip64Limit ? 0xFFFFFFFF : e.zipOffset;
+    const sizeMark = e.size >= zip64Limit ? 0xffffffff : e.size;
+    const offMark = e.zipOffset >= zip64Limit ? 0xffffffff : e.zipOffset;
     const extra = new ByteBuilder();
-    if (sizeMark === 0xFFFFFFFF || offMark === 0xFFFFFFFF) {
+    if (sizeMark === 0xffffffff || offMark === 0xffffffff) {
       const fields = new ByteBuilder();
-      if (sizeMark === 0xFFFFFFFF) { fields.u64(e.size); fields.u64(e.size); } // usize, csize
-      if (offMark === 0xFFFFFFFF) fields.u64(e.zipOffset);
-      extra.u16(0x0001); extra.u16(fields.len); extra.push(fields.bytes());
+      if (sizeMark === 0xffffffff) {
+        fields.u64(e.size);
+        fields.u64(e.size);
+      } // usize, csize
+      if (offMark === 0xffffffff) fields.u64(e.zipOffset);
+      extra.u16(0x0001);
+      extra.u16(fields.len);
+      extra.push(fields.bytes());
     }
     b.u32(SIG_CENTRAL);
-    b.u16(45);                                   // version made by
-    b.u16(sizeMark === 0xFFFFFFFF || offMark === 0xFFFFFFFF ? 45 : 20);
-    b.u16(FLAGS); b.u16(0);
-    b.u16(e.time ?? 0); b.u16(e.date ?? 0x21);
+    b.u16(45); // version made by
+    b.u16(sizeMark === 0xffffffff || offMark === 0xffffffff ? 45 : 20);
+    b.u16(FLAGS);
+    b.u16(0);
+    b.u16(e.time ?? 0);
+    b.u16(e.date ?? 0x21);
     b.u32(e.crc);
-    b.u32(sizeMark); b.u32(sizeMark);
-    b.u16(nameBytes.length); b.u16(extra.len); b.u16(0);
-    b.u16(0); b.u16(0); b.u32(0);
+    b.u32(sizeMark);
+    b.u32(sizeMark);
+    b.u16(nameBytes.length);
+    b.u16(extra.len);
+    b.u16(0);
+    b.u16(0);
+    b.u16(0);
+    b.u32(0);
     b.u32(offMark);
     b.push(nameBytes);
     b.push(extra.bytes());
@@ -114,29 +157,46 @@ export function centralDirectoryBytes(entries, { zip64Limit = 0xFFFFFFFF, maxEnt
   const needZip64 = entries.length > maxEntries || cdStart >= zip64Limit || cdSize >= zip64Limit;
   if (needZip64) {
     const z64At = cdStart + cdSize;
-    b.u32(SIG_Z64_EOCD); b.u64(44); b.u16(45); b.u16(45);
-    b.u32(0); b.u32(0);
-    b.u64(entries.length); b.u64(entries.length);
-    b.u64(cdSize); b.u64(cdStart);
-    b.u32(SIG_Z64_LOC); b.u32(0); b.u64(z64At); b.u32(1);
+    b.u32(SIG_Z64_EOCD);
+    b.u64(44);
+    b.u16(45);
+    b.u16(45);
+    b.u32(0);
+    b.u32(0);
+    b.u64(entries.length);
+    b.u64(entries.length);
+    b.u64(cdSize);
+    b.u64(cdStart);
+    b.u32(SIG_Z64_LOC);
+    b.u32(0);
+    b.u64(z64At);
+    b.u32(1);
   }
-  b.u32(SIG_EOCD); b.u16(0); b.u16(0);
-  const cnt = needZip64 ? 0xFFFF : entries.length;
-  b.u16(cnt); b.u16(cnt);
-  b.u32(needZip64 ? 0xFFFFFFFF : cdSize);
-  b.u32(needZip64 ? 0xFFFFFFFF : cdStart);
+  b.u32(SIG_EOCD);
+  b.u16(0);
+  b.u16(0);
+  const cnt = needZip64 ? 0xffff : entries.length;
+  b.u16(cnt);
+  b.u16(cnt);
+  b.u32(needZip64 ? 0xffffffff : cdSize);
+  b.u32(needZip64 ? 0xffffffff : cdStart);
   b.u16(0);
   return b.bytes();
 }
 
-export function createZipWriter(sink, { zip64Limit = 0xFFFFFFFF, maxEntries = 0xFFFF, startOffset = 0 } = {}) {
+export function createZipWriter(sink, { zip64Limit = 0xffffffff, maxEntries = 0xffff, startOffset = 0 } = {}) {
   let offset = startOffset;
   let cur = null; // { path, nameBytes, zipOffset, declaredSize, zip64, crc, size, time, date }
 
-  const write = async (u8) => { await sink.write(u8); offset += u8.length; };
+  const write = async (u8) => {
+    await sink.write(u8);
+    offset += u8.length;
+  };
 
   return {
-    get offset() { return offset; },
+    get offset() {
+      return offset;
+    },
 
     async beginEntry(path, { mtime = null, declaredSize = 0 } = {}) {
       if (cur) throw new Error('previous entry not ended');
@@ -158,11 +218,20 @@ export function createZipWriter(sink, { zip64Limit = 0xFFFFFFFF, maxEntries = 0x
     async endEntry() {
       if (!cur) throw new Error('no entry in progress');
       if (cur.size !== cur.declaredSize) {
-        const e = cur; cur = null;
+        const e = cur;
+        cur = null;
         throw new Error(`entry ${e.path}: streamed ${e.size} bytes but declared ${e.declaredSize}`);
       }
       await write(dataDescriptorBytes({ crc: cur.crc, size: cur.size, zip64: cur.zip64 }));
-      const rec = { path: cur.path, zipOffset: cur.zipOffset, zipEnd: offset, size: cur.size, crc: cur.crc, time: cur.time, date: cur.date };
+      const rec = {
+        path: cur.path,
+        zipOffset: cur.zipOffset,
+        zipEnd: offset,
+        size: cur.size,
+        crc: cur.crc,
+        time: cur.time,
+        date: cur.date,
+      };
       cur = null;
       return rec;
     },

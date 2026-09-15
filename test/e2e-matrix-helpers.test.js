@@ -1,8 +1,14 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  parseListEnv, parseDeviceListEnv, buildCombos, comboLabel, imageTagFromLock, pickRuntime,
-  DEFAULT_ENGINES, DEFAULT_DEVICES,
+  parseListEnv,
+  parseDeviceListEnv,
+  buildCombos,
+  comboLabel,
+  imageTagFromLock,
+  pickRuntime,
+  DEFAULT_ENGINES,
+  DEFAULT_DEVICES,
 } from './e2e/matrix-helpers.mjs';
 
 describe('parseListEnv', () => {
@@ -31,8 +37,10 @@ describe('parseDeviceListEnv', () => {
 describe('buildCombos', () => {
   test('engine-major expansion mirrors the CI matrix layout', () => {
     assert.deepEqual(buildCombos(['a', 'b'], ['', 'd1']), [
-      { engine: 'a', device: '' }, { engine: 'a', device: 'd1' },
-      { engine: 'b', device: '' }, { engine: 'b', device: 'd1' },
+      { engine: 'a', device: '' },
+      { engine: 'a', device: 'd1' },
+      { engine: 'b', device: '' },
+      { engine: 'b', device: 'd1' },
     ]);
   });
   test('defaults produce the full 9-combo grid', () => {
@@ -56,14 +64,19 @@ describe('imageTagFromLock', () => {
   test('throws on missing or non-exact versions (a wrong image skews every result)', () => {
     assert.throws(() => imageTagFromLock({}), /Cannot derive/);
     assert.throws(() => imageTagFromLock({ packages: {} }), /Cannot derive/);
-    assert.throws(() => imageTagFromLock({ packages: { 'node_modules/playwright': { version: '^1.60.0' } } }), /Cannot derive/);
+    assert.throws(
+      () => imageTagFromLock({ packages: { 'node_modules/playwright': { version: '^1.60.0' } } }),
+      /Cannot derive/,
+    );
   });
   test('matches the image pinned in .gitlab-ci.yml (keep CI and local in lockstep)', async () => {
     const { readFileSync } = await import('node:fs');
     const lock = JSON.parse(readFileSync(new URL('../package-lock.json', import.meta.url), 'utf8'));
     const ci = readFileSync(new URL('../.gitlab-ci.yml', import.meta.url), 'utf8');
-    assert.ok(ci.includes(`image: ${imageTagFromLock(lock)}`),
-      `.gitlab-ci.yml must pin ${imageTagFromLock(lock)} (locked playwright version) — update the image tag or the dependency together`);
+    assert.ok(
+      ci.includes(`image: ${imageTagFromLock(lock)}`),
+      `.gitlab-ci.yml must pin ${imageTagFromLock(lock)} (locked playwright version) — update the image tag or the dependency together`,
+    );
   });
 });
 
@@ -98,8 +111,10 @@ describe('e2e browser lanes retry flaky failures (CI)', () => {
   test('the deterministic e2e-node lane does NOT retry', async () => {
     const { readFileSync } = await import('node:fs');
     const ci = readFileSync(new URL('../.gitlab-ci.yml', import.meta.url), 'utf8');
-    assert.ok(!section(ci, 'e2e-node:').includes('retry'),
-      'e2e-node is deterministic — a failure there is real and must not be retried');
+    assert.ok(
+      !section(ci, 'e2e-node:').includes('retry'),
+      'e2e-node is deterministic — a failure there is real and must not be retried',
+    );
   });
 
   // The npm-audit CVE check is deliberately ADVISORY: a fresh transitive vulnerability must

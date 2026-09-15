@@ -30,10 +30,10 @@ export const PROVIDER_LABELS = {
 // at /r2/ would incorrectly match if we tested the full URL). Patterns are anchored
 // with $ to prevent suffix-based misdetection (e.g. 'mybackblazeb2.com' must not match).
 const PATTERNS = [
-  { re: /\.backblazeb2\.com$/i,        provider: PROVIDERS.B2 },
+  { re: /\.backblazeb2\.com$/i, provider: PROVIDERS.B2 },
   { re: /\.r2\.cloudflarestorage\.com$/i, provider: PROVIDERS.R2 },
-  { re: /\.wasabisys\.com$/i,          provider: PROVIDERS.WASABI },
-  { re: /\.amazonaws\.com$/i,          provider: PROVIDERS.AWS },
+  { re: /\.wasabisys\.com$/i, provider: PROVIDERS.WASABI },
+  { re: /\.amazonaws\.com$/i, provider: PROVIDERS.AWS },
   { re: /\.digitaloceanspaces\.com$/i, provider: PROVIDERS.DO_SPACES },
 ];
 
@@ -43,7 +43,9 @@ export function detectProvider(endpoint) {
     for (const { re, provider } of PATTERNS) {
       if (re.test(host)) return provider;
     }
-  } catch { /* unparseable endpoint — fall through to GENERIC */ }
+  } catch {
+    /* unparseable endpoint — fall through to GENERIC */
+  }
   return PROVIDERS.GENERIC;
 }
 
@@ -68,9 +70,12 @@ export function extractRegion(endpoint, provider) {
         // Some Wasabi regions use legacy alias slugs that differ from canonical SigV4 names.
         // Using the alias slug causes SigV4 signing failures; map to canonical names.
         const WASABI_ALIASES = {
-          'nl-1': 'eu-central-1', 'de-1': 'eu-central-2',
-          'uk-1': 'eu-west-1',    'fr-1': 'eu-west-2',
-          'uk-2': 'eu-west-3',    'it-1': 'eu-south-1',
+          'nl-1': 'eu-central-1',
+          'de-1': 'eu-central-2',
+          'uk-1': 'eu-west-1',
+          'fr-1': 'eu-west-2',
+          'uk-2': 'eu-west-3',
+          'it-1': 'eu-south-1',
         };
         return WASABI_ALIASES[m[1]] ?? m[1];
       }
@@ -141,9 +146,7 @@ export function buildEndpoint(provider, region) {
     case PROVIDERS.WASABI:
       // us-east-1 uses the legacy bare endpoint (no region segment in hostname).
       // All other regions follow the standard template.
-      return region === 'us-east-1'
-        ? 'https://s3.wasabisys.com'
-        : `https://s3.${region}.wasabisys.com`;
+      return region === 'us-east-1' ? 'https://s3.wasabisys.com' : `https://s3.${region}.wasabisys.com`;
     case PROVIDERS.AWS:
       return `https://s3.${region}.amazonaws.com`;
     case PROVIDERS.DO_SPACES:

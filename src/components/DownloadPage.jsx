@@ -13,7 +13,7 @@ const TEXT_PREVIEW_LIMIT = 100 * 1024;
 
 // AWS basic ISO 8601 (20260611T203417Z) → extended ISO (2026-06-11T20:34:17Z)
 function awsDateToIso(d) {
-  return `${d.slice(0,4)}-${d.slice(4,6)}-${d.slice(6,8)}T${d.slice(9,11)}:${d.slice(11,13)}:${d.slice(13,15)}Z`;
+  return `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}T${d.slice(9, 11)}:${d.slice(11, 13)}:${d.slice(13, 15)}Z`;
 }
 
 function parseExpiry(url) {
@@ -59,13 +59,16 @@ export function DownloadPage({ presignedUrl }) {
   useEffect(() => {
     if (kind !== 'text' || expired) return;
     fetch(presignedUrl, { headers: { Range: `bytes=0-${TEXT_PREVIEW_LIMIT - 1}` } })
-      .then(r => {
+      .then((r) => {
         const mtime = r.headers.get('x-amz-meta-' + FILE_MTIME_KEY);
         if (mtime) {
           const d = new Date(mtime);
           if (!isNaN(d.getTime())) setFileMtime(d);
         }
-        return r.text().then(t => { setPreviewText(t); setPreviewTruncated(r.status === 206); });
+        return r.text().then((t) => {
+          setPreviewText(t);
+          setPreviewTruncated(r.status === 206);
+        });
       })
       .catch(() => {});
   }, [presignedUrl]);
@@ -76,7 +79,7 @@ export function DownloadPage({ presignedUrl }) {
   useEffect(() => {
     if (kind === 'text' || expired) return;
     fetch(presignedUrl, { headers: { Range: 'bytes=0-0' } })
-      .then(r => {
+      .then((r) => {
         const mtime = r.headers.get('x-amz-meta-' + FILE_MTIME_KEY);
         if (mtime) {
           const d = new Date(mtime);
@@ -91,7 +94,9 @@ export function DownloadPage({ presignedUrl }) {
       <header class="app-header">
         <BucketerLogo />
         <span class="spacer" />
-        <button class="btn-version" disabled>v{CURRENT_VERSION}</button>
+        <button class="btn-version" disabled>
+          v{CURRENT_VERSION}
+        </button>
       </header>
 
       <div class="main-content">
@@ -109,9 +114,7 @@ export function DownloadPage({ presignedUrl }) {
                   File Modified: {fileMtime.toLocaleString()}
                 </p>
               )}
-              <p style={{ color: 'var(--text-muted)', margin: '0 0 1.5rem' }}>
-                Expires in {remaining}
-              </p>
+              <p style={{ color: 'var(--text-muted)', margin: '0 0 1.5rem' }}>Expires in {remaining}</p>
               <a class="btn btn-primary" href={presignedUrl} style={{ display: 'inline-block' }}>
                 Download
               </a>
@@ -124,7 +127,7 @@ export function DownloadPage({ presignedUrl }) {
                     truncated={previewTruncated}
                     alt={fileName}
                     pixelated={pixelated}
-                    onLoad={e => setPixelated(e.target.naturalWidth < 128 && e.target.naturalHeight < 128)}
+                    onLoad={(e) => setPixelated(e.target.naturalWidth < 128 && e.target.naturalHeight < 128)}
                   />
                 </div>
               )}
@@ -133,9 +136,7 @@ export function DownloadPage({ presignedUrl }) {
         </div>
       </div>
 
-      <footer class="app-footer">
-        Bucketer &mdash; Copyright &copy; 2026 HidayahTech, LLC
-      </footer>
+      <footer class="app-footer">Bucketer &mdash; Copyright &copy; 2026 HidayahTech, LLC</footer>
     </div>
   );
 }

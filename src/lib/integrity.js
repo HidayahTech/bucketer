@@ -19,15 +19,15 @@
 // Algorithms we know how to compute, in preferred order. The manifest's hashes
 // field is intentionally an object (not a string) so future algorithms can be
 // added here without a schema migration on the published manifests.
-const ALGORITHMS = [
-  { id: 'sha256', subtleName: 'SHA-256' },
-];
+const ALGORITHMS = [{ id: 'sha256', subtleName: 'SHA-256' }];
 
 const GITLAB_PROJECT = 'hidayahtech%2Fbucketer';
 
 function manifestUrlFor(version) {
-  return `https://gitlab.com/api/v4/projects/${GITLAB_PROJECT}` +
-    `/packages/generic/bucketer/${version}/bucketer-v${version}.integrity.json`;
+  return (
+    `https://gitlab.com/api/v4/projects/${GITLAB_PROJECT}` +
+    `/packages/generic/bucketer/${version}/bucketer-v${version}.integrity.json`
+  );
 }
 
 function toHex(buffer) {
@@ -75,7 +75,7 @@ export async function verifyIntegrity({ version, pageUrl, fetchFn, subtle }) {
     return { status: 'network-error', version, message: 'Manifest missing hashes object' };
   }
 
-  const algo = ALGORITHMS.find(a => typeof hashes[a.id] === 'string');
+  const algo = ALGORITHMS.find((a) => typeof hashes[a.id] === 'string');
   if (!algo) {
     return { status: 'unknown-algorithm', version, algorithms: Object.keys(hashes) };
   }

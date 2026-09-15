@@ -17,7 +17,9 @@ function recordingClient(requests) {
       if (cmd.constructor.name === 'ListObjectsV2Command') {
         requests.push(cmd.input.Prefix ?? '');
         return Promise.resolve({
-          Contents: [{ Key: (cmd.input.Prefix || '') + 'a.txt', Size: 5, ETag: '"a"', LastModified: new Date(1700000000000) }],
+          Contents: [
+            { Key: (cmd.input.Prefix || '') + 'a.txt', Size: 5, ETag: '"a"', LastModified: new Date(1700000000000) },
+          ],
           IsTruncated: false,
           CommonPrefixes: [{ Prefix: (cmd.input.Prefix || '') + 'sub/' }],
         });
@@ -30,16 +32,27 @@ function recordingClient(requests) {
 const caps = { list: 'permitted', download: 'permitted', upload: 'permitted', delete: 'permitted' };
 
 function mountScoped(requests, { basePrefix = 'team/alice/', isFirstMount = false } = {}) {
-  return mount(h(Browser, {
-    client: recordingClient(requests), bucket: 'b', provider: 'generic',
-    credentials: { bucket: 'b', basePrefix },
-    capabilities: caps, onCapabilityChange: () => {}, onDownloadRequest: () => {},
-    onDeleteRequest: () => {}, onMoveRequest: () => {}, onUploadTargetChange: () => {},
-    onInitialListFailed: () => {}, isFirstMount,
-  }));
+  return mount(
+    h(Browser, {
+      client: recordingClient(requests),
+      bucket: 'b',
+      provider: 'generic',
+      credentials: { bucket: 'b', basePrefix },
+      capabilities: caps,
+      onCapabilityChange: () => {},
+      onDownloadRequest: () => {},
+      onDeleteRequest: () => {},
+      onMoveRequest: () => {},
+      onUploadTargetChange: () => {},
+      onInitialListFailed: () => {},
+      isFirstMount,
+    }),
+  );
 }
 
-async function tick() { await new Promise(r => setTimeout(r, 20)); }
+async function tick() {
+  await new Promise((r) => setTimeout(r, 20));
+}
 
 describe('Browser — base prefix floor (#60)', () => {
   test('scoped connect starts listing at the floor, never the root', async () => {
@@ -66,7 +79,10 @@ describe('Browser — base prefix floor (#60)', () => {
     try {
       await tick();
       assert.equal(requests[0], 'team/alice/2026/');
-    } finally { cleanup(); window.location.hash = ''; }
+    } finally {
+      cleanup();
+      window.location.hash = '';
+    }
   });
 
   test('an initial hash prefix outside the floor is clamped to the floor with a notice', async () => {
@@ -77,9 +93,14 @@ describe('Browser — base prefix floor (#60)', () => {
       await tick();
       assert.equal(requests[0], 'team/alice/', 'out-of-floor deep link must clamp to the floor');
       assert.ok(!requests.includes('team/bob/'), 'the out-of-floor prefix must never be requested');
-      assert.ok(text().includes('outside this connection’s base folder'),
-        'the clamp must be said out loud, not silent');
-    } finally { cleanup(); window.location.hash = ''; }
+      assert.ok(
+        text().includes('outside this connection’s base folder'),
+        'the clamp must be said out loud, not silent',
+      );
+    } finally {
+      cleanup();
+      window.location.hash = '';
+    }
   });
 
   test('a popstate carrying an out-of-floor prefix is clamped', async () => {
@@ -92,7 +113,9 @@ describe('Browser — base prefix floor (#60)', () => {
       await tick();
       assert.ok(!requests.includes('elsewhere/'), 'popstate must not escape the floor');
       assert.equal(requests[requests.length - 1], 'team/alice/', 'clamped navigation lands on the floor');
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 
   test('the breadcrumb is floor-pinned (no root crumb while scoped)', async () => {
@@ -110,7 +133,7 @@ describe('Browser — base prefix floor (#60)', () => {
     const { query, queryAll, cleanup } = mountScoped(requests);
     await tick();
     for (const cb of queryAll('tbody .col-check input[type="checkbox"]')) fire(cb, 'change');
-    const moveBtn = Array.from(queryAll('.batch-bar button')).find(b => b.textContent.includes('Move'));
+    const moveBtn = Array.from(queryAll('.batch-bar button')).find((b) => b.textContent.includes('Move'));
     fire(moveBtn, 'click');
     await tick();
     assert.ok(query('.modal-overlay') || query('.breadcrumb'), 'picker must render');

@@ -18,13 +18,13 @@ export function isEditableTarget(el) {
 }
 
 export function resolveShortcut(e, ctx) {
-  if (ctx.previewOpen) return null;   // preview owns Esc / arrows
-  if (ctx.inTextField) return null;   // don't hijack typing
+  if (ctx.previewOpen) return null; // preview owns Esc / arrows
+  if (ctx.inTextField) return null; // don't hijack typing
 
   const mod = e.ctrlKey || e.metaKey;
   if (mod) {
     if (e.key === 'a' || e.key === 'A') return 'select-all';
-    return null;                      // leave other Ctrl/Cmd combos to the browser
+    return null; // leave other Ctrl/Cmd combos to the browser
   }
   if (e.key === '/') return 'focus-filter';
   if (e.key === 'Delete' && ctx.hasSelection) return 'delete';

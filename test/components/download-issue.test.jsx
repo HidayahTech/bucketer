@@ -13,7 +13,9 @@ import { issueBrowserDownload, MAX_DOWNLOAD_FRAMES } from '../../src/lib/downloa
 const frames = () => [...document.querySelectorAll('iframe')];
 
 describe('issueBrowserDownload', () => {
-  beforeEach(() => { document.body.innerHTML = ''; });
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
 
   // BUG-053: one reused frame meant every src assignment could cancel the previous file's
   // still-pending navigation. Consecutive issues must land in different frames.
@@ -22,11 +24,11 @@ describe('issueBrowserDownload', () => {
     issueBrowserDownload('https://example.invalid/b', 'b.txt');
     issueBrowserDownload('https://example.invalid/c', 'c.txt');
 
-    assert.deepEqual(frames().map(f => f.src), [
-      'https://example.invalid/a',
-      'https://example.invalid/b',
-      'https://example.invalid/c',
-    ], 'reusing a frame with a navigation in flight cancels that download');
+    assert.deepEqual(
+      frames().map((f) => f.src),
+      ['https://example.invalid/a', 'https://example.invalid/b', 'https://example.invalid/c'],
+      'reusing a frame with a navigation in flight cancels that download',
+    );
   });
 
   test('the pool is bounded: a job of thousands of files stays at the cap', () => {
@@ -34,8 +36,11 @@ describe('issueBrowserDownload', () => {
       issueBrowserDownload(`https://example.invalid/f${i}`, `f${i}.txt`);
     }
 
-    assert.equal(frames().length, MAX_DOWNLOAD_FRAMES,
-      'an element per file would be an unbounded DOM leak (the reason the old code shared one frame)');
+    assert.equal(
+      frames().length,
+      MAX_DOWNLOAD_FRAMES,
+      'an element per file would be an unbounded DOM leak (the reason the old code shared one frame)',
+    );
   });
 
   test('recycling replaces the oldest frame, never a recent one', () => {
@@ -43,19 +48,24 @@ describe('issueBrowserDownload', () => {
       issueBrowserDownload(`https://example.invalid/f${i}`, `f${i}.txt`);
     }
 
-    const srcs = frames().map(f => f.src);
-    assert.equal(srcs.includes('https://example.invalid/f0'), false,
-      'f0 is the oldest navigation, the one most likely to have already resolved');
+    const srcs = frames().map((f) => f.src);
+    assert.equal(
+      srcs.includes('https://example.invalid/f0'),
+      false,
+      'f0 is the oldest navigation, the one most likely to have already resolved',
+    );
     assert.equal(srcs.includes(`https://example.invalid/f${MAX_DOWNLOAD_FRAMES}`), true);
-    assert.equal(srcs.includes('https://example.invalid/f1'), true,
-      'f1 must survive until the pool cycles again');
+    assert.equal(srcs.includes('https://example.invalid/f1'), true, 'f1 must survive until the pool cycles again');
   });
 
   test('creates no anchor', () => {
     issueBrowserDownload('https://example.invalid/a', 'a.txt');
 
-    assert.equal(document.querySelectorAll('a').length, 0,
-      'an anchor pointed at an error response navigates the top frame — that is BUG-050');
+    assert.equal(
+      document.querySelectorAll('a').length,
+      0,
+      'an anchor pointed at an error response navigates the top frame — that is BUG-050',
+    );
   });
 
   test('the frames are hidden', () => {

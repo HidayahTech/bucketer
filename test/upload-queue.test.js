@@ -4,7 +4,7 @@ import { UploadQueue, uploadPartsWithPool, runPool } from '../src/lib/upload-que
 
 // Helper: a task that resolves after `ms` milliseconds
 function delayed(ms, value) {
-  return () => new Promise(resolve => setTimeout(() => resolve(value), ms));
+  return () => new Promise((resolve) => setTimeout(() => resolve(value), ms));
 }
 
 // Helper: a task that rejects after `ms` milliseconds
@@ -19,11 +19,15 @@ describe('UploadQueue concurrency', () => {
     let peak = 0;
 
     // Each task increments running, records the peak, then holds for 20ms
-    const task = () => new Promise(resolve => {
-      running++;
-      peak = Math.max(peak, running);
-      setTimeout(() => { running--; resolve(); }, 20);
-    });
+    const task = () =>
+      new Promise((resolve) => {
+        running++;
+        peak = Math.max(peak, running);
+        setTimeout(() => {
+          running--;
+          resolve();
+        }, 20);
+      });
 
     await Promise.all([q.enqueue(task), q.enqueue(task), q.enqueue(task)]);
     assert.equal(peak, 2, 'no more than 2 tasks should run simultaneously');
@@ -35,13 +39,22 @@ describe('UploadQueue concurrency', () => {
 
     // With concurrency=1, tasks must complete in enqueue order
     await Promise.all([
-      q.enqueue(() => new Promise(r => setTimeout(() => { order.push(1); r(); }, 20))),
-      q.enqueue(async () => { order.push(2); }),
+      q.enqueue(
+        () =>
+          new Promise((r) =>
+            setTimeout(() => {
+              order.push(1);
+              r();
+            }, 20),
+          ),
+      ),
+      q.enqueue(async () => {
+        order.push(2);
+      }),
     ]);
 
     assert.deepEqual(order, [1, 2]);
   });
-
 });
 
 describe('UploadQueue clear()', () => {
@@ -53,8 +66,12 @@ describe('UploadQueue clear()', () => {
     const running = q.enqueue(delayed(30));
 
     // Queue two more — they will be pending while the first runs
-    q.enqueue(() => { pendingRan++; });
-    q.enqueue(() => { pendingRan++; });
+    q.enqueue(() => {
+      pendingRan++;
+    });
+    q.enqueue(() => {
+      pendingRan++;
+    });
 
     q.clear();
     await running; // the running task completes normally
@@ -82,7 +99,9 @@ describe('UploadQueue error handling', () => {
     let secondRan = false;
 
     const first = q.enqueue(failing(10));
-    const second = q.enqueue(async () => { secondRan = true; });
+    const second = q.enqueue(async () => {
+      secondRan = true;
+    });
 
     await first.catch(() => {}); // swallow the expected rejection
     await second;
@@ -95,7 +114,7 @@ describe('UploadQueue error handling', () => {
     const err = new Error('upload failed');
     await assert.rejects(
       q.enqueue(() => Promise.reject(err)),
-      { message: 'upload failed' }
+      { message: 'upload failed' },
     );
   });
 
@@ -105,8 +124,12 @@ describe('UploadQueue error handling', () => {
 
     await Promise.allSettled([
       q.enqueue(failing(5)),
-      q.enqueue(async () => { results.push('b'); }),
-      q.enqueue(async () => { results.push('c'); }),
+      q.enqueue(async () => {
+        results.push('b');
+      }),
+      q.enqueue(async () => {
+        results.push('c');
+      }),
     ]);
 
     assert.ok(results.includes('b'), 'b should run');
@@ -121,39 +144,60 @@ describe('UploadQueue error handling', () => {
 describe('uploadPartsWithPool', () => {
   test('processes all parts exactly once', async () => {
     const processed = new Set();
-    await uploadPartsWithPool([1, 2, 3, 4, 5], async (n) => {
-      processed.add(n);
-    }, 2);
-    assert.deepEqual([...processed].sort((a, b) => a - b), [1, 2, 3, 4, 5]);
+    await uploadPartsWithPool(
+      [1, 2, 3, 4, 5],
+      async (n) => {
+        processed.add(n);
+      },
+      2,
+    );
+    assert.deepEqual(
+      [...processed].sort((a, b) => a - b),
+      [1, 2, 3, 4, 5],
+    );
   });
 
   test('respects concurrency limit — peak in-flight equals concurrency', async () => {
     let inFlight = 0;
     let peakInFlight = 0;
 
-    await uploadPartsWithPool([1, 2, 3, 4, 5, 6, 7, 8], async () => {
-      inFlight++;
-      peakInFlight = Math.max(peakInFlight, inFlight);
-      await new Promise(resolve => setTimeout(resolve, 5));
-      inFlight--;
-    }, 3);
+    await uploadPartsWithPool(
+      [1, 2, 3, 4, 5, 6, 7, 8],
+      async () => {
+        inFlight++;
+        peakInFlight = Math.max(peakInFlight, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        inFlight--;
+      },
+      3,
+    );
 
-    assert.ok(peakInFlight > 1,
-      `pool must upload more than 1 part at a time (was serial: peak=${peakInFlight})`);
-    assert.ok(peakInFlight <= 3,
-      `pool must not exceed concurrency=3 (peak=${peakInFlight})`);
+    assert.ok(peakInFlight > 1, `pool must upload more than 1 part at a time (was serial: peak=${peakInFlight})`);
+    assert.ok(peakInFlight <= 3, `pool must not exceed concurrency=3 (peak=${peakInFlight})`);
   });
 
   test('concurrency=1 processes parts serially in order', async () => {
     const order = [];
-    await uploadPartsWithPool([3, 1, 2], async (n) => { order.push(n); }, 1);
+    await uploadPartsWithPool(
+      [3, 1, 2],
+      async (n) => {
+        order.push(n);
+      },
+      1,
+    );
     assert.deepEqual(order, [3, 1, 2]);
   });
 
   test('propagates errors from workFn', async () => {
     await assert.rejects(
-      uploadPartsWithPool([1], async () => { throw new Error('part failed'); }, 1),
-      { message: 'part failed' }
+      uploadPartsWithPool(
+        [1],
+        async () => {
+          throw new Error('part failed');
+        },
+        1,
+      ),
+      { message: 'part failed' },
     );
   });
 });
@@ -166,12 +210,16 @@ describe('runPool', () => {
     let inFlight = 0;
     let peakInFlight = 0;
 
-    await runPool([1, 2, 3, 4, 5, 6, 7, 8], async () => {
-      inFlight++;
-      peakInFlight = Math.max(peakInFlight, inFlight);
-      await new Promise(resolve => setTimeout(resolve, 5));
-      inFlight--;
-    }, 3);
+    await runPool(
+      [1, 2, 3, 4, 5, 6, 7, 8],
+      async () => {
+        inFlight++;
+        peakInFlight = Math.max(peakInFlight, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        inFlight--;
+      },
+      3,
+    );
 
     assert.ok(peakInFlight > 1, `pool must run more than 1 item at a time (was serial: peak=${peakInFlight})`);
     assert.ok(peakInFlight <= 3, `pool must not exceed concurrency=3 (peak=${peakInFlight})`);
@@ -179,7 +227,13 @@ describe('runPool', () => {
 
   test('processes every item exactly once, arbitrary item type', async () => {
     const seen = [];
-    await runPool(['a', 'b', 'c'], async (item) => { seen.push(item); }, 2);
+    await runPool(
+      ['a', 'b', 'c'],
+      async (item) => {
+        seen.push(item);
+      },
+      2,
+    );
     assert.deepEqual(seen.sort(), ['a', 'b', 'c']);
   });
 });
@@ -196,11 +250,15 @@ describe('UploadQueue concurrency property', () => {
     // Raise concurrency before next batch
     q.concurrency = 3;
 
-    const task = () => new Promise(resolve => {
-      running++;
-      peak = Math.max(peak, running);
-      setTimeout(() => { running--; resolve(); }, 20);
-    });
+    const task = () =>
+      new Promise((resolve) => {
+        running++;
+        peak = Math.max(peak, running);
+        setTimeout(() => {
+          running--;
+          resolve();
+        }, 20);
+      });
 
     await Promise.all([q.enqueue(task), q.enqueue(task), q.enqueue(task)]);
     assert.equal(peak, 3, 'should allow 3 concurrent after raising concurrency');

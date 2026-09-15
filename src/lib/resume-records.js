@@ -30,17 +30,17 @@ export async function saveResumeRecord(params) {
     const tx = db.transaction(STORE, 'readwrite');
     tx.objectStore(STORE).put(params, recordKey(params));
     tx.oncomplete = resolve;
-    tx.onerror    = () => reject(tx.error);
+    tx.onerror = () => reject(tx.error);
   });
 }
 
 export async function loadResumeRecord({ provider, endpoint, bucket, destinationKey }) {
   const db = await openDB();
   return new Promise((resolve, reject) => {
-    const tx  = db.transaction(STORE, 'readonly');
+    const tx = db.transaction(STORE, 'readonly');
     const req = tx.objectStore(STORE).get(recordKey({ provider, endpoint, bucket, destinationKey }));
     req.onsuccess = () => resolve(req.result ?? null);
-    req.onerror   = () => reject(req.error);
+    req.onerror = () => reject(req.error);
   });
 }
 
@@ -50,7 +50,7 @@ export async function deleteResumeRecord({ provider, endpoint, bucket, destinati
     const tx = db.transaction(STORE, 'readwrite');
     tx.objectStore(STORE).delete(recordKey({ provider, endpoint, bucket, destinationKey }));
     tx.oncomplete = resolve;
-    tx.onerror    = () => reject(tx.error);
+    tx.onerror = () => reject(tx.error);
   });
 }
 
@@ -58,12 +58,14 @@ export async function loadAllResumeRecords() {
   try {
     const db = await openDB();
     return new Promise((resolve, reject) => {
-      const tx  = db.transaction(STORE, 'readonly');
+      const tx = db.transaction(STORE, 'readonly');
       const req = tx.objectStore(STORE).getAll();
       req.onsuccess = () => resolve(req.result ?? []);
-      req.onerror   = () => reject(req.error);
+      req.onerror = () => reject(req.error);
     });
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 
 export async function clearAllResumeRecords() {
@@ -72,6 +74,6 @@ export async function clearAllResumeRecords() {
     const tx = db.transaction(STORE, 'readwrite');
     tx.objectStore(STORE).clear();
     tx.oncomplete = resolve;
-    tx.onerror    = () => reject(tx.error);
+    tx.onerror = () => reject(tx.error);
   });
 }

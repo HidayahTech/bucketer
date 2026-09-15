@@ -11,9 +11,12 @@ export async function collectFileEntries(entries) {
 
   async function traverse(entry, pathPrefix) {
     if (entry.isFile) {
-      await new Promise(resolve => {
+      await new Promise((resolve) => {
         entry.file(
-          file => { result.push({ file, relativePath: pathPrefix + file.name }); resolve(); },
+          (file) => {
+            result.push({ file, relativePath: pathPrefix + file.name });
+            resolve();
+          },
           () => resolve(), // skip unreadable files
         );
       });
@@ -28,7 +31,7 @@ export async function collectFileEntries(entries) {
     }
   }
 
-  await Promise.all(entries.map(entry => traverse(entry, '')));
+  await Promise.all(entries.map((entry) => traverse(entry, '')));
   return result;
 }
 
@@ -55,5 +58,5 @@ export async function resolveDroppedFiles(dataTransfer) {
     const fileEntries = await collectFileEntries(fsEntries).catch(() => []);
     if (fileEntries.length) return fileEntries;
   }
-  return flat.map(f => ({ file: f, relativePath: f.name }));
+  return flat.map((f) => ({ file: f, relativePath: f.name }));
 }

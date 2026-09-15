@@ -22,10 +22,16 @@ export function createTaskStore(scheduleFlush, cancelFlush) {
   const listeners = new Set();
   const cancelRequests = new Set();
   let suppressEmit = false;
-  const emit = () => { if (suppressEmit) return; for (const l of listeners) l(tasks); };
+  const emit = () => {
+    if (suppressEmit) return;
+    for (const l of listeners) l(tasks);
+  };
 
   const batcher = createUpdateBatcher(
-    (fn) => { tasks = fn(tasks); emit(); },
+    (fn) => {
+      tasks = fn(tasks);
+      emit();
+    },
     scheduleFlush,
     cancelFlush,
   );
@@ -46,7 +52,7 @@ export function createTaskStore(scheduleFlush, cancelFlush) {
     batcher.flush();
     suppressEmit = false;
     cancelRequests.delete(id);
-    tasks = tasks.filter(t => t.id !== id);
+    tasks = tasks.filter((t) => t.id !== id);
     emit();
   };
 
@@ -73,10 +79,6 @@ export function createTaskStore(scheduleFlush, cancelFlush) {
   };
 }
 
-const raf = typeof requestAnimationFrame === 'function'
-  ? requestAnimationFrame
-  : (fn) => setTimeout(fn, 16);
-const caf = typeof cancelAnimationFrame === 'function'
-  ? cancelAnimationFrame
-  : clearTimeout;
+const raf = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : (fn) => setTimeout(fn, 16);
+const caf = typeof cancelAnimationFrame === 'function' ? cancelAnimationFrame : clearTimeout;
 export const taskStore = createTaskStore(raf, caf);

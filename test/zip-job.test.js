@@ -50,7 +50,10 @@ describe('zipGate', () => {
     assert.match(g.reason, /storage/);
   });
   test('unavailable (not needs-storage) when persist is already granted and it still does not fit', () => {
-    assert.equal(zipGate({ caps: CAPS, sendableBytes: 5000, quota: quota(1000), persisted: true }).state, 'unavailable');
+    assert.equal(
+      zipGate({ caps: CAPS, sendableBytes: 5000, quota: quota(1000), persisted: true }).state,
+      'unavailable',
+    );
   });
   test('fit respects the QUOTA_SAFETY headroom, not the raw free space', () => {
     // free = 100; safety 0.9 → 90 usable; 95 must NOT fit.

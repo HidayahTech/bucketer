@@ -5,38 +5,57 @@
 // them at call time (not import time), so the globals just need to be present
 // on the global object before any function is invoked.
 
-const ls = {};   // localStorage backing store
-const ss = {};   // sessionStorage backing store
+const ls = {}; // localStorage backing store
+const ss = {}; // sessionStorage backing store
 
 function makeStore(backing) {
   return {
-    getItem:    k     => Object.prototype.hasOwnProperty.call(backing, k) ? backing[k] : null,
-    setItem:    (k,v) => { backing[k] = String(v); },
-    removeItem: k     => { delete backing[k]; },
+    getItem: (k) => (Object.prototype.hasOwnProperty.call(backing, k) ? backing[k] : null),
+    setItem: (k, v) => {
+      backing[k] = String(v);
+    },
+    removeItem: (k) => {
+      delete backing[k];
+    },
   };
 }
 
-global.localStorage   = makeStore(ls);
+global.localStorage = makeStore(ls);
 global.sessionStorage = makeStore(ss);
 
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   repairStorageInvariants,
-  loadCredentials, saveCredentials, clearCredentials,
-  loadMaxKeys, saveMaxKeys,
-  loadPartConcurrency, savePartConcurrency,
-  loadPartSizeMB, savePartSizeMB,
-  loadUploadMemoryMB, saveUploadMemoryMB,
-  loadMultiOriginUpload, saveMultiOriginUpload,
-  loadFileConcurrency, saveFileConcurrency,
-  loadListingCacheTTL, saveListingCacheTTL,
-  loadProfiles, saveProfile, deleteProfile,
-  loadLastProfileId, saveLastProfileId,
+  loadCredentials,
+  saveCredentials,
+  clearCredentials,
+  loadMaxKeys,
+  saveMaxKeys,
+  loadPartConcurrency,
+  savePartConcurrency,
+  loadPartSizeMB,
+  savePartSizeMB,
+  loadUploadMemoryMB,
+  saveUploadMemoryMB,
+  loadMultiOriginUpload,
+  saveMultiOriginUpload,
+  loadFileConcurrency,
+  saveFileConcurrency,
+  loadListingCacheTTL,
+  saveListingCacheTTL,
+  loadProfiles,
+  saveProfile,
+  deleteProfile,
+  loadLastProfileId,
+  saveLastProfileId,
   migrateProfilesFromLegacy,
-  loadAdaptiveMode, saveAdaptiveMode,
-  loadFileMtimeAutoLoad, saveFileMtimeAutoLoad,
-  wipeAllAppData, deleteAllProfiles,
+  loadAdaptiveMode,
+  saveAdaptiveMode,
+  loadFileMtimeAutoLoad,
+  saveFileMtimeAutoLoad,
+  wipeAllAppData,
+  deleteAllProfiles,
 } from '../src/lib/storage.js';
 
 // Clear both stores before each test to prevent cross-test contamination.
@@ -60,11 +79,11 @@ describe('saveCredentials / loadCredentials', () => {
   test('round-trips all credential fields', () => {
     saveCredentials(creds);
     const loaded = loadCredentials();
-    assert.equal(loaded.endpoint,       creds.endpoint);
-    assert.equal(loaded.bucket,         creds.bucket);
-    assert.equal(loaded.keyId,          creds.keyId);
-    assert.equal(loaded.secretKey,      creds.secretKey);
-    assert.equal(loaded.provider,       creds.provider);
+    assert.equal(loaded.endpoint, creds.endpoint);
+    assert.equal(loaded.bucket, creds.bucket);
+    assert.equal(loaded.keyId, creds.keyId);
+    assert.equal(loaded.secretKey, creds.secretKey);
+    assert.equal(loaded.provider, creds.provider);
     assert.equal(loaded.regionOverride, creds.regionOverride);
   });
 
@@ -75,20 +94,29 @@ describe('saveCredentials / loadCredentials', () => {
     saveCredentials(creds);
     const lsValues = Object.values(ls).join(' ');
     assert.ok(!lsValues.includes('supersecret'), 'secretKey must not appear in localStorage');
-    assert.ok(Object.values(ss).some(v => v === 'supersecret'), 'secretKey must be in sessionStorage');
+    assert.ok(
+      Object.values(ss).some((v) => v === 'supersecret'),
+      'secretKey must be in sessionStorage',
+    );
   });
 
   test('non-sensitive fields go to localStorage, not sessionStorage', () => {
     saveCredentials(creds);
-    assert.ok(Object.values(ls).some(v => v === creds.endpoint), 'endpoint must be in localStorage');
-    assert.ok(Object.values(ls).some(v => v === creds.keyId),    'keyId must be in localStorage');
+    assert.ok(
+      Object.values(ls).some((v) => v === creds.endpoint),
+      'endpoint must be in localStorage',
+    );
+    assert.ok(
+      Object.values(ls).some((v) => v === creds.keyId),
+      'keyId must be in localStorage',
+    );
   });
 
   test('returns empty strings for unset fields', () => {
     const loaded = loadCredentials();
-    assert.equal(loaded.endpoint,  '');
+    assert.equal(loaded.endpoint, '');
     assert.equal(loaded.secretKey, '');
-    assert.equal(loaded.keyId,     '');
+    assert.equal(loaded.keyId, '');
   });
 
   test('provider returns null (not empty string) when not set', () => {
@@ -114,12 +142,20 @@ describe('saveCredentials / loadCredentials', () => {
 
 describe('clearCredentials', () => {
   test('removes all credential fields from both stores', () => {
-    saveCredentials({ endpoint: 'https://s3.example.com', bucket: 'b', keyId: 'k', secretKey: 's', provider: 'r2', regionOverride: '', basePrefix: 'team/alice/' });
+    saveCredentials({
+      endpoint: 'https://s3.example.com',
+      bucket: 'b',
+      keyId: 'k',
+      secretKey: 's',
+      provider: 'r2',
+      regionOverride: '',
+      basePrefix: 'team/alice/',
+    });
     clearCredentials();
     const loaded = loadCredentials();
-    assert.equal(loaded.endpoint,  '');
+    assert.equal(loaded.endpoint, '');
     assert.equal(loaded.secretKey, '');
-    assert.equal(loaded.keyId,     '');
+    assert.equal(loaded.keyId, '');
     assert.equal(loaded.basePrefix, '', 'clearCredentials must wipe basePrefix with the other credential fields');
   });
 
@@ -128,12 +164,25 @@ describe('clearCredentials', () => {
   test('does not erase settings keys (T2-1)', () => {
     savePartSizeMB(50);
     savePartConcurrency(8);
-    saveCredentials({ endpoint: 'https://s3.example.com', bucket: 'b', keyId: 'k', secretKey: 's', provider: null, regionOverride: '' });
+    saveCredentials({
+      endpoint: 'https://s3.example.com',
+      bucket: 'b',
+      keyId: 'k',
+      secretKey: 's',
+      provider: null,
+      regionOverride: '',
+    });
     clearCredentials();
-    assert.equal(loadPartSizeMB(), 50,
-      'clearCredentials must not wipe partSizeMB — user loses config on every disconnect');
-    assert.equal(loadPartConcurrency(), 8,
-      'clearCredentials must not wipe partConcurrency — user loses config on every disconnect');
+    assert.equal(
+      loadPartSizeMB(),
+      50,
+      'clearCredentials must not wipe partSizeMB — user loses config on every disconnect',
+    );
+    assert.equal(
+      loadPartConcurrency(),
+      8,
+      'clearCredentials must not wipe partConcurrency — user loses config on every disconnect',
+    );
   });
 });
 
@@ -141,23 +190,51 @@ describe('clearCredentials', () => {
 
 describe('saveCredentials — provider write-boundary validation', () => {
   test('writes a valid provider identifier normally', () => {
-    saveCredentials({ endpoint: 'https://s3.example.com', bucket: 'b', keyId: 'k', secretKey: 's', provider: 'b2', regionOverride: '' });
+    saveCredentials({
+      endpoint: 'https://s3.example.com',
+      bucket: 'b',
+      keyId: 'k',
+      secretKey: 's',
+      provider: 'b2',
+      regionOverride: '',
+    });
     assert.equal(loadCredentials().provider, 'b2');
   });
 
   test('writes empty string when provider contains spaces (corrupted paste)', () => {
-    saveCredentials({ endpoint: 'https://s3.example.com', bucket: 'b', keyId: 'k', secretKey: 's', provider: 'b2Key ID: abc Secret Key: xyz', regionOverride: '' });
+    saveCredentials({
+      endpoint: 'https://s3.example.com',
+      bucket: 'b',
+      keyId: 'k',
+      secretKey: 's',
+      provider: 'b2Key ID: abc Secret Key: xyz',
+      regionOverride: '',
+    });
     assert.equal(ls['s3b_provider'], '');
     assert.equal(loadCredentials().provider, null);
   });
 
   test('writes empty string when provider exceeds 20 chars', () => {
-    saveCredentials({ endpoint: 'https://s3.example.com', bucket: 'b', keyId: 'k', secretKey: 's', provider: 'a_very_long_provider_identifier', regionOverride: '' });
+    saveCredentials({
+      endpoint: 'https://s3.example.com',
+      bucket: 'b',
+      keyId: 'k',
+      secretKey: 's',
+      provider: 'a_very_long_provider_identifier',
+      regionOverride: '',
+    });
     assert.equal(ls['s3b_provider'], '');
   });
 
   test('writes empty string for null/undefined provider', () => {
-    saveCredentials({ endpoint: 'https://s3.example.com', bucket: 'b', keyId: 'k', secretKey: 's', provider: null, regionOverride: '' });
+    saveCredentials({
+      endpoint: 'https://s3.example.com',
+      bucket: 'b',
+      keyId: 'k',
+      secretKey: 's',
+      provider: null,
+      regionOverride: '',
+    });
     assert.equal(ls['s3b_provider'], '');
   });
 });
@@ -290,7 +367,15 @@ describe('repairStorageInvariants', () => {
   });
 
   test('repairs corrupted provider field inside a stored profile', () => {
-    saveProfile({ id: 1, name: 'B2KEY ID: CORRUPTED — my-bucket', endpoint: 'https://s3.example.com', bucket: 'my-bucket', keyId: 'k', provider: 'b2Key ID: 000a8794834eb7c000000001cSecret Key: abc', regionOverride: '' });
+    saveProfile({
+      id: 1,
+      name: 'B2KEY ID: CORRUPTED — my-bucket',
+      endpoint: 'https://s3.example.com',
+      bucket: 'my-bucket',
+      keyId: 'k',
+      provider: 'b2Key ID: 000a8794834eb7c000000001cSecret Key: abc',
+      regionOverride: '',
+    });
     repairStorageInvariants();
     const { profiles } = loadProfiles();
     assert.equal(profiles[0].provider, null);
@@ -298,7 +383,15 @@ describe('repairStorageInvariants', () => {
   });
 
   test('leaves profiles with valid provider untouched', () => {
-    saveProfile({ id: 1, name: 'B2 — my-bucket', endpoint: 'https://s3.example.com', bucket: 'my-bucket', keyId: 'k', provider: 'b2', regionOverride: '' });
+    saveProfile({
+      id: 1,
+      name: 'B2 — my-bucket',
+      endpoint: 'https://s3.example.com',
+      bucket: 'my-bucket',
+      keyId: 'k',
+      provider: 'b2',
+      regionOverride: '',
+    });
     repairStorageInvariants();
     const { profiles } = loadProfiles();
     assert.equal(profiles[0].provider, 'b2');
@@ -315,18 +408,27 @@ describe('repairStorageInvariants', () => {
   // The provider field moved from profiles onto credential records
   // (connections.js) — repairStorageInvariants must repair it there too.
   test('repairs corrupted provider field inside a stored credential record', () => {
-    ls['s3b_credentials'] = JSON.stringify({ version: 1, credentials: [
-      { id: 'cred1', provider: 'b2Key ID: 000a8794834eb7c000000001cSecret Key: abc', endpoint: 'https://s3.example.com', keyId: 'k' },
-    ] });
+    ls['s3b_credentials'] = JSON.stringify({
+      version: 1,
+      credentials: [
+        {
+          id: 'cred1',
+          provider: 'b2Key ID: 000a8794834eb7c000000001cSecret Key: abc',
+          endpoint: 'https://s3.example.com',
+          keyId: 'k',
+        },
+      ],
+    });
     repairStorageInvariants();
     const { credentials } = JSON.parse(ls['s3b_credentials']);
     assert.equal(credentials[0].provider, null);
   });
 
   test('leaves credential records with a valid provider untouched', () => {
-    ls['s3b_credentials'] = JSON.stringify({ version: 1, credentials: [
-      { id: 'cred1', provider: 'b2', endpoint: 'https://s3.example.com', keyId: 'k' },
-    ] });
+    ls['s3b_credentials'] = JSON.stringify({
+      version: 1,
+      credentials: [{ id: 'cred1', provider: 'b2', endpoint: 'https://s3.example.com', keyId: 'k' }],
+    });
     repairStorageInvariants();
     const { credentials } = JSON.parse(ls['s3b_credentials']);
     assert.equal(credentials[0].provider, 'b2');
@@ -359,7 +461,15 @@ describe('loadProfiles', () => {
 });
 
 describe('saveProfile / loadProfiles (upsert)', () => {
-  const profile = { id: 1000, name: 'B2 — test', endpoint: 'https://s3.example.com', bucket: 'b', keyId: 'k', provider: 'b2', regionOverride: '' };
+  const profile = {
+    id: 1000,
+    name: 'B2 — test',
+    endpoint: 'https://s3.example.com',
+    bucket: 'b',
+    keyId: 'k',
+    provider: 'b2',
+    regionOverride: '',
+  };
 
   test('appends a new profile', () => {
     saveProfile(profile);
@@ -410,8 +520,23 @@ describe('deleteProfile', () => {
 
 describe('clearCredentials does not remove profiles', () => {
   test('profile data survives clearCredentials', () => {
-    saveProfile({ id: 1, name: 'A', endpoint: 'https://s3.example.com', bucket: 'b', keyId: 'k', provider: null, regionOverride: '' });
-    saveCredentials({ endpoint: 'https://s3.example.com', bucket: 'b', keyId: 'k', secretKey: 's', provider: null, regionOverride: '' });
+    saveProfile({
+      id: 1,
+      name: 'A',
+      endpoint: 'https://s3.example.com',
+      bucket: 'b',
+      keyId: 'k',
+      provider: null,
+      regionOverride: '',
+    });
+    saveCredentials({
+      endpoint: 'https://s3.example.com',
+      bucket: 'b',
+      keyId: 'k',
+      secretKey: 's',
+      provider: null,
+      regionOverride: '',
+    });
     clearCredentials();
     const { profiles } = loadProfiles();
     assert.equal(profiles.length, 1, 'profiles must survive clearCredentials');
@@ -438,10 +563,10 @@ describe('loadLastProfileId / saveLastProfileId', () => {
 
 describe('migrateProfilesFromLegacy', () => {
   test('creates a profile from flat credential keys', () => {
-    ls['s3b_endpoint']  = 'https://s3.example.com';
-    ls['s3b_bucket']    = 'my-bucket';
-    ls['s3b_key_id']    = 'AKID';
-    ls['s3b_provider']  = 'b2';
+    ls['s3b_endpoint'] = 'https://s3.example.com';
+    ls['s3b_bucket'] = 'my-bucket';
+    ls['s3b_key_id'] = 'AKID';
+    ls['s3b_provider'] = 'b2';
     migrateProfilesFromLegacy();
     const { profiles } = loadProfiles();
     assert.equal(profiles.length, 1);
@@ -452,8 +577,8 @@ describe('migrateProfilesFromLegacy', () => {
 
   test('is idempotent — does not create a second profile on re-run', () => {
     ls['s3b_endpoint'] = 'https://s3.example.com';
-    ls['s3b_bucket']   = 'my-bucket';
-    ls['s3b_key_id']   = 'AKID';
+    ls['s3b_bucket'] = 'my-bucket';
+    ls['s3b_key_id'] = 'AKID';
     migrateProfilesFromLegacy();
     migrateProfilesFromLegacy();
     assert.equal(loadProfiles().profiles.length, 1);
@@ -466,17 +591,26 @@ describe('migrateProfilesFromLegacy', () => {
 
   test('skips migration when bucket is longer than 63 chars (corrupted data)', () => {
     ls['s3b_endpoint'] = 'https://s3.example.com';
-    ls['s3b_bucket']   = 'KEY ID: 000A8794834EB7C000000001CSECRET KEY: K000RH9J5DROULDCCJ1CK88TZPETN5QUSE THE ABOVE CREDENTIALS TO LOGIN.';
-    ls['s3b_key_id']   = 'AKID';
+    ls['s3b_bucket'] =
+      'KEY ID: 000A8794834EB7C000000001CSECRET KEY: K000RH9J5DROULDCCJ1CK88TZPETN5QUSE THE ABOVE CREDENTIALS TO LOGIN.';
+    ls['s3b_key_id'] = 'AKID';
     migrateProfilesFromLegacy();
     assert.deepEqual(loadProfiles().profiles, []);
   });
 
   test('does nothing when profiles already exist', () => {
-    saveProfile({ id: 1, name: 'Existing', endpoint: 'x', bucket: 'b', keyId: 'k', provider: null, regionOverride: '' });
+    saveProfile({
+      id: 1,
+      name: 'Existing',
+      endpoint: 'x',
+      bucket: 'b',
+      keyId: 'k',
+      provider: null,
+      regionOverride: '',
+    });
     ls['s3b_endpoint'] = 'https://s3.example.com';
-    ls['s3b_bucket']   = 'my-bucket';
-    ls['s3b_key_id']   = 'AKID';
+    ls['s3b_bucket'] = 'my-bucket';
+    ls['s3b_key_id'] = 'AKID';
     migrateProfilesFromLegacy();
     assert.equal(loadProfiles().profiles.length, 1);
     assert.equal(loadProfiles().profiles[0].name, 'Existing');
@@ -520,7 +654,9 @@ describe('loadFileMtimeAutoLoad / saveFileMtimeAutoLoad', () => {
 import { loadThemePref, saveThemePref } from '../src/lib/storage.js';
 
 describe('loadThemePref / saveThemePref (#14)', () => {
-  beforeEach(() => { delete ls['s3b_theme']; });
+  beforeEach(() => {
+    delete ls['s3b_theme'];
+  });
 
   test('defaults to system when unset', () => {
     assert.equal(loadThemePref(), 'system');
@@ -554,7 +690,7 @@ describe('wipeAllAppData covers the connection model keys', () => {
   test('removes s3b_credentials and s3b_connections', () => {
     ls['s3b_credentials'] = JSON.stringify({ version: 1, credentials: [{ id: 'c1' }] });
     ls['s3b_connections'] = JSON.stringify({ version: 2, connections: [{ id: 1 }] });
-    ls['s3b_profiles']    = JSON.stringify({ version: 1, profiles: [{ id: 1 }] });
+    ls['s3b_profiles'] = JSON.stringify({ version: 1, profiles: [{ id: 1 }] });
     wipeAllAppData();
     assert.equal(ls['s3b_credentials'], undefined);
     assert.equal(ls['s3b_connections'], undefined);
@@ -574,7 +710,13 @@ describe('wipeAllAppData covers the connection model keys', () => {
   // deleteAllProfiles below, it must remove the vault record outright, not just
   // its entries.
   test('removes the vault record entirely', () => {
-    ls['s3b_vault'] = JSON.stringify({ version: 1, salt: 's', iterations: 600000, check: { iv: 'i', ct: 'c' }, entries: { a: { iv: 'i', ct: 'c' } } });
+    ls['s3b_vault'] = JSON.stringify({
+      version: 1,
+      salt: 's',
+      iterations: 600000,
+      check: { iv: 'i', ct: 'c' },
+      entries: { a: { iv: 'i', ct: 'c' } },
+    });
     wipeAllAppData();
     assert.equal(ls['s3b_vault'], undefined);
   });
@@ -597,8 +739,8 @@ describe('repairStorageInvariants clears the retired capability key', () => {
 
   test('does not disturb the connection model records', () => {
     ls['s3b_capabilities'] = JSON.stringify({ list: 'denied' });
-    ls['s3b_connections']  = JSON.stringify({ version: 2, connections: [{ id: 1, name: 'A' }] });
-    ls['s3b_credentials']  = JSON.stringify({ version: 1, credentials: [{ id: 'c1', provider: 'b2' }] });
+    ls['s3b_connections'] = JSON.stringify({ version: 2, connections: [{ id: 1, name: 'A' }] });
+    ls['s3b_credentials'] = JSON.stringify({ version: 1, credentials: [{ id: 'c1', provider: 'b2' }] });
     repairStorageInvariants();
     assert.equal(ls['s3b_capabilities'], undefined);
     assert.equal(JSON.parse(ls['s3b_connections']).connections.length, 1);
@@ -610,7 +752,7 @@ describe('deleteAllProfiles covers the connection model keys', () => {
   test('removes connection data alongside legacy profiles', () => {
     ls['s3b_credentials'] = JSON.stringify({ version: 1, credentials: [{ id: 'c1' }] });
     ls['s3b_connections'] = JSON.stringify({ version: 2, connections: [{ id: 1 }] });
-    ls['s3b_profiles']    = JSON.stringify({ version: 1, profiles: [{ id: 1 }] });
+    ls['s3b_profiles'] = JSON.stringify({ version: 1, profiles: [{ id: 1 }] });
     deleteAllProfiles();
     assert.equal(ls['s3b_credentials'], undefined);
     assert.equal(ls['s3b_connections'], undefined);
@@ -628,7 +770,10 @@ describe('deleteAllProfiles covers the connection model keys', () => {
 describe('deleteAllProfiles and the vault', () => {
   test('empties vault entries while leaving the vault record, salt, and check intact', () => {
     ls['s3b_vault'] = JSON.stringify({
-      version: 1, salt: 's', iterations: 600000, check: { iv: 'i', ct: 'c' },
+      version: 1,
+      salt: 's',
+      iterations: 600000,
+      check: { iv: 'i', ct: 'c' },
       entries: { c1: { iv: 'i1', ct: 'c1' }, c2: { iv: 'i2', ct: 'c2' } },
     });
     deleteAllProfiles();

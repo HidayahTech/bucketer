@@ -6,9 +6,11 @@ import assert from 'node:assert/strict';
 const loc = { protocol: 'https:', origin: 'https://app.example.com', pathname: '/', hash: '' };
 const historyLog = [];
 global.window = {
-  get location() { return loc; },
+  get location() {
+    return loc;
+  },
   history: {
-    pushState:    (state, _, url) => historyLog.push({ type: 'push',    state, url }),
+    pushState: (state, _, url) => historyLog.push({ type: 'push', state, url }),
     replaceState: (state, _, url) => historyLog.push({ type: 'replace', state, url }),
   },
 };
@@ -16,22 +18,35 @@ global.window = {
 import { readUrlParams, hasUrlParams, buildShareUrl, pushPrefixHistory } from '../src/lib/url-params.js';
 
 describe('buildShareUrl', () => {
-  beforeEach(() => { loc.hash = ''; loc.protocol = 'https:'; });
+  beforeEach(() => {
+    loc.hash = '';
+    loc.protocol = 'https:';
+  });
 
   // BUG-013: params were previously in the query string and appeared in server access logs.
   // They must live in the hash fragment, which browsers strip before sending HTTP requests.
   test('all params appear in the hash fragment, never the query string (BUG-013)', () => {
-    const url = buildShareUrl({ endpoint: 'https://s3.example.com', bucket: 'my-bucket', provider: 'b2', regionOverride: 'us-west-1' });
+    const url = buildShareUrl({
+      endpoint: 'https://s3.example.com',
+      bucket: 'my-bucket',
+      provider: 'b2',
+      regionOverride: 'us-west-1',
+    });
     assert.ok(url.includes('#'), 'URL must contain a hash fragment');
     assert.ok(!url.includes('?'), 'URL must not use a query string');
   });
 
   test('keyId and secretKey are never included in the output', () => {
-    const url = buildShareUrl({ endpoint: 'https://s3.example.com', bucket: 'my-bucket', keyId: 'AKID123', secretKey: 'supersecret' });
-    assert.ok(!url.includes('AKID123'),    'key ID must not appear in share URL');
+    const url = buildShareUrl({
+      endpoint: 'https://s3.example.com',
+      bucket: 'my-bucket',
+      keyId: 'AKID123',
+      secretKey: 'supersecret',
+    });
+    assert.ok(!url.includes('AKID123'), 'key ID must not appear in share URL');
     assert.ok(!url.includes('supersecret'), 'secret key must not appear in share URL');
-    assert.ok(!url.includes('keyId'),      'keyId param must not appear');
-    assert.ok(!url.includes('secretKey'),  'secretKey param must not appear');
+    assert.ok(!url.includes('keyId'), 'keyId param must not appear');
+    assert.ok(!url.includes('secretKey'), 'secretKey param must not appear');
   });
 
   test('endpoint and bucket are encoded in the hash', () => {
@@ -95,7 +110,9 @@ describe('buildShareUrl', () => {
 });
 
 describe('readUrlParams', () => {
-  beforeEach(() => { loc.hash = ''; });
+  beforeEach(() => {
+    loc.hash = '';
+  });
 
   test('reads endpoint and bucket from hash', () => {
     loc.hash = '#endpoint=https%3A%2F%2Fs3.example.com&bucket=my-bucket';
@@ -138,14 +155,12 @@ describe('readUrlParams', () => {
   // pre-fill the credential form with a malicious URL.
   test('rejects endpoint with javascript: scheme (T2-4)', () => {
     loc.hash = '#endpoint=javascript%3Aalert(1)';
-    assert.equal(readUrlParams().endpoint, undefined,
-      'endpoint with javascript: scheme must be silently ignored');
+    assert.equal(readUrlParams().endpoint, undefined, 'endpoint with javascript: scheme must be silently ignored');
   });
 
   test('rejects endpoint with ftp: scheme (T2-4)', () => {
     loc.hash = '#endpoint=ftp%3A%2F%2Fattacker.example.com';
-    assert.equal(readUrlParams().endpoint, undefined,
-      'endpoint with ftp: scheme must be silently ignored');
+    assert.equal(readUrlParams().endpoint, undefined, 'endpoint with ftp: scheme must be silently ignored');
   });
 
   test('accepts endpoint with https: scheme (T2-4)', () => {
@@ -160,14 +175,16 @@ describe('readUrlParams', () => {
 
   test('rejects bucket containing path traversal sequences (T2-4)', () => {
     loc.hash = '#bucket=..%2F..%2F..%2Fetc%2Fpasswd';
-    assert.equal(readUrlParams().bucket, undefined,
-      'bucket with .. path traversal must be silently ignored');
+    assert.equal(readUrlParams().bucket, undefined, 'bucket with .. path traversal must be silently ignored');
   });
 
   test('rejects bucket containing forward slashes (T2-4)', () => {
     loc.hash = '#bucket=legit%2Finjected-path';
-    assert.equal(readUrlParams().bucket, undefined,
-      'bucket with / must be silently ignored — S3 bucket names never contain slashes');
+    assert.equal(
+      readUrlParams().bucket,
+      undefined,
+      'bucket with / must be silently ignored — S3 bucket names never contain slashes',
+    );
   });
 
   test('accepts a valid bucket name (T2-4)', () => {
@@ -226,7 +243,9 @@ describe('readUrlParams', () => {
 });
 
 describe('hasUrlParams', () => {
-  beforeEach(() => { loc.hash = ''; });
+  beforeEach(() => {
+    loc.hash = '';
+  });
 
   test('true when endpoint is present', () => {
     loc.hash = '#endpoint=https%3A%2F%2Fs3.example.com';
@@ -259,7 +278,10 @@ describe('hasUrlParams', () => {
 });
 
 describe('pushPrefixHistory', () => {
-  beforeEach(() => { loc.hash = ''; historyLog.length = 0; });
+  beforeEach(() => {
+    loc.hash = '';
+    historyLog.length = 0;
+  });
 
   test('prefix is placed in the hash, not the query string', () => {
     pushPrefixHistory('photos/2024/');

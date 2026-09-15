@@ -28,17 +28,28 @@ export function useNewFolder({ client, bucket, prefix, commonPrefixes, setCommon
   async function handleCreateFolder() {
     const name = newFolderName.trim();
     const nameErr = validateObjectName(name);
-    if (nameErr) { setNewFolderError(nameErr); return; }
+    if (nameErr) {
+      setNewFolderError(nameErr);
+      return;
+    }
     const key = prefix + name + '/';
-    if (commonPrefixes.includes(key)) { setNewFolderError('A folder with that name already exists.'); return; }
+    if (commonPrefixes.includes(key)) {
+      setNewFolderError('A folder with that name already exists.');
+      return;
+    }
     setNewFolderSaving(true);
     setNewFolderError(null);
     try {
-      await client.send(new PutObjectCommand({
-        Bucket: bucket, Key: key, Body: '', ContentType: 'application/x-directory',
-      }));
+      await client.send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: key,
+          Body: '',
+          ContentType: 'application/x-directory',
+        }),
+      );
       invalidateCache(prefix);
-      setCommonPrefixes(prev => [...prev, key].sort());
+      setCommonPrefixes((prev) => [...prev, key].sort());
       setNewFolderOpen(false);
     } catch (err) {
       setNewFolderError(err.message || String(err));
@@ -48,7 +59,14 @@ export function useNewFolder({ client, bucket, prefix, commonPrefixes, setCommon
   }
 
   return {
-    newFolderOpen, newFolderName, setNewFolderName, newFolderError, setNewFolderError,
-    newFolderSaving, openNewFolder, closeNewFolder, handleCreateFolder,
+    newFolderOpen,
+    newFolderName,
+    setNewFolderName,
+    newFolderError,
+    setNewFolderError,
+    newFolderSaving,
+    openNewFolder,
+    closeNewFolder,
+    handleCreateFolder,
   };
 }

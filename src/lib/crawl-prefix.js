@@ -24,23 +24,25 @@ const DEFAULT_MAX_KEYS = 1000;
 // becomes resumable across sessions.
 //
 // Returns { objects, bytes, cancelled, nextToken } — counts only, never the keys.
-export async function crawlPrefix(client, bucket, prefix, {
-  onBatch,
-  shouldCancel = () => false,
-  maxKeys = DEFAULT_MAX_KEYS,
-  startToken = undefined,
-} = {}) {
+export async function crawlPrefix(
+  client,
+  bucket,
+  prefix,
+  { onBatch, shouldCancel = () => false, maxKeys = DEFAULT_MAX_KEYS, startToken = undefined } = {},
+) {
   let token = startToken;
   let objects = 0;
   let bytes = 0;
 
   for (;;) {
-    const resp = await client.send(new ListObjectsV2Command({
-      Bucket: bucket,
-      Prefix: prefix || undefined,
-      MaxKeys: maxKeys,
-      ContinuationToken: token,
-    }));
+    const resp = await client.send(
+      new ListObjectsV2Command({
+        Bucket: bucket,
+        Prefix: prefix || undefined,
+        MaxKeys: maxKeys,
+        ContinuationToken: token,
+      }),
+    );
 
     const contents = resp.Contents || [];
     // Trust IsTruncated, not the presence of a token: some implementations echo a stale

@@ -29,7 +29,7 @@ export function prefixRoot(prefix) {
 export function normalizeRoots({ files = [], prefixes = [] }) {
   const roots = prefixes.map(prefixRoot);
   for (const o of files) {
-    if (!prefixes.some(p => o.Key.startsWith(p))) roots.push(fileRoot(o));
+    if (!prefixes.some((p) => o.Key.startsWith(p))) roots.push(fileRoot(o));
   }
   return roots;
 }

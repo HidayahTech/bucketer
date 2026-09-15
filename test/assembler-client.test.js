@@ -23,11 +23,17 @@ function fakeWorker() {
         else if (msg.type === 'finish') emit({ type: 'finished', totalBytes: 999 });
       });
     },
-    addEventListener(evt, fn) { (listeners[evt] ??= []).push(fn); },
+    addEventListener(evt, fn) {
+      (listeners[evt] ??= []).push(fn);
+    },
     terminate() {},
   };
-  function emit(data) { for (const fn of listeners.message) fn({ data }); }
-  function emitError(err) { for (const fn of listeners.error) fn(err); }
+  function emit(data) {
+    for (const fn of listeners.message) fn({ data });
+  }
+  function emitError(err) {
+    for (const fn of listeners.error) fn(err);
+  }
   return { w, emit, emitError };
 }
 
@@ -43,11 +49,17 @@ function controllableFakeWorker() {
         // 'chunk': no auto-ack — the test controls draining via emit({type:'ack',...}).
       });
     },
-    addEventListener(evt, fn) { (listeners[evt] ??= []).push(fn); },
+    addEventListener(evt, fn) {
+      (listeners[evt] ??= []).push(fn);
+    },
     terminate() {},
   };
-  function emit(data) { for (const fn of listeners.message) fn({ data }); }
-  function emitError(err) { for (const fn of listeners.error) fn(err); }
+  function emit(data) {
+    for (const fn of listeners.message) fn({ data });
+  }
+  function emitError(err) {
+    for (const fn of listeners.error) fn(err);
+  }
   return { w, emit, emitError };
 }
 
@@ -65,7 +77,10 @@ test('client: init resolves {supported:true} on ready; endEntry resolves with wr
 
 test('client: init resolves {supported:false} when the worker reports unsupported', async () => {
   const { w, emit } = fakeWorker();
-  w.postMessage = (msg) => { if (msg.type === 'init') queueMicrotask(() => emit({ type: 'unsupported', reason: 'no createSyncAccessHandle in worker' })); };
+  w.postMessage = (msg) => {
+    if (msg.type === 'init')
+      queueMicrotask(() => emit({ type: 'unsupported', reason: 'no createSyncAccessHandle in worker' }));
+  };
   const c = createAssemblerClient(w);
   const initRes = await c.init('s.zip', { entries: [] }, []);
   assert.equal(initRes.supported, false);
@@ -76,7 +91,11 @@ test('client: entryError rejects the matching endEntry', async () => {
   const { w, emit } = fakeWorker();
   // override entryEnd to error
   const orig = w.postMessage;
-  w.postMessage = (msg) => { if (msg.type === 'entryEnd') queueMicrotask(() => emit({ type: 'entryError', key: msg.key, name: 'Bad', message: 'nope' })); else orig(msg); };
+  w.postMessage = (msg) => {
+    if (msg.type === 'entryEnd')
+      queueMicrotask(() => emit({ type: 'entryError', key: msg.key, name: 'Bad', message: 'nope' }));
+    else orig(msg);
+  };
   const c = createAssemblerClient(w);
   await c.init('s.zip', { entries: [] }, ['x']);
   await assert.rejects(() => c.endEntry('x'), /nope/);
@@ -86,7 +105,9 @@ test('client: onFatal fires on a fatal message', async () => {
   const { w, emit } = fakeWorker();
   const c = createAssemblerClient(w);
   let fatal = null;
-  c.onFatal((f) => { fatal = f; });
+  c.onFatal((f) => {
+    fatal = f;
+  });
   await c.init('s.zip', { entries: [] }, []);
   emit({ type: 'fatal', name: 'QuotaExceededError', message: 'full' });
   assert.equal(fatal.name, 'QuotaExceededError');
@@ -98,14 +119,18 @@ test('client: writeChunk backpressure — blocks past writeWindowBytes until an 
   await c.init('s.zip', { entries: [] }, ['x']);
 
   let p1Settled = false;
-  c.writeChunk('x', new Uint8Array(6)).then(() => { p1Settled = true; });
+  c.writeChunk('x', new Uint8Array(6)).then(() => {
+    p1Settled = true;
+  });
   await Promise.resolve();
   await Promise.resolve();
   assert.equal(p1Settled, true, 'a chunk that keeps outstanding under the window resolves immediately');
 
   let p2Settled = false;
   const p2 = c.writeChunk('x', new Uint8Array(6)); // outstanding now 12 > window of 10
-  p2.then(() => { p2Settled = true; });
+  p2.then(() => {
+    p2Settled = true;
+  });
   await Promise.resolve();
   await Promise.resolve();
   await Promise.resolve();
@@ -147,7 +172,9 @@ test('client: a worker "error" event resolves a pending init as unsupported (not
   const c = createAssemblerClient(w, { writeWindowBytes: 5 });
 
   let fatal = null;
-  c.onFatal((f) => { fatal = f; });
+  c.onFatal((f) => {
+    fatal = f;
+  });
 
   const initPromise = c.init('s.zip', { entries: [] }, ['x']);
   // Fired synchronously, before the fake worker's queued 'ready' microtask ever runs —

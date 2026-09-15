@@ -33,9 +33,7 @@ export function isShardCapableProvider(provider) {
 const DNS_LABEL = /^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/;
 
 export function isVhostShardable(bucket, provider) {
-  return VHOST_SHARDABLE_PROVIDERS.has(provider)
-    && typeof bucket === 'string'
-    && DNS_LABEL.test(bucket);
+  return VHOST_SHARDABLE_PROVIDERS.has(provider) && typeof bucket === 'string' && DNS_LABEL.test(bucket);
 }
 
 // Uploads parts across multiple "lanes", each lane being { client, concurrency }. Every
@@ -77,24 +75,32 @@ export function shouldFallbackFromVhost(err) {
 // is rejected (anything but an abort), the whole file continues single-origin on the default —
 // so enabling sharding can never cause a failure, only a missed speedup.
 // workFn(partNumber, client) performs the actual send. Returns { sharded }.
-export async function uploadPartsSharded(partNumbers, workFn, { fallbackClient, probeClient, shardConcurrency, poolConcurrency }) {
+export async function uploadPartsSharded(
+  partNumbers,
+  workFn,
+  { fallbackClient, probeClient, shardConcurrency, poolConcurrency },
+) {
   if (!partNumbers.length) return { sharded: false };
   const [first, ...rest] = partNumbers;
 
   let sharded = true;
   try {
-    await workFn(first, probeClient);      // probe the added (second) origin
+    await workFn(first, probeClient); // probe the added (second) origin
   } catch (err) {
-    if (!shouldFallbackFromVhost(err)) throw err;   // abort → propagate, don't fall back
+    if (!shouldFallbackFromVhost(err)) throw err; // abort → propagate, don't fall back
     sharded = false;
-    await workFn(first, fallbackClient);   // re-upload part 1 on the always-available default origin
+    await workFn(first, fallbackClient); // re-upload part 1 on the always-available default origin
   }
 
   if (sharded) {
-    await uploadPartsAcrossLanes(rest, [
-      { client: fallbackClient, concurrency: shardConcurrency },
-      { client: probeClient,    concurrency: shardConcurrency },
-    ], workFn);
+    await uploadPartsAcrossLanes(
+      rest,
+      [
+        { client: fallbackClient, concurrency: shardConcurrency },
+        { client: probeClient, concurrency: shardConcurrency },
+      ],
+      workFn,
+    );
   } else {
     await uploadPartsWithPool(rest, (n) => workFn(n, fallbackClient), poolConcurrency);
   }

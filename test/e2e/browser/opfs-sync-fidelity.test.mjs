@@ -13,9 +13,7 @@
 // back to the serial writer, which is already how WebKit reaches handoff for ZIP today.
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  startAppServer, launchBrowser, newE2EContext, newE2EPage, e2eTest, e2eEngineName,
-} from '../harness.mjs';
+import { startAppServer, launchBrowser, newE2EContext, newE2EPage, e2eTest, e2eEngineName } from '../harness.mjs';
 
 let app, browser, context, page;
 
@@ -72,26 +70,32 @@ describe('OPFS worker positioned-write fidelity (in-place gate)', () => {
     page = await newE2EPage(context);
     await page.goto(app.url);
 
-    const result = await page.evaluate(async ({ src }) => {
-      if (typeof Worker === 'undefined') return { skipped: 'no Worker' };
-      // Do NOT gate on the window's FileSystemFileHandle.prototype — createSyncAccessHandle
-      // is worker-scope-only and is absent there even on engines that fully support it in a
-      // worker. Always spawn the worker; it self-reports support or fidelity.
-      const worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
-      // Three regions written OUT OF ORDER (C, then A, then B); [10,20) left as a gap.
-      const total = 30;
-      const regionA = { at: 0, bytes: [1, 2, 3, 4, 5] };
-      const regionB = { at: 5, bytes: [6, 7, 8, 9, 10] };
-      const regionC = { at: 20, bytes: [21, 22, 23, 24, 25] };
-      const expected = new Array(total).fill(0);
-      for (const r of [regionA, regionB, regionC]) r.bytes.forEach((b, i) => { expected[r.at + i] = b; });
-      const msg = await new Promise((res) => {
-        worker.onmessage = (ev) => res(ev.data);
-        worker.postMessage({ fileName: 'fidelity-probe.bin', total, ops: [regionC, regionA, regionB] });
-      });
-      worker.terminate();
-      return { msg, expected };
-    }, { src: WORKER_SRC });
+    const result = await page.evaluate(
+      async ({ src }) => {
+        if (typeof Worker === 'undefined') return { skipped: 'no Worker' };
+        // Do NOT gate on the window's FileSystemFileHandle.prototype — createSyncAccessHandle
+        // is worker-scope-only and is absent there even on engines that fully support it in a
+        // worker. Always spawn the worker; it self-reports support or fidelity.
+        const worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+        // Three regions written OUT OF ORDER (C, then A, then B); [10,20) left as a gap.
+        const total = 30;
+        const regionA = { at: 0, bytes: [1, 2, 3, 4, 5] };
+        const regionB = { at: 5, bytes: [6, 7, 8, 9, 10] };
+        const regionC = { at: 20, bytes: [21, 22, 23, 24, 25] };
+        const expected = new Array(total).fill(0);
+        for (const r of [regionA, regionB, regionC])
+          r.bytes.forEach((b, i) => {
+            expected[r.at + i] = b;
+          });
+        const msg = await new Promise((res) => {
+          worker.onmessage = (ev) => res(ev.data);
+          worker.postMessage({ fileName: 'fidelity-probe.bin', total, ops: [regionC, regionA, regionB] });
+        });
+        worker.terminate();
+        return { msg, expected };
+      },
+      { src: WORKER_SRC },
+    );
 
     await context.close();
 

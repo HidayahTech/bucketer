@@ -17,9 +17,17 @@ global.IDBKeyRange = IDBKeyRange;
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  saveJob, loadJob, loadAllJobs, deleteJob,
-  appendManifestPage, updateItem, countItemsByStatus,
-  eachItemByStatus, takeItemsByStatus, resetFailedToPending, ITEM_STATUS,
+  saveJob,
+  loadJob,
+  loadAllJobs,
+  deleteJob,
+  appendManifestPage,
+  updateItem,
+  countItemsByStatus,
+  eachItemByStatus,
+  takeItemsByStatus,
+  resetFailedToPending,
+  ITEM_STATUS,
   jobMatchesOrigin,
 } from '../src/lib/download-records.js';
 
@@ -57,7 +65,7 @@ describe('download-records', () => {
     await saveJob(job());
     await saveJob(job({ id: 'job-2' }));
     const all = await loadAllJobs();
-    assert.deepEqual(all.map(j => j.id).sort(), ['job-1', 'job-2']);
+    assert.deepEqual(all.map((j) => j.id).sort(), ['job-1', 'job-2']);
   });
 
   test('appends a manifest page and advances the token together', async () => {
@@ -125,7 +133,9 @@ describe('download-records', () => {
     await updateItem('job-1', 'b', { status: ITEM_STATUS.DONE });
 
     const seen = [];
-    await eachItemByStatus('job-1', ITEM_STATUS.PENDING, it => { seen.push(it.key); });
+    await eachItemByStatus('job-1', ITEM_STATUS.PENDING, (it) => {
+      seen.push(it.key);
+    });
     assert.deepEqual(seen.sort(), ['a', 'c']);
   });
 
@@ -134,7 +144,10 @@ describe('download-records', () => {
     await appendManifestPage('job-1', [item('a'), item('b'), item('c')], {});
 
     const seen = [];
-    await eachItemByStatus('job-1', ITEM_STATUS.PENDING, it => { seen.push(it.key); return false; });
+    await eachItemByStatus('job-1', ITEM_STATUS.PENDING, (it) => {
+      seen.push(it.key);
+      return false;
+    });
     assert.equal(seen.length, 1);
   });
 
@@ -165,7 +178,7 @@ describe('download-records', () => {
 // Resuming must actually retry what failed. Items are left in FAILED so the run can report
 // them, but a resume that only picks up PENDING would skip them forever.
 describe('resetFailedToPending', () => {
-  beforeEach(reset);   // sibling of the block above, so it needs its own isolation
+  beforeEach(reset); // sibling of the block above, so it needs its own isolation
 
   test('returns failed items to the queue and reports how many', async () => {
     await saveJob(job());
@@ -220,7 +233,10 @@ describe('download-records — jobMatchesOrigin', () => {
   });
 
   test('rejects a same-bucket job on a different provider', () => {
-    assert.equal(jobMatchesOrigin({ bucket: 'backups', provider: 'aws', endpoint: 'https://s3.amazonaws.com' }, ORIGIN), false);
+    assert.equal(
+      jobMatchesOrigin({ bucket: 'backups', provider: 'aws', endpoint: 'https://s3.amazonaws.com' }, ORIGIN),
+      false,
+    );
   });
 
   test('legacy job without an endpoint falls back to bucket + provider', () => {

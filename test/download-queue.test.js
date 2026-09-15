@@ -16,17 +16,32 @@ import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { runDownloadJob, jobOutcome } from '../src/lib/download-queue.js';
 import {
-  saveJob, loadJob, loadAllJobs, deleteJob,
-  appendManifestPage, countItemsByStatus, ITEM_STATUS,
+  saveJob,
+  loadJob,
+  loadAllJobs,
+  deleteJob,
+  appendManifestPage,
+  countItemsByStatus,
+  ITEM_STATUS,
 } from '../src/lib/download-records.js';
 
 const job = (over = {}) => ({
-  id: 'job-1', bucket: 'bkt', prefix: '', status: 'running',
-  enumeration: { done: true }, counters: { total: 0, bytesTotal: 0 }, ...over,
+  id: 'job-1',
+  bucket: 'bkt',
+  prefix: '',
+  status: 'running',
+  enumeration: { done: true },
+  counters: { total: 0, bytesTotal: 0 },
+  ...over,
 });
 
 const item = (key, over = {}) => ({
-  key, size: 10, etag: `"${key}"`, localName: key, status: ITEM_STATUS.PENDING, ...over,
+  key,
+  size: 10,
+  etag: `"${key}"`,
+  localName: key,
+  status: ITEM_STATUS.PENDING,
+  ...over,
 });
 
 async function reset() {
@@ -38,8 +53,10 @@ function harness(over = {}) {
   return {
     issued,
     presign: async (key, filename) => `https://signed/${key}?as=${filename}`,
-    issue:   async (url, filename) => { issued.push({ url, filename }); },
-    wait:    async () => {},
+    issue: async (url, filename) => {
+      issued.push({ url, filename });
+    },
+    wait: async () => {},
     ...over,
   };
 }
@@ -54,7 +71,7 @@ describe('runDownloadJob', () => {
 
     const result = await runDownloadJob(await loadJob('job-1'), h);
 
-    assert.deepEqual(h.issued.map(i => i.filename).sort(), ['a', 'b']);
+    assert.deepEqual(h.issued.map((i) => i.filename).sort(), ['a', 'b']);
     assert.equal(result.issued, 2);
     assert.equal(result.cancelled, false);
   });
@@ -79,7 +96,11 @@ describe('runDownloadJob', () => {
     await saveJob(job());
     await appendManifestPage('job-1', [item('a', { size: 42 })], {});
     let seenItem;
-    const h = harness({ issue: async (url, filename, it) => { seenItem = it; } });
+    const h = harness({
+      issue: async (url, filename, it) => {
+        seenItem = it;
+      },
+    });
     await runDownloadJob(await loadJob('job-1'), h);
 
     assert.equal(seenItem.key, 'a');
@@ -125,7 +146,11 @@ describe('runDownloadJob', () => {
     const jobBlock = { kind: 'STORAGE', message: 'Ran out of temporary browser storage while building the ZIP.' };
     const h = harness({
       issue: async (url, filename, it) => {
-        if (it.key === 'a') { const err = new Error('quota'); err.jobBlock = jobBlock; throw err; }
+        if (it.key === 'a') {
+          const err = new Error('quota');
+          err.jobBlock = jobBlock;
+          throw err;
+        }
       },
     });
 
@@ -133,9 +158,12 @@ describe('runDownloadJob', () => {
 
     assert.deepEqual(result.blocked, jobBlock);
     assert.equal(result.issued, 0);
-    assert.equal(result.failed, 0, 'a job-wide block is not this item\'s fault');
-    assert.equal(await countItemsByStatus('job-1', ITEM_STATUS.PENDING), 2,
-      'the item that hit the block, and everything after it, stay PENDING for the resume');
+    assert.equal(result.failed, 0, "a job-wide block is not this item's fault");
+    assert.equal(
+      await countItemsByStatus('job-1', ITEM_STATUS.PENDING),
+      2,
+      'the item that hit the block, and everything after it, stay PENDING for the resume',
+    );
     assert.equal(await countItemsByStatus('job-1', ITEM_STATUS.FAILED), 0);
   });
 
@@ -160,9 +188,14 @@ describe('runDownloadJob', () => {
   test('records why an item failed', async () => {
     await saveJob(job());
     await appendManifestPage('job-1', [item('bad')], {});
-    const result = await runDownloadJob(await loadJob('job-1'), harness({
-      presign: async () => { throw new Error('AccessDenied'); },
-    }));
+    const result = await runDownloadJob(
+      await loadJob('job-1'),
+      harness({
+        presign: async () => {
+          throw new Error('AccessDenied');
+        },
+      }),
+    );
 
     assert.equal(result.errors.length, 1);
     assert.equal(result.errors[0].key, 'bad');
@@ -175,9 +208,15 @@ describe('runDownloadJob', () => {
     await saveJob(job());
     const many = Array.from({ length: 60 }, (_, i) => item(`k${i}`));
     await appendManifestPage('job-1', many, {});
-    const result = await runDownloadJob(await loadJob('job-1'), harness({
-      presign: async () => { throw new Error('nope'); },
-    }), { maxErrors: 10 });
+    const result = await runDownloadJob(
+      await loadJob('job-1'),
+      harness({
+        presign: async () => {
+          throw new Error('nope');
+        },
+      }),
+      { maxErrors: 10 },
+    );
 
     assert.equal(result.failed, 60);
     assert.equal(result.errors.length, 10);
@@ -187,7 +226,7 @@ describe('runDownloadJob', () => {
     await saveJob(job());
     await appendManifestPage('job-1', [item('a'), item('b')], {});
     const seen = [];
-    await runDownloadJob(await loadJob('job-1'), harness({ onProgress: p => seen.push({ ...p }) }));
+    await runDownloadJob(await loadJob('job-1'), harness({ onProgress: (p) => seen.push({ ...p }) }));
 
     assert.equal(seen.length, 2);
     assert.deepEqual(seen[seen.length - 1], { issued: 2, failed: 0, total: 2 });
@@ -197,9 +236,15 @@ describe('runDownloadJob', () => {
     await saveJob(job());
     await appendManifestPage('job-1', [item('a'), item('b')], {});
     const waits = [];
-    await runDownloadJob(await loadJob('job-1'), harness({
-      wait: async (ms) => { waits.push(ms); },
-    }), { delayMs: 250 });
+    await runDownloadJob(
+      await loadJob('job-1'),
+      harness({
+        wait: async (ms) => {
+          waits.push(ms);
+        },
+      }),
+      { delayMs: 250 },
+    );
 
     assert.equal(waits.length, 2);
     assert.deepEqual(waits, [250, 250]);
@@ -276,19 +321,25 @@ describe('runDownloadJob — per-file pre-flight', () => {
     await runDownloadJob(await loadJob('job-1'), h);
 
     assert.equal(probe.calls.length, 1);
-    assert.equal(probe.calls[0], h.issued[0].url,
-      'probing a different url than the one issued proves nothing about the download');
+    assert.equal(
+      probe.calls[0],
+      h.issued[0].url,
+      'probing a different url than the one issued proves nothing about the download',
+    );
   });
 
   test('probes every file, not a sample', async () => {
     await saveJob(job());
-    await appendManifestPage('job-1', Array.from({ length: 10 }, (_, i) => item(`k${i}`)), {});
+    await appendManifestPage(
+      'job-1',
+      Array.from({ length: 10 }, (_, i) => item(`k${i}`)),
+      {},
+    );
     const probe = probing([]);
 
     await runDownloadJob(await loadJob('job-1'), harness({ probe }));
 
-    assert.equal(probe.calls.length, 10,
-      'an unprobed file is issued with no round trip pacing it — the BUG-053 shape');
+    assert.equal(probe.calls.length, 10, 'an unprobed file is issued with no round trip pacing it — the BUG-053 shape');
   });
 
   test('a network failure stops the job immediately, leaving items pending', async () => {
@@ -300,8 +351,11 @@ describe('runDownloadJob — per-file pre-flight', () => {
 
     assert.equal(h.issued.length, 0, 'nothing may be handed to the download manager');
     assert.equal(result.blocked.kind, 'network');
-    assert.equal(await countItemsByStatus('job-1', ITEM_STATUS.PENDING), 2,
-      'a job-wide fault is not the fault of any individual item');
+    assert.equal(
+      await countItemsByStatus('job-1', ITEM_STATUS.PENDING),
+      2,
+      'a job-wide fault is not the fault of any individual item',
+    );
   });
 
   test('a missing object fails that file and the job continues', async () => {
@@ -314,8 +368,11 @@ describe('runDownloadJob — per-file pre-flight', () => {
     assert.equal(result.issued, 1);
     assert.equal(result.failed, 1);
     assert.equal(result.blocked, null);
-    assert.equal(await countItemsByStatus('job-1', ITEM_STATUS.FAILED), 1,
-      'a file that provably cannot be read must not be reported as sent');
+    assert.equal(
+      await countItemsByStatus('job-1', ITEM_STATUS.FAILED),
+      1,
+      'a file that provably cannot be read must not be reported as sent',
+    );
   });
 
   test('a transient error fails that file and the job continues', async () => {
@@ -345,7 +402,11 @@ describe('runDownloadJob — per-file pre-flight', () => {
 
   test('three consecutive denials block the job as a wholesale deny', async () => {
     await saveJob(job());
-    await appendManifestPage('job-1', Array.from({ length: 6 }, (_, i) => item(`k${i}`)), {});
+    await appendManifestPage(
+      'job-1',
+      Array.from({ length: 6 }, (_, i) => item(`k${i}`)),
+      {},
+    );
     const h = harness({ probe: probing(['denied', 'denied', 'denied']) });
 
     const result = await runDownloadJob(await loadJob('job-1'), h);
@@ -353,13 +414,20 @@ describe('runDownloadJob — per-file pre-flight', () => {
     assert.equal(h.issued.length, 0);
     assert.equal(result.blocked.kind, 'denied');
     assert.equal(result.failed, 3, 'the streak files are failed, so a resume retries them');
-    assert.equal(await countItemsByStatus('job-1', ITEM_STATUS.PENDING), 3,
-      'files after the block stay pending for the resume');
+    assert.equal(
+      await countItemsByStatus('job-1', ITEM_STATUS.PENDING),
+      3,
+      'files after the block stay pending for the resume',
+    );
   });
 
   test('denials separated by successes never accumulate into a block', async () => {
     await saveJob(job());
-    await appendManifestPage('job-1', Array.from({ length: 6 }, (_, i) => item(`k${i}`)), {});
+    await appendManifestPage(
+      'job-1',
+      Array.from({ length: 6 }, (_, i) => item(`k${i}`)),
+      {},
+    );
     const h = harness({ probe: probing(['denied', 'ok', 'denied', 'ok', 'denied', 'ok']) });
 
     const result = await runDownloadJob(await loadJob('job-1'), h);

@@ -20,7 +20,7 @@ function mockClient(foldersByPrefix) {
       if (name === 'ListObjectsV2Command') {
         const p = cmd.input.Prefix || '';
         const kids = foldersByPrefix.get(p) || [];
-        return Promise.resolve({ CommonPrefixes: kids.map(Prefix => ({ Prefix })), IsTruncated: false });
+        return Promise.resolve({ CommonPrefixes: kids.map((Prefix) => ({ Prefix })), IsTruncated: false });
       }
       return Promise.reject(new Error(`unexpected: ${name}`));
     },
@@ -32,9 +32,14 @@ const NOOP = { onCancel: () => {}, onMove: () => {} };
 describe('MovePickerModal — rendering', () => {
   test('shows the item count and a "Move here" button', async () => {
     const client = mockClient(new Map([['', ['photos/', 'docs/']]]));
-    const { text, query, cleanup } = mount(h(MovePickerModal, {
-      client, bucket: 'bk', selection: { files: [{ key: 'a.txt', size: 1 }], prefixes: [] }, ...NOOP,
-    }));
+    const { text, query, cleanup } = mount(
+      h(MovePickerModal, {
+        client,
+        bucket: 'bk',
+        selection: { files: [{ key: 'a.txt', size: 1 }], prefixes: [] },
+        ...NOOP,
+      }),
+    );
     await tick();
     assert.match(text(), /Move 1 item/);
     assert.ok(query('.move-here'), 'a "Move here" action must render');
@@ -43,27 +48,39 @@ describe('MovePickerModal — rendering', () => {
 
   test('lists subfolders of the current prefix', async () => {
     const client = mockClient(new Map([['', ['photos/', 'docs/']]]));
-    const { queryAll, cleanup } = mount(h(MovePickerModal, {
-      client, bucket: 'bk', selection: { files: [{ key: 'a.txt', size: 1 }], prefixes: [] }, ...NOOP,
-    }));
+    const { queryAll, cleanup } = mount(
+      h(MovePickerModal, {
+        client,
+        bucket: 'bk',
+        selection: { files: [{ key: 'a.txt', size: 1 }], prefixes: [] },
+        ...NOOP,
+      }),
+    );
     await tick();
-    const labels = queryAll('.move-picker-folder').map(b => b.textContent);
+    const labels = queryAll('.move-picker-folder').map((b) => b.textContent);
     assert.equal(labels.length, 2);
-    assert.ok(labels.some(l => l.includes('photos')));
-    assert.ok(labels.some(l => l.includes('docs')));
+    assert.ok(labels.some((l) => l.includes('photos')));
+    assert.ok(labels.some((l) => l.includes('docs')));
     cleanup();
   });
 });
 
 describe('MovePickerModal — navigation', () => {
   test('clicking a folder drills into it and lists its children', async () => {
-    const client = mockClient(new Map([
-      ['', ['photos/']],
-      ['photos/', ['photos/2024/']],
-    ]));
-    const { queryAll, query, text, cleanup } = mount(h(MovePickerModal, {
-      client, bucket: 'bk', selection: { files: [{ key: 'a.txt', size: 1 }], prefixes: [] }, ...NOOP,
-    }));
+    const client = mockClient(
+      new Map([
+        ['', ['photos/']],
+        ['photos/', ['photos/2024/']],
+      ]),
+    );
+    const { queryAll, query, text, cleanup } = mount(
+      h(MovePickerModal, {
+        client,
+        bucket: 'bk',
+        selection: { files: [{ key: 'a.txt', size: 1 }], prefixes: [] },
+        ...NOOP,
+      }),
+    );
     await tick();
     fire(queryAll('.move-picker-folder')[0], 'click'); // into photos/
     await tick();
@@ -76,12 +93,15 @@ describe('MovePickerModal — navigation', () => {
 describe('MovePickerModal — guard rails', () => {
   test('disables "Move here" with a reason when moving a folder into itself', async () => {
     const client = mockClient(new Map([['photos/', []]]));
-    const { query, cleanup } = mount(h(MovePickerModal, {
-      client, bucket: 'bk',
-      selection: { files: [], prefixes: ['photos/'] },
-      initialPrefix: 'photos/', // already inside the folder being moved → invalid destination
-      ...NOOP,
-    }));
+    const { query, cleanup } = mount(
+      h(MovePickerModal, {
+        client,
+        bucket: 'bk',
+        selection: { files: [], prefixes: ['photos/'] },
+        initialPrefix: 'photos/', // already inside the folder being moved → invalid destination
+        ...NOOP,
+      }),
+    );
     await tick();
     assert.ok(query('.move-here').disabled, '"Move here" must be disabled for an invalid destination');
     assert.ok(query('.move-picker-reason'), 'a reason explaining why must be shown');
@@ -92,12 +112,23 @@ describe('MovePickerModal — guard rails', () => {
 describe('MovePickerModal — actions', () => {
   test('"Move here" calls onMove with the current destination prefix', async () => {
     let dest = null;
-    const client = mockClient(new Map([['', ['photos/']], ['photos/', []]]));
-    const { queryAll, query, cleanup } = mount(h(MovePickerModal, {
-      client, bucket: 'bk',
-      selection: { files: [{ key: 'reports/a.txt', size: 1 }], prefixes: [] },
-      onCancel: () => {}, onMove: (d) => { dest = d; },
-    }));
+    const client = mockClient(
+      new Map([
+        ['', ['photos/']],
+        ['photos/', []],
+      ]),
+    );
+    const { queryAll, query, cleanup } = mount(
+      h(MovePickerModal, {
+        client,
+        bucket: 'bk',
+        selection: { files: [{ key: 'reports/a.txt', size: 1 }], prefixes: [] },
+        onCancel: () => {},
+        onMove: (d) => {
+          dest = d;
+        },
+      }),
+    );
     await tick();
     fire(queryAll('.move-picker-folder')[0], 'click'); // into photos/
     await tick();
@@ -109,12 +140,19 @@ describe('MovePickerModal — actions', () => {
   test('Cancel calls onCancel', async () => {
     let cancelled = false;
     const client = mockClient(new Map([['', []]]));
-    const { query, cleanup } = mount(h(MovePickerModal, {
-      client, bucket: 'bk', selection: { files: [{ key: 'a.txt', size: 1 }], prefixes: [] },
-      onCancel: () => { cancelled = true; }, onMove: () => {},
-    }));
+    const { query, cleanup } = mount(
+      h(MovePickerModal, {
+        client,
+        bucket: 'bk',
+        selection: { files: [{ key: 'a.txt', size: 1 }], prefixes: [] },
+        onCancel: () => {
+          cancelled = true;
+        },
+        onMove: () => {},
+      }),
+    );
     await tick();
-    const cancelBtn = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Cancel');
+    const cancelBtn = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Cancel');
     fire(cancelBtn, 'click');
     assert.ok(cancelled);
     cleanup();
@@ -137,10 +175,15 @@ describe('MovePickerModal — floor (#60)', () => {
 
   test('scoped picker lists the floor, not the bucket root', async () => {
     const requests = [];
-    const { cleanup } = mount(h(MovePickerModal, {
-      client: recordingClient(requests), bucket: 'bk', selection: scopedSelection,
-      initialPrefix: 'team/alice/', ...NOOP,
-    }));
+    const { cleanup } = mount(
+      h(MovePickerModal, {
+        client: recordingClient(requests),
+        bucket: 'bk',
+        selection: scopedSelection,
+        initialPrefix: 'team/alice/',
+        ...NOOP,
+      }),
+    );
     await tick();
     assert.equal(requests[0], 'team/alice/', 'first listing must target the floor');
     assert.ok(!requests.includes(''), 'no root-level listing while scoped');
@@ -149,10 +192,15 @@ describe('MovePickerModal — floor (#60)', () => {
 
   test('scoped picker breadcrumb is floor-pinned (no root crumb)', async () => {
     const requests = [];
-    const { query, cleanup } = mount(h(MovePickerModal, {
-      client: recordingClient(requests), bucket: 'bk', selection: scopedSelection,
-      initialPrefix: 'team/alice/', ...NOOP,
-    }));
+    const { query, cleanup } = mount(
+      h(MovePickerModal, {
+        client: recordingClient(requests),
+        bucket: 'bk',
+        selection: scopedSelection,
+        initialPrefix: 'team/alice/',
+        ...NOOP,
+      }),
+    );
     await tick();
     const crumbText = query('.breadcrumb').textContent;
     assert.ok(crumbText.includes('alice'), 'floor leaf must label the picker breadcrumb');
@@ -162,10 +210,14 @@ describe('MovePickerModal — floor (#60)', () => {
 
   test('unscoped picker still opens at the bucket root (regression anchor)', async () => {
     const requests = [];
-    const { query, cleanup } = mount(h(MovePickerModal, {
-      client: recordingClient(requests), bucket: 'bk', selection: scopedSelection,
-      ...NOOP,
-    }));
+    const { query, cleanup } = mount(
+      h(MovePickerModal, {
+        client: recordingClient(requests),
+        bucket: 'bk',
+        selection: scopedSelection,
+        ...NOOP,
+      }),
+    );
     await tick();
     assert.equal(requests[0], '', 'unscoped picker must list the root as before');
     assert.ok(query('.breadcrumb').textContent.includes('root'));

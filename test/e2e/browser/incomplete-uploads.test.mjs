@@ -5,7 +5,16 @@
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { CreateMultipartUploadCommand, ListMultipartUploadsCommand } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest } from '../harness.mjs';
+import {
+  startMock,
+  startAppServer,
+  connectApp,
+  BUCKET,
+  launchBrowser,
+  newE2EContext,
+  newE2EPage,
+  e2eTest,
+} from '../harness.mjs';
 
 let ctx, app, browser;
 before(async () => {
@@ -13,7 +22,11 @@ before(async () => {
   app = await startAppServer();
   browser = await launchBrowser();
 });
-after(async () => { await browser?.close(); await app?.close(); await ctx?.mock.close(); });
+after(async () => {
+  await browser?.close();
+  await app?.close();
+  await ctx?.mock.close();
+});
 
 describe('incomplete uploads — discover and discard', () => {
   e2eTest('an orphaned multipart upload is listed and Discard aborts it', async () => {
@@ -41,6 +54,8 @@ describe('incomplete uploads — discover and discard', () => {
 
       const after = await ctx.client.send(new ListMultipartUploadsCommand({ Bucket: BUCKET }));
       assert.deepEqual(after.Uploads ?? [], [], 'the incomplete upload is gone server-side');
-    } finally { await context.close(); }
+    } finally {
+      await context.close();
+    }
   });
 });

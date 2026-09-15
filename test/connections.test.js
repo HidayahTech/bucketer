@@ -8,9 +8,13 @@ const ls = {};
 
 function makeStore(backing) {
   return {
-    getItem:    k     => Object.prototype.hasOwnProperty.call(backing, k) ? backing[k] : null,
-    setItem:    (k,v) => { backing[k] = String(v); },
-    removeItem: k     => { delete backing[k]; },
+    getItem: (k) => (Object.prototype.hasOwnProperty.call(backing, k) ? backing[k] : null),
+    setItem: (k, v) => {
+      backing[k] = String(v);
+    },
+    removeItem: (k) => {
+      delete backing[k];
+    },
   };
 }
 
@@ -20,19 +24,32 @@ import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   newId,
-  loadCredentialRecords, saveCredentialRecord, deleteCredentialRecord,
-  loadConnectionRecords, saveConnectionRecord, deleteConnectionRecord,
-  credentialFingerprint, findOrCreateCredential, defaultCredentialLabel,
-  defaultConnectionName, resolveConnection, listResolvedConnections,
-  migrateProfilesToConnections, deleteAllConnectionData, hasMigratedConnections,
-  defaultCapabilities, loadConnectionCapabilities, saveConnectionCapabilities, clearAllConnectionCapabilities,
+  loadCredentialRecords,
+  saveCredentialRecord,
+  deleteCredentialRecord,
+  loadConnectionRecords,
+  saveConnectionRecord,
+  deleteConnectionRecord,
+  credentialFingerprint,
+  findOrCreateCredential,
+  defaultCredentialLabel,
+  defaultConnectionName,
+  resolveConnection,
+  listResolvedConnections,
+  migrateProfilesToConnections,
+  deleteAllConnectionData,
+  hasMigratedConnections,
+  defaultCapabilities,
+  loadConnectionCapabilities,
+  saveConnectionCapabilities,
+  clearAllConnectionCapabilities,
   repairCredentialProviders,
 } from '../src/lib/connections.js';
-import {
-  saveVaultRecord, setVaultEntry, getVaultEntry, VAULT_VERSION, PBKDF2_ITERATIONS,
-} from '../src/lib/vault.js';
+import { saveVaultRecord, setVaultEntry, getVaultEntry, VAULT_VERSION, PBKDF2_ITERATIONS } from '../src/lib/vault.js';
 
-beforeEach(() => { for (const k of Object.keys(ls)) delete ls[k]; });
+beforeEach(() => {
+  for (const k of Object.keys(ls)) delete ls[k];
+});
 
 describe('newId', () => {
   test('generates unique ids within the same millisecond', () => {
@@ -62,7 +79,14 @@ describe('credential records', () => {
   });
 
   test('saves and reads back a credential', () => {
-    saveCredentialRecord({ id: 'c1', label: 'B2 — 0057ab', endpoint: 'https://s3.example.com', keyId: 'k1', provider: 'b2', regionOverride: 'us-west-004' });
+    saveCredentialRecord({
+      id: 'c1',
+      label: 'B2 — 0057ab',
+      endpoint: 'https://s3.example.com',
+      keyId: 'k1',
+      provider: 'b2',
+      regionOverride: 'us-west-004',
+    });
     const { credentials } = loadCredentialRecords();
     assert.equal(credentials.length, 1);
     assert.equal(credentials[0].keyId, 'k1');
@@ -77,7 +101,15 @@ describe('credential records', () => {
   });
 
   test('never persists a secretKey even when one is passed in', () => {
-    saveCredentialRecord({ id: 'c1', label: 'A', endpoint: 'e', keyId: 'k', provider: null, regionOverride: '', secretKey: 'leaked' });
+    saveCredentialRecord({
+      id: 'c1',
+      label: 'A',
+      endpoint: 'e',
+      keyId: 'k',
+      provider: null,
+      regionOverride: '',
+      secretKey: 'leaked',
+    });
     assert.equal(ls['s3b_credentials'].includes('leaked'), false);
   });
 
@@ -86,7 +118,10 @@ describe('credential records', () => {
     saveCredentialRecord({ id: 'c2', label: 'B', endpoint: 'e2', keyId: 'k2', provider: null, regionOverride: '' });
     assert.equal(deleteCredentialRecord('c1'), true);
     const { credentials } = loadCredentialRecords();
-    assert.deepEqual(credentials.map(c => c.id), ['c2']);
+    assert.deepEqual(
+      credentials.map((c) => c.id),
+      ['c2'],
+    );
   });
 
   test('refuses to delete a credential a connection still references', () => {
@@ -117,15 +152,32 @@ describe('connection records', () => {
   });
 
   test('never persists a secretKey even when one is passed in', () => {
-    saveConnectionRecord({ id: 1, name: 'A', credentialId: 'c1', bucket: 'b', capabilities: null, secretKey: 'leaked' });
+    saveConnectionRecord({
+      id: 1,
+      name: 'A',
+      credentialId: 'c1',
+      bucket: 'b',
+      capabilities: null,
+      secretKey: 'leaked',
+    });
     assert.equal(ls['s3b_connections'].includes('leaked'), false);
   });
 });
 
 describe('credentialFingerprint', () => {
   test('is stable across trailing slashes and surrounding whitespace on endpoint', () => {
-    const a = credentialFingerprint({ endpoint: 'https://s3.example.com/', keyId: 'k', provider: 'b2', regionOverride: 'us-west-004' });
-    const b = credentialFingerprint({ endpoint: '  https://s3.example.com  ', keyId: 'k', provider: 'b2', regionOverride: 'us-west-004' });
+    const a = credentialFingerprint({
+      endpoint: 'https://s3.example.com/',
+      keyId: 'k',
+      provider: 'b2',
+      regionOverride: 'us-west-004',
+    });
+    const b = credentialFingerprint({
+      endpoint: '  https://s3.example.com  ',
+      keyId: 'k',
+      provider: 'b2',
+      regionOverride: 'us-west-004',
+    });
     assert.equal(a, b);
   });
 
@@ -150,8 +202,8 @@ describe('credentialFingerprint', () => {
   });
 
   test('does not collide when a field contains an internal space', () => {
-    const a = credentialFingerprint({ endpoint: 'a',   keyId: 'b c', provider: '', regionOverride: '' });
-    const b = credentialFingerprint({ endpoint: 'a b', keyId: 'c',   provider: '', regionOverride: '' });
+    const a = credentialFingerprint({ endpoint: 'a', keyId: 'b c', provider: '', regionOverride: '' });
+    const b = credentialFingerprint({ endpoint: 'a b', keyId: 'c', provider: '', regionOverride: '' });
     assert.notEqual(a, b);
   });
 });
@@ -166,7 +218,7 @@ describe('findOrCreateCredential', () => {
   });
 
   test('returns the existing credential instead of creating a second', () => {
-    const first  = findOrCreateCredential(fields);
+    const first = findOrCreateCredential(fields);
     const second = findOrCreateCredential({ ...fields, endpoint: 'https://s3.example.com/' });
     assert.equal(first.id, second.id);
     assert.equal(loadCredentialRecords().credentials.length, 1);
@@ -215,7 +267,12 @@ describe('defaultConnectionName', () => {
 
 describe('resolveConnection / listResolvedConnections', () => {
   test('joins a connection to its credential in profile-compatible shape', () => {
-    const cred = findOrCreateCredential({ endpoint: 'https://s3.example.com', keyId: 'k1', provider: 'b2', regionOverride: 'us-west-004' });
+    const cred = findOrCreateCredential({
+      endpoint: 'https://s3.example.com',
+      keyId: 'k1',
+      provider: 'b2',
+      regionOverride: 'us-west-004',
+    });
     saveConnectionRecord({ id: 1, name: 'Photos', credentialId: cred.id, bucket: 'photos', capabilities: null });
     const resolved = resolveConnection(1);
     assert.equal(resolved.id, 1);
@@ -235,7 +292,14 @@ describe('resolveConnection / listResolvedConnections', () => {
   // Prefix-scoped keys (#60): basePrefix lives on the connection record, like bucket.
   test('round-trips basePrefix through save/resolve', () => {
     const cred = findOrCreateCredential({ endpoint: 'e', keyId: 'k', provider: 'b2', regionOverride: '' });
-    saveConnectionRecord({ id: 1, name: 'Scoped', credentialId: cred.id, bucket: 'b', capabilities: null, basePrefix: 'team/alice/' });
+    saveConnectionRecord({
+      id: 1,
+      name: 'Scoped',
+      credentialId: cred.id,
+      bucket: 'b',
+      capabilities: null,
+      basePrefix: 'team/alice/',
+    });
     assert.equal(resolveConnection(1).basePrefix, 'team/alice/');
   });
 
@@ -247,7 +311,14 @@ describe('resolveConnection / listResolvedConnections', () => {
 
   test('a partial update omitting basePrefix leaves the stored value untouched', () => {
     const cred = findOrCreateCredential({ endpoint: 'e', keyId: 'k', provider: 'b2', regionOverride: '' });
-    saveConnectionRecord({ id: 1, name: 'Scoped', credentialId: cred.id, bucket: 'b', capabilities: null, basePrefix: 'team/alice/' });
+    saveConnectionRecord({
+      id: 1,
+      name: 'Scoped',
+      credentialId: cred.id,
+      bucket: 'b',
+      capabilities: null,
+      basePrefix: 'team/alice/',
+    });
     saveConnectionRecord({ id: 1, name: 'Scoped (renamed)' });
     assert.equal(resolveConnection(1).basePrefix, 'team/alice/');
   });
@@ -259,16 +330,25 @@ describe('resolveConnection / listResolvedConnections', () => {
 
   test('listResolvedConnections omits orphaned connections rather than throwing', () => {
     const cred = findOrCreateCredential({ endpoint: 'e', keyId: 'k', provider: null, regionOverride: '' });
-    saveConnectionRecord({ id: 1, name: 'Good',   credentialId: cred.id,  bucket: 'b1', capabilities: null });
-    saveConnectionRecord({ id: 2, name: 'Orphan', credentialId: 'gone',   bucket: 'b2', capabilities: null });
+    saveConnectionRecord({ id: 1, name: 'Good', credentialId: cred.id, bucket: 'b1', capabilities: null });
+    saveConnectionRecord({ id: 2, name: 'Orphan', credentialId: 'gone', bucket: 'b2', capabilities: null });
     const list = listResolvedConnections();
-    assert.deepEqual(list.map(c => c.id), [1]);
+    assert.deepEqual(
+      list.map((c) => c.id),
+      [1],
+    );
   });
 
   test('two connections can share one credential', () => {
     const cred = findOrCreateCredential({ endpoint: 'e', keyId: 'k', provider: 'b2', regionOverride: '' });
     saveConnectionRecord({ id: 1, name: 'Photos (R/O)', credentialId: cred.id, bucket: 'photos', capabilities: null });
-    saveConnectionRecord({ id: 2, name: 'Photos (admin)', credentialId: cred.id, bucket: 'photos', capabilities: null });
+    saveConnectionRecord({
+      id: 2,
+      name: 'Photos (admin)',
+      credentialId: cred.id,
+      bucket: 'photos',
+      capabilities: null,
+    });
     const list = listResolvedConnections();
     assert.equal(list.length, 2);
     assert.equal(list[0].credentialId, list[1].credentialId);
@@ -288,7 +368,17 @@ describe('migrateProfilesToConnections', () => {
   });
 
   test('converts one profile into one credential and one connection', () => {
-    writeProfiles([{ id: 1, name: 'Photos', endpoint: 'https://s3.example.com', bucket: 'photos', keyId: 'k1', provider: 'b2', regionOverride: 'us-west-004' }]);
+    writeProfiles([
+      {
+        id: 1,
+        name: 'Photos',
+        endpoint: 'https://s3.example.com',
+        bucket: 'photos',
+        keyId: 'k1',
+        provider: 'b2',
+        regionOverride: 'us-west-004',
+      },
+    ]);
     migrateProfilesToConnections();
     assert.equal(loadCredentialRecords().credentials.length, 1);
     const { connections } = loadConnectionRecords();
@@ -298,16 +388,42 @@ describe('migrateProfilesToConnections', () => {
   });
 
   test('preserves the profile id as the connection id so s3b_last_profile_id stays valid', () => {
-    writeProfiles([{ id: 12345, name: 'Photos', endpoint: 'e', bucket: 'photos', keyId: 'k1', provider: 'b2', regionOverride: '' }]);
+    writeProfiles([
+      { id: 12345, name: 'Photos', endpoint: 'e', bucket: 'photos', keyId: 'k1', provider: 'b2', regionOverride: '' },
+    ]);
     migrateProfilesToConnections();
     assert.equal(loadConnectionRecords().connections[0].id, 12345);
   });
 
   test('dedupes credentials across profiles sharing one key', () => {
     writeProfiles([
-      { id: 1, name: 'A', endpoint: 'https://s3.example.com', bucket: 'b1', keyId: 'k1', provider: 'b2', regionOverride: 'us-west-004' },
-      { id: 2, name: 'B', endpoint: 'https://s3.example.com', bucket: 'b2', keyId: 'k1', provider: 'b2', regionOverride: 'us-west-004' },
-      { id: 3, name: 'C', endpoint: 'https://s3.example.com/', bucket: 'b3', keyId: 'k1', provider: 'b2', regionOverride: 'us-west-004' },
+      {
+        id: 1,
+        name: 'A',
+        endpoint: 'https://s3.example.com',
+        bucket: 'b1',
+        keyId: 'k1',
+        provider: 'b2',
+        regionOverride: 'us-west-004',
+      },
+      {
+        id: 2,
+        name: 'B',
+        endpoint: 'https://s3.example.com',
+        bucket: 'b2',
+        keyId: 'k1',
+        provider: 'b2',
+        regionOverride: 'us-west-004',
+      },
+      {
+        id: 3,
+        name: 'C',
+        endpoint: 'https://s3.example.com/',
+        bucket: 'b3',
+        keyId: 'k1',
+        provider: 'b2',
+        regionOverride: 'us-west-004',
+      },
     ]);
     migrateProfilesToConnections();
     assert.equal(loadCredentialRecords().credentials.length, 1);
@@ -316,8 +432,16 @@ describe('migrateProfilesToConnections', () => {
 
   test('keeps credentials separate when the key differs on the same bucket', () => {
     writeProfiles([
-      { id: 1, name: 'Photos (R/O)',   endpoint: 'e', bucket: 'photos', keyId: 'ro', provider: 'b2', regionOverride: '' },
-      { id: 2, name: 'Photos (admin)', endpoint: 'e', bucket: 'photos', keyId: 'rw', provider: 'b2', regionOverride: '' },
+      { id: 1, name: 'Photos (R/O)', endpoint: 'e', bucket: 'photos', keyId: 'ro', provider: 'b2', regionOverride: '' },
+      {
+        id: 2,
+        name: 'Photos (admin)',
+        endpoint: 'e',
+        bucket: 'photos',
+        keyId: 'rw',
+        provider: 'b2',
+        regionOverride: '',
+      },
     ]);
     migrateProfilesToConnections();
     assert.equal(loadCredentialRecords().credentials.length, 2);
@@ -325,7 +449,9 @@ describe('migrateProfilesToConnections', () => {
   });
 
   test('is idempotent — running twice does not duplicate', () => {
-    writeProfiles([{ id: 1, name: 'Photos', endpoint: 'e', bucket: 'photos', keyId: 'k1', provider: 'b2', regionOverride: '' }]);
+    writeProfiles([
+      { id: 1, name: 'Photos', endpoint: 'e', bucket: 'photos', keyId: 'k1', provider: 'b2', regionOverride: '' },
+    ]);
     migrateProfilesToConnections();
     migrateProfilesToConnections();
     assert.equal(loadConnectionRecords().connections.length, 1);
@@ -333,13 +459,17 @@ describe('migrateProfilesToConnections', () => {
   });
 
   test('leaves s3b_profiles in place as a rollback path', () => {
-    writeProfiles([{ id: 1, name: 'Photos', endpoint: 'e', bucket: 'photos', keyId: 'k1', provider: 'b2', regionOverride: '' }]);
+    writeProfiles([
+      { id: 1, name: 'Photos', endpoint: 'e', bucket: 'photos', keyId: 'k1', provider: 'b2', regionOverride: '' },
+    ]);
     migrateProfilesToConnections();
     assert.ok(ls['s3b_profiles']);
   });
 
   test('skips a profile with no bucket rather than creating a broken connection', () => {
-    writeProfiles([{ id: 1, name: 'Broken', endpoint: 'e', bucket: '', keyId: 'k1', provider: 'b2', regionOverride: '' }]);
+    writeProfiles([
+      { id: 1, name: 'Broken', endpoint: 'e', bucket: '', keyId: 'k1', provider: 'b2', regionOverride: '' },
+    ]);
     migrateProfilesToConnections();
     assert.deepEqual(loadConnectionRecords().connections, []);
   });
@@ -353,7 +483,9 @@ describe('migrateProfilesToConnections', () => {
   test('does not run when connections already exist', () => {
     const cred = findOrCreateCredential({ endpoint: 'e', keyId: 'k', provider: null, regionOverride: '' });
     saveConnectionRecord({ id: 99, name: 'Existing', credentialId: cred.id, bucket: 'b', capabilities: null });
-    writeProfiles([{ id: 1, name: 'Photos', endpoint: 'e2', bucket: 'photos', keyId: 'k9', provider: 'b2', regionOverride: '' }]);
+    writeProfiles([
+      { id: 1, name: 'Photos', endpoint: 'e2', bucket: 'photos', keyId: 'k9', provider: 'b2', regionOverride: '' },
+    ]);
     migrateProfilesToConnections();
     assert.equal(loadConnectionRecords().connections.length, 1);
     assert.equal(loadConnectionRecords().connections[0].id, 99);
@@ -366,7 +498,10 @@ describe('migrateProfilesToConnections', () => {
       { id: 3, name: 'C', endpoint: 'e', bucket: 'b3', keyId: 'k1', provider: 'b2', regionOverride: '' },
     ]);
     migrateProfilesToConnections();
-    assert.deepEqual(loadConnectionRecords().connections.map(c => c.id), [1, 3]);
+    assert.deepEqual(
+      loadConnectionRecords().connections.map((c) => c.id),
+      [1, 3],
+    );
   });
 
   test('a profile with a non-string endpoint is skipped, not fatal', () => {
@@ -375,7 +510,10 @@ describe('migrateProfilesToConnections', () => {
       { id: 2, name: 'B', endpoint: 'e', bucket: 'b2', keyId: 'k1', provider: 'b2', regionOverride: '' },
     ]);
     migrateProfilesToConnections();
-    assert.deepEqual(loadConnectionRecords().connections.map(c => c.id), [2]);
+    assert.deepEqual(
+      loadConnectionRecords().connections.map((c) => c.id),
+      [2],
+    );
   });
 
   test('falls back to a generated name when the profile has none', () => {
@@ -399,7 +537,7 @@ describe('migrateProfilesToConnections — the sentinel survives deleting every 
 
   test('migrate, delete every connection, migrate again: the deletions must stick', () => {
     writeProfiles([
-      { id: 1, name: 'Photos',  endpoint: 'e', bucket: 'photos',  keyId: 'k1', provider: 'b2', regionOverride: '' },
+      { id: 1, name: 'Photos', endpoint: 'e', bucket: 'photos', keyId: 'k1', provider: 'b2', regionOverride: '' },
       { id: 2, name: 'Backups', endpoint: 'e', bucket: 'backups', keyId: 'k2', provider: 'b2', regionOverride: '' },
     ]);
 
@@ -410,8 +548,11 @@ describe('migrateProfilesToConnections — the sentinel survives deleting every 
     assert.deepEqual(loadConnectionRecords().connections, [], 'sanity: both connections were deleted');
 
     migrateProfilesToConnections();
-    assert.deepEqual(loadConnectionRecords().connections, [],
-      'deleted connections must stay deleted — they must not be resurrected from s3b_profiles');
+    assert.deepEqual(
+      loadConnectionRecords().connections,
+      [],
+      'deleted connections must stay deleted — they must not be resurrected from s3b_profiles',
+    );
   });
 });
 
@@ -422,16 +563,26 @@ describe('migrateProfilesToConnections — the sentinel survives deleting every 
 describe('deleteConnectionRecord garbage-collects its credential (Finding 3)', () => {
   test('a credential shared by two connections survives until the last one is deleted', () => {
     const cred = findOrCreateCredential({ endpoint: 'e', keyId: 'k1', provider: 'b2', regionOverride: '' });
-    saveConnectionRecord({ id: 1, name: 'Photos (R/O)',   credentialId: cred.id, bucket: 'photos', capabilities: null });
-    saveConnectionRecord({ id: 2, name: 'Photos (admin)', credentialId: cred.id, bucket: 'photos', capabilities: null });
+    saveConnectionRecord({ id: 1, name: 'Photos (R/O)', credentialId: cred.id, bucket: 'photos', capabilities: null });
+    saveConnectionRecord({
+      id: 2,
+      name: 'Photos (admin)',
+      credentialId: cred.id,
+      bucket: 'photos',
+      capabilities: null,
+    });
 
     deleteConnectionRecord(1);
-    assert.ok(loadCredentialRecords().credentials.some(c => c.id === cred.id),
-      'credential must survive while connection 2 still references it');
+    assert.ok(
+      loadCredentialRecords().credentials.some((c) => c.id === cred.id),
+      'credential must survive while connection 2 still references it',
+    );
 
     deleteConnectionRecord(2);
-    assert.ok(!loadCredentialRecords().credentials.some(c => c.id === cred.id),
-      'credential must be removed once nothing references it any more');
+    assert.ok(
+      !loadCredentialRecords().credentials.some((c) => c.id === cred.id),
+      'credential must be removed once nothing references it any more',
+    );
   });
 
   test('deleting a connection with no shared reference removes its credential outright', () => {
@@ -451,7 +602,9 @@ describe('wiping connection data clears the migration marker', () => {
   test('deleteAllConnectionData clears the marker so migration can run again', () => {
     ls['s3b_profiles'] = JSON.stringify({
       version: 1,
-      profiles: [{ id: 1, name: 'Photos', endpoint: 'e', bucket: 'photos', keyId: 'k1', provider: 'b2', regionOverride: '' }],
+      profiles: [
+        { id: 1, name: 'Photos', endpoint: 'e', bucket: 'photos', keyId: 'k1', provider: 'b2', regionOverride: '' },
+      ],
     });
     migrateProfilesToConnections();
     assert.equal(loadConnectionRecords().connections.length, 1, 'sanity: migration ran once');
@@ -461,8 +614,11 @@ describe('wiping connection data clears the migration marker', () => {
     assert.deepEqual(loadCredentialRecords().credentials, [], 'sanity: wipe cleared credentials');
 
     migrateProfilesToConnections();
-    assert.equal(loadConnectionRecords().connections.length, 1,
-      'migration must be able to run again after a wipe — the marker must not survive deleteAllConnectionData');
+    assert.equal(
+      loadConnectionRecords().connections.length,
+      1,
+      'migration must be able to run again after a wipe — the marker must not survive deleteAllConnectionData',
+    );
   });
 });
 
@@ -514,7 +670,12 @@ describe('per-connection capabilities', () => {
   }
 
   test('defaultCapabilities are all unknown', () => {
-    assert.deepEqual(defaultCapabilities(), { list: 'unknown', download: 'unknown', upload: 'unknown', delete: 'unknown' });
+    assert.deepEqual(defaultCapabilities(), {
+      list: 'unknown',
+      download: 'unknown',
+      upload: 'unknown',
+      delete: 'unknown',
+    });
   });
 
   test('an unsaved connection reads back defaults', () => {
@@ -567,10 +728,15 @@ describe('per-connection capabilities', () => {
 // importing it — the rule (isValidProvider) lives in storage.js, so this keeps
 // it encoded in exactly one place. Tests here stand in a minimal equivalent.
 describe('repairCredentialProviders', () => {
-  const isValidProvider = p => typeof p === 'string' && p.length <= 20 && !/\s/.test(p);
+  const isValidProvider = (p) => typeof p === 'string' && p.length <= 20 && !/\s/.test(p);
 
   test('clears provider fields that fail the validity check', () => {
-    saveCredentialRecord({ id: 'c1', provider: 'b2Key ID: 000a8794834eb7c000000001cSecret Key: abc', endpoint: 'e', keyId: 'k' });
+    saveCredentialRecord({
+      id: 'c1',
+      provider: 'b2Key ID: 000a8794834eb7c000000001cSecret Key: abc',
+      endpoint: 'e',
+      keyId: 'k',
+    });
     repairCredentialProviders(isValidProvider);
     assert.equal(loadCredentialRecords().credentials[0].provider, null);
   });
@@ -589,38 +755,73 @@ describe('repairCredentialProviders', () => {
 
 describe('saveConnectionRecord collects a superseded credential (#53)', () => {
   test('re-pointing a connection at new credentials deletes the old credential', () => {
-    const a = findOrCreateCredential({ endpoint: 'https://a.example.com', keyId: 'k1', provider: 'b2', regionOverride: '' });
+    const a = findOrCreateCredential({
+      endpoint: 'https://a.example.com',
+      keyId: 'k1',
+      provider: 'b2',
+      regionOverride: '',
+    });
     saveConnectionRecord({ id: 1, name: 'C', credentialId: a.id, bucket: 'b', capabilities: null });
     assert.equal(loadCredentialRecords().credentials.length, 1);
 
-    const b = findOrCreateCredential({ endpoint: 'https://b.example.com', keyId: 'k2', provider: 'b2', regionOverride: '' });
+    const b = findOrCreateCredential({
+      endpoint: 'https://b.example.com',
+      keyId: 'k2',
+      provider: 'b2',
+      regionOverride: '',
+    });
     saveConnectionRecord({ id: 1, name: 'C', credentialId: b.id, bucket: 'b' });
 
     const { credentials } = loadCredentialRecords();
-    assert.deepEqual(credentials.map(c => c.id), [b.id],
-      'the superseded credential must not linger with nothing referencing it');
+    assert.deepEqual(
+      credentials.map((c) => c.id),
+      [b.id],
+      'the superseded credential must not linger with nothing referencing it',
+    );
   });
 
   test('a credential still used by another connection survives', () => {
-    const a = findOrCreateCredential({ endpoint: 'https://a.example.com', keyId: 'k1', provider: 'b2', regionOverride: '' });
+    const a = findOrCreateCredential({
+      endpoint: 'https://a.example.com',
+      keyId: 'k1',
+      provider: 'b2',
+      regionOverride: '',
+    });
     saveConnectionRecord({ id: 1, name: 'C1', credentialId: a.id, bucket: 'b1', capabilities: null });
     saveConnectionRecord({ id: 2, name: 'C2', credentialId: a.id, bucket: 'b2', capabilities: null });
 
-    const b = findOrCreateCredential({ endpoint: 'https://b.example.com', keyId: 'k2', provider: 'b2', regionOverride: '' });
+    const b = findOrCreateCredential({
+      endpoint: 'https://b.example.com',
+      keyId: 'k2',
+      provider: 'b2',
+      regionOverride: '',
+    });
     saveConnectionRecord({ id: 1, name: 'C1', credentialId: b.id, bucket: 'b1' });
 
-    const ids = loadCredentialRecords().credentials.map(c => c.id).sort();
+    const ids = loadCredentialRecords()
+      .credentials.map((c) => c.id)
+      .sort();
     assert.deepEqual(ids, [a.id, b.id].sort(), 'connection 2 still uses credential a');
   });
 
   test('creating a connection deletes nothing', () => {
-    const a = findOrCreateCredential({ endpoint: 'https://a.example.com', keyId: 'k1', provider: 'b2', regionOverride: '' });
+    const a = findOrCreateCredential({
+      endpoint: 'https://a.example.com',
+      keyId: 'k1',
+      provider: 'b2',
+      regionOverride: '',
+    });
     saveConnectionRecord({ id: 1, name: 'C', credentialId: a.id, bucket: 'b', capabilities: null });
     assert.equal(loadCredentialRecords().credentials.length, 1);
   });
 
   test('updating a connection without changing its credential deletes nothing', () => {
-    const a = findOrCreateCredential({ endpoint: 'https://a.example.com', keyId: 'k1', provider: 'b2', regionOverride: '' });
+    const a = findOrCreateCredential({
+      endpoint: 'https://a.example.com',
+      keyId: 'k1',
+      provider: 'b2',
+      regionOverride: '',
+    });
     saveConnectionRecord({ id: 1, name: 'C', credentialId: a.id, bucket: 'b', capabilities: null });
     saveConnectionRecord({ id: 1, name: 'Renamed', credentialId: a.id, bucket: 'b' });
     assert.equal(loadCredentialRecords().credentials.length, 1);
@@ -628,19 +829,35 @@ describe('saveConnectionRecord collects a superseded credential (#53)', () => {
   });
 
   test('an explicitly undefined credentialId does not orphan the connection', () => {
-    const a = findOrCreateCredential({ endpoint: 'https://a.example.com', keyId: 'k1', provider: 'b2', regionOverride: '' });
+    const a = findOrCreateCredential({
+      endpoint: 'https://a.example.com',
+      keyId: 'k1',
+      provider: 'b2',
+      regionOverride: '',
+    });
     saveConnectionRecord({ id: 1, name: 'C', credentialId: a.id, bucket: 'b', capabilities: null });
 
     saveConnectionRecord({ id: 1, name: 'X', credentialId: undefined });
 
-    assert.equal(loadCredentialRecords().credentials.length, 1,
-      'a credential must never be collected because a caller passed undefined');
-    assert.equal(loadConnectionRecords().connections[0].credentialId, a.id,
-      'and the connection must not be left pointing at nothing');
+    assert.equal(
+      loadCredentialRecords().credentials.length,
+      1,
+      'a credential must never be collected because a caller passed undefined',
+    );
+    assert.equal(
+      loadConnectionRecords().connections[0].credentialId,
+      a.id,
+      'and the connection must not be left pointing at nothing',
+    );
   });
 
   test('a partial update that omits credentialId leaves it untouched', () => {
-    const a = findOrCreateCredential({ endpoint: 'https://a.example.com', keyId: 'k1', provider: 'b2', regionOverride: '' });
+    const a = findOrCreateCredential({
+      endpoint: 'https://a.example.com',
+      keyId: 'k1',
+      provider: 'b2',
+      regionOverride: '',
+    });
     saveConnectionRecord({ id: 1, name: 'C', credentialId: a.id, bucket: 'b', capabilities: null });
 
     saveConnectionRecord({ id: 1, name: 'Renamed' });
@@ -668,8 +885,11 @@ describe('deleting a credential cascades to its vault entry', () => {
     saveConnectionRecord({ id: 1, name: 'C', credentialId: c.id, bucket: 'b', capabilities: null });
 
     assert.equal(deleteCredentialRecord(c.id), false, 'still referenced');
-    assert.deepEqual(getVaultEntry(c.id), { iv: 'aXY=', ct: 'Y3Q=' },
-      'the credential survived, so its secret must too');
+    assert.deepEqual(
+      getVaultEntry(c.id),
+      { iv: 'aXY=', ct: 'Y3Q=' },
+      'the credential survived, so its secret must too',
+    );
   });
 
   test('deleting the last connection cascades all the way to the ciphertext', () => {

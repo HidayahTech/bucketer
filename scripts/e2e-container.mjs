@@ -38,7 +38,9 @@ if (!runtime) {
 
 const lock = JSON.parse(readFileSync(join(ROOT, 'package-lock.json'), 'utf8'));
 const image = imageTagFromLock(lock);
-const lockHash = createHash('sha256').update(readFileSync(join(ROOT, 'package-lock.json'))).digest('hex');
+const lockHash = createHash('sha256')
+  .update(readFileSync(join(ROOT, 'package-lock.json')))
+  .digest('hex');
 
 // npm ci only when the lock changed since the volume's last install (npm ci wipes
 // node_modules by design, so an unconditional ci would re-download every run).
@@ -58,14 +60,26 @@ const PASS_ENV = ['E2E_ENGINES', 'E2E_DEVICES', 'E2E_ENGINE', 'E2E_DEVICE', 'E2E
 const envArgs = PASS_ENV.filter((k) => process.env[k]).flatMap((k) => ['-e', `${k}=${process.env[k]}`]);
 
 console.log(`── containerized e2e: ${runtime} + ${image} (volume ${VOLUME}) ──`);
-const r = spawnSync(runtime, [
-  'run', '--rm', '--ipc=host',
-  '-v', `${ROOT}:/work:Z`,
-  '-v', `${VOLUME}:/work/node_modules`,
-  '-w', '/work',
-  '-e', `LOCK_HASH=${lockHash}`,
-  ...envArgs,
-  image,
-  'bash', '-c', script,
-], { stdio: 'inherit' });
+const r = spawnSync(
+  runtime,
+  [
+    'run',
+    '--rm',
+    '--ipc=host',
+    '-v',
+    `${ROOT}:/work:Z`,
+    '-v',
+    `${VOLUME}:/work/node_modules`,
+    '-w',
+    '/work',
+    '-e',
+    `LOCK_HASH=${lockHash}`,
+    ...envArgs,
+    image,
+    'bash',
+    '-c',
+    script,
+  ],
+  { stdio: 'inherit' },
+);
 process.exit(r.status ?? 1);

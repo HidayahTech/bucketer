@@ -20,7 +20,7 @@ function detectBrowser() {
 
 const CAVEATS = {
   chrome: [
-    'Multi-file deployments blocked (ES module CORS) — this build uses inlined JS, so you\'re OK.',
+    "Multi-file deployments blocked (ES module CORS) — this build uses inlined JS, so you're OK.",
     'localStorage uses a shared null-origin namespace — all local HTML files share the same storage.',
     'Credential Management API unavailable from file://.',
   ],
@@ -33,17 +33,13 @@ const CAVEATS = {
     'Storage APIs may be unreliable in Private Browsing mode.',
     'Credential Management API unavailable from file://.',
   ],
-  unknown: [
-    'Browser-specific behavior unknown in file:// context.',
-  ],
+  unknown: ['Browser-specific behavior unknown in file:// context.'],
 };
 
 const DISMISS_KEY = 's3b_file_banner_dismissed';
 
 export function FileBanner() {
-  const [dismissed, setDismissed] = useState(
-    () => !!sessionStorage.getItem(DISMISS_KEY)
-  );
+  const [dismissed, setDismissed] = useState(() => !!sessionStorage.getItem(DISMISS_KEY));
 
   if (dismissed || window.location.protocol !== 'file:') return null;
 
@@ -53,9 +49,13 @@ export function FileBanner() {
   return (
     <div class="banner banner-warn" role="alert">
       <div class="banner-body">
-        <div class="banner-title">Running from a local file ({browser === 'unknown' ? 'unknown browser' : browser})</div>
+        <div class="banner-title">
+          Running from a local file ({browser === 'unknown' ? 'unknown browser' : browser})
+        </div>
         <ul style={{ paddingLeft: '1.2rem', marginTop: '.3rem' }}>
-          {caveats.map((c, i) => <li key={i}>{c}</li>)}
+          {caveats.map((c, i) => (
+            <li key={i}>{c}</li>
+          ))}
         </ul>
         <div style={{ marginTop: '.4rem' }}>
           For the most reliable experience, serve via <code>http://localhost</code> instead.{' '}
@@ -64,7 +64,16 @@ export function FileBanner() {
           </a>
         </div>
       </div>
-      <button class="banner-close" onClick={() => { sessionStorage.setItem(DISMISS_KEY, '1'); setDismissed(true); }} aria-label="Dismiss">✕</button>
+      <button
+        class="banner-close"
+        onClick={() => {
+          sessionStorage.setItem(DISMISS_KEY, '1');
+          setDismissed(true);
+        }}
+        aria-label="Dismiss"
+      >
+        ✕
+      </button>
     </div>
   );
 }

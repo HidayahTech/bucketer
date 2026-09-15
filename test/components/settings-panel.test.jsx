@@ -23,15 +23,20 @@ function defaultProps(overrides = {}) {
 describe('SettingsPanel — field rendering', () => {
   test('renders a form or settings container', () => {
     const { query, cleanup } = mount(h(SettingsPanel, defaultProps()));
-    assert.ok(query('form') || query('.settings-panel') || query('section'), 'settings panel must render a form or container');
+    assert.ok(
+      query('form') || query('.settings-panel') || query('section'),
+      'settings panel must render a form or container',
+    );
     cleanup();
   });
 
   test('renders an input for page size (MaxKeys)', () => {
     const { text, cleanup } = mount(h(SettingsPanel, defaultProps()));
     assert.ok(
-      text().toLowerCase().includes('page size') || text().toLowerCase().includes('max keys') || text().toLowerCase().includes('keys per'),
-      'page size setting must be labeled'
+      text().toLowerCase().includes('page size') ||
+        text().toLowerCase().includes('max keys') ||
+        text().toLowerCase().includes('keys per'),
+      'page size setting must be labeled',
     );
     cleanup();
   });
@@ -40,7 +45,7 @@ describe('SettingsPanel — field rendering', () => {
     const { text, cleanup } = mount(h(SettingsPanel, defaultProps()));
     assert.ok(
       text().toLowerCase().includes('part size') || text().toLowerCase().includes('part size'),
-      'part size setting must be labeled'
+      'part size setting must be labeled',
     );
     cleanup();
   });
@@ -49,7 +54,7 @@ describe('SettingsPanel — field rendering', () => {
     const { text, cleanup } = mount(h(SettingsPanel, defaultProps()));
     assert.ok(
       text().toLowerCase().includes('memory budget') || text().toLowerCase().includes('upload memory'),
-      'upload memory budget setting must be labeled'
+      'upload memory budget setting must be labeled',
     );
     cleanup();
   });
@@ -58,7 +63,7 @@ describe('SettingsPanel — field rendering', () => {
     const { text, cleanup } = mount(h(SettingsPanel, defaultProps({ provider: 'b2' })));
     assert.ok(
       text().toLowerCase().includes('parallel upload connections'),
-      'multi-origin upload toggle must be labeled for B2'
+      'multi-origin upload toggle must be labeled for B2',
     );
     cleanup();
   });
@@ -67,7 +72,7 @@ describe('SettingsPanel — field rendering', () => {
     const { text, cleanup } = mount(h(SettingsPanel, defaultProps({ provider: 'aws' })));
     assert.ok(
       text().toLowerCase().includes('parallel upload connections'),
-      'multi-origin upload toggle must be shown for AWS'
+      'multi-origin upload toggle must be shown for AWS',
     );
     cleanup();
   });
@@ -76,7 +81,7 @@ describe('SettingsPanel — field rendering', () => {
     const { text, cleanup } = mount(h(SettingsPanel, defaultProps({ provider: 'r2' })));
     assert.ok(
       !text().toLowerCase().includes('parallel upload connections'),
-      'multi-origin upload toggle must be hidden for providers other than B2/AWS'
+      'multi-origin upload toggle must be hidden for providers other than B2/AWS',
     );
     cleanup();
   });
@@ -85,7 +90,7 @@ describe('SettingsPanel — field rendering', () => {
     const { text, cleanup } = mount(h(SettingsPanel, defaultProps()));
     assert.ok(
       text().toLowerCase().includes('concurrency') || text().toLowerCase().includes('concurrent'),
-      'concurrency setting must be labeled'
+      'concurrency setting must be labeled',
     );
     cleanup();
   });
@@ -94,7 +99,7 @@ describe('SettingsPanel — field rendering', () => {
     const { text, cleanup } = mount(h(SettingsPanel, defaultProps()));
     assert.ok(
       text().toLowerCase().includes('file concurrency') || text().toLowerCase().includes('files'),
-      'file concurrency setting must be labeled'
+      'file concurrency setting must be labeled',
     );
     cleanup();
   });
@@ -103,14 +108,14 @@ describe('SettingsPanel — field rendering', () => {
     const { text, cleanup } = mount(h(SettingsPanel, defaultProps()));
     assert.ok(
       text().toLowerCase().includes('cache') || text().toLowerCase().includes('ttl'),
-      'cache TTL setting must be labeled'
+      'cache TTL setting must be labeled',
     );
     cleanup();
   });
 
   test('renders a Save button', () => {
     const { cleanup } = mount(h(SettingsPanel, defaultProps()));
-    const btn = [...document.querySelectorAll('button')].find(b => /save/i.test(b.textContent));
+    const btn = [...document.querySelectorAll('button')].find((b) => /save/i.test(b.textContent));
     assert.ok(btn, 'Save button must be present');
     cleanup();
   });
@@ -125,10 +130,14 @@ describe('SettingsPanel — validation', () => {
     const pageInput = [...inputs][0];
     if (pageInput) {
       setInput(pageInput, '999999');
-      const saveBtn = [...document.querySelectorAll('button')].find(b => /save/i.test(b.textContent));
+      const saveBtn = [...document.querySelectorAll('button')].find((b) => /save/i.test(b.textContent));
       if (saveBtn) fire(saveBtn, 'click');
       // An error message should appear
-      const hasError = document.body.textContent.includes('must be') || document.body.textContent.includes('–') || document.body.textContent.includes('100,000') || document.body.textContent.includes('100000');
+      const hasError =
+        document.body.textContent.includes('must be') ||
+        document.body.textContent.includes('–') ||
+        document.body.textContent.includes('100,000') ||
+        document.body.textContent.includes('100000');
       assert.ok(hasError, 'validation error must appear for out-of-range page size');
     }
     cleanup();
@@ -140,7 +149,7 @@ describe('SettingsPanel — Update Check toggle', () => {
     const { text, cleanup } = mount(h(SettingsPanel, defaultProps({ updateCheckEnabled: true })));
     assert.ok(
       text().toLowerCase().includes('update') || text().toLowerCase().includes('check'),
-      'update check setting must be labeled'
+      'update check setting must be labeled',
     );
     cleanup();
   });
@@ -151,7 +160,7 @@ describe('SettingsPanel — adaptive/manual toggle', () => {
     const { text, cleanup } = mount(h(SettingsPanel, defaultProps()));
     assert.ok(
       text().toLowerCase().includes('adaptive') || text().toLowerCase().includes('manual'),
-      'settings panel must contain an adaptive/manual toggle'
+      'settings panel must contain an adaptive/manual toggle',
     );
     cleanup();
   });
@@ -173,7 +182,7 @@ describe('SettingsPanel — file-mtime auto-load setting', () => {
     const { text, cleanup } = mount(h(SettingsPanel, defaultProps()));
     assert.ok(
       text().toLowerCase().includes('file modification') || text().toLowerCase().includes('modification time'),
-      'SettingsPanel must render a label for the file modification time auto-load toggle'
+      'SettingsPanel must render a label for the file modification time auto-load toggle',
     );
     cleanup();
   });

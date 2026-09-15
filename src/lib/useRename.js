@@ -35,20 +35,33 @@ export function useRename({ client, bucket, prefix, items, setItems, commonPrefi
   async function commitRename(oldKey) {
     const newName = renameValue.trim();
     const nameErr = validateObjectName(newName);
-    if (nameErr) { setRenameError(nameErr); return; }
+    if (nameErr) {
+      setRenameError(nameErr);
+      return;
+    }
     const newKey = prefix + newName;
-    if (newKey === oldKey) { setRenamingKey(null); return; }
-    if (items.some(o => o.Key === newKey)) { setRenameError('A file with that name already exists.'); return; }
+    if (newKey === oldKey) {
+      setRenamingKey(null);
+      return;
+    }
+    if (items.some((o) => o.Key === newKey)) {
+      setRenameError('A file with that name already exists.');
+      return;
+    }
     setRenameSaving(true);
     setRenameError(null);
     try {
-      await client.send(new CopyObjectCommand({
-        Bucket: bucket, CopySource: copySource(bucket, oldKey),
-        Key: newKey, MetadataDirective: 'COPY',
-      }));
+      await client.send(
+        new CopyObjectCommand({
+          Bucket: bucket,
+          CopySource: copySource(bucket, oldKey),
+          Key: newKey,
+          MetadataDirective: 'COPY',
+        }),
+      );
       await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: oldKey }));
       invalidateCache(prefix);
-      setItems(prev => prev.map(o => o.Key === oldKey ? { ...o, Key: newKey } : o));
+      setItems((prev) => prev.map((o) => (o.Key === oldKey ? { ...o, Key: newKey } : o)));
       setRenamingKey(null);
       showToast(`Renamed to "${newName}"`);
     } catch (err) {
@@ -70,8 +83,14 @@ export function useRename({ client, bucket, prefix, items, setItems, commonPrefi
   function commitFolderRename(oldPrefix) {
     const newName = renameValue.trim();
     const nameErr = validateObjectName(newName);
-    if (nameErr) { setRenameError(nameErr); return; }
-    if (newName === leafName(oldPrefix.slice(0, -1))) { setRenamingKey(null); return; }
+    if (nameErr) {
+      setRenameError(nameErr);
+      return;
+    }
+    if (newName === leafName(oldPrefix.slice(0, -1))) {
+      setRenamingKey(null);
+      return;
+    }
     if (commonPrefixes.includes(prefix + newName + '/')) {
       setRenameError('A folder with that name already exists.');
       return;
@@ -81,8 +100,16 @@ export function useRename({ client, bucket, prefix, items, setItems, commonPrefi
   }
 
   return {
-    renamingKey, renameValue, renameError, renameSaving,
-    setRenameValue, setRenameError,
-    startRename, cancelRename, commitRename, startFolderRename, commitFolderRename,
+    renamingKey,
+    renameValue,
+    renameError,
+    renameSaving,
+    setRenameValue,
+    setRenameError,
+    startRename,
+    cancelRename,
+    commitRename,
+    startFolderRename,
+    commitFolderRename,
   };
 }

@@ -8,10 +8,18 @@ function memSink(size = 0) {
   let buf = new Uint8Array(size);
   return {
     write(u8, at) {
-      if (at + u8.length > buf.length) { const n = new Uint8Array(at + u8.length); n.set(buf); buf = n; }
+      if (at + u8.length > buf.length) {
+        const n = new Uint8Array(at + u8.length);
+        n.set(buf);
+        buf = n;
+      }
       buf.set(u8, at);
     },
-    truncate(n) { const nb = new Uint8Array(n); nb.set(buf.subarray(0, Math.min(n, buf.length))); buf = nb; },
+    truncate(n) {
+      const nb = new Uint8Array(n);
+      nb.set(buf.subarray(0, Math.min(n, buf.length)));
+      buf = nb;
+    },
     flush() {},
     bytes: () => buf,
   };
@@ -35,7 +43,14 @@ test('assembler: out-of-order entries produce the same bytes as the serial write
     const r = await asm.endEntry(key);
     recs[key] = r;
   }
-  const records = layout.entries.map((e) => ({ path: e.path, zipOffset: e.headerOffset, size: recs[e.key].size, crc: recs[e.key].crc, time: e.time, date: e.date }));
+  const records = layout.entries.map((e) => ({
+    path: e.path,
+    zipOffset: e.headerOffset,
+    size: recs[e.key].size,
+    crc: recs[e.key].crc,
+    time: e.time,
+    date: e.date,
+  }));
   await asm.finish(records);
 
   // Reference: serial writer, SAME (layout/key) order
@@ -64,10 +79,14 @@ test('assembler: chunked writes accumulate; oversize throws; undersize endEntry 
 
   const asm2 = createAssembler(memSink(), layout);
   await asm2.writeHeaders();
-  await assert.rejects(async () => { await asm2.writeChunk('x', new Uint8Array([1, 2, 3, 4, 5])); });
+  await assert.rejects(async () => {
+    await asm2.writeChunk('x', new Uint8Array([1, 2, 3, 4, 5]));
+  });
 
   const asm3 = createAssembler(memSink(), layout);
   await asm3.writeHeaders();
   await asm3.writeChunk('x', new Uint8Array([1, 2]));
-  await assert.rejects(async () => { await asm3.endEntry('x'); }); // size 2 != 4
+  await assert.rejects(async () => {
+    await asm3.endEntry('x');
+  }); // size 2 != 4
 });

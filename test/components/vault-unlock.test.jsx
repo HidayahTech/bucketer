@@ -39,7 +39,13 @@ const getRandomValues = webcrypto.getRandomValues.bind(webcrypto);
 const VAULT_USERNAME = 'Bucketer vault (this device)';
 const PASSPHRASE = 'correct horse battery staple';
 
-const CONN_A = { id: 'c1', name: 'Family photos (R/O)', bucket: 'family-photos', provider: 'b2', credentialId: 'cred1' };
+const CONN_A = {
+  id: 'c1',
+  name: 'Family photos (R/O)',
+  bucket: 'family-photos',
+  provider: 'b2',
+  credentialId: 'cred1',
+};
 const CONN_B = { id: 'c2', name: 'Site backups', bucket: 'site-backups', provider: 'b2', credentialId: 'cred2' };
 
 function defaultProps(overrides = {}) {
@@ -55,7 +61,7 @@ beforeEach(() => {
 // mirrors the pattern in test/components/app.test.jsx rather than a fixed sleep.
 async function waitFor(condition, { tries = 60, intervalMs = 10 } = {}) {
   for (let i = 0; i < tries && !condition(); i++) {
-    await new Promise(resolve => setTimeout(resolve, intervalMs));
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
   }
   return condition();
 }
@@ -67,7 +73,7 @@ async function waitFor(condition, { tries = 60, intervalMs = 10 } = {}) {
 // test never clicks through to the second step. Text-based rather than a CSS
 // class, matching the "no dictated selectors" scope of this task.
 function hasResetTrigger(form) {
-  return [...form.querySelectorAll('button')].some(b => /reset/i.test(b.textContent));
+  return [...form.querySelectorAll('button')].some((b) => /reset/i.test(b.textContent));
 }
 
 describe('VaultUnlock — password-manager fields', () => {
@@ -78,7 +84,9 @@ describe('VaultUnlock — password-manager fields', () => {
       assert.ok(input, 'a username-autocomplete input must be present');
       assert.equal(input.value, VAULT_USERNAME, 'username value must be the exact constant, character for character');
       assert.equal(input.readOnly, true, 'username field must be readonly');
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 
   test('the passphrase field is type="password" with autocomplete="current-password"', () => {
@@ -87,7 +95,9 @@ describe('VaultUnlock — password-manager fields', () => {
       const input = query('input[autocomplete="current-password"]');
       assert.ok(input, 'a current-password-autocomplete input must be present');
       assert.equal(input.type, 'password', 'passphrase field must be type="password"');
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 
   test('every input has a non-empty name attribute', () => {
@@ -98,7 +108,9 @@ describe('VaultUnlock — password-manager fields', () => {
       for (const input of inputs) {
         assert.ok(input.getAttribute('name'), `input#${input.id || '(no id)'} must have a name attribute`);
       }
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 });
 
@@ -108,7 +120,9 @@ describe('VaultUnlock — connection list', () => {
     try {
       assert.ok(text().includes('Family photos (R/O)'));
       assert.ok(text().includes('Site backups'));
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 
   test('clicking a connection focuses the passphrase field', () => {
@@ -117,9 +131,14 @@ describe('VaultUnlock — connection list', () => {
       const rows = queryAll('.profile-row');
       assert.equal(rows.length, 2, 'expected one row per connection');
       fire(rows[1], 'click');
-      assert.equal(document.activeElement, query('input[autocomplete="current-password"]'),
-        'clicking a connection row must focus the passphrase field');
-    } finally { cleanup(); }
+      assert.equal(
+        document.activeElement,
+        query('input[autocomplete="current-password"]'),
+        'clicking a connection row must focus the passphrase field',
+      );
+    } finally {
+      cleanup();
+    }
   });
 });
 
@@ -136,16 +155,29 @@ describe('VaultUnlock — unlock submission', () => {
     sessionStorage.clear();
 
     let calls = null;
-    const { query, cleanup } = mount(h(VaultUnlock, defaultProps({
-      onUnlock: (...args) => { calls = args; },
-    })));
+    const { query, cleanup } = mount(
+      h(
+        VaultUnlock,
+        defaultProps({
+          onUnlock: (...args) => {
+            calls = args;
+          },
+        }),
+      ),
+    );
     try {
       setInput(query('input[autocomplete="current-password"]'), PASSPHRASE);
       fire(query('form'), 'submit');
       const ok = await waitFor(() => calls !== null);
       assert.ok(ok, 'onUnlock must be called after a correct passphrase is submitted');
-      assert.deepEqual(calls, [], 'onUnlock must be called with no argument — the passphrase has already done its job by the time unlockVault resolves');
-    } finally { cleanup(); }
+      assert.deepEqual(
+        calls,
+        [],
+        'onUnlock must be called with no argument — the passphrase has already done its job by the time unlockVault resolves',
+      );
+    } finally {
+      cleanup();
+    }
   });
 
   test('the passphrase input is cleared after a successful unlock', async () => {
@@ -158,8 +190,13 @@ describe('VaultUnlock — unlock submission', () => {
       setInput(input, PASSPHRASE);
       fire(query('form'), 'submit');
       const cleared = await waitFor(() => input.value === '');
-      assert.ok(cleared, 'the passphrase field must be cleared once unlock succeeds — it must not linger in the DOM or component state');
-    } finally { cleanup(); }
+      assert.ok(
+        cleared,
+        'the passphrase field must be cleared once unlock succeeds — it must not linger in the DOM or component state',
+      );
+    } finally {
+      cleanup();
+    }
   });
 
   test('the submit button disables and shows the spinner while unlocking is in flight', async () => {
@@ -177,7 +214,9 @@ describe('VaultUnlock — unlock submission', () => {
       assert.ok(query('.spinner'), 'the existing .spinner element must render while unlocking');
       // Let the real derivation finish so it doesn't bleed into the next test.
       await waitFor(() => !query('button[type="submit"]').disabled);
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 });
 
@@ -193,9 +232,13 @@ describe('VaultUnlock — wrong passphrase vs corrupt vault', () => {
       const shown = await waitFor(() => /wrong/i.test(text()));
       assert.ok(shown, 'a wrong-passphrase error must be shown');
       assert.equal(query('.btn-danger'), null, 'a wrong passphrase must NOT offer a reset control');
-      assert.ok(!hasResetTrigger(query('form')),
-        'a wrong passphrase must NOT show even the first-step "Reset vault…" trigger');
-    } finally { cleanup(); }
+      assert.ok(
+        !hasResetTrigger(query('form')),
+        'a wrong passphrase must NOT show even the first-step "Reset vault…" trigger',
+      );
+    } finally {
+      cleanup();
+    }
   });
 
   test('a corrupt vault shows an error and does render a reset control', async () => {
@@ -216,7 +259,9 @@ describe('VaultUnlock — wrong passphrase vs corrupt vault', () => {
       const shown = await waitFor(() => /corrupt/i.test(text()));
       assert.ok(shown, 'a corrupt-vault error must be shown');
       assert.ok(hasResetTrigger(query('form')), 'a corrupt vault must offer a reset control');
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 
   // Real-crypto fixtures naturally cover the states createVault() produces
@@ -233,9 +278,13 @@ describe('VaultUnlock — wrong passphrase vs corrupt vault', () => {
       const shown = await waitFor(() => /no vault/i.test(text()));
       assert.ok(shown, 'a no-vault error must be shown');
       assert.equal(query('.btn-danger'), null, 'a no-vault result must NOT offer a reset control');
-      assert.ok(!hasResetTrigger(query('form')),
-        'a no-vault result must NOT show even the first-step "Reset vault…" trigger');
-    } finally { cleanup(); }
+      assert.ok(
+        !hasResetTrigger(query('form')),
+        'a no-vault result must NOT show even the first-step "Reset vault…" trigger',
+      );
+    } finally {
+      cleanup();
+    }
   });
 });
 
@@ -256,25 +305,40 @@ describe('VaultUnlock — reset confirmation', () => {
 
   test('activating the reset control does NOT call onReset before confirmation', async () => {
     let resetCalled = false;
-    const { query, cleanup } = await mountCorrupted({ onReset: () => { resetCalled = true; } });
+    const { query, cleanup } = await mountCorrupted({
+      onReset: () => {
+        resetCalled = true;
+      },
+    });
     try {
-      const trigger = query('.reset-vault-trigger') || query('button.btn-danger') || [...query('form').querySelectorAll('button')].find(b => /reset/i.test(b.textContent));
+      const trigger =
+        query('.reset-vault-trigger') ||
+        query('button.btn-danger') ||
+        [...query('form').querySelectorAll('button')].find((b) => /reset/i.test(b.textContent));
       assert.ok(trigger, 'a reset-activating control must be present for a corrupt vault');
       fire(trigger, 'click');
       assert.ok(!resetCalled, 'onReset must not fire from the first click — a confirmation step must come first');
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 
   test('confirming reset calls onReset', async () => {
     let resetCalled = false;
-    const { query, cleanup } = await mountCorrupted({ onReset: () => { resetCalled = true; } });
+    const { query, cleanup } = await mountCorrupted({
+      onReset: () => {
+        resetCalled = true;
+      },
+    });
     try {
-      const trigger = [...query('form').querySelectorAll('button')].find(b => /reset/i.test(b.textContent));
+      const trigger = [...query('form').querySelectorAll('button')].find((b) => /reset/i.test(b.textContent));
       fire(trigger, 'click');
-      const confirmBtn = [...query('form').querySelectorAll('button')].find(b => /yes|confirm/i.test(b.textContent));
+      const confirmBtn = [...query('form').querySelectorAll('button')].find((b) => /yes|confirm/i.test(b.textContent));
       assert.ok(confirmBtn, 'a confirmation button must appear after activating reset');
       fire(confirmBtn, 'click');
       assert.ok(resetCalled, 'onReset must be called once the destructive action is confirmed');
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 });

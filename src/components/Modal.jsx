@@ -3,7 +3,7 @@
 export function Modal({ onClose, class: extraClass, children }) {
   return (
     <div class="modal-overlay" onClick={onClose}>
-      <div class={extraClass ? `modal-dialog ${extraClass}` : 'modal-dialog'} onClick={e => e.stopPropagation()}>
+      <div class={extraClass ? `modal-dialog ${extraClass}` : 'modal-dialog'} onClick={(e) => e.stopPropagation()}>
         {children}
       </div>
     </div>

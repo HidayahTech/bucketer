@@ -4,7 +4,17 @@
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest, scaleTimeout } from '../harness.mjs';
+import {
+  startMock,
+  startAppServer,
+  connectApp,
+  BUCKET,
+  launchBrowser,
+  newE2EContext,
+  newE2EPage,
+  e2eTest,
+  scaleTimeout,
+} from '../harness.mjs';
 
 let ctx, app, browser;
 before(async () => {
@@ -12,7 +22,11 @@ before(async () => {
   app = await startAppServer();
   browser = await launchBrowser();
 });
-after(async () => { await browser?.close(); await app?.close(); await ctx?.mock.close(); });
+after(async () => {
+  await browser?.close();
+  await app?.close();
+  await ctx?.mock.close();
+});
 
 async function bucketKeys() {
   const r = await ctx.client.send(new ListObjectsV2Command({ Bucket: BUCKET }));
@@ -22,9 +36,13 @@ async function bucketKeys() {
 // workers) — waiting for a single relocated key and then asserting the rest races a slow
 // runner that observes the copy before the delete (or a sibling file mid-move).
 async function waitForKeys(expected, timeout = scaleTimeout(10000)) {
-  const want = JSON.stringify(expected); const deadline = Date.now() + timeout;
+  const want = JSON.stringify(expected);
+  const deadline = Date.now() + timeout;
   let keys = await bucketKeys();
-  while (JSON.stringify(keys) !== want && Date.now() < deadline) { await new Promise((r) => setTimeout(r, 150)); keys = await bucketKeys(); }
+  while (JSON.stringify(keys) !== want && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 150));
+    keys = await bucketKeys();
+  }
   assert.deepEqual(keys, expected);
 }
 async function freshSession() {
@@ -35,13 +53,18 @@ async function freshSession() {
   await connectApp(page, ctx.browserEndpoint);
   return { context, page };
 }
-function fileInput(page) { return page.locator('[data-testid="file-input"]'); }
+function fileInput(page) {
+  return page.locator('[data-testid="file-input"]');
+}
 // The upload target prefix propagates Browser→App→UploadQueue across a few async renders; wait for
 // the Destination folder input to reflect it before uploading, so the object lands in the folder.
 async function waitForUploadTarget(page, prefix) {
   const input = page.locator('input[placeholder="(root of bucket)"]');
   const deadline = Date.now() + 5000;
-  while (Date.now() < deadline) { if ((await input.inputValue().catch(() => '')) === prefix) return; await page.waitForTimeout(100); }
+  while (Date.now() < deadline) {
+    if ((await input.inputValue().catch(() => '')) === prefix) return;
+    await page.waitForTimeout(100);
+  }
   throw new Error(`upload target never became ${prefix}`);
 }
 
@@ -57,8 +80,11 @@ describe('B3 — batch upload', () => {
       ]);
       await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: 20000 });
       assert.deepEqual(await bucketKeys(), ['a.txt', 'b.txt', 'c.txt']);
-      for (const n of ['a.txt', 'b.txt', 'c.txt']) await page.locator(`[data-testid="file-row:${n}"]`).waitFor({ timeout: 10000 });
-    } finally { await context.close(); }
+      for (const n of ['a.txt', 'b.txt', 'c.txt'])
+        await page.locator(`[data-testid="file-row:${n}"]`).waitFor({ timeout: 10000 });
+    } finally {
+      await context.close();
+    }
   });
 });
 
@@ -84,9 +110,14 @@ describe('B4 — folder journey + stay-put', () => {
       assert.ok((await bucketKeys()).includes('docs/note.txt'));
       // STILL in the folder — breadcrumb shows docs, URL hash retains the prefix (BUG-029).
       await page.locator('[data-testid="file-row:note.txt"]').waitFor({ timeout: 10000 });
-      assert.ok(await page.locator('.breadcrumb .current', { hasText: 'docs' }).count() >= 1, 'still in docs/ after upload');
+      assert.ok(
+        (await page.locator('.breadcrumb .current', { hasText: 'docs' }).count()) >= 1,
+        'still in docs/ after upload',
+      );
       assert.match(await page.evaluate(() => location.hash), /docs/, 'URL hash retains the prefix');
-    } finally { await context.close(); }
+    } finally {
+      await context.close();
+    }
   });
 });
 
@@ -98,20 +129,27 @@ describe('B6 — move (picker + drag-and-drop)', () => {
       // Seed a folder and a file at root.
       await page.locator('button[title="Create a new folder"]').click();
       const nameInput = page.locator('.modal-overlay input.form-input');
-      await nameInput.waitFor({ timeout: 5000 }); await nameInput.fill('dest'); await nameInput.press('Enter');
+      await nameInput.waitFor({ timeout: 5000 });
+      await nameInput.fill('dest');
+      await nameInput.press('Enter');
       await page.locator('[data-testid="folder-row:dest"]').waitFor({ timeout: 5000 });
       await fileInput(page).setInputFiles({ name: 'm.txt', mimeType: 'text/plain', buffer: Buffer.from('x') });
       await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: 20000 });
       await page.locator('[data-testid="file-row:m.txt"]').waitFor({ timeout: 10000 });
 
       // Open the move picker from the file row, drill into dest/, Move here.
-      await page.locator('[data-testid="file-row:m.txt"]').locator('button[title="Move to another folder"]').click({ force: true });
+      await page
+        .locator('[data-testid="file-row:m.txt"]')
+        .locator('button[title="Move to another folder"]')
+        .click({ force: true });
       await page.locator('.move-picker-folder', { hasText: 'dest' }).click();
       await page.locator('.move-here').click();
 
       // Relocated in the bucket (alongside the dest/ folder-marker) and out of the root listing.
       await waitForKeys(['dest/', 'dest/m.txt']);
-    } finally { await context.close(); }
+    } finally {
+      await context.close();
+    }
   });
 
   e2eTest('drag-and-drop a file row onto a folder row moves it (one HTML5 DnD path)', async () => {
@@ -119,7 +157,9 @@ describe('B6 — move (picker + drag-and-drop)', () => {
     try {
       await page.locator('button[title="Create a new folder"]').click();
       const nameInput = page.locator('.modal-overlay input.form-input');
-      await nameInput.waitFor({ timeout: 5000 }); await nameInput.fill('box'); await nameInput.press('Enter');
+      await nameInput.waitFor({ timeout: 5000 });
+      await nameInput.fill('box');
+      await nameInput.press('Enter');
       await page.locator('[data-testid="folder-row:box"]').waitFor({ timeout: 5000 });
       await fileInput(page).setInputFiles({ name: 'drag.txt', mimeType: 'text/plain', buffer: Buffer.from('x') });
       await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: 20000 });
@@ -138,7 +178,9 @@ describe('B6 — move (picker + drag-and-drop)', () => {
       });
 
       await waitForKeys(['box/', 'box/drag.txt']);
-    } finally { await context.close(); }
+    } finally {
+      await context.close();
+    }
   });
 });
 
@@ -154,16 +196,26 @@ describe('B7 — presigned download', () => {
   e2eTest('clicking Download fetches the presigned URL and returns the file bytes', async () => {
     const { context, page } = await freshSession();
     try {
-      await fileInput(page).setInputFiles({ name: 'dl.txt', mimeType: 'text/plain', buffer: Buffer.from('download-me') });
+      await fileInput(page).setInputFiles({
+        name: 'dl.txt',
+        mimeType: 'text/plain',
+        buffer: Buffer.from('download-me'),
+      });
       await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: 20000 });
       const row = page.locator('[data-testid="file-row:dl.txt"]');
       await row.waitFor({ timeout: 10000 });
       const [response] = await Promise.all([
-        page.waitForResponse((r) => r.url().includes('X-Amz-Signature') && r.url().includes('dl.txt'), { timeout: 10000 }),
+        page.waitForResponse((r) => r.url().includes('X-Amz-Signature') && r.url().includes('dl.txt'), {
+          timeout: 10000,
+        }),
         row.locator('button[title="Download"]').click(),
       ]);
       assert.equal(response.status(), 200, 'the presigned GET is accepted (SigV4 verified by the mock)');
-      assert.match(response.headers()['content-disposition'] || '', /attachment/, 'response carries the attachment disposition');
+      assert.match(
+        response.headers()['content-disposition'] || '',
+        /attachment/,
+        'response carries the attachment disposition',
+      );
       // response.body() is unreadable when the engine converts the response into a download
       // (chromium/firefox), so verify the bytes by re-fetching the same presigned URL —
       // reusable until expiry. Constraints: the fetch must run IN A PAGE (browsers resolve
@@ -181,7 +233,9 @@ describe('B7 — presigned download', () => {
       await fetcher.close();
       assert.equal(refetch.status, 200);
       assert.equal(refetch.text, 'download-me', 'the presigned URL returns the stored bytes');
-    } finally { await context.close(); }
+    } finally {
+      await context.close();
+    }
   });
 });
 
@@ -190,7 +244,9 @@ describe('B8 — capability denied', () => {
   e2eTest('a 403 on PutObject surfaces an error and marks upload denied', async () => {
     const { context, page } = await freshSession();
     try {
-      ctx.mock.configure({ faults: [{ op: 'PutObject', method: 'PUT', status: 403, code: 'AccessDenied', message: 'no write' }] });
+      ctx.mock.configure({
+        faults: [{ op: 'PutObject', method: 'PUT', status: 403, code: 'AccessDenied', message: 'no write' }],
+      });
       await fileInput(page).setInputFiles({ name: 'denied.txt', mimeType: 'text/plain', buffer: Buffer.from('x') });
       // The upload fails; the object never lands.
       await page.waitForTimeout(2000);
@@ -199,6 +255,8 @@ describe('B8 — capability denied', () => {
       const denied = await page.locator('text=/denied/i').count();
       assert.ok(denied >= 1 || (await page.locator('.cap-denied').count()) >= 1, 'upload denial is surfaced in the UI');
       ctx.mock.configure({ faults: [] });
-    } finally { await context.close(); }
+    } finally {
+      await context.close();
+    }
   });
 });

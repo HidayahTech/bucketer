@@ -25,8 +25,12 @@ describe('applyThemeToRoot (#14)', () => {
   function fakeRoot() {
     return {
       attrs: {},
-      setAttribute(k, v) { this.attrs[k] = v; },
-      removeAttribute(k) { delete this.attrs[k]; },
+      setAttribute(k, v) {
+        this.attrs[k] = v;
+      },
+      removeAttribute(k) {
+        delete this.attrs[k];
+      },
     };
   }
 

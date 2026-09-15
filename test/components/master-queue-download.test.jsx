@@ -17,7 +17,7 @@ import { createTaskStore } from '../../src/lib/task-store.js';
 import { createDownloadTask } from '../../src/lib/queue-tasks.js';
 import { formatBytes } from '../../src/lib/format.js';
 
-const makeStore = () => createTaskStore(fn => setTimeout(fn, 0), clearTimeout);
+const makeStore = () => createTaskStore((fn) => setTimeout(fn, 0), clearTimeout);
 
 function addDownload(store, patch = {}) {
   const id = store.add(createDownloadTask({ fileCount: 412, bucket: 'b', capturedPrefix: 'videos/' }));
@@ -108,7 +108,9 @@ describe('MasterQueue — download rows', () => {
   test('failed keys still surface as errors', () => {
     const store = makeStore();
     addDownload(store, {
-      status: 'done', current: 410, total: 412,
+      status: 'done',
+      current: 410,
+      total: 412,
       errors: [{ key: 'videos/a.mp4', message: 'AccessDenied' }],
     });
     const { text, cleanup } = mount(h(MasterQueue, { store }));
@@ -195,8 +197,12 @@ describe('MasterQueue — zip progress (byte/speed/ETA parity, active-focused de
   test('a running zip task with bytesTotal renders the enriched files/byte lines and a progress bar at ~35%', () => {
     const store = makeStore();
     addZip(store, {
-      status: 'running', current: 12, total: 4231,
-      bytesDone: 1.2e9, bytesTotal: 3.4e9, failed: 1,
+      status: 'running',
+      current: 12,
+      total: 4231,
+      bytesDone: 1.2e9,
+      bytesTotal: 3.4e9,
+      failed: 1,
     });
     const { text, query, cleanup } = mount(h(MasterQueue, { store }));
     const body = text();
@@ -216,8 +222,12 @@ describe('MasterQueue — zip progress (byte/speed/ETA parity, active-focused de
   test('speed/ETA are absent on a fresh task (no rate sampled yet)', () => {
     const store = makeStore();
     addZip(store, {
-      status: 'running', current: 1, total: 4231,
-      bytesDone: 1000, bytesTotal: 3.4e9, failed: 0,
+      status: 'running',
+      current: 1,
+      total: 4231,
+      bytesDone: 1000,
+      bytesTotal: 3.4e9,
+      failed: 0,
     });
     const { text, cleanup } = mount(h(MasterQueue, { store }));
     const body = text();
@@ -247,24 +257,35 @@ describe('MasterQueue — zip progress (byte/speed/ETA parity, active-focused de
   test('expanding a running zip task reads the per-file detail and renders active/done/failed rows plus the queued/overflow footer', async () => {
     const store = makeStore();
     addZip(store, {
-      status: 'running', current: 12, total: 4231, bytesDone: 1.2e9, bytesTotal: 3.4e9, failed: 1,
+      status: 'running',
+      current: 12,
+      total: 4231,
+      bytesDone: 1.2e9,
+      bytesTotal: 3.4e9,
+      failed: 1,
       jobId: 'job-1',
       active: [{ key: 'photos/2024/trip-4k.mov', bytes: 412 * 1024 * 1024, size: 900 * 1024 * 1024 }],
     });
     const detail = {
-      done: [{ key: 'photos/2024/b.jpg', size: 6_100_000 }, { key: 'photos/2024/a.jpg', size: 8_200_000 }],
+      done: [
+        { key: 'photos/2024/b.jpg', size: 6_100_000 },
+        { key: 'photos/2024/a.jpg', size: 8_200_000 },
+      ],
       failed: [{ key: 'photos/2024/corrupt.raw' }],
       doneCount: 11,
       failedCount: 1,
     };
     let calledWith = null;
-    const readZipDetail = (jobId) => { calledWith = jobId; return Promise.resolve(detail); };
+    const readZipDetail = (jobId) => {
+      calledWith = jobId;
+      return Promise.resolve(detail);
+    };
 
     const { text, query, cleanup } = mount(h(MasterQueue, { store, readZipDetail }));
     // The running-zip detail is opt-in (Fix 3) — it does not auto-expand or auto-poll, so
     // the toggle must be clicked before the read fires.
     fire(query('[data-testid="task-expand-toggle"]'), 'click');
-    await new Promise(r => setTimeout(r, 60)); // flush the async readZipDetail read + re-render
+    await new Promise((r) => setTimeout(r, 60)); // flush the async readZipDetail read + re-render
 
     assert.equal(calledWith, 'job-1');
     const body = text();
@@ -283,7 +304,12 @@ describe('MasterQueue — zip progress (byte/speed/ETA parity, active-focused de
   test('a running zip task with N concurrent downloads renders one ▶ row per in-flight file, each with its own key/bytes/pct (Task 5)', async () => {
     const store = makeStore();
     addZip(store, {
-      status: 'running', current: 12, total: 4231, bytesDone: 1.2e9, bytesTotal: 3.4e9, failed: 1,
+      status: 'running',
+      current: 12,
+      total: 4231,
+      bytesDone: 1.2e9,
+      bytesTotal: 3.4e9,
+      failed: 1,
       jobId: 'job-multi',
       active: [
         { key: 'a.mov', size: 900, bytes: 180 },
@@ -302,13 +328,24 @@ describe('MasterQueue — zip progress (byte/speed/ETA parity, active-focused de
     const { text, query, queryAll, cleanup } = mount(h(MasterQueue, { store, readZipDetail }));
     try {
       fire(query('[data-testid="task-expand-toggle"]'), 'click');
-      await new Promise(r => setTimeout(r, 60));
+      await new Promise((r) => setTimeout(r, 60));
 
       const body = text();
       assert.equal(queryAll('.queue-op-zip-active').length, 3, 'one ▶ row per in-flight file');
-      assert.ok(body.includes('▶ a.mov') && body.includes(`${formatBytes(180)} / ${formatBytes(900)}`) && body.includes('(20%)'), body);
-      assert.ok(body.includes('▶ b.mov') && body.includes(`${formatBytes(64)} / ${formatBytes(210)}`) && body.includes('(30%)'), body);
-      assert.ok(body.includes('▶ c.raw') && body.includes(`${formatBytes(12)} / ${formatBytes(48)}`) && body.includes('(25%)'), body);
+      assert.ok(
+        body.includes('▶ a.mov') &&
+          body.includes(`${formatBytes(180)} / ${formatBytes(900)}`) &&
+          body.includes('(20%)'),
+        body,
+      );
+      assert.ok(
+        body.includes('▶ b.mov') && body.includes(`${formatBytes(64)} / ${formatBytes(210)}`) && body.includes('(30%)'),
+        body,
+      );
+      assert.ok(
+        body.includes('▶ c.raw') && body.includes(`${formatBytes(12)} / ${formatBytes(48)}`) && body.includes('(25%)'),
+        body,
+      );
 
       // The aggregate line + bar + done/failed/queued detail are unchanged by the active-list work.
       assert.ok(body.includes('Zipping · 12 of 4,231 files · 1 failed'), body);
@@ -327,7 +364,12 @@ describe('MasterQueue — zip progress (byte/speed/ETA parity, active-focused de
   test('REGRESSION: active: [] renders NO ▶ rows — an empty array is truthy, so a naive `task.active &&` guard breaks this', async () => {
     const store = makeStore();
     addZip(store, {
-      status: 'running', current: 12, total: 4231, bytesDone: 1.2e9, bytesTotal: 3.4e9, failed: 0,
+      status: 'running',
+      current: 12,
+      total: 4231,
+      bytesDone: 1.2e9,
+      bytesTotal: 3.4e9,
+      failed: 0,
       jobId: 'job-empty',
       active: [],
     });
@@ -335,7 +377,7 @@ describe('MasterQueue — zip progress (byte/speed/ETA parity, active-focused de
     const { text, query, queryAll, cleanup } = mount(h(MasterQueue, { store, readZipDetail }));
     try {
       fire(query('[data-testid="task-expand-toggle"]'), 'click');
-      await new Promise(r => setTimeout(r, 60));
+      await new Promise((r) => setTimeout(r, 60));
 
       assert.equal(queryAll('.queue-op-zip-active').length, 0, 'no active rows when nothing is in flight');
       const body = text();
@@ -350,14 +392,19 @@ describe('MasterQueue — zip progress (byte/speed/ETA parity, active-focused de
   test('active absent/null renders NO ▶ rows', async () => {
     const store = makeStore();
     addZip(store, {
-      status: 'running', current: 12, total: 4231, bytesDone: 1.2e9, bytesTotal: 3.4e9, failed: 0,
+      status: 'running',
+      current: 12,
+      total: 4231,
+      bytesDone: 1.2e9,
+      bytesTotal: 3.4e9,
+      failed: 0,
       jobId: 'job-none',
     });
     const readZipDetail = () => Promise.resolve({ done: [], failed: [], doneCount: 0, failedCount: 0 });
     const { query, queryAll, cleanup } = mount(h(MasterQueue, { store, readZipDetail }));
     try {
       fire(query('[data-testid="task-expand-toggle"]'), 'click');
-      await new Promise(r => setTimeout(r, 60));
+      await new Promise((r) => setTimeout(r, 60));
 
       assert.equal(queryAll('.queue-op-zip-active').length, 0, 'no active rows when task.active is absent');
     } finally {
@@ -368,13 +415,21 @@ describe('MasterQueue — zip progress (byte/speed/ETA parity, active-focused de
   test('a running zip task does not auto-expand the per-file detail or poll readZipDetail until the toggle is clicked (Fix 3)', async () => {
     const store = makeStore();
     let callCount = 0;
-    const readZipDetail = () => { callCount++; return Promise.resolve({ done: [], failed: [], doneCount: 0, failedCount: 0 }); };
+    const readZipDetail = () => {
+      callCount++;
+      return Promise.resolve({ done: [], failed: [], doneCount: 0, failedCount: 0 });
+    };
     addZip(store, {
-      status: 'running', current: 12, total: 4231, bytesDone: 1.2e9, bytesTotal: 3.4e9, failed: 0,
+      status: 'running',
+      current: 12,
+      total: 4231,
+      bytesDone: 1.2e9,
+      bytesTotal: 3.4e9,
+      failed: 0,
       jobId: 'job-3',
     });
     const { text, query, cleanup } = mount(h(MasterQueue, { store, readZipDetail }));
-    await new Promise(r => setTimeout(r, 60));
+    await new Promise((r) => setTimeout(r, 60));
 
     // The aggregate line + bar always show for a running zip, regardless of expand state.
     const bodyBefore = text();
@@ -389,7 +444,7 @@ describe('MasterQueue — zip progress (byte/speed/ETA parity, active-focused de
     assert.notEqual(toggle, null);
     assert.ok(toggle.textContent.includes('Show details'), 'closed by default, so the button offers to open it');
     fire(toggle, 'click');
-    await new Promise(r => setTimeout(r, 60));
+    await new Promise((r) => setTimeout(r, 60));
 
     assert.notEqual(query('[data-testid="zip-detail"]'), null, 'expanding must now render the detail');
     assert.ok(callCount >= 1, 'readZipDetail must be called once the detail is opened');
@@ -398,16 +453,24 @@ describe('MasterQueue — zip progress (byte/speed/ETA parity, active-focused de
 
   test('a settled (paused) zip task with per-key errors shows the failure MESSAGE in the active-focused detail, not just "failed" (Fix 1)', async () => {
     const store = makeStore();
-    const readZipDetail = () => Promise.resolve({
-      done: [], failed: [{ key: 'a/x.raw' }], doneCount: 0, failedCount: 1,
-    });
+    const readZipDetail = () =>
+      Promise.resolve({
+        done: [],
+        failed: [{ key: 'a/x.raw' }],
+        doneCount: 0,
+        failedCount: 1,
+      });
     addZip(store, {
-      status: 'done', current: 8, total: 10, finished: false, failed: 1,
+      status: 'done',
+      current: 8,
+      total: 10,
+      finished: false,
+      failed: 1,
       jobId: 'job-2',
       errors: [{ key: 'a/x.raw', message: 'AccessDenied' }],
     });
     const { text, cleanup } = mount(h(MasterQueue, { store, readZipDetail }));
-    await new Promise(r => setTimeout(r, 60)); // settled zip+errors auto-expands (unchanged pre-existing behavior)
+    await new Promise((r) => setTimeout(r, 60)); // settled zip+errors auto-expands (unchanged pre-existing behavior)
 
     const body = text();
     assert.ok(body.includes('Paused — 8 of 10 zipped, 1 failed'), body);

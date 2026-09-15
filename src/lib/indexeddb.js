@@ -38,22 +38,18 @@ export {
   clearActiveUploads,
 } from './active-uploads.js';
 
-export {
-  saveUploadLogEntry,
-  loadUploadLog,
-  clearUploadLog,
-} from './upload-log.js';
+export { saveUploadLogEntry, loadUploadLog, clearUploadLog } from './upload-log.js';
 
 // deleteDatabase closes the cached connection first — must be imported from core.
 import { closeDB } from './indexeddb-core.js';
-import { DB_NAME }  from './indexeddb-core.js';
+import { DB_NAME } from './indexeddb-core.js';
 
 export async function deleteDatabase() {
   closeDB();
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     const req = indexedDB.deleteDatabase(DB_NAME);
     req.onsuccess = resolve;
-    req.onerror   = resolve;
+    req.onerror = resolve;
     req.onblocked = resolve;
   });
 }

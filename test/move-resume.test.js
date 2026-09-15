@@ -21,51 +21,75 @@ function mockClient({ destKeys = [], existingParts = [], copyReject } = {}) {
       calls.push({ name, input });
       switch (name) {
         case 'ListObjectsV2Command':
-          return Promise.resolve({ Contents: destKeys.map(k => ({ Key: k, Size: 0 })), IsTruncated: false });
+          return Promise.resolve({ Contents: destKeys.map((k) => ({ Key: k, Size: 0 })), IsTruncated: false });
         case 'CopyObjectCommand': {
           const err = copyReject?.(input);
           return err ? Promise.reject(err) : Promise.resolve({ CopyObjectResult: { ETag: 'e' } });
         }
-        case 'DeleteObjectCommand':    return Promise.resolve({});
-        case 'HeadObjectCommand':      return Promise.resolve({ ContentType: 'x', Metadata: {} });
-        case 'CreateMultipartUploadCommand': return Promise.resolve({ UploadId: 'up-new' });
-        case 'ListPartsCommand':       return Promise.resolve({ Parts: existingParts, IsTruncated: false });
-        case 'UploadPartCopyCommand':  return Promise.resolve({ CopyPartResult: { ETag: `e-${input.PartNumber}` } });
-        case 'CompleteMultipartUploadCommand': return Promise.resolve({});
-        case 'AbortMultipartUploadCommand':    return Promise.resolve({});
-        default: return Promise.reject(new Error(`unexpected: ${name}`));
+        case 'DeleteObjectCommand':
+          return Promise.resolve({});
+        case 'HeadObjectCommand':
+          return Promise.resolve({ ContentType: 'x', Metadata: {} });
+        case 'CreateMultipartUploadCommand':
+          return Promise.resolve({ UploadId: 'up-new' });
+        case 'ListPartsCommand':
+          return Promise.resolve({ Parts: existingParts, IsTruncated: false });
+        case 'UploadPartCopyCommand':
+          return Promise.resolve({ CopyPartResult: { ETag: `e-${input.PartNumber}` } });
+        case 'CompleteMultipartUploadCommand':
+          return Promise.resolve({});
+        case 'AbortMultipartUploadCommand':
+          return Promise.resolve({});
+        default:
+          return Promise.reject(new Error(`unexpected: ${name}`));
       }
     },
   };
 }
 
-const collect = async (run) => { const u = []; await run(x => u.push({ ...x })); return u; };
+const collect = async (run) => {
+  const u = [];
+  await run((x) => u.push({ ...x }));
+  return u;
+};
 
 const record = (over = {}) => ({
-  id: 'mv-1', provider: 'b2', endpoint: 'e', bucket: 'bk', mode: 'move',
-  dest: 'arch/', capturedPrefix: '', createdAt: 0,
+  id: 'mv-1',
+  provider: 'b2',
+  endpoint: 'e',
+  bucket: 'bk',
+  mode: 'move',
+  dest: 'arch/',
+  capturedPrefix: '',
+  createdAt: 0,
   items: [{ sourceKey: 'a.bin', destKey: 'arch/a.bin', size: 100 }],
-  inflightUploads: {}, ...over,
+  inflightUploads: {},
+  ...over,
 });
 
 describe('resumeMoveOperation', () => {
-  beforeEach(async () => { await clearAllMoveJobs(); });
+  beforeEach(async () => {
+    await clearAllMoveJobs();
+  });
 
   test('skips an item already at the destination and deletes its lingering source', async () => {
     await saveMoveJob(record());
     const client = mockClient({ destKeys: ['arch/a.bin'] });
-    const updates = await collect(cb => resumeMoveOperation(client, 'bk', record(), cb));
-    assert.ok(!client.calls.some(c => c.name === 'CopyObjectCommand'), 'must not re-copy a finished item');
-    assert.ok(client.calls.some(c => c.name === 'DeleteObjectCommand' && c.input.Key === 'a.bin'), 'finishes the move by deleting the source');
-    assert.equal(updates.find(u => u.phase === 'done').moved, 1);
+    const updates = await collect((cb) => resumeMoveOperation(client, 'bk', record(), cb));
+    assert.ok(!client.calls.some((c) => c.name === 'CopyObjectCommand'), 'must not re-copy a finished item');
+    assert.ok(
+      client.calls.some((c) => c.name === 'DeleteObjectCommand' && c.input.Key === 'a.bin'),
+      'finishes the move by deleting the source',
+    );
+    assert.equal(updates.find((u) => u.phase === 'done').moved, 1);
   });
 
   test('copies a not-yet-done item and deletes its source', async () => {
     await saveMoveJob(record());
     const client = mockClient({ destKeys: [] });
     await resumeMoveOperation(client, 'bk', record(), () => {});
-    assert.ok(client.calls.some(c => c.name === 'CopyObjectCommand' && c.input.Key === 'arch/a.bin'));
-    assert.ok(client.calls.some(c => c.name === 'DeleteObjectCommand' && c.input.Key === 'a.bin'));
+    assert.ok(client.calls.some((c) => c.name === 'CopyObjectCommand' && c.input.Key === 'arch/a.bin'));
+    assert.ok(client.calls.some((c) => c.name === 'DeleteObjectCommand' && c.input.Key === 'a.bin'));
   });
 
   test('resumes an in-flight multipart item via its stored upload id (no Create)', async () => {
@@ -76,10 +100,10 @@ describe('resumeMoveOperation', () => {
     await saveMoveJob(rec);
     const client = mockClient({ destKeys: [], existingParts: [{ PartNumber: 1, ETag: 'd-1' }] });
     await resumeMoveOperation(client, 'bk', rec, () => {});
-    assert.ok(!client.calls.some(c => c.name === 'CreateMultipartUploadCommand'), 'resumes, does not create');
-    assert.ok(client.calls.some(c => c.name === 'ListPartsCommand' && c.input.UploadId === 'up-existing'));
-    assert.ok(client.calls.some(c => c.name === 'CompleteMultipartUploadCommand'));
-    assert.ok(client.calls.some(c => c.name === 'DeleteObjectCommand' && c.input.Key === 'big.bin'));
+    assert.ok(!client.calls.some((c) => c.name === 'CreateMultipartUploadCommand'), 'resumes, does not create');
+    assert.ok(client.calls.some((c) => c.name === 'ListPartsCommand' && c.input.UploadId === 'up-existing'));
+    assert.ok(client.calls.some((c) => c.name === 'CompleteMultipartUploadCommand'));
+    assert.ok(client.calls.some((c) => c.name === 'DeleteObjectCommand' && c.input.Key === 'big.bin'));
   });
 
   test('deletes the job record on clean completion', async () => {
@@ -91,7 +115,9 @@ describe('resumeMoveOperation', () => {
 });
 
 describe('runMoveOperation — persistence', () => {
-  beforeEach(async () => { await clearAllMoveJobs(); });
+  beforeEach(async () => {
+    await clearAllMoveJobs();
+  });
 
   test('a clean completion leaves no record behind', async () => {
     const client = mockClient({ destKeys: [] });
@@ -102,10 +128,24 @@ describe('runMoveOperation — persistence', () => {
 
   test('a cancelled move leaves the record with its work list for later resume', async () => {
     const client = mockClient({ destKeys: [] });
-    const op = { jobId: 'mv-8', provider: 'b2', endpoint: 'e',
-      files: [{ key: 'a.bin', size: 100 }, { key: 'b.bin', size: 100 }], dest: 'arch/' };
+    const op = {
+      jobId: 'mv-8',
+      provider: 'b2',
+      endpoint: 'e',
+      files: [
+        { key: 'a.bin', size: 100 },
+        { key: 'b.bin', size: 100 },
+      ],
+      dest: 'arch/',
+    };
     let n = 0;
-    await runMoveOperation(client, 'bk', op, () => {}, () => n++ > 0); // cancel after the first item
+    await runMoveOperation(
+      client,
+      'bk',
+      op,
+      () => {},
+      () => n++ > 0,
+    ); // cancel after the first item
     const rec = await loadMoveJob('mv-8');
     assert.ok(rec, 'record survives a cancel');
     assert.equal(rec.items.length, 2);
@@ -123,22 +163,35 @@ describe('runMoveOperation — persistence', () => {
 // job resumable; a clean finish — including one whose only "errors" are collision skips —
 // deletes the record and reports resumable:false.
 describe('runMoveOperation — resumable flag on done', () => {
-  beforeEach(async () => { await clearAllMoveJobs(); });
+  beforeEach(async () => {
+    await clearAllMoveJobs();
+  });
 
   test('a real copy failure reports resumable:true and keeps the record', async () => {
-    const client = mockClient({ destKeys: [], copyReject: (i) => i.Key === 'arch/b.bin' ? new Error('cap exceeded') : undefined });
-    const op = { jobId: 'mv-r1', provider: 'b2', endpoint: 'e',
-      files: [{ key: 'a.bin', size: 1 }, { key: 'b.bin', size: 1 }], dest: 'arch/' };
-    const updates = await collect(cb => runMoveOperation(client, 'bk', op, cb));
-    assert.equal(updates.find(u => u.phase === 'done').resumable, true);
+    const client = mockClient({
+      destKeys: [],
+      copyReject: (i) => (i.Key === 'arch/b.bin' ? new Error('cap exceeded') : undefined),
+    });
+    const op = {
+      jobId: 'mv-r1',
+      provider: 'b2',
+      endpoint: 'e',
+      files: [
+        { key: 'a.bin', size: 1 },
+        { key: 'b.bin', size: 1 },
+      ],
+      dest: 'arch/',
+    };
+    const updates = await collect((cb) => runMoveOperation(client, 'bk', op, cb));
+    assert.equal(updates.find((u) => u.phase === 'done').resumable, true);
     assert.ok(await loadMoveJob('mv-r1'), 'record kept for resume');
   });
 
   test('a clean move reports resumable:false and deletes the record', async () => {
     const client = mockClient({ destKeys: [] });
     const op = { jobId: 'mv-r2', provider: 'b2', endpoint: 'e', files: [{ key: 'a.bin', size: 1 }], dest: 'arch/' };
-    const updates = await collect(cb => runMoveOperation(client, 'bk', op, cb));
-    assert.equal(updates.find(u => u.phase === 'done').resumable, false);
+    const updates = await collect((cb) => runMoveOperation(client, 'bk', op, cb));
+    assert.equal(updates.find((u) => u.phase === 'done').resumable, false);
     assert.equal(await loadMoveJob('mv-r2'), null);
   });
 
@@ -146,8 +199,8 @@ describe('runMoveOperation — resumable flag on done', () => {
     // The one file already exists at the destination → skipped, nothing actually failed.
     const client = mockClient({ destKeys: ['arch/a.bin'] });
     const op = { jobId: 'mv-r3', provider: 'b2', endpoint: 'e', files: [{ key: 'a.bin', size: 1 }], dest: 'arch/' };
-    const updates = await collect(cb => runMoveOperation(client, 'bk', op, cb));
-    assert.equal(updates.find(u => u.phase === 'done').resumable, false);
+    const updates = await collect((cb) => runMoveOperation(client, 'bk', op, cb));
+    assert.equal(updates.find((u) => u.phase === 'done').resumable, false);
     assert.equal(await loadMoveJob('mv-r3'), null);
   });
 });

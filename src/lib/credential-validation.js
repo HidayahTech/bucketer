@@ -13,10 +13,14 @@ export function canSaveProfile(formData) {
   if (!formData) return false;
   const { endpoint, bucket, keyId } = formData;
   const ep = (endpoint || '').trim();
-  const bk = (bucket  || '').trim();
-  const ki = (keyId   || '').trim();
+  const bk = (bucket || '').trim();
+  const ki = (keyId || '').trim();
   if (!ep || !bk || !ki) return false;
-  try { new URL(ep); } catch { return false; }
+  try {
+    new URL(ep);
+  } catch {
+    return false;
+  }
   if (/\s/.test(bk) || bk.length > 63) return false;
   if (/\s/.test(ki)) return false;
   return true;
@@ -24,21 +28,17 @@ export function canSaveProfile(formData) {
 
 export function credentialErrors(form) {
   const e = {};
-  if (form.bucket && /\s/.test(form.bucket))
-    e.bucket = 'Bucket names cannot contain spaces.';
+  if (form.bucket && /\s/.test(form.bucket)) e.bucket = 'Bucket names cannot contain spaces.';
   else if (form.bucket && form.bucket.length > 63)
     e.bucket = "Bucket name exceeds 63 characters — verify your provider's naming rules.";
-  if (form.keyId && /\s/.test(form.keyId))
-    e.keyId = 'Key ID must not contain spaces — check for an accidental paste.';
+  if (form.keyId && /\s/.test(form.keyId)) e.keyId = 'Key ID must not contain spaces — check for an accidental paste.';
   if (form.secretKey && /\s/.test(form.secretKey))
     e.secretKey = 'Secret key must not contain spaces — check for an accidental paste.';
-  if (form.regionOverride && /\s/.test(form.regionOverride))
-    e.regionOverride = 'Region must not contain spaces.';
+  if (form.regionOverride && /\s/.test(form.regionOverride)) e.regionOverride = 'Region must not contain spaces.';
   // Base folder (prefix-scoped keys, #60): optional. Slashes are normalized on
   // submit, so only structural violations block — a '..' path segment is
   // nonsensical in an S3 key namespace, and a backslash is a Windows-path paste.
-  if (form.basePrefix &&
-      (form.basePrefix.includes('\\') || form.basePrefix.split('/').some(s => s === '..')))
+  if (form.basePrefix && (form.basePrefix.includes('\\') || form.basePrefix.split('/').some((s) => s === '..')))
     e.basePrefix = 'Base folder can’t contain ".." or backslashes — use a plain folder path like team/alice/.';
   return e;
 }

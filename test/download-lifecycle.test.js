@@ -20,8 +20,10 @@ describe('classifyJob — the reachability invariant', () => {
       for (const failed of COUNT_SHAPES) {
         for (const issued of COUNT_SHAPES) {
           const cls = classifyJob({ pending, failed, issued });
-          assert.ok(ALL_CLASSES.has(cls),
-            `unclassified job state: pending=${pending} failed=${failed} issued=${issued}`);
+          assert.ok(
+            ALL_CLASSES.has(cls),
+            `unclassified job state: pending=${pending} failed=${failed} issued=${issued}`,
+          );
         }
       }
     }

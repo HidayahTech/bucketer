@@ -41,8 +41,9 @@ describe('SetupGuide — every <button> has explicit type (BUG-006)', () => {
       }
     }
     assert.deepEqual(
-      missing, [],
-      `SetupGuide buttons missing explicit type (default is "submit", submits parent form): ${missing.join(', ')}`
+      missing,
+      [],
+      `SetupGuide buttons missing explicit type (default is "submit", submits parent form): ${missing.join(', ')}`,
     );
   });
 });
@@ -64,7 +65,7 @@ describe('App.jsx — required hooks imported from preact/hooks (BUG-014)', () =
     test(`${hook} is imported`, () => {
       assert.ok(
         importMatch && importMatch[1].includes(hook),
-        `${hook} must be in the preact/hooks import — a missing hook import causes a blank page at runtime`
+        `${hook} must be in the preact/hooks import — a missing hook import causes a blank page at runtime`,
       );
     });
   }
@@ -83,7 +84,7 @@ describe('UploadLog — MAX_DISPLAY cap is present and bounded (BUG-021)', () =>
   test('MAX_DISPLAY constant is declared', () => {
     assert.ok(
       /const\s+MAX_DISPLAY\s*=/.test(source),
-      'UploadLog.jsx must declare MAX_DISPLAY — removing it re-exposes the Preact VDOM freeze on large upload histories'
+      'UploadLog.jsx must declare MAX_DISPLAY — removing it re-exposes the Preact VDOM freeze on large upload histories',
     );
   });
 
@@ -93,14 +94,14 @@ describe('UploadLog — MAX_DISPLAY cap is present and bounded (BUG-021)', () =>
     const value = Number(m[1]);
     assert.ok(
       value <= 500,
-      `MAX_DISPLAY is ${value}, which is dangerously high — keep it at or below 500 to prevent VDOM diffing thousands of rows`
+      `MAX_DISPLAY is ${value}, which is dangerously high — keep it at or below 500 to prevent VDOM diffing thousands of rows`,
     );
   });
 
   test('displayEntries slices using MAX_DISPLAY', () => {
     assert.ok(
       /slice\s*\(\s*0\s*,\s*MAX_DISPLAY\s*\)/.test(source),
-      'UploadLog.jsx must slice entries to MAX_DISPLAY rows before rendering'
+      'UploadLog.jsx must slice entries to MAX_DISPLAY rows before rendering',
     );
   });
 });
@@ -110,14 +111,14 @@ describe('UploadLog — MAX_DISPLAY cap is present and bounded (BUG-021)', () =>
 // Declaring it after produces a temporal-dead-zone ReferenceError at mount.
 test('selectedConnectionId is declared before credentials in App.jsx', () => {
   const source = readFileSync(new URL('../src/components/App.jsx', import.meta.url), 'utf8');
-  const selIdx  = source.indexOf('const [selectedConnectionId');
+  const selIdx = source.indexOf('const [selectedConnectionId');
   const credIdx = source.indexOf('const [credentials');
   assert.ok(selIdx > -1, 'selectedConnectionId state not found in App.jsx');
   assert.ok(credIdx > -1, 'credentials state not found in App.jsx');
   assert.ok(
     selIdx < credIdx,
     'selectedConnectionId must be declared before credentials; its initializer calls ' +
-    'loadLastProfileId() to pre-fill from the saved connection'
+      'loadLastProfileId() to pre-fill from the saved connection',
   );
 });
 
@@ -128,7 +129,7 @@ test('App.jsx does not import capability functions from storage.js', () => {
   assert.equal(
     /loadCapabilities|saveCapabilities|clearCapabilities/.test(source),
     false,
-    'capability state must come from connections.js, not storage.js'
+    'capability state must come from connections.js, not storage.js',
   );
 });
 
@@ -168,11 +169,12 @@ describe('App.jsx — recallSecret is not called from inside a useState initiali
       }
     }
     assert.deepEqual(
-      offenders, [],
+      offenders,
+      [],
       `App.jsx must not call recallSecret from inside a useState(...) initializer ` +
-      `(found at: ${offenders.join(', ')}) — the credentials initializer runs before ` +
-      `the mount effect, so the migration and unlock state recall depends on are not ` +
-      `established yet; recall belongs in the mount effect`
+        `(found at: ${offenders.join(', ')}) — the credentials initializer runs before ` +
+        `the mount effect, so the migration and unlock state recall depends on are not ` +
+        `established yet; recall belongs in the mount effect`,
     );
   });
 });
@@ -191,7 +193,7 @@ describe('HiddenVersions.jsx — Wasabi 90-day billing warning in purge-all (T3-
   test('warning text mentions Wasabi and 90 days', () => {
     assert.ok(
       /[Ww]asabi/.test(source) && /90.day/.test(source),
-      'HiddenVersions.jsx must include Wasabi 90-day retention warning in purge-all confirmation'
+      'HiddenVersions.jsx must include Wasabi 90-day retention warning in purge-all confirmation',
     );
   });
 });
@@ -206,14 +208,14 @@ describe('HiddenVersions.jsx — R2 versioning not-supported gate (T3-2)', () =>
   test('component accepts provider prop', () => {
     assert.ok(
       /HiddenVersions\s*\(\s*\{[^}]*provider/.test(source),
-      'HiddenVersions must accept a provider prop to gate R2 users'
+      'HiddenVersions must accept a provider prop to gate R2 users',
     );
   });
 
   test('renders not-supported message for R2', () => {
     assert.ok(
       /R2[^}]*not support|not support[^}]*R2|versioning.*not.*support|R2.*versioning/i.test(source),
-      'HiddenVersions must render a "versioning not supported" message for Cloudflare R2'
+      'HiddenVersions must render a "versioning not supported" message for Cloudflare R2',
     );
   });
 });
@@ -228,14 +230,14 @@ describe('SetupGuide.jsx — MinIO HTTPS mixed-content warning (T3-4)', () => {
   test('GuideMinIO has explicit mixed-content warning paragraph', () => {
     // Look within GuideMinIO function body (from its definition to the next function)
     const guideStart = source.indexOf('function GuideMinIO');
-    const guideEnd   = source.indexOf('\nfunction ', guideStart + 1);
+    const guideEnd = source.indexOf('\nfunction ', guideStart + 1);
     const guide = source.slice(guideStart, guideEnd > guideStart ? guideEnd : undefined);
     // Must contain an explicit warning about mixed-content or the HTTPS requirement,
     // NOT just incidentally contain "https" in a URL placeholder.
     assert.ok(
       /mixed.content|HTTPS.*required|must.*HTTPS|HTTP.*block|TLS.*required|mixed content/i.test(guide),
       'GuideMinIO must include an explicit mixed-content warning — HTTPS Bucketer cannot ' +
-      'make requests to an HTTP MinIO server; the error appears only in DevTools'
+        'make requests to an HTTP MinIO server; the error appears only in DevTools',
     );
   });
 });
@@ -249,12 +251,12 @@ describe('SetupGuide.jsx — B2 listAllBucketNames capability mentioned (T3-5)',
 
   test('GuideB2 mentions listAllBucketNames or List All Bucket Names', () => {
     const guideStart = source.indexOf('function GuideB2');
-    const guideEnd   = source.indexOf('\nfunction ', guideStart + 1);
+    const guideEnd = source.indexOf('\nfunction ', guideStart + 1);
     const guide = source.slice(guideStart, guideEnd > guideStart ? guideEnd : undefined);
     assert.ok(
       /listAllBucketNames|List All Bucket Names/i.test(guide),
       'GuideB2 must mention listAllBucketNames — a single-bucket key without this capability ' +
-      'causes AWS SDK v3 initialisation to fail entirely'
+        'causes AWS SDK v3 initialisation to fail entirely',
     );
   });
 });
@@ -268,28 +270,28 @@ describe('SetupGuide.jsx — R2 guide completeness (T3-6)', () => {
 
   function r2Guide() {
     const guideStart = source.indexOf('function GuideR2');
-    const guideEnd   = source.indexOf('\nfunction ', guideStart + 1);
+    const guideEnd = source.indexOf('\nfunction ', guideStart + 1);
     return source.slice(guideStart, guideEnd > guideStart ? guideEnd : undefined);
   }
 
   test('GuideR2 mentions Account ID location', () => {
     assert.ok(
       /[Aa]ccount\s+ID/i.test(r2Guide()),
-      'GuideR2 must tell users where to find their Account ID (Cloudflare dashboard sidebar)'
+      'GuideR2 must tell users where to find their Account ID (Cloudflare dashboard sidebar)',
     );
   });
 
   test('GuideR2 mentions payment method requirement', () => {
     assert.ok(
       /payment|billing|credit card|free tier/i.test(r2Guide()),
-      'GuideR2 must note that a payment method is required even on the free tier'
+      'GuideR2 must note that a payment method is required even on the free tier',
     );
   });
 
   test('GuideR2 mentions token scope (bucket-scoped vs account-scoped)', () => {
     assert.ok(
       /bucket.scoped|account.scoped|token scope|scope/i.test(r2Guide()),
-      'GuideR2 must explain token scope: bucket-scoped for single-bucket, account-scoped for multi-bucket'
+      'GuideR2 must explain token scope: bucket-scoped for single-bucket, account-scoped for multi-bucket',
     );
   });
 });
@@ -312,11 +314,11 @@ describe('App.jsx — handleDeleteConfirm wraps runDeleteOperation in try/catch 
     assert.ok(
       /\btry\s*\{/.test(fnBody),
       'handleDeleteConfirm must wrap runDeleteOperation in try/catch — an uncaught throw ' +
-      'leaves the delete panel permanently stuck with no dismiss path'
+        'leaves the delete panel permanently stuck with no dismiss path',
     );
     assert.ok(
       /\bcatch\s*\(/.test(fnBody),
-      'handleDeleteConfirm must have a catch clause to recover from unexpected errors'
+      'handleDeleteConfirm must have a catch clause to recover from unexpected errors',
     );
   });
 });
@@ -333,7 +335,7 @@ describe('README.md — CSP examples include media-src and frame-src (T2-5)', ()
     assert.ok(
       /media-src https:/.test(readme),
       'README.md CSP examples must include media-src https: — presigned audio/video preview ' +
-      'URLs are https:, not data: URIs; without this directive previews are silently blocked'
+        'URLs are https:, not data: URIs; without this directive previews are silently blocked',
     );
   });
 
@@ -341,7 +343,7 @@ describe('README.md — CSP examples include media-src and frame-src (T2-5)', ()
     assert.ok(
       /frame-src https:/.test(readme),
       'README.md CSP examples must include frame-src https: — PDF previews use an <iframe> ' +
-      'with a presigned https: URL; without this directive PDF previews are silently blocked'
+        'with a presigned https: URL; without this directive PDF previews are silently blocked',
     );
   });
 
@@ -349,7 +351,7 @@ describe('README.md — CSP examples include media-src and frame-src (T2-5)', ()
     assert.ok(
       /img-src data: https:/.test(readme),
       'README.md CSP examples must include img-src data: https: — presigned image preview ' +
-      'URLs are https:, not data: URIs'
+        'URLs are https:, not data: URIs',
     );
   });
 });
@@ -368,7 +370,7 @@ describe('purge-versions.js — purge-all accumulates errors across all batches 
     assert.ok(
       /allErrors\.push/.test(source),
       'purge-versions.js must accumulate errors into allErrors[] — throwing on the ' +
-      'first error abandons remaining batches and silently leaves versions undeleted'
+        'first error abandons remaining batches and silently leaves versions undeleted',
     );
   });
 
@@ -378,7 +380,7 @@ describe('purge-versions.js — purge-all accumulates errors across all batches 
     assert.ok(
       !/if\s*\(resp\.Errors[^}]*throw/.test(source),
       'purge-versions.js must not throw inside the batch loop on resp.Errors — ' +
-      'this stops all remaining batches and leaves a partial purge with no error summary'
+        'this stops all remaining batches and leaves a partial purge with no error summary',
     );
   });
 });
@@ -404,9 +406,7 @@ function allSrcFiles(dir) {
 }
 
 const SDK_IMPORT = '@aws-sdk/client-s3';
-const sdkFiles = allSrcFiles('src').filter(f =>
-  readFileSync(resolve(ROOT, f), 'utf8').includes(SDK_IMPORT)
-);
+const sdkFiles = allSrcFiles('src').filter((f) => readFileSync(resolve(ROOT, f), 'utf8').includes(SDK_IMPORT));
 
 describe('every new XCommand() has a matching @aws-sdk/client-s3 import (T1-2)', () => {
   for (const relPath of sdkFiles) {
@@ -416,7 +416,12 @@ describe('every new XCommand() has a matching @aws-sdk/client-s3 import (T1-2)',
       // Named imports from @aws-sdk/client-s3
       const importMatch = source.match(/import\s*\{([^}]+)\}\s*from\s*['"]@aws-sdk\/client-s3['"]/);
       const imported = new Set(
-        importMatch ? importMatch[1].split(',').map(s => s.trim().replace(/\s+as\s+\S+$/, '')).filter(Boolean) : []
+        importMatch
+          ? importMatch[1]
+              .split(',')
+              .map((s) => s.trim().replace(/\s+as\s+\S+$/, ''))
+              .filter(Boolean)
+          : [],
       );
 
       // All `new XyzCommand(` usages in the file
@@ -427,11 +432,12 @@ describe('every new XCommand() has a matching @aws-sdk/client-s3 import (T1-2)',
         used.add(m[1]);
       }
 
-      const missing = [...used].filter(cmd => !imported.has(cmd));
+      const missing = [...used].filter((cmd) => !imported.has(cmd));
       assert.deepEqual(
-        missing, [],
+        missing,
+        [],
         `${relPath} uses Commands not present in its @aws-sdk/client-s3 import: ` +
-        `${missing.join(', ')} — add them to prevent ReferenceError at runtime`
+          `${missing.join(', ')} — add them to prevent ReferenceError at runtime`,
       );
     });
   }
@@ -448,8 +454,8 @@ describe('delete-queue.js — discoverPrefixKeys concurrency is capped (T4-3)', 
     assert.ok(
       !source.includes('Promise.all(prefixes.map'),
       'delete-queue.js must not use bare Promise.all(prefixes.map) — deleting 30+ folders ' +
-      'launches unlimited concurrent ListObjectsV2 crawls that can saturate the ' +
-      'connection pool and trigger provider throttling (T4-3)'
+        'launches unlimited concurrent ListObjectsV2 crawls that can saturate the ' +
+        'connection pool and trigger provider throttling (T4-3)',
     );
   });
 });
@@ -463,7 +469,7 @@ describe('docs/QUESTIONS.md — stale claims absent (T4-5)', () => {
   test('"No delete, rename, copy — out of scope" claim is removed', () => {
     assert.ok(
       !questions.includes('No delete, rename, copy'),
-      'docs/QUESTIONS.md must not claim "No delete, rename, copy" — all three shipped in v1.14.0+'
+      'docs/QUESTIONS.md must not claim "No delete, rename, copy" — all three shipped in v1.14.0+',
     );
   });
 
@@ -471,7 +477,7 @@ describe('docs/QUESTIONS.md — stale claims absent (T4-5)', () => {
     assert.ok(
       !questions.includes('N=2 upload concurrency'),
       'docs/QUESTIONS.md claims N=2 upload concurrency default — actual default is N=3 ' +
-      '(DEFAULT_FILE_CONCURRENCY = 3 in UploadQueue.jsx)'
+        '(DEFAULT_FILE_CONCURRENCY = 3 in UploadQueue.jsx)',
     );
   });
 });
@@ -487,8 +493,8 @@ describe('Browser.jsx — no module-level mutable _sessionFirstMount (T5-5)', ()
     assert.ok(
       !/^let _sessionFirstMount/m.test(source),
       'Browser.jsx must not use a module-level let _sessionFirstMount — ' +
-      'module-level mutables are shared across instances and pollute test isolation; ' +
-      'derive from browserKey (passed as prop from App.jsx) instead'
+        'module-level mutables are shared across instances and pollute test isolation; ' +
+        'derive from browserKey (passed as prop from App.jsx) instead',
     );
   });
 });
@@ -504,8 +510,8 @@ describe('Browser.jsx — empty-bucket and empty-prefix have distinct copy (T5-6
     assert.ok(
       /This bucket is empty|bucket is empty/i.test(source),
       'Browser.jsx must render distinct copy when the root of a bucket is empty — ' +
-      '"This prefix is empty." shown at the root is misleading; use onboarding copy ' +
-      'that tells the user the bucket has no objects and invites an upload'
+        '"This prefix is empty." shown at the root is misleading; use onboarding copy ' +
+        'that tells the user the bucket has no objects and invites an upload',
     );
   });
 });
@@ -528,8 +534,8 @@ describe('CapabilityPanel.jsx — inline hint text for unknown (?) state (T5-8)'
     assert.ok(
       /detected automatically|as you use.*feature|as you use each/i.test(source),
       'CapabilityPanel.jsx must include an inline hint explaining the ? state — ' +
-      '"Not yet tested" as a tooltip title is not visible enough; users need an ' +
-      'inline note that permissions are detected automatically as they use features'
+        '"Not yet tested" as a tooltip title is not visible enough; users need an ' +
+        'inline note that permissions are detected automatically as they use features',
     );
   });
 });
@@ -554,7 +560,7 @@ describe('UploadQueue.jsx — BUG-023 regression: handleCancelBatch calls delete
     assert.ok(
       fn.includes('deleteResumeRecord'),
       'handleCancelBatch must call deleteResumeRecord — otherwise re-dragging a cancelled ' +
-      'folder shows all files as "Paused" due to surviving stale IndexedDB records (BUG-023)'
+        'folder shows all files as "Paused" due to surviving stale IndexedDB records (BUG-023)',
     );
   });
 });
@@ -566,8 +572,8 @@ describe('UploadQueue.jsx — BUG-024 regression: cancellation guard after loadR
     assert.ok(
       /await loadResumeRecord[\s\S]{0,500}cancelledBatchesRef\.current\.has/.test(source),
       'enqueueUpload must check cancelledBatchesRef.current.has after await loadResumeRecord — ' +
-      'without this guard a cancel fired during the async gap overwrites "aborted" ' +
-      'with "paused" when the promise resolves (BUG-024)'
+        'without this guard a cancel fired during the async gap overwrites "aborted" ' +
+        'with "paused" when the promise resolves (BUG-024)',
     );
   });
 });
@@ -582,13 +588,13 @@ describe('SetupGuide.jsx — Wasabi dotted-bucket SSL caveat present (T5-11)', (
 
   test('GuideWasabi warns about dotted bucket names causing SSL issues', () => {
     const guideStart = source.indexOf('function GuideWasabi');
-    const guideEnd   = source.indexOf('\nfunction ', guideStart + 1);
+    const guideEnd = source.indexOf('\nfunction ', guideStart + 1);
     const guide = source.slice(guideStart, guideEnd > guideStart ? guideEnd : undefined);
     assert.ok(
       /dotted|dot.*name|path.?style.*bucket|bucket.*dot|avoid.*dot/i.test(guide),
       'GuideWasabi must warn that bucket names containing dots cause SSL SNI failures ' +
-      'with virtual-hosted style — the wildcard cert *.s3.wasabisys.com does not cover ' +
-      'dotted subdomain names like my.bucket.s3.wasabisys.com'
+        'with virtual-hosted style — the wildcard cert *.s3.wasabisys.com does not cover ' +
+        'dotted subdomain names like my.bucket.s3.wasabisys.com',
     );
   });
 });
@@ -605,8 +611,8 @@ describe('provider.js — requiresPathStyle B2 comment accuracy (T5-12)', () => 
     assert.ok(
       !/B2 and MinIO require path-style URLs/.test(source),
       'provider.js comment overstates: B2 supports both path-style and virtual-hosted URLs. ' +
-      'We force path-style because users supply a plain regional endpoint, not a bucket-prefixed one. ' +
-      'MinIO genuinely requires path-style. Update the comment to reflect this distinction.'
+        'We force path-style because users supply a plain regional endpoint, not a bucket-prefixed one. ' +
+        'MinIO genuinely requires path-style. Update the comment to reflect this distinction.',
     );
   });
 });
@@ -622,8 +628,8 @@ describe('provider.js — defaultMaxKeys B2 comment accuracy (T5-13)', () => {
     assert.ok(
       !/billed per call/.test(source),
       'provider.js comment is factually wrong: B2 Class C operations are free for PAYG accounts. ' +
-      'Reframe the 200 default as a UX choice (smaller pages make browsing feel snappier), ' +
-      'not a billing-avoidance measure.'
+        'Reframe the 200 default as a UX choice (smaller pages make browsing feel snappier), ' +
+        'not a billing-avoidance measure.',
     );
   });
 });
@@ -639,14 +645,14 @@ describe('Browser.jsx — preview state extracted to usePreview hook (T4-1)', ()
     assert.ok(
       !source.includes('const [previewItem,'),
       'Browser.jsx must not declare previewItem state inline — preview state must be ' +
-      'extracted to src/lib/usePreview.js so the logic is testable and Browser stays focused'
+        'extracted to src/lib/usePreview.js so the logic is testable and Browser stays focused',
     );
   });
 
   test('Browser.jsx imports usePreview from lib', () => {
     assert.ok(
       /usePreview/.test(source),
-      'Browser.jsx must import and use usePreview — the preview hook must be wired in'
+      'Browser.jsx must import and use usePreview — the preview hook must be wired in',
     );
   });
 });
@@ -659,7 +665,7 @@ describe('Browser.jsx — preview state extracted to usePreview hook (T4-1)', ()
 
 describe('src/lib/usePreview.js — gen-ref cancellation guard (T4-2)', () => {
   const hookPath = resolve(ROOT, 'src/lib/usePreview.js');
-  const hookSrc  = existsSync(hookPath) ? readFileSync(hookPath, 'utf8') : '';
+  const hookSrc = existsSync(hookPath) ? readFileSync(hookPath, 'utf8') : '';
 
   test('src/lib/usePreview.js exists', () => {
     assert.ok(existsSync(hookPath), 'src/lib/usePreview.js must exist — extract preview logic from Browser.jsx');
@@ -669,7 +675,7 @@ describe('src/lib/usePreview.js — gen-ref cancellation guard (T4-2)', () => {
     assert.ok(
       /genRef|previewGenRef/.test(hookSrc),
       'usePreview.js must use a genRef to guard against stale async callbacks — ' +
-      'without it, opening preview for file B while A is loading overwrites B\'s state'
+        "without it, opening preview for file B while A is loading overwrites B's state",
     );
   });
 
@@ -677,7 +683,7 @@ describe('src/lib/usePreview.js — gen-ref cancellation guard (T4-2)', () => {
     assert.ok(
       /gen !== /.test(hookSrc),
       'usePreview.js must check `if (gen !== genRef.current) return` after every await — ' +
-      'this is the cancellation guard that prevents stale preview state'
+        'this is the cancellation guard that prevents stale preview state',
     );
   });
 });
@@ -697,7 +703,7 @@ describe('CredentialForm.jsx — all standalone labels have htmlFor (T4-6)', () 
     assert.ok(
       !source.includes('<label>'),
       'CredentialForm.jsx must not contain bare <label> — every standalone label must have ' +
-      'htmlFor so screen readers and click-to-focus work correctly (T4-6)'
+        'htmlFor so screen readers and click-to-focus work correctly (T4-6)',
     );
   });
 });
@@ -711,7 +717,7 @@ describe('SettingsPanel.jsx — all standalone labels have htmlFor (T4-6)', () =
     assert.ok(
       !source.includes('<label>'),
       'SettingsPanel.jsx must not contain bare <label> — every standalone label must have ' +
-      'htmlFor so screen readers and click-to-focus work correctly (T4-6)'
+        'htmlFor so screen readers and click-to-focus work correctly (T4-6)',
     );
   });
 });
@@ -728,7 +734,7 @@ describe('BatchSummary.jsx — progress bars have ARIA attributes (T5-9)', () =>
     assert.ok(
       source.includes('aria-valuenow'),
       'BatchSummary.jsx progress-bar-wrap must have aria-valuenow — without it, screen ' +
-      'readers cannot report upload progress (T5-9)'
+        'readers cannot report upload progress (T5-9)',
     );
   });
 
@@ -736,7 +742,7 @@ describe('BatchSummary.jsx — progress bars have ARIA attributes (T5-9)', () =>
     assert.ok(
       source.includes('role="progressbar"'),
       'BatchSummary.jsx progress-bar-wrap must have role="progressbar" — exposes the ' +
-      'upload bar to the accessibility tree (T5-9)'
+        'upload bar to the accessibility tree (T5-9)',
     );
   });
 });
@@ -758,9 +764,9 @@ describe('Browser.jsx — handleTableDrop is not async (drop-sync)', () => {
     assert.ok(
       !/async function handleTableDrop/.test(source),
       'Browser.jsx handleTableDrop must not be async — an async handler blocks the drop ' +
-      'event until collectFileEntries resolves; with 1000+ file folders the next drop ' +
-      'is not captured until the first traversal completes. Capture entries sync, then ' +
-      'fire collectFileEntries as a detached .then().'
+        'event until collectFileEntries resolves; with 1000+ file folders the next drop ' +
+        'is not captured until the first traversal completes. Capture entries sync, then ' +
+        'fire collectFileEntries as a detached .then().',
     );
   });
 });
@@ -772,8 +778,8 @@ describe('UploadQueue.jsx — handleDrop is not async (drop-sync)', () => {
     assert.ok(
       !/async function handleDrop/.test(source),
       'UploadQueue.jsx handleDrop must not be async — an async handler blocks the drop ' +
-      'event until collectFileEntries resolves; rapid consecutive folder drops are not ' +
-      'captured promptly. Capture entries sync, fire collectFileEntries as a detached .then().'
+        'event until collectFileEntries resolves; rapid consecutive folder drops are not ' +
+        'captured promptly. Capture entries sync, fire collectFileEntries as a detached .then().',
     );
   });
 });
@@ -802,9 +808,9 @@ describe('useWindowDragDrop.js — uses the shared drop resolver (window-drop, B
     assert.ok(
       /resolveDroppedFiles/.test(source),
       'useWindowDragDrop.js must resolve drops via resolveDroppedFiles — the shared resolver ' +
-      'traverses FileSystemEntry trees AND falls back to dataTransfer.files when the entries ' +
-      'yield nothing (BUG-041: WebKit returns truthy entries whose .file() errors NotFoundError; ' +
-      'without the fallback such drops die silently)'
+        'traverses FileSystemEntry trees AND falls back to dataTransfer.files when the entries ' +
+        'yield nothing (BUG-041: WebKit returns truthy entries whose .file() errors NotFoundError; ' +
+        'without the fallback such drops die silently)',
     );
   });
 });
@@ -816,7 +822,7 @@ describe('Browser.jsx — uses the shared drop resolver (table-drop, BUG-041)', 
     assert.ok(
       /resolveDroppedFiles/.test(source),
       'Browser.jsx handleTableDrop must resolve drops via resolveDroppedFiles (see the ' +
-      'useWindowDragDrop invariant above for the BUG-041 fallback rationale)'
+        'useWindowDragDrop invariant above for the BUG-041 fallback rationale)',
     );
   });
 });
@@ -828,8 +834,8 @@ describe('App.jsx — window-drop overlay: windowDragOver state (window-drop)', 
     assert.ok(
       /windowDragOver/.test(source),
       'App.jsx must declare windowDragOver state — it drives whether the full-screen ' +
-      'drop overlay is rendered; set true on dragenter (files + connected + no modal), ' +
-      'false on dragleave counter reaching zero or drop completing'
+        'drop overlay is rendered; set true on dragenter (files + connected + no modal), ' +
+        'false on dragleave counter reaching zero or drop completing',
     );
   });
 });
@@ -841,7 +847,7 @@ describe('useWindowDragDrop.js — document dragenter listener (window-drop)', (
     assert.ok(
       /addEventListener\s*\(\s*['"]dragenter['"]/.test(source),
       "useWindowDragDrop.js must register a document-level 'dragenter' listener — this is what " +
-      'activates the window-drop overlay when any file is dragged over the viewport'
+        'activates the window-drop overlay when any file is dragged over the viewport',
     );
   });
 });
@@ -853,7 +859,7 @@ describe('App.jsx — window-drop overlay: overlay element rendered (window-drop
     assert.ok(
       /window-drop-overlay/.test(source),
       'App.jsx must render a window-drop-overlay element — the full-screen fixed overlay ' +
-      'that gives the user visual feedback and captures drops from anywhere on the page'
+        'that gives the user visual feedback and captures drops from anywhere on the page',
     );
   });
 });
@@ -886,7 +892,7 @@ describe('UploadQueue.jsx — dedicated drop zone removed (v1.15.3)', () => {
     assert.ok(
       !source.includes('upload-zone'),
       'UploadQueue.jsx must not contain the upload-zone element — the window-wide overlay ' +
-      '(v1.15.2) covers the same surface; the dedicated zone is redundant and adds visual noise'
+        '(v1.15.2) covers the same surface; the dedicated zone is redundant and adds visual noise',
     );
   });
 });
@@ -898,7 +904,7 @@ describe('UploadQueue.jsx — no "Upload not permitted" warning banner (v1.15.3)
     assert.ok(
       !source.includes('Upload not permitted'),
       'UploadQueue.jsx must not show an "Upload not permitted" banner — when upload is ' +
-      'denied the entire upload initiation UI is hidden rather than shown in a degraded state'
+        'denied the entire upload initiation UI is hidden rather than shown in a degraded state',
     );
   });
 });
@@ -910,8 +916,8 @@ describe('UploadQueue.jsx — empty-state drag-anywhere hint (v1.15.3)', () => {
     assert.ok(
       /drag.*anywhere|anywhere.*drag/i.test(source),
       'UploadQueue.jsx must include an empty-state hint explaining that files can be ' +
-      'dragged anywhere in the window — without it users have no cue that drag-and-drop ' +
-      'is available now that the dedicated drop zone is removed'
+        'dragged anywhere in the window — without it users have no cue that drag-and-drop ' +
+        'is available now that the dedicated drop zone is removed',
     );
   });
 });
@@ -922,8 +928,8 @@ describe('App.jsx — window overlay gated on upload capability (v1.15.3)', () =
   test("dragenter handler skips when capabilities.upload is 'denied'", () => {
     assert.ok(
       /capabilities\.upload/.test(source),
-      "App.jsx must check capabilities.upload in the window-drop path — the overlay " +
-      "must not activate when upload is definitively denied, matching UploadQueue's canUpload guard"
+      'App.jsx must check capabilities.upload in the window-drop path — the overlay ' +
+        "must not activate when upload is definitively denied, matching UploadQueue's canUpload guard",
     );
   });
 });
@@ -939,7 +945,7 @@ describe('useWindowDragDrop.js — handleWindowDrop has error handling (v1.15.3)
     assert.ok(
       /\.catch\(/.test(fnBody),
       'handleWindowDrop must chain .catch() onto the collectFileEntries .then() — ' +
-      'an unhandled rejection from collectFileEntries silently swallows the drop with no user feedback'
+        'an unhandled rejection from collectFileEntries silently swallows the drop with no user feedback',
     );
   });
 });
@@ -954,7 +960,7 @@ describe('Browser.jsx — handleTableDrop has error handling (v1.15.3)', () => {
     assert.ok(
       /\.catch\(/.test(fnBody),
       'handleTableDrop must chain .catch() onto the collectFileEntries .then() — ' +
-      'an unhandled rejection from collectFileEntries silently swallows the drop with no user feedback'
+        'an unhandled rejection from collectFileEntries silently swallows the drop with no user feedback',
     );
   });
 });
@@ -975,8 +981,8 @@ describe('CredentialForm.jsx — _initExtractedRegion does not bail on regionOve
     assert.ok(
       !/if\s*\(\s*initial\.regionOverride\s*\|\|/.test(source),
       'CredentialForm.jsx _initExtractedRegion must not bail on initial.regionOverride — ' +
-      'that made the region always "user-edited" for loaded profiles, silently sending the ' +
-      'wrong region to the S3 client after any endpoint change (BUG-026)'
+        'that made the region always "user-edited" for loaded profiles, silently sending the ' +
+        'wrong region to the S3 client after any endpoint change (BUG-026)',
     );
   });
 });
@@ -994,13 +1000,13 @@ describe('App.jsx — handleDisconnect calls setLiveFormData (BUG-027)', () => {
   test('handleDisconnect body includes setLiveFormData', () => {
     const fnStart = source.indexOf('function handleDisconnect');
     assert.ok(fnStart !== -1, 'handleDisconnect must exist in App.jsx');
-    const fnEnd   = source.indexOf('\n  function ', fnStart + 1);
+    const fnEnd = source.indexOf('\n  function ', fnStart + 1);
     const fn = source.slice(fnStart, fnEnd > fnStart ? fnEnd : fnStart + 600);
     assert.ok(
       fn.includes('setLiveFormData'),
       'handleDisconnect must call setLiveFormData — without it, the "Save/Update profile" ' +
-      'button reflects stale pre-disconnect data, and the profile row is un-clickable ' +
-      'because the form never sees the reset credentials (BUG-027)'
+        'button reflects stale pre-disconnect data, and the profile row is un-clickable ' +
+        'because the form never sees the reset credentials (BUG-027)',
     );
   });
 });
@@ -1015,7 +1021,7 @@ describe('UploadQueue.jsx — uses shared hooks and helpers', () => {
   test('imports useDoubleClickSafety hook (double-click pattern not duplicated inline)', () => {
     assert.ok(
       source.includes("from '../hooks/useDoubleClickSafety.js'"),
-      'UploadQueue.jsx must import useDoubleClickSafety — the prime/confirm pattern must not be written inline again'
+      'UploadQueue.jsx must import useDoubleClickSafety — the prime/confirm pattern must not be written inline again',
     );
   });
 
@@ -1023,31 +1029,30 @@ describe('UploadQueue.jsx — uses shared hooks and helpers', () => {
     const uploadItemSource = src('components/UploadItem.jsx');
     assert.ok(
       uploadItemSource.includes("from '../hooks/useInterpolatedProgress.js'"),
-      'UploadItem.jsx must import useInterpolatedProgress — the rAF byte animation must not be written inline again'
+      'UploadItem.jsx must import useInterpolatedProgress — the rAF byte animation must not be written inline again',
     );
   });
 
   test('imports upload status predicates (inline status chains not duplicated)', () => {
     assert.ok(
       source.includes("from '../lib/upload-status.js'"),
-      'UploadQueue.jsx must import status predicates (isActive, isFailed, …) from upload-status.js'
+      'UploadQueue.jsx must import status predicates (isActive, isFailed, …) from upload-status.js',
     );
   });
 
   test('imports abortMultipartSession (abort+cleanup sequence not duplicated inline)', () => {
     assert.ok(
       source.includes("from '../lib/upload-cleanup.js'"),
-      'UploadQueue.jsx must import abortMultipartSession — abort+deleteResumeRecord must not be copy-pasted again'
+      'UploadQueue.jsx must import abortMultipartSession — abort+deleteResumeRecord must not be copy-pasted again',
     );
   });
 
   test('imports constants from constants.js (thresholds not defined inline)', () => {
     assert.ok(
       source.includes("from '../lib/constants.js'"),
-      'UploadQueue.jsx must import MULTIPART_THRESHOLD and other constants from constants.js'
+      'UploadQueue.jsx must import MULTIPART_THRESHOLD and other constants from constants.js',
     );
   });
-
 });
 
 describe('Browser.jsx — uses shared utilities', () => {
@@ -1056,7 +1061,7 @@ describe('Browser.jsx — uses shared utilities', () => {
   test('BatchCopyLinkPopover does not exist as a separate function (merged into CopyLinkPopover)', () => {
     assert.ok(
       !source.includes('function BatchCopyLinkPopover'),
-      'BatchCopyLinkPopover was merged into CopyLinkPopover — it must not be re-introduced as a separate function'
+      'BatchCopyLinkPopover was merged into CopyLinkPopover — it must not be re-introduced as a separate function',
     );
   });
 
@@ -1068,32 +1073,38 @@ describe('Browser.jsx — uses shared utilities', () => {
     const useRename = src('lib/useRename.js');
     assert.ok(
       useNewFolder.includes("from './validate-object-name.js'"),
-      'useNewFolder.js must import validateObjectName from validate-object-name.js'
+      'useNewFolder.js must import validateObjectName from validate-object-name.js',
     );
     assert.ok(
       useRename.includes("from './validate-object-name.js'"),
-      'useRename.js must import validateObjectName from validate-object-name.js'
+      'useRename.js must import validateObjectName from validate-object-name.js',
     );
   });
 
   test('imports constants from constants.js', () => {
     assert.ok(
       source.includes("from '../lib/constants.js'"),
-      'Browser.jsx must import PRESIGN_EXPIRES and other constants from constants.js'
+      'Browser.jsx must import PRESIGN_EXPIRES and other constants from constants.js',
     );
   });
 });
 
 describe('constants.js — all centralized thresholds present', () => {
   const source = src('lib/constants.js');
-  test('exports MULTIPART_THRESHOLD', () => { assert.ok(source.includes('MULTIPART_THRESHOLD')); });
-  test('exports PRESIGN_EXPIRES',     () => { assert.ok(source.includes('PRESIGN_EXPIRES')); });
-  test('exports COPY_LINK_PRESETS',   () => { assert.ok(source.includes('COPY_LINK_PRESETS')); });
+  test('exports MULTIPART_THRESHOLD', () => {
+    assert.ok(source.includes('MULTIPART_THRESHOLD'));
+  });
+  test('exports PRESIGN_EXPIRES', () => {
+    assert.ok(source.includes('PRESIGN_EXPIRES'));
+  });
+  test('exports COPY_LINK_PRESETS', () => {
+    assert.ok(source.includes('COPY_LINK_PRESETS'));
+  });
   test('exports COPY_MULTIPART_THRESHOLD', () => {
     assert.ok(
       source.includes('COPY_MULTIPART_THRESHOLD'),
       'constants.js must export COPY_MULTIPART_THRESHOLD — the 5 GiB ceiling above which ' +
-      'a move switches from single-request CopyObject to multipart UploadPartCopy'
+        'a move switches from single-request CopyObject to multipart UploadPartCopy',
     );
   });
 });
@@ -1111,7 +1122,7 @@ describe('move-multipart.js — uses UploadPartCopy with CopySourceRange', () =>
     assert.ok(
       source.includes('UploadPartCopyCommand'),
       'move-multipart.js must use UploadPartCopyCommand — it is the only server-side copy ' +
-      'path for objects above the 5 GiB single-request CopyObject cap'
+        'path for objects above the 5 GiB single-request CopyObject cap',
     );
   });
 
@@ -1119,7 +1130,7 @@ describe('move-multipart.js — uses UploadPartCopy with CopySourceRange', () =>
     assert.ok(
       source.includes('CopySourceRange'),
       'move-multipart.js must set CopySourceRange on each UploadPartCopy — without per-part ' +
-      'byte ranges the multipart copy is incorrect'
+        'byte ranges the multipart copy is incorrect',
     );
   });
 
@@ -1127,7 +1138,7 @@ describe('move-multipart.js — uses UploadPartCopy with CopySourceRange', () =>
     assert.ok(
       source.includes('AbortMultipartUploadCommand'),
       'move-multipart.js must abort the multipart upload on any failure so a partial copy ' +
-      'does not linger and the source is never deleted'
+        'does not linger and the source is never deleted',
     );
   });
 });
@@ -1157,10 +1168,11 @@ describe('CopySource is never built by raw interpolation (BUG-060/062)', () => {
   test('no src file assigns CopySource from a string/template literal', () => {
     const hits = [...scanDir('lib'), ...scanDir('components')];
     assert.deepEqual(
-      hits, [],
+      hits,
+      [],
       `CopySource must be built with copySource(bucket, key) from move-key.js — a raw ` +
-      `string/template is not percent-encoded and breaks keys with chars above U+00FF ` +
-      `(BUG-060/062). Offending file(s): ${hits.join(', ')}`
+        `string/template is not percent-encoded and breaks keys with chars above U+00FF ` +
+        `(BUG-060/062). Offending file(s): ${hits.join(', ')}`,
     );
   });
 });
@@ -1171,8 +1183,8 @@ describe('constants.js — FILE_MTIME_KEY exported', () => {
     assert.ok(
       source.includes('FILE_MTIME_KEY'),
       'constants.js must export FILE_MTIME_KEY — the S3 Metadata key used to store ' +
-      'the original file modification time; a shared constant prevents typos across ' +
-      'UploadQueue.jsx, Browser.jsx, and DownloadPage.jsx'
+        'the original file modification time; a shared constant prevents typos across ' +
+        'UploadQueue.jsx, Browser.jsx, and DownloadPage.jsx',
     );
   });
 });
@@ -1184,8 +1196,8 @@ describe('Browser.jsx — file-mtime formatted in properties modal', () => {
     assert.ok(
       source.includes('FILE_MTIME_KEY') || source.includes('file-mtime'),
       'Browser.jsx properties modal must special-case FILE_MTIME_KEY — ' +
-      'without this, the mtime appears as a raw ISO string under "x-amz-meta-file-mtime" ' +
-      'rather than as a labelled, human-readable date row'
+        'without this, the mtime appears as a raw ISO string under "x-amz-meta-file-mtime" ' +
+        'rather than as a labelled, human-readable date row',
     );
   });
 
@@ -1193,17 +1205,25 @@ describe('Browser.jsx — file-mtime formatted in properties modal', () => {
     assert.ok(
       /custom\.filter|k !== FILE_MTIME_KEY|k !== 'file-mtime'/.test(source),
       'Browser.jsx must exclude FILE_MTIME_KEY from the generic x-amz-meta-* loop — ' +
-      'otherwise the mtime appears twice: once formatted and once as a raw string'
+        'otherwise the mtime appears twice: once formatted and once as a raw string',
     );
   });
 });
 
 describe('upload-status.js — all predicates present', () => {
   const source = src('lib/upload-status.js');
-  test('exports isActive',  () => { assert.ok(source.includes('export const isActive')); });
-  test('exports isFailed',  () => { assert.ok(source.includes('export const isFailed')); });
-  test('exports isSettled', () => { assert.ok(source.includes('export const isSettled')); });
-  test('exports isPaused',  () => { assert.ok(source.includes('export const isPaused')); });
+  test('exports isActive', () => {
+    assert.ok(source.includes('export const isActive'));
+  });
+  test('exports isFailed', () => {
+    assert.ok(source.includes('export const isFailed'));
+  });
+  test('exports isSettled', () => {
+    assert.ok(source.includes('export const isSettled'));
+  });
+  test('exports isPaused', () => {
+    assert.ok(source.includes('export const isPaused'));
+  });
 });
 
 describe('indexeddb.js — is a barrel re-export (no new logic)', () => {
@@ -1212,7 +1232,7 @@ describe('indexeddb.js — is a barrel re-export (no new logic)', () => {
   test('does not define openDB directly (openDB lives in indexeddb-core.js)', () => {
     assert.ok(
       !source.includes('function openDB'),
-      'indexeddb.js must not define openDB — it is a barrel; openDB lives in indexeddb-core.js'
+      'indexeddb.js must not define openDB — it is a barrel; openDB lives in indexeddb-core.js',
     );
   });
 
@@ -1244,7 +1264,7 @@ describe('UploadQueue.jsx — object metadata set on both upload paths', () => {
     assert.ok(
       uploadSmallBody().includes('buildUploadMetadata('),
       'uploadSmall must set PutObjectCommand Metadata via buildUploadMetadata — the original ' +
-      'file modification time is discarded without this; once lost, it cannot be recovered'
+        'file modification time is discarded without this; once lost, it cannot be recovered',
     );
   });
 
@@ -1252,7 +1272,7 @@ describe('UploadQueue.jsx — object metadata set on both upload paths', () => {
     assert.ok(
       uploadSmallBody().includes('buildContentHashValue('),
       'uploadSmall must stamp the content hash so the object is a cheap duplicate-detection ' +
-      'candidate on a later scan'
+        'candidate on a later scan',
     );
   });
 
@@ -1267,7 +1287,7 @@ describe('UploadQueue.jsx — object metadata set on both upload paths', () => {
     assert.ok(
       call.includes('buildUploadMetadata('),
       'uploadMultipart CreateMultipartUploadCommand must set Metadata via buildUploadMetadata — ' +
-      'multipart metadata must be set at creation, not in UploadPartCommand'
+        'multipart metadata must be set at creation, not in UploadPartCommand',
     );
   });
 
@@ -1278,7 +1298,7 @@ describe('UploadQueue.jsx — object metadata set on both upload paths', () => {
     assert.ok(
       fn.includes('computeFileHash(file)') && fn.includes('buildContentHashValue('),
       'uploadMultipart must compute the content hash once and stamp it (reusing it for the ' +
-      'resume record), so the object is a cheap duplicate-detection candidate on a later scan'
+        'resume record), so the object is a cheap duplicate-detection candidate on a later scan',
     );
   });
 });
@@ -1290,7 +1310,7 @@ describe('Browser.jsx — File Modified column with background HeadObject loadin
     assert.ok(
       source.includes('fileMtimeCacheRef'),
       'Browser.jsx must declare fileMtimeCacheRef — a useRef Map that caches file-mtime ' +
-      'HeadObject results for the current session, preventing redundant re-fetches on pagination'
+        'HeadObject results for the current session, preventing redundant re-fetches on pagination',
     );
   });
 
@@ -1298,14 +1318,14 @@ describe('Browser.jsx — File Modified column with background HeadObject loadin
     assert.ok(
       /fileMtimeCacheRef[\s\S]{0,2000}HeadObjectCommand|HeadObjectCommand[\s\S]{0,500}fileMtimeCacheRef/.test(source),
       'Browser.jsx must call HeadObjectCommand inside the mtime-loading useEffect — ' +
-      'the File Modified column requires HeadObject since ListObjectsV2 does not return custom metadata'
+        'the File Modified column requires HeadObject since ListObjectsV2 does not return custom metadata',
     );
   });
 
   test('renders col-file-modified table column', () => {
     assert.ok(
       source.includes('col-file-modified'),
-      'Browser.jsx must include a "File Modified" column in the file table'
+      'Browser.jsx must include a "File Modified" column in the file table',
     );
   });
 });
@@ -1317,8 +1337,8 @@ describe('Browser.jsx — file-mtime loading is opt-in (default off)', () => {
     assert.ok(
       source.includes('mtimeLoadEnabled') && source.includes('loadFileMtimeAutoLoad'),
       'Browser.jsx must declare mtimeLoadEnabled state initialised from loadFileMtimeAutoLoad — ' +
-      'the File Modified column must be opt-in; HeadObject requests must not fire until ' +
-      'the user clicks the column header or enables the setting'
+        'the File Modified column must be opt-in; HeadObject requests must not fire until ' +
+        'the user clicks the column header or enables the setting',
     );
   });
 
@@ -1326,8 +1346,8 @@ describe('Browser.jsx — file-mtime loading is opt-in (default off)', () => {
     assert.ok(
       /if\s*\(!mtimeLoadEnabled/.test(source),
       'Browser.jsx mtime loading useEffect must bail with `if (!mtimeLoadEnabled ...) return` — ' +
-      'without this guard, HeadObject calls fire automatically for every listed file, ' +
-      'incurring one API call per file per page load without user consent'
+        'without this guard, HeadObject calls fire automatically for every listed file, ' +
+        'incurring one API call per file per page load without user consent',
     );
   });
 
@@ -1335,7 +1355,7 @@ describe('Browser.jsx — file-mtime loading is opt-in (default off)', () => {
     assert.ok(
       /col-file-modified[\s\S]{0,300}onClick|onClick[\s\S]{0,100}setMtimeLoadEnabled/.test(source),
       'Browser.jsx must wire an onClick to the col-file-modified header — clicking it ' +
-      'is the primary way to opt in to loading file modification times'
+        'is the primary way to opt in to loading file modification times',
     );
   });
 });
@@ -1361,8 +1381,8 @@ describe('App.jsx — onUploadsComplete must not remount Browser (BUG-029)', () 
     assert.ok(
       !/setBrowserKey/.test(m[1]),
       `onUploadsComplete handler must not call setBrowserKey — that triggers a full ` +
-      `Browser remount which resets prefix, URL hash, selection, and filter. ` +
-      `Current handler: ${m[1].trim()}`
+        `Browser remount which resets prefix, URL hash, selection, and filter. ` +
+        `Current handler: ${m[1].trim()}`,
     );
   });
 
@@ -1372,8 +1392,8 @@ describe('App.jsx — onUploadsComplete must not remount Browser (BUG-029)', () 
     assert.ok(
       /browserActionsRef[\s\S]*onUploadsDrained/.test(m[1]),
       `onUploadsComplete handler must delegate to browserActionsRef.current.onUploadsDrained — ` +
-      `that method does targeted cache invalidation per affected prefix and refetches only ` +
-      `when the user is in one of them. Current handler: ${m[1].trim()}`
+        `that method does targeted cache invalidation per affected prefix and refetches only ` +
+        `when the user is in one of them. Current handler: ${m[1].trim()}`,
     );
   });
 });
@@ -1385,7 +1405,7 @@ describe('Browser.jsx — onUploadsDrained action exposed via onMount (BUG-029)'
     assert.ok(
       /onMount\?\.\(\s*\{[^}]*onUploadsDrained[^}]*\}\s*\)/.test(source),
       'Browser.jsx must expose onUploadsDrained via the onMount actions object — ' +
-      'App.jsx calls it through browserActionsRef.current after each upload batch drains'
+        'App.jsx calls it through browserActionsRef.current after each upload batch drains',
     );
   });
 
@@ -1394,8 +1414,8 @@ describe('Browser.jsx — onUploadsDrained action exposed via onMount (BUG-029)'
     assert.ok(m, 'Browser.jsx must define an onUploadsDrained function');
     const body = m[1];
     assert.ok(/invalidateCache/.test(body), 'onUploadsDrained must invalidate cache for each completed prefix');
-    assert.ok(/fetchPage/.test(body),       'onUploadsDrained must refetch the current prefix when affected');
-    assert.ok(/prefixRef/.test(body),       'onUploadsDrained must read prefixRef (live prefix) not the captured closure');
+    assert.ok(/fetchPage/.test(body), 'onUploadsDrained must refetch the current prefix when affected');
+    assert.ok(/prefixRef/.test(body), 'onUploadsDrained must read prefixRef (live prefix) not the captured closure');
   });
 });
 
@@ -1406,18 +1426,18 @@ describe('UploadQueue.jsx — onUploadsComplete passes drained prefix set (BUG-0
     assert.ok(
       /drainedPrefixesRef\s*=\s*useRef\(\s*new Set\(\)\s*\)/.test(source),
       'UploadQueue.jsx must declare drainedPrefixesRef as a useRef(new Set()) — ' +
-      'this accumulates parent prefixes of successful uploads since the last drain fire'
+        'this accumulates parent prefixes of successful uploads since the last drain fire',
     );
   });
 
   test('drain effect passes the accumulator and resets it', () => {
     assert.ok(
       /onUploadsComplete\?\.\(\s*drained\s*\)/.test(source),
-      'UploadQueue.jsx drain effect must call onUploadsComplete?.(drained) so App can route the affected-prefixes set to Browser'
+      'UploadQueue.jsx drain effect must call onUploadsComplete?.(drained) so App can route the affected-prefixes set to Browser',
     );
     assert.ok(
       /drainedPrefixesRef\.current\s*=\s*new Set\(\)/.test(source),
-      'UploadQueue.jsx drain effect must reset drainedPrefixesRef to a fresh Set so the next batch starts clean'
+      'UploadQueue.jsx drain effect must reset drainedPrefixesRef to a fresh Set so the next batch starts clean',
     );
   });
 
@@ -1425,8 +1445,8 @@ describe('UploadQueue.jsx — onUploadsComplete passes drained prefix set (BUG-0
     assert.ok(
       /drainedPrefixesRef\.current\.add\(\s*parentPrefix\(destinationKey\)\s*\)/.test(source),
       'UploadQueue.jsx must call drainedPrefixesRef.current.add(parentPrefix(destinationKey)) ' +
-      'right after marking an item status:"done" — this is the seam between per-file completion ' +
-      'and per-batch drain notification'
+        'right after marking an item status:"done" — this is the seam between per-file completion ' +
+        'and per-batch drain notification',
     );
   });
 });
@@ -1467,7 +1487,7 @@ describe('Browser.jsx — drag-and-drop move wiring (v1.26.0)', () => {
     assert.ok(
       source.includes("from '../lib/move-drag.js'") && /dragPayload/.test(source) && /dropAccepted/.test(source),
       'Browser.jsx must import dragPayload/dropAccepted — the drag payload and drop-validity decisions ' +
-      'live in src/lib/move-drag.js so they are unit-testable without a DragEvent'
+        'live in src/lib/move-drag.js so they are unit-testable without a DragEvent',
     );
   });
 
@@ -1478,27 +1498,34 @@ describe('Browser.jsx — drag-and-drop move wiring (v1.26.0)', () => {
     assert.ok(
       /types\?\.includes\('Files'\)/.test(fn),
       'handleTableDragEnter must return early unless the drag carries OS files — otherwise an ' +
-      'internal object-move drag wrongly raises the "Drop files to upload" overlay'
+        'internal object-move drag wrongly raises the "Drop files to upload" overlay',
     );
   });
 
   test('file and folder rows are draggable and wired to handleRowDragStart', () => {
     const draggableGated = source.match(/draggable=\{canMove && renamingKey/g) || [];
-    assert.equal(draggableGated.length, 2, 'both folder and file rows must be draggable, gated off while renaming that row');
-    assert.ok(/onDragStart=\{e => handleRowDragStart/.test(source), 'rows must wire onDragStart to handleRowDragStart');
+    assert.equal(
+      draggableGated.length,
+      2,
+      'both folder and file rows must be draggable, gated off while renaming that row',
+    );
+    assert.ok(
+      /onDragStart=\{\(?e\)? => handleRowDragStart/.test(source),
+      'rows must wire onDragStart to handleRowDragStart',
+    );
   });
 
   test('folder rows are drop targets wired to handleInternalDrop', () => {
     assert.ok(
-      /onDrop=\{e => handleInternalDrop\(cp/.test(source),
-      'folder rows must accept an internal drop via handleInternalDrop(cp, e)'
+      /onDrop=\{\(?e\)? => handleInternalDrop\(cp/.test(source),
+      'folder rows must accept an internal drop via handleInternalDrop(cp, e)',
     );
   });
 
   test('Breadcrumb is wired as a move drop target', () => {
     assert.ok(
       /onMoveDrop=\{handleInternalDrop\}/.test(source) && /moveHoverTarget=\{dndHoverTarget\}/.test(source),
-      'Breadcrumb must receive onMoveDrop + moveHoverTarget so crumbs become move-up drop targets'
+      'Breadcrumb must receive onMoveDrop + moveHoverTarget so crumbs become move-up drop targets',
     );
   });
 });
@@ -1514,13 +1541,19 @@ describe('source hygiene', () => {
     const walk = (dir) => {
       for (const entry of readdirSync(resolve(ROOT, dir), { withFileTypes: true })) {
         const rel = `${dir}/${entry.name}`;
-        if (entry.isDirectory()) { walk(rel); continue; }
+        if (entry.isDirectory()) {
+          walk(rel);
+          continue;
+        }
         if (!/\.(js|jsx|css)$/.test(entry.name)) continue;
         const text = readFileSync(resolve(ROOT, rel), 'utf8');
         for (let i = 0; i < text.length; i += 1) {
           const code = text.charCodeAt(i);
           const isControl = (code < 0x20 && code !== 0x0a && code !== 0x09) || code === 0x7f;
-          if (isControl) { offenders.push(`${rel} (0x${code.toString(16)})`); break; }
+          if (isControl) {
+            offenders.push(`${rel} (0x${code.toString(16)})`);
+            break;
+          }
         }
       }
     };
@@ -1548,7 +1581,7 @@ describe('App.jsx — a download job cannot run against another connection', () 
     assert.ok(
       /jobMatchesOrigin\(fresh/.test(preamble),
       'handleDownloadStart must reject a job whose full origin (bucket+provider+endpoint) ' +
-      'differs from the connected one, and must do so before any presigned URL is created'
+        'differs from the connected one, and must do so before any presigned URL is created',
     );
   });
 });
@@ -1584,13 +1617,13 @@ describe('App.jsx — handleZipStart marks the job DONE before attempting export
     assert.ok(
       doneIdx < exportIdx,
       'the job must be marked DONE before exportZip is attempted — otherwise a thrown ' +
-      'exportZip leaves the job stuck at RUNNING forever instead of the recoverable ' +
-      '"DONE, no exportedAt" state'
+        'exportZip leaves the job stuck at RUNNING forever instead of the recoverable ' +
+        '"DONE, no exportedAt" state',
     );
     assert.ok(
       exportIdx < exportedAtIdx,
       'exportedAt must be written only after exportZip actually succeeds — folding it into ' +
-      'the same updateJob as status would record exportedAt even when export throws'
+        'the same updateJob as status would record exportedAt even when export throws',
     );
   });
 });
@@ -1608,12 +1641,13 @@ describe('download call sites use the shared presign helper (BUG-049)', () => {
       const source = src(site);
       assert.ok(
         /presignDownloadParams\(/.test(source),
-        `${site} must call presignDownloadParams for its download presign`
+        `${site} must call presignDownloadParams for its download presign`,
       );
       assert.equal(
-        /ResponseContentDisposition:\s*`attachment/.test(source), false,
+        /ResponseContentDisposition:\s*`attachment/.test(source),
+        false,
         `${site} must not hand-roll an attachment disposition — encodeURIComponent inside a ` +
-        'quoted-string parameter is what made "my file.jpg" save as "my%20file.jpg"'
+          'quoted-string parameter is what made "my file.jpg" save as "my%20file.jpg"',
       );
     });
 
@@ -1621,7 +1655,7 @@ describe('download call sites use the shared presign helper (BUG-049)', () => {
       const source = src(site);
       assert.ok(
         /DOWNLOAD_PRESIGN_EXPIRES/.test(source),
-        `${site} must use the long download expiry, not the short preview one`
+        `${site} must use the long download expiry, not the short preview one`,
       );
     });
   }
@@ -1636,17 +1670,16 @@ describe('download call sites use the shared presign helper (BUG-049)', () => {
 // Bump with `npm version <x> --no-git-tag-version`, which updates all three fields at once.
 // (--no-git-tag-version because the pre-push hook owns tagging.)
 describe('package-lock.json tracks package.json', () => {
-  const pkg  = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
+  const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
   const lock = JSON.parse(readFileSync(resolve(ROOT, 'package-lock.json'), 'utf8'));
-  const fix  = `run \`npm version ${pkg.version} --no-git-tag-version\` (or correct package.json)`;
+  const fix = `run \`npm version ${pkg.version} --no-git-tag-version\` (or correct package.json)`;
 
   test('the lock root version matches package.json', () => {
     assert.equal(lock.version, pkg.version, `package-lock.json version is stale — ${fix}`);
   });
 
   test('the lock self-entry version matches package.json', () => {
-    assert.equal(lock.packages?.['']?.version, pkg.version,
-      `package-lock.json packages[""].version is stale — ${fix}`);
+    assert.equal(lock.packages?.['']?.version, pkg.version, `package-lock.json packages[""].version is stale — ${fix}`);
   });
 });
 
@@ -1663,8 +1696,7 @@ describe('static-analysis tooling is pinned exact', () => {
     test(`${name} devDependency is an exact version`, () => {
       const spec = pkg.devDependencies?.[name];
       assert.ok(spec, `${name} must be a devDependency`);
-      assert.ok(/^\d+\.\d+\.\d+$/.test(spec),
-        `${name} must be pinned exact (no ^/~), got "${spec}"`);
+      assert.ok(/^\d+\.\d+\.\d+$/.test(spec), `${name} must be pinned exact (no ^/~), got "${spec}"`);
     });
   }
 });
@@ -1700,8 +1732,11 @@ describe('App.jsx — a download job records its provider', () => {
   test('startJob writes a provider onto the job record', () => {
     const source = src('components/App.jsx');
     const startJob = source.slice(source.indexOf('startJob:'), source.indexOf('enumerate:'));
-    assert.match(startJob, /provider:/,
-      'startJob must record provider, or enumeration cannot tell an archived object from a normal one');
+    assert.match(
+      startJob,
+      /provider:/,
+      'startJob must record provider, or enumeration cannot tell an archived object from a normal one',
+    );
   });
 });
 
@@ -1714,11 +1749,15 @@ describe('App.jsx — a download job records its provider', () => {
 
 test('the sidebar download entry is gone and lives in the browser toolbar (2026-08-02 relocation)', () => {
   const app = src('components/App.jsx');
-  assert.ok(!app.includes('handoff-entry'),
-    'App.jsx must not reintroduce the sidebar handoff-entry block; download entry points live in Browser.jsx');
+  assert.ok(
+    !app.includes('handoff-entry'),
+    'App.jsx must not reintroduce the sidebar handoff-entry block; download entry points live in Browser.jsx',
+  );
   const browser = src('components/Browser.jsx');
-  assert.ok(browser.includes('data-testid="open-download-job"'),
-    'the toolbar download button must keep the open-download-job testid the e2e specs use');
+  assert.ok(
+    browser.includes('data-testid="open-download-job"'),
+    'the toolbar download button must keep the open-download-job testid the e2e specs use',
+  );
 });
 
 // ── zip-download-progress Task 4: bytesTotal, active, jobId threaded onto the zip task ──
@@ -1749,29 +1788,41 @@ describe('App.jsx / queue-tasks.js — zip task carries bytesTotal, active, jobI
     assert.match(fnBody, /\bbytesTotal\b/, 'createDownloadTask must accept and return bytesTotal');
   });
 
-  test('handleZipStart sets bytesTotal on the task from the job\'s sendable-bytes counter', () => {
+  test("handleZipStart sets bytesTotal on the task from the job's sendable-bytes counter", () => {
     const body = zipStartBody();
     assert.match(body, /bytesTotal/, 'handleZipStart must compute/pass bytesTotal');
-    assert.match(body, /counters\?\.bytesSendable/,
-      'bytesTotal must be sourced from the job\'s counters.bytesSendable (falling back sensibly), ' +
-      'the same job-row counters DownloadJobPanel already reads for sendable bytes');
+    assert.match(
+      body,
+      /counters\?\.bytesSendable/,
+      "bytesTotal must be sourced from the job's counters.bytesSendable (falling back sensibly), " +
+        'the same job-row counters DownloadJobPanel already reads for sendable bytes',
+    );
   });
 
   test('handleZipStart tags the task with jobId', () => {
     const body = zipStartBody();
-    assert.match(body, /jobId:\s*fresh\.id/,
-      'handleZipStart must tag the created task with jobId: fresh.id so MasterQueue can key detail reads to it');
+    assert.match(
+      body,
+      /jobId:\s*fresh\.id/,
+      'handleZipStart must tag the created task with jobId: fresh.id so MasterQueue can key detail reads to it',
+    );
   });
 
-  test('handleZipStart\'s onProgress forwards active alongside current and bytesDone', () => {
+  test("handleZipStart's onProgress forwards active alongside current and bytesDone", () => {
     const body = zipStartBody();
     const onProgressIdx = body.indexOf('onProgress:');
     assert.ok(onProgressIdx > -1, 'handleZipStart must pass onProgress to runZipJob');
     const onProgressLine = body.slice(onProgressIdx, body.indexOf('\n', onProgressIdx));
-    assert.match(onProgressLine, /\bactive\b/,
-      'onProgress must destructure and forward active, not just done/bytesDone');
-    assert.match(onProgressLine, /taskStore\.update\(id,\s*\{[^}]*active[^}]*\}/,
-      'the taskStore.update patch inside onProgress must include active');
+    assert.match(
+      onProgressLine,
+      /\bactive\b/,
+      'onProgress must destructure and forward active, not just done/bytesDone',
+    );
+    assert.match(
+      onProgressLine,
+      /taskStore\.update\(id,\s*\{[^}]*active[^}]*\}/,
+      'the taskStore.update patch inside onProgress must include active',
+    );
   });
 
   test('<MasterQueue> is passed a readZipDetail prop wired to loadZipDetail with a .catch fallback', () => {
@@ -1781,9 +1832,12 @@ describe('App.jsx / queue-tasks.js — zip task carries bytesTotal, active, jobI
     const tag = appSource.slice(idx, tagEnd > -1 ? tagEnd : idx + 400);
     assert.match(tag, /readZipDetail\s*=/, '<MasterQueue> must receive a readZipDetail prop');
     assert.match(tag, /loadZipDetail/, 'readZipDetail must be wired to loadZipDetail');
-    assert.match(tag, /\.catch\(/,
+    assert.match(
+      tag,
+      /\.catch\(/,
       'readZipDetail must catch a loadZipDetail rejection so a read failure degrades gracefully ' +
-      'instead of crashing the queue UI (Task 3 review ruling)');
+        'instead of crashing the queue UI (Task 3 review ruling)',
+    );
   });
 
   test('App.jsx imports loadZipDetail from download-records.js', () => {
@@ -1800,8 +1854,11 @@ describe('App.jsx — handleZipStart passes concurrency to runZipJob (download-c
   const appSource = src('components/App.jsx');
 
   test('App.jsx imports CONCURRENCY from zip-prefetch.js', () => {
-    assert.match(appSource, /import\s*\{[^}]*\bCONCURRENCY\b[^}]*\}\s*from\s*['"]\.\.\/lib\/zip-prefetch\.js['"]/,
-      'App.jsx must import CONCURRENCY from zip-prefetch.js to pass it to runZipJob');
+    assert.match(
+      appSource,
+      /import\s*\{[^}]*\bCONCURRENCY\b[^}]*\}\s*from\s*['"]\.\.\/lib\/zip-prefetch\.js['"]/,
+      'App.jsx must import CONCURRENCY from zip-prefetch.js to pass it to runZipJob',
+    );
   });
 
   test('the runZipJob call inside handleZipStart passes concurrency: CONCURRENCY', () => {
@@ -1815,8 +1872,11 @@ describe('App.jsx — handleZipStart passes concurrency to runZipJob (download-c
     assert.ok(callIdx > -1, 'handleZipStart must call runZipJob(fresh, {...})');
     const callEnd = fnBody.indexOf('});', callIdx);
     const call = fnBody.slice(callIdx, callEnd > -1 ? callEnd : callIdx + 400);
-    assert.match(call, /concurrency:\s*CONCURRENCY\b/,
-      'handleZipStart must pass concurrency: CONCURRENCY to runZipJob explicitly');
+    assert.match(
+      call,
+      /concurrency:\s*CONCURRENCY\b/,
+      'handleZipStart must pass concurrency: CONCURRENCY to runZipJob explicitly',
+    );
   });
 });
 
@@ -1830,8 +1890,11 @@ describe('App.jsx — sweeps orphaned OPFS prefetch temps at startup (download-c
   const appSource = src('components/App.jsx');
 
   test('App.jsx imports sweepOrphanTemps from zip-prefetch.js', () => {
-    assert.match(appSource, /import\s*\{[^}]*\bsweepOrphanTemps\b[^}]*\}\s*from\s*['"]\.\.\/lib\/zip-prefetch\.js['"]/,
-      'App.jsx must import sweepOrphanTemps from zip-prefetch.js');
+    assert.match(
+      appSource,
+      /import\s*\{[^}]*\bsweepOrphanTemps\b[^}]*\}\s*from\s*['"]\.\.\/lib\/zip-prefetch\.js['"]/,
+      'App.jsx must import sweepOrphanTemps from zip-prefetch.js',
+    );
   });
 
   test('the app-init mount effect calls sweepOrphanTemps via navigator.storage.getDirectory()', () => {
@@ -1843,9 +1906,15 @@ describe('App.jsx — sweeps orphaned OPFS prefetch temps at startup (download-c
     const effectStart = appSource.lastIndexOf('useEffect(() => {', anchorIdx);
     assert.ok(effectStart > -1, 'repairStorageInvariants must be called inside a useEffect');
     const preamble = appSource.slice(effectStart, anchorIdx);
-    assert.match(preamble, /sweepOrphanTemps/,
-      'the app-init effect must call sweepOrphanTemps to clean up orphaned prefetch temps at startup');
-    assert.match(preamble, /navigator\.storage\?\.getDirectory/,
-      'the sweep must guard on navigator.storage.getDirectory being available before calling it');
+    assert.match(
+      preamble,
+      /sweepOrphanTemps/,
+      'the app-init effect must call sweepOrphanTemps to clean up orphaned prefetch temps at startup',
+    );
+    assert.match(
+      preamble,
+      /navigator\.storage\?\.getDirectory/,
+      'the sweep must guard on navigator.storage.getDirectory being available before calling it',
+    );
   });
 });

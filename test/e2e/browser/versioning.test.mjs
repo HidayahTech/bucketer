@@ -4,7 +4,16 @@
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { ListObjectsV2Command, ListObjectVersionsCommand } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest } from '../harness.mjs';
+import {
+  startMock,
+  startAppServer,
+  connectApp,
+  BUCKET,
+  launchBrowser,
+  newE2EContext,
+  newE2EPage,
+  e2eTest,
+} from '../harness.mjs';
 
 let ctx, app, browser;
 before(async () => {
@@ -12,7 +21,11 @@ before(async () => {
   app = await startAppServer();
   browser = await launchBrowser();
 });
-after(async () => { await browser?.close(); await app?.close(); await ctx?.mock.close(); });
+after(async () => {
+  await browser?.close();
+  await app?.close();
+  await ctx?.mock.close();
+});
 
 async function liveKeys() {
   const r = await ctx.client.send(new ListObjectsV2Command({ Bucket: BUCKET }));
@@ -34,7 +47,9 @@ describe('versioning — delete marker then undelete', () => {
       await connectApp(page, ctx.browserEndpoint);
 
       // Upload, then delete via the row → a versioned delete creates a delete marker.
-      await page.locator('[data-testid="file-input"]').setInputFiles({ name: 'v.txt', mimeType: 'text/plain', buffer: Buffer.from('keepme') });
+      await page
+        .locator('[data-testid="file-input"]')
+        .setInputFiles({ name: 'v.txt', mimeType: 'text/plain', buffer: Buffer.from('keepme') });
       await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: 20000 });
       await page.locator('[data-testid="file-row:v.txt"]').waitFor({ timeout: 10000 });
 
@@ -61,6 +76,8 @@ describe('versioning — delete marker then undelete', () => {
       while (!(await liveKeys()).includes('v.txt') && Date.now() < deadline) await page.waitForTimeout(150);
       assert.ok((await liveKeys()).includes('v.txt'), 'removing the delete marker undeletes the file');
       assert.equal(await markerCount(), 0, 'the delete marker was removed');
-    } finally { await context.close(); }
+    } finally {
+      await context.close();
+    }
   });
 });

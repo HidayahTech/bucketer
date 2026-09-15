@@ -6,32 +6,59 @@
 // function runs — placed above the imports for that reason.
 const ls = {};
 global.localStorage = {
-  getItem:    k     => Object.prototype.hasOwnProperty.call(ls, k) ? ls[k] : null,
-  setItem:    (k,v) => { ls[k] = String(v); },
-  removeItem: k     => { delete ls[k]; },
+  getItem: (k) => (Object.prototype.hasOwnProperty.call(ls, k) ? ls[k] : null),
+  setItem: (k, v) => {
+    ls[k] = String(v);
+  },
+  removeItem: (k) => {
+    delete ls[k];
+  },
 };
 
 const ss = {};
 global.sessionStorage = {
-  getItem:    k     => Object.prototype.hasOwnProperty.call(ss, k) ? ss[k] : null,
-  setItem:    (k,v) => { ss[k] = String(v); },
-  removeItem: k     => { delete ss[k]; },
+  getItem: (k) => (Object.prototype.hasOwnProperty.call(ss, k) ? ss[k] : null),
+  setItem: (k, v) => {
+    ss[k] = String(v);
+  },
+  removeItem: (k) => {
+    delete ss[k];
+  },
 };
 
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { webcrypto } from 'node:crypto';
 import {
-  VAULT_VERSION, PBKDF2_ITERATIONS, CHECK_PLAINTEXT,
-  deriveVaultKey, wrapSecret, unwrapSecret, newSalt,
-  loadVaultRecord, vaultExists, saveVaultRecord, deleteVaultRecord,
-  getVaultEntry, setVaultEntry, deleteVaultEntry, clearVaultEntries,
-  createVault, unlockVault, isUnlocked, lockVault, resetVault,
-  rememberSecret, recallSecret, SS_KEY_VAULT_KEY,
+  VAULT_VERSION,
+  PBKDF2_ITERATIONS,
+  CHECK_PLAINTEXT,
+  deriveVaultKey,
+  wrapSecret,
+  unwrapSecret,
+  newSalt,
+  loadVaultRecord,
+  vaultExists,
+  saveVaultRecord,
+  deleteVaultRecord,
+  getVaultEntry,
+  setVaultEntry,
+  deleteVaultEntry,
+  clearVaultEntries,
+  createVault,
+  unlockVault,
+  isUnlocked,
+  lockVault,
+  resetVault,
+  rememberSecret,
+  recallSecret,
+  SS_KEY_VAULT_KEY,
 } from '../src/lib/vault.js';
 import {
-  findOrCreateCredential, saveConnectionRecord,
-  loadConnectionRecords, loadCredentialRecords,
+  findOrCreateCredential,
+  saveConnectionRecord,
+  loadConnectionRecords,
+  loadCredentialRecords,
 } from '../src/lib/connections.js';
 
 const subtle = webcrypto.subtle;
@@ -41,7 +68,10 @@ const getRandomValues = webcrypto.getRandomValues.bind(webcrypto);
 // that do not specifically exercise derivation.
 const SALT = newSalt(getRandomValues);
 let KEY;
-async function key() { KEY ??= await deriveVaultKey('correct horse', SALT, PBKDF2_ITERATIONS, subtle); return KEY; }
+async function key() {
+  KEY ??= await deriveVaultKey('correct horse', SALT, PBKDF2_ITERATIONS, subtle);
+  return KEY;
+}
 
 describe('vault parameters', () => {
   test('iteration count is 600,000', () => {
@@ -126,7 +156,9 @@ describe('key derivation', () => {
 });
 
 describe('vault record', () => {
-  beforeEach(() => { for (const k of Object.keys(ls)) delete ls[k]; });
+  beforeEach(() => {
+    for (const k of Object.keys(ls)) delete ls[k];
+  });
 
   test('absent vault reads as null and does not exist', () => {
     assert.equal(loadVaultRecord(), null);
@@ -140,7 +172,13 @@ describe('vault record', () => {
   });
 
   test('saves and reads back a record', () => {
-    const rec = { version: VAULT_VERSION, salt: 'c2FsdA==', iterations: PBKDF2_ITERATIONS, check: { iv: 'aXY=', ct: 'Y3Q=' }, entries: {} };
+    const rec = {
+      version: VAULT_VERSION,
+      salt: 'c2FsdA==',
+      iterations: PBKDF2_ITERATIONS,
+      check: { iv: 'aXY=', ct: 'Y3Q=' },
+      entries: {},
+    };
     assert.equal(saveVaultRecord(rec), true);
     assert.equal(vaultExists(), true);
     assert.deepEqual(loadVaultRecord(), rec);
@@ -148,11 +186,18 @@ describe('vault record', () => {
 
   test('reports failure when the write does not land', () => {
     const original = global.localStorage.setItem;
-    global.localStorage.setItem = () => { throw new Error('quota'); };
+    global.localStorage.setItem = () => {
+      throw new Error('quota');
+    };
     try {
-      assert.equal(saveVaultRecord({ version: VAULT_VERSION, salt: 's', iterations: 1, check: {}, entries: {} }), false,
-        'a vault that did not persist must not report success');
-    } finally { global.localStorage.setItem = original; }
+      assert.equal(
+        saveVaultRecord({ version: VAULT_VERSION, salt: 's', iterations: 1, check: {}, entries: {} }),
+        false,
+        'a vault that did not persist must not report success',
+      );
+    } finally {
+      global.localStorage.setItem = original;
+    }
   });
 
   test('entries round-trip by credential id', () => {
@@ -170,13 +215,22 @@ describe('vault record', () => {
   });
 
   test('setEntry on an absent vault does not create a headless record', () => {
-    assert.equal(setVaultEntry('cred1', { iv: 'a', ct: 'b' }), false,
-      'entries without a salt and check value would be undecryptable');
+    assert.equal(
+      setVaultEntry('cred1', { iv: 'a', ct: 'b' }),
+      false,
+      'entries without a salt and check value would be undecryptable',
+    );
     assert.equal(vaultExists(), false);
   });
 
   test('deleteVaultRecord removes everything', () => {
-    saveVaultRecord({ version: VAULT_VERSION, salt: 's', iterations: PBKDF2_ITERATIONS, check: {}, entries: { a: { iv: 'i', ct: 'c' } } });
+    saveVaultRecord({
+      version: VAULT_VERSION,
+      salt: 's',
+      iterations: PBKDF2_ITERATIONS,
+      check: {},
+      entries: { a: { iv: 'i', ct: 'c' } },
+    });
     deleteVaultRecord();
     assert.equal(vaultExists(), false);
     assert.equal(ls['s3b_vault'], undefined);
@@ -188,7 +242,13 @@ describe('vault record', () => {
   // iterations, check) — the user did not ask to re-choose a passphrase by
   // deleting their profiles.
   test('clearVaultEntries empties entries but keeps the vault record', () => {
-    saveVaultRecord({ version: VAULT_VERSION, salt: 's', iterations: PBKDF2_ITERATIONS, check: { iv: 'i', ct: 'c' }, entries: { a: { iv: 'i', ct: 'c' } } });
+    saveVaultRecord({
+      version: VAULT_VERSION,
+      salt: 's',
+      iterations: PBKDF2_ITERATIONS,
+      check: { iv: 'i', ct: 'c' },
+      entries: { a: { iv: 'i', ct: 'c' } },
+    });
     clearVaultEntries();
     assert.equal(vaultExists(), true);
     const record = loadVaultRecord();
@@ -219,12 +279,16 @@ describe('unlock lifecycle', () => {
 
   test('creation fails loudly when the record cannot persist', async () => {
     const original = global.localStorage.setItem;
-    global.localStorage.setItem = () => { throw new Error('private browsing'); };
+    global.localStorage.setItem = () => {
+      throw new Error('private browsing');
+    };
     try {
       const r = await createVault('hunter2', subtle, getRandomValues);
       assert.equal(r.ok, false, 'a vault that did not persist must never report success');
       assert.equal(isUnlocked(), false, 'and must not appear unlocked');
-    } finally { global.localStorage.setItem = original; }
+    } finally {
+      global.localStorage.setItem = original;
+    }
   });
 
   test('the correct passphrase unlocks after a lock', async () => {
@@ -321,7 +385,6 @@ describe('remember / recall', () => {
   test('the plaintext secret never appears in localStorage', async () => {
     await createVault('hunter2', subtle, getRandomValues);
     await rememberSecret('cred1', 'PLAINTEXTMARKER', subtle);
-    assert.equal(JSON.stringify(ls).includes('PLAINTEXTMARKER'), false,
-      'this is the entire point of the feature');
+    assert.equal(JSON.stringify(ls).includes('PLAINTEXTMARKER'), false, 'this is the entire point of the feature');
   });
 });

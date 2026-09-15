@@ -64,12 +64,18 @@ describe('copyObjectMultipart — happy path', () => {
 
   test('HeadObjects the source and carries its metadata onto CreateMultipartUpload', async () => {
     const client = mockClient();
-    await copyObjectMultipart(client, { bucket: 'bk', sourceKey: 'big.bin', destKey: 'arch/big.bin', size: SIZE, preferredPartBytes: PART });
+    await copyObjectMultipart(client, {
+      bucket: 'bk',
+      sourceKey: 'big.bin',
+      destKey: 'arch/big.bin',
+      size: SIZE,
+      preferredPartBytes: PART,
+    });
 
-    const head = client.calls.find(c => c.name === 'HeadObjectCommand');
+    const head = client.calls.find((c) => c.name === 'HeadObjectCommand');
     assert.equal(head.input.Key, 'big.bin');
 
-    const create = client.calls.find(c => c.name === 'CreateMultipartUploadCommand');
+    const create = client.calls.find((c) => c.name === 'CreateMultipartUploadCommand');
     assert.equal(create.input.Key, 'arch/big.bin');
     assert.equal(create.input.ContentType, 'image/png');
     assert.deepEqual(create.input.Metadata, { 'file-mtime': '123' });
@@ -78,11 +84,15 @@ describe('copyObjectMultipart — happy path', () => {
 
   test('uses inclusive CopySourceRange boundaries with a smaller final part', async () => {
     const client = mockClient();
-    await copyObjectMultipart(client, { bucket: 'bk', sourceKey: 'big.bin', destKey: 'arch/big.bin', size: SIZE, preferredPartBytes: PART });
+    await copyObjectMultipart(client, {
+      bucket: 'bk',
+      sourceKey: 'big.bin',
+      destKey: 'arch/big.bin',
+      size: SIZE,
+      preferredPartBytes: PART,
+    });
 
-    const ranges = client.calls
-      .filter(c => c.name === 'UploadPartCopyCommand')
-      .map(c => c.input.CopySourceRange);
+    const ranges = client.calls.filter((c) => c.name === 'UploadPartCopyCommand').map((c) => c.input.CopySourceRange);
     assert.deepEqual(ranges, [
       'bytes=0-4999999',
       'bytes=5000000-9999999',
@@ -92,16 +102,28 @@ describe('copyObjectMultipart — happy path', () => {
 
   test('CopySource points at the source key', async () => {
     const client = mockClient();
-    await copyObjectMultipart(client, { bucket: 'bk', sourceKey: 'big.bin', destKey: 'arch/big.bin', size: SIZE, preferredPartBytes: PART });
-    const part = client.calls.find(c => c.name === 'UploadPartCopyCommand');
+    await copyObjectMultipart(client, {
+      bucket: 'bk',
+      sourceKey: 'big.bin',
+      destKey: 'arch/big.bin',
+      size: SIZE,
+      preferredPartBytes: PART,
+    });
+    const part = client.calls.find((c) => c.name === 'UploadPartCopyCommand');
     assert.equal(part.input.CopySource, 'bk/big.bin');
   });
 
   test('reads part ETags from CopyPartResult and completes with sorted parts', async () => {
     const client = mockClient();
-    await copyObjectMultipart(client, { bucket: 'bk', sourceKey: 'big.bin', destKey: 'arch/big.bin', size: SIZE, preferredPartBytes: PART });
+    await copyObjectMultipart(client, {
+      bucket: 'bk',
+      sourceKey: 'big.bin',
+      destKey: 'arch/big.bin',
+      size: SIZE,
+      preferredPartBytes: PART,
+    });
 
-    const complete = client.calls.find(c => c.name === 'CompleteMultipartUploadCommand');
+    const complete = client.calls.find((c) => c.name === 'CompleteMultipartUploadCommand');
     assert.deepEqual(complete.input.MultipartUpload.Parts, [
       { PartNumber: 1, ETag: 'etag-1' },
       { PartNumber: 2, ETag: 'etag-2' },
@@ -111,8 +133,14 @@ describe('copyObjectMultipart — happy path', () => {
 
   test('does not abort on success', async () => {
     const client = mockClient();
-    await copyObjectMultipart(client, { bucket: 'bk', sourceKey: 'big.bin', destKey: 'arch/big.bin', size: SIZE, preferredPartBytes: PART });
-    assert.ok(!client.calls.some(c => c.name === 'AbortMultipartUploadCommand'));
+    await copyObjectMultipart(client, {
+      bucket: 'bk',
+      sourceKey: 'big.bin',
+      destKey: 'arch/big.bin',
+      size: SIZE,
+      preferredPartBytes: PART,
+    });
+    assert.ok(!client.calls.some((c) => c.name === 'AbortMultipartUploadCommand'));
   });
 });
 
@@ -120,13 +148,19 @@ describe('copyObjectMultipart — failure', () => {
   test('aborts the multipart upload and rethrows when a part copy fails', async () => {
     const client = mockClient({ partCopyRejectOn: 2 });
     await assert.rejects(
-      copyObjectMultipart(client, { bucket: 'bk', sourceKey: 'big.bin', destKey: 'arch/big.bin', size: 12_000_000, preferredPartBytes: 5_000_000 }),
+      copyObjectMultipart(client, {
+        bucket: 'bk',
+        sourceKey: 'big.bin',
+        destKey: 'arch/big.bin',
+        size: 12_000_000,
+        preferredPartBytes: 5_000_000,
+      }),
       /PartFailed/,
     );
-    const abort = client.calls.find(c => c.name === 'AbortMultipartUploadCommand');
+    const abort = client.calls.find((c) => c.name === 'AbortMultipartUploadCommand');
     assert.ok(abort, 'must abort the orphaned multipart upload');
     assert.equal(abort.input.UploadId, 'up-1');
-    assert.ok(!client.calls.some(c => c.name === 'CompleteMultipartUploadCommand'), 'must not complete');
+    assert.ok(!client.calls.some((c) => c.name === 'CompleteMultipartUploadCommand'), 'must not complete');
   });
 });
 
@@ -138,7 +172,7 @@ const GiB = 1024 * 1024 * 1024;
 // is pinned at the 10,000-part cap; at 1 GiB a 10 GiB object is just 10 parts.
 describe('copyObjectMultipart — copy part sizing', () => {
   function partCount(client) {
-    return client.calls.filter(c => c.name === 'UploadPartCopyCommand').length;
+    return client.calls.filter((c) => c.name === 'UploadPartCopyCommand').length;
   }
 
   test('defaults to 1 GiB parts (10 GiB object → 10 parts, not thousands)', async () => {
@@ -153,8 +187,11 @@ describe('copyObjectMultipart — copy part sizing', () => {
     // both the 5 GB camp (B2/Wasabi/DO) and the 5 GiB camp (AWS/R2/MinIO) — and below 2^32.
     const client = mockClient();
     await copyObjectMultipart(client, {
-      bucket: 'bk', sourceKey: 'big.bin', destKey: 'arch/big.bin',
-      size: 20_000_000_000, preferredPartBytes: 10_000_000_000,
+      bucket: 'bk',
+      sourceKey: 'big.bin',
+      destKey: 'arch/big.bin',
+      size: 20_000_000_000,
+      preferredPartBytes: 10_000_000_000,
     });
     assert.equal(partCount(client), 5);
   });
@@ -169,13 +206,16 @@ describe('copyObjectMultipart — R2 uniform part size', () => {
     // 3 GiB + 500 bytes at 1 GiB parts → three full 1 GiB parts and a 500-byte tail.
     await copyObjectMultipart(client, { bucket: 'bk', sourceKey: 'big.bin', destKey: 'd', size: 3 * GiB + 500 });
     const lengths = client.calls
-      .filter(c => c.name === 'UploadPartCopyCommand')
-      .map(c => {
+      .filter((c) => c.name === 'UploadPartCopyCommand')
+      .map((c) => {
         const [, a, b] = c.input.CopySourceRange.match(/bytes=(\d+)-(\d+)/);
         return Number(b) - Number(a) + 1;
       });
     const nonLast = lengths.slice(0, -1);
-    assert.ok(nonLast.every(len => len === nonLast[0]), 'non-final parts must be uniform');
+    assert.ok(
+      nonLast.every((len) => len === nonLast[0]),
+      'non-final parts must be uniform',
+    );
     assert.equal(nonLast[0], GiB);
     assert.equal(lengths[lengths.length - 1], 500);
   });
@@ -185,22 +225,38 @@ describe('copyObjectMultipart — R2 uniform part size', () => {
 // "0 of 1" for the whole transfer. copyObjectMultipart reports each copied part's byte count
 // so the bar advances at part granularity.
 describe('copyObjectMultipart — per-part progress', () => {
-  test('reports each copied part\'s byte count, summing to the object size', async () => {
+  test("reports each copied part's byte count, summing to the object size", async () => {
     const client = mockClient();
     const chunks = [];
     // 12 MB in 5 MB parts → 5,000,000 + 5,000,000 + 2,000,000.
     await copyObjectMultipart(client, {
-      bucket: 'bk', sourceKey: 's', destKey: 'd', size: 12_000_000, preferredPartBytes: 5_000_000,
+      bucket: 'bk',
+      sourceKey: 's',
+      destKey: 'd',
+      size: 12_000_000,
+      preferredPartBytes: 5_000_000,
       onPartCopied: (bytes) => chunks.push(bytes),
     });
-    assert.deepEqual(chunks.slice().sort((a, b) => b - a), [5_000_000, 5_000_000, 2_000_000]);
-    assert.equal(chunks.reduce((a, b) => a + b, 0), 12_000_000);
+    assert.deepEqual(
+      chunks.slice().sort((a, b) => b - a),
+      [5_000_000, 5_000_000, 2_000_000],
+    );
+    assert.equal(
+      chunks.reduce((a, b) => a + b, 0),
+      12_000_000,
+    );
   });
 
   test('is optional — a copy without the callback still completes', async () => {
     const client = mockClient();
-    await copyObjectMultipart(client, { bucket: 'bk', sourceKey: 's', destKey: 'd', size: 12_000_000, preferredPartBytes: 5_000_000 });
-    assert.ok(client.calls.some(c => c.name === 'CompleteMultipartUploadCommand'));
+    await copyObjectMultipart(client, {
+      bucket: 'bk',
+      sourceKey: 's',
+      destKey: 'd',
+      size: 12_000_000,
+      preferredPartBytes: 5_000_000,
+    });
+    assert.ok(client.calls.some((c) => c.name === 'CompleteMultipartUploadCommand'));
   });
 });
 
@@ -212,23 +268,38 @@ describe('copyObjectMultipart — resume via ListParts', () => {
     const client = mockClient();
     let seen = null;
     await copyObjectMultipart(client, {
-      bucket: 'bk', sourceKey: 's', destKey: 'd', size: 12_000_000, preferredPartBytes: 5_000_000,
-      onUploadIdCreated: (id, ps) => { seen = { id, ps }; },
+      bucket: 'bk',
+      sourceKey: 's',
+      destKey: 'd',
+      size: 12_000_000,
+      preferredPartBytes: 5_000_000,
+      onUploadIdCreated: (id, ps) => {
+        seen = { id, ps };
+      },
     });
     assert.deepEqual(seen, { id: 'up-1', ps: 5_000_000 });
   });
 
   test('resuming skips Create, copies only the missing parts, completes with all parts', async () => {
     // 12 MB in 5 MB parts → 3 parts; parts 1 and 2 already done server-side.
-    const client = mockClient({ existingParts: [{ PartNumber: 1, ETag: 'done-1' }, { PartNumber: 2, ETag: 'done-2' }] });
+    const client = mockClient({
+      existingParts: [
+        { PartNumber: 1, ETag: 'done-1' },
+        { PartNumber: 2, ETag: 'done-2' },
+      ],
+    });
     await copyObjectMultipart(client, {
-      bucket: 'bk', sourceKey: 's', destKey: 'd', size: 12_000_000, preferredPartBytes: 5_000_000,
+      bucket: 'bk',
+      sourceKey: 's',
+      destKey: 'd',
+      size: 12_000_000,
+      preferredPartBytes: 5_000_000,
       resumeUploadId: 'up-existing',
     });
-    assert.ok(!client.calls.some(c => c.name === 'CreateMultipartUploadCommand'), 'must not create a new upload');
-    const copied = client.calls.filter(c => c.name === 'UploadPartCopyCommand').map(c => c.input.PartNumber);
+    assert.ok(!client.calls.some((c) => c.name === 'CreateMultipartUploadCommand'), 'must not create a new upload');
+    const copied = client.calls.filter((c) => c.name === 'UploadPartCopyCommand').map((c) => c.input.PartNumber);
     assert.deepEqual(copied, [3], 'only the missing part is copied');
-    const complete = client.calls.find(c => c.name === 'CompleteMultipartUploadCommand');
+    const complete = client.calls.find((c) => c.name === 'CompleteMultipartUploadCommand');
     assert.equal(complete.input.UploadId, 'up-existing');
     assert.deepEqual(complete.input.MultipartUpload.Parts, [
       { PartNumber: 1, ETag: 'done-1' },
@@ -241,19 +312,37 @@ describe('copyObjectMultipart — resume via ListParts', () => {
     const client = mockClient({ existingParts: [{ PartNumber: 1, ETag: 'done-1' }] });
     const chunks = [];
     await copyObjectMultipart(client, {
-      bucket: 'bk', sourceKey: 's', destKey: 'd', size: 12_000_000, preferredPartBytes: 5_000_000,
-      resumeUploadId: 'up-existing', onPartCopied: (b) => chunks.push(b),
+      bucket: 'bk',
+      sourceKey: 's',
+      destKey: 'd',
+      size: 12_000_000,
+      preferredPartBytes: 5_000_000,
+      resumeUploadId: 'up-existing',
+      onPartCopied: (b) => chunks.push(b),
     });
-    assert.equal(chunks.reduce((a, b) => a + b, 0), 12_000_000, 'absolute progress across all parts');
+    assert.equal(
+      chunks.reduce((a, b) => a + b, 0),
+      12_000_000,
+      'absolute progress across all parts',
+    );
   });
 
   test('a failed resume does NOT abort — the upload is kept for another attempt', async () => {
     const client = mockClient({ existingParts: [{ PartNumber: 1, ETag: 'done-1' }], partCopyRejectOn: 3 });
-    await assert.rejects(copyObjectMultipart(client, {
-      bucket: 'bk', sourceKey: 's', destKey: 'd', size: 12_000_000, preferredPartBytes: 5_000_000,
-      resumeUploadId: 'up-existing',
-    }));
-    assert.ok(!client.calls.some(c => c.name === 'AbortMultipartUploadCommand'), 'resume keeps the upload on failure');
+    await assert.rejects(
+      copyObjectMultipart(client, {
+        bucket: 'bk',
+        sourceKey: 's',
+        destKey: 'd',
+        size: 12_000_000,
+        preferredPartBytes: 5_000_000,
+        resumeUploadId: 'up-existing',
+      }),
+    );
+    assert.ok(
+      !client.calls.some((c) => c.name === 'AbortMultipartUploadCommand'),
+      'resume keeps the upload on failure',
+    );
   });
 });
 
@@ -263,9 +352,18 @@ describe('copyObjectMultipart — resume via ListParts', () => {
 describe('copyObjectMultipart — transient network retry', () => {
   test('retries a part copy that fails once with a transient fetch error, then completes', async () => {
     const client = mockClient({ networkFailOncePart: 2 });
-    await copyObjectMultipart(client, { bucket: 'bk', sourceKey: 'big.bin', destKey: 'd', size: 12_000_000, preferredPartBytes: 5_000_000 });
+    await copyObjectMultipart(client, {
+      bucket: 'bk',
+      sourceKey: 'big.bin',
+      destKey: 'd',
+      size: 12_000_000,
+      preferredPartBytes: 5_000_000,
+    });
     assert.equal(client.partAttempts.get(2), 2, 'part 2 must be attempted twice (one retry)');
-    assert.ok(client.calls.some(c => c.name === 'CompleteMultipartUploadCommand'), 'copy must complete');
-    assert.ok(!client.calls.some(c => c.name === 'AbortMultipartUploadCommand'), 'must not abort');
+    assert.ok(
+      client.calls.some((c) => c.name === 'CompleteMultipartUploadCommand'),
+      'copy must complete',
+    );
+    assert.ok(!client.calls.some((c) => c.name === 'AbortMultipartUploadCommand'), 'must not abort');
   });
 });

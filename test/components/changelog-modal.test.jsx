@@ -49,7 +49,7 @@ describe('ChangelogModal — content', () => {
     // gated behind authentication would defeat the point — you want to verify
     // the running build BEFORE you trust it with your secret key.
     const { queryAll, cleanup } = mount(h(ChangelogModal, { onClose: () => {} }));
-    const verifyBtn = queryAll('button').find(b => /verify build integrity/i.test(b.textContent));
+    const verifyBtn = queryAll('button').find((b) => /verify build integrity/i.test(b.textContent));
     assert.ok(verifyBtn, 'IntegrityCheck button must render inside ChangelogModal');
     cleanup();
   });
@@ -58,8 +58,14 @@ describe('ChangelogModal — content', () => {
 describe('ChangelogModal — close mechanisms', () => {
   test('Close button calls onClose', () => {
     let closed = false;
-    const { cleanup } = mount(h(ChangelogModal, { onClose: () => { closed = true; } }));
-    const btn = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Close');
+    const { cleanup } = mount(
+      h(ChangelogModal, {
+        onClose: () => {
+          closed = true;
+        },
+      }),
+    );
+    const btn = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Close');
     assert.ok(btn, 'Close button must be present');
     fire(btn, 'click');
     assert.ok(closed, 'onClose must be called when Close is clicked');
@@ -68,7 +74,13 @@ describe('ChangelogModal — close mechanisms', () => {
 
   test('clicking the backdrop overlay calls onClose', () => {
     let closed = false;
-    const { query, cleanup } = mount(h(ChangelogModal, { onClose: () => { closed = true; } }));
+    const { query, cleanup } = mount(
+      h(ChangelogModal, {
+        onClose: () => {
+          closed = true;
+        },
+      }),
+    );
     fire(query('.modal-overlay'), 'click');
     assert.ok(closed, 'backdrop click must call onClose');
     cleanup();
@@ -76,7 +88,13 @@ describe('ChangelogModal — close mechanisms', () => {
 
   test('clicking inside the dialog does NOT call onClose', () => {
     let closed = false;
-    const { query, cleanup } = mount(h(ChangelogModal, { onClose: () => { closed = true; } }));
+    const { query, cleanup } = mount(
+      h(ChangelogModal, {
+        onClose: () => {
+          closed = true;
+        },
+      }),
+    );
     fire(query('.modal-dialog'), 'click');
     assert.ok(!closed, 'clicking inside the dialog must not close it (stopPropagation)');
     cleanup();
@@ -84,7 +102,13 @@ describe('ChangelogModal — close mechanisms', () => {
 
   test('pressing Escape calls onClose', () => {
     let closed = false;
-    const { cleanup } = mount(h(ChangelogModal, { onClose: () => { closed = true; } }));
+    const { cleanup } = mount(
+      h(ChangelogModal, {
+        onClose: () => {
+          closed = true;
+        },
+      }),
+    );
     fire(document, 'keydown', { key: 'Escape' });
     assert.ok(closed, 'Escape key must call onClose');
     cleanup();
@@ -92,7 +116,13 @@ describe('ChangelogModal — close mechanisms', () => {
 
   test('pressing a non-Escape key does NOT call onClose', () => {
     let closed = false;
-    const { cleanup } = mount(h(ChangelogModal, { onClose: () => { closed = true; } }));
+    const { cleanup } = mount(
+      h(ChangelogModal, {
+        onClose: () => {
+          closed = true;
+        },
+      }),
+    );
     fire(document, 'keydown', { key: 'Enter' });
     assert.ok(!closed, 'non-Escape key must not close the modal');
     cleanup();
@@ -100,7 +130,13 @@ describe('ChangelogModal — close mechanisms', () => {
 
   test('unmounting removes the Escape key listener', () => {
     let closedAfterUnmount = false;
-    const { cleanup } = mount(h(ChangelogModal, { onClose: () => { closedAfterUnmount = true; } }));
+    const { cleanup } = mount(
+      h(ChangelogModal, {
+        onClose: () => {
+          closedAfterUnmount = true;
+        },
+      }),
+    );
     cleanup();
     fire(document, 'keydown', { key: 'Escape' });
     assert.ok(!closedAfterUnmount, 'Escape must not fire after modal is unmounted');

@@ -13,13 +13,15 @@ export async function listIncompleteUploads(client, bucket, prefix = '') {
   let keyMarker;
   let uploadIdMarker;
   do {
-    const resp = await client.send(new ListMultipartUploadsCommand({
-      Bucket: bucket,
-      Prefix: prefix || undefined,
-      KeyMarker: keyMarker,
-      UploadIdMarker: uploadIdMarker,
-    }));
-    for (const u of (resp.Uploads || [])) {
+    const resp = await client.send(
+      new ListMultipartUploadsCommand({
+        Bucket: bucket,
+        Prefix: prefix || undefined,
+        KeyMarker: keyMarker,
+        UploadIdMarker: uploadIdMarker,
+      }),
+    );
+    for (const u of resp.Uploads || []) {
       out.push({ key: u.Key, uploadId: u.UploadId, initiated: u.Initiated });
     }
     if (resp.IsTruncated) {

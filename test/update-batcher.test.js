@@ -7,7 +7,7 @@ function makeHarness() {
   let items = [
     { id: 1, status: 'uploading', bytesUploaded: 0, speed: 0 },
     { id: 2, status: 'uploading', bytesUploaded: 0, speed: 0 },
-    { id: 3, status: 'queued',    bytesUploaded: 0, speed: 0 },
+    { id: 3, status: 'queued', bytesUploaded: 0, speed: 0 },
   ];
 
   let pendingFlush = null;
@@ -56,7 +56,7 @@ describe('update-batcher — non-urgent accumulation', () => {
     const { batcher, hasPending } = makeHarness();
     batcher.update(1, { bytesUploaded: 100 });
     batcher.update(1, { bytesUploaded: 200 });
-    batcher.update(2, { bytesUploaded: 50  });
+    batcher.update(2, { bytesUploaded: 50 });
     assert.ok(hasPending(), 'one flush should be scheduled');
   });
 
@@ -114,7 +114,7 @@ describe('update-batcher — urgent flush', () => {
   it('preserves accumulated bytes when urgent status patch arrives', () => {
     const { batcher, getItems } = makeHarness();
     batcher.update(1, { bytesUploaded: 999, speed: 100 }); // non-urgent, in accumulator
-    batcher.update(1, { status: 'done' }, true);           // urgent — should merge
+    batcher.update(1, { status: 'done' }, true); // urgent — should merge
     const item = getItems()[0];
     assert.equal(item.status, 'done');
     assert.equal(item.bytesUploaded, 999, 'accumulated bytes should survive urgent flush');
@@ -131,7 +131,7 @@ describe('update-batcher — urgent flush', () => {
   it('allows new non-urgent patches to schedule a fresh flush after urgent flush', () => {
     const { batcher, hasPending } = makeHarness();
     batcher.update(1, { status: 'done' }, true); // urgent flush clears handle
-    batcher.update(2, { bytesUploaded: 50 });    // should schedule a new flush
+    batcher.update(2, { bytesUploaded: 50 }); // should schedule a new flush
     assert.ok(hasPending(), 'new flush should be scheduled after urgent cleared the old one');
   });
 });
@@ -140,13 +140,19 @@ describe('update-batcher — edge cases', () => {
   it('flush with empty pending map is a no-op', () => {
     const { batcher, getItems } = makeHarness();
     batcher.flush(); // nothing pending
-    assert.deepEqual(getItems().map(i => i.bytesUploaded), [0, 0, 0]);
+    assert.deepEqual(
+      getItems().map((i) => i.bytesUploaded),
+      [0, 0, 0],
+    );
   });
 
   it('does not apply patch to item with unknown id', () => {
     const { batcher, getItems, triggerFlush } = makeHarness();
     batcher.update(999, { bytesUploaded: 500 }); // id 999 does not exist
     triggerFlush();
-    assert.deepEqual(getItems().map(i => i.bytesUploaded), [0, 0, 0]);
+    assert.deepEqual(
+      getItems().map((i) => i.bytesUploaded),
+      [0, 0, 0],
+    );
   });
 });

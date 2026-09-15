@@ -3,9 +3,7 @@
 // Never persisted (no localStorage/sessionStorage) — pure module state.
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  cacheSecret, getCachedSecret, forgetCachedSecret, clearSecretCache,
-} from '../src/lib/secret-cache.js';
+import { cacheSecret, getCachedSecret, forgetCachedSecret, clearSecretCache } from '../src/lib/secret-cache.js';
 
 beforeEach(() => clearSecretCache());
 

@@ -37,10 +37,19 @@ export function createAssemblerClient(worker, { writeWindowBytes = 16 * 1024 * 1
     if (m.type === 'ready') readyResolve?.({ supported: true });
     else if (m.type === 'unsupported') readyResolve?.({ supported: false, reason: m.reason });
     else if (m.type === 'written') pendingEnd.get(m.key)?.resolve({ crc: m.crc, size: m.size });
-    else if (m.type === 'entryError') pendingEnd.get(m.key)?.reject(Object.assign(new Error(m.message), { name: m.name }));
-    else if (m.type === 'ack') { outstanding -= m.bytes; drainWaiters(); }
-    else if (m.type === 'finished') { finishResolve?.({ totalBytes: m.totalBytes }); releaseWaiters(); }
-    else if (m.type === 'fatal') { fatalCb?.({ name: m.name, message: m.message }); finishReject?.(Object.assign(new Error(m.message), { name: m.name })); releaseWaiters(); }
+    else if (m.type === 'entryError')
+      pendingEnd.get(m.key)?.reject(Object.assign(new Error(m.message), { name: m.name }));
+    else if (m.type === 'ack') {
+      outstanding -= m.bytes;
+      drainWaiters();
+    } else if (m.type === 'finished') {
+      finishResolve?.({ totalBytes: m.totalBytes });
+      releaseWaiters();
+    } else if (m.type === 'fatal') {
+      fatalCb?.({ name: m.name, message: m.message });
+      finishReject?.(Object.assign(new Error(m.message), { name: m.name }));
+      releaseWaiters();
+    }
   });
 
   // The worker can die without ever posting a 'fatal' message — a raw Worker error event
@@ -58,7 +67,10 @@ export function createAssemblerClient(worker, { writeWindowBytes = 16 * 1024 * 1
   });
   return {
     init(stagingName, layout, freshKeys) {
-      return new Promise((res) => { readyResolve = res; worker.postMessage({ type: 'init', stagingName, layout, freshKeys }); });
+      return new Promise((res) => {
+        readyResolve = res;
+        worker.postMessage({ type: 'init', stagingName, layout, freshKeys });
+      });
     },
     writeChunk(key, u8) {
       const len = u8.byteLength;
@@ -66,17 +78,29 @@ export function createAssemblerClient(worker, { writeWindowBytes = 16 * 1024 * 1
       worker.postMessage({ type: 'chunk', key, buffer }, [buffer]);
       outstanding += len;
       if (outstanding <= writeWindowBytes) return Promise.resolve();
-      return new Promise((resolve) => { waiters.push(resolve); });
+      return new Promise((resolve) => {
+        waiters.push(resolve);
+      });
     },
     endEntry(key) {
-      return new Promise((resolve, reject) => { pendingEnd.set(key, { resolve, reject }); worker.postMessage({ type: 'entryEnd', key }); })
-        .finally(() => pendingEnd.delete(key));
+      return new Promise((resolve, reject) => {
+        pendingEnd.set(key, { resolve, reject });
+        worker.postMessage({ type: 'entryEnd', key });
+      }).finally(() => pendingEnd.delete(key));
     },
     finish(records) {
-      return new Promise((res, rej) => { finishResolve = res; finishReject = rej; worker.postMessage({ type: 'finish', records }); })
-        .finally(() => releaseWaiters());
+      return new Promise((res, rej) => {
+        finishResolve = res;
+        finishReject = rej;
+        worker.postMessage({ type: 'finish', records });
+      }).finally(() => releaseWaiters());
     },
-    abort() { worker.postMessage({ type: 'abort' }); releaseWaiters(); },
-    onFatal(cb) { fatalCb = cb; },
+    abort() {
+      worker.postMessage({ type: 'abort' });
+      releaseWaiters();
+    },
+    onFatal(cb) {
+      fatalCb = cb;
+    },
   };
 }

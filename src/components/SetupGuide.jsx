@@ -43,13 +43,19 @@ function Code({ children }) {
           type="button"
           class="btn btn-sm"
           style={{
-            position: 'absolute', top: '.35rem', right: '.35rem',
-            fontSize: '.7rem', padding: '.2rem .45rem',
-            background: 'rgba(255,255,255,.15)', color: '#cdd6f4',
+            position: 'absolute',
+            top: '.35rem',
+            right: '.35rem',
+            fontSize: '.7rem',
+            padding: '.2rem .45rem',
+            background: 'rgba(255,255,255,.15)',
+            color: '#cdd6f4',
             border: '1px solid rgba(255,255,255,.25)',
           }}
           onClick={copy}
-        >{copied ? '✓ Copied' : 'Copy'}</button>
+        >
+          {copied ? '✓ Copied' : 'Copy'}
+        </button>
       )}
     </div>
   );
@@ -58,11 +64,23 @@ function Code({ children }) {
 function Step({ n, title, children }) {
   return (
     <div style={{ display: 'flex', gap: '.75rem', alignItems: 'flex-start' }}>
-      <span style={{
-        flexShrink: 0, width: '1.5rem', height: '1.5rem', borderRadius: '50%',
-        background: 'var(--accent)', color: '#fff', fontSize: '.75rem',
-        fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}>{n}</span>
+      <span
+        style={{
+          flexShrink: 0,
+          width: '1.5rem',
+          height: '1.5rem',
+          borderRadius: '50%',
+          background: 'var(--accent)',
+          color: '#fff',
+          fontSize: '.75rem',
+          fontWeight: 700,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {n}
+      </span>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 600, marginBottom: '.35rem' }}>{title}</div>
         {children}
@@ -72,7 +90,7 @@ function Step({ n, title, children }) {
 }
 
 function corsCmd({ endpoint, bucket, origin, profile = 'bucketer', provider }) {
-  const ep  = shellQuote(endpoint || 'https://s3.<region>.backblazeb2.com');
+  const ep = shellQuote(endpoint || 'https://s3.<region>.backblazeb2.com');
   const bkt = shellQuote(bucket || '<your-bucket>');
   const prof = shellQuote(profile);
   return `aws s3api put-bucket-cors \\
@@ -94,7 +112,15 @@ function GuideB2({ endpoint, bucket, keyId }) {
     <div class="setup-steps">
       <Step n="1" title="Install the AWS CLI">
         <p class="cors-note">
-          Download from <a href="https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html" target="_blank" rel="noopener">aws.amazon.com/cli</a> or via your package manager:
+          Download from{' '}
+          <a
+            href="https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html"
+            target="_blank"
+            rel="noopener"
+          >
+            aws.amazon.com/cli
+          </a>{' '}
+          or via your package manager:
         </p>
         <Code>{`# Debian/Ubuntu
 sudo apt install awscli
@@ -108,11 +134,12 @@ winget install Amazon.AWSCLI`}</Code>
 
       <Step n="2" title="Configure a B2 profile">
         <p class="cors-note">
-          Use an application key — <strong>not</strong> your master key. Create one in the B2 console
-          under <em>App Keys</em> with access to this bucket. Enable the <strong>List All Bucket Names</strong> (<code>listAllBucketNames</code>) capability — the AWS SDK calls ListBuckets on initialisation and will fail entirely without it.
-          If you restrict the key with a <strong>Name Prefix</strong>, enter that same folder into
-          the <strong>Base folder</strong> field on the connect form — otherwise the first connection
-          attempt will fail, because Bucketer lists the bucket root by default.
+          Use an application key — <strong>not</strong> your master key. Create one in the B2 console under{' '}
+          <em>App Keys</em> with access to this bucket. Enable the <strong>List All Bucket Names</strong> (
+          <code>listAllBucketNames</code>) capability — the AWS SDK calls ListBuckets on initialisation and will fail
+          entirely without it. If you restrict the key with a <strong>Name Prefix</strong>, enter that same folder into
+          the <strong>Base folder</strong> field on the connect form — otherwise the first connection attempt will fail,
+          because Bucketer lists the bucket root by default.
         </p>
         <Code>{`aws configure --profile bucketer
 # AWS Access Key ID:     ${keyId || '<your-key-id>'}
@@ -123,8 +150,8 @@ winget install Amazon.AWSCLI`}</Code>
 
       <Step n="3" title="Remove any existing B2 native CORS rules">
         <p class="cors-note">
-          B2 won't apply S3-compatible CORS rules if native rules are already set.
-          Check first — if <code>corsRules</code> is non-empty in the output below, clear them:
+          B2 won't apply S3-compatible CORS rules if native rules are already set. Check first — if{' '}
+          <code>corsRules</code> is non-empty in the output below, clear them:
         </p>
         <Code>{`# Check existing rules
 b2 bucket get ${bkt}
@@ -139,9 +166,9 @@ b2 bucket update ${bkt} --cors-rules '[]'`}</Code>
       <Step n="4" title="Apply S3-compatible CORS rules">
         {isFileProtocol && (
           <p class="cors-note cors-note-warn" style={{ marginBottom: '.4rem' }}>
-            You're running from <code>file://</code> — using <code>"*"</code> (wildcard) as the allowed origin,
-            since browsers send <code>Origin: null</code> for local files and most providers reject <code>"null"</code> as invalid.
-            If you later deploy to a domain, re-run this with that specific origin instead.
+            You're running from <code>file://</code> — using <code>"*"</code> (wildcard) as the allowed origin, since
+            browsers send <code>Origin: null</code> for local files and most providers reject <code>"null"</code> as
+            invalid. If you later deploy to a domain, re-run this with that specific origin instead.
           </p>
         )}
         <Code>{corsCmd({ endpoint: ep, bucket: bkt, origin, profile: 'bucketer', provider: PROVIDERS.B2 })}</Code>
@@ -177,11 +204,11 @@ brew install awscli`}</Code>
 
       <Step n="2" title="Configure an R2 profile">
         <p class="cors-note">
-          Your <strong>Account ID</strong> is shown in the Cloudflare dashboard sidebar — use it to construct the endpoint above.
-          Get your R2 API token from the dashboard → R2 → Manage R2 API Tokens.
-          A <strong>payment method</strong> (credit card) must be on file even to use the free tier.
-          Use <strong>account-scoped</strong> token scope for full access, or bucket-scoped if you prefer to restrict to a single bucket.
-          Use <code>auto</code> as the region.
+          Your <strong>Account ID</strong> is shown in the Cloudflare dashboard sidebar — use it to construct the
+          endpoint above. Get your R2 API token from the dashboard → R2 → Manage R2 API Tokens. A{' '}
+          <strong>payment method</strong> (credit card) must be on file even to use the free tier. Use{' '}
+          <strong>account-scoped</strong> token scope for full access, or bucket-scoped if you prefer to restrict to a
+          single bucket. Use <code>auto</code> as the region.
         </p>
         <Code>{`aws configure --profile bucketer
 # AWS Access Key ID:     ${keyId || '<r2-access-key-id>'}
@@ -196,8 +223,8 @@ brew install awscli`}</Code>
         </p>
         <Code>{corsCmd({ endpoint: ep, bucket: bkt, origin, profile: 'bucketer' })}</Code>
         <p class="cors-note" style={{ marginTop: '.4rem' }}>
-          <strong>Note:</strong> R2 automatically aborts incomplete multipart uploads after 7 days,
-          so orphaned parts won't accumulate.
+          <strong>Note:</strong> R2 automatically aborts incomplete multipart uploads after 7 days, so orphaned parts
+          won't accumulate.
         </p>
       </Step>
 
@@ -212,23 +239,24 @@ brew install awscli`}</Code>
 }
 
 function GuideWasabi({ keyId }) {
-
   return (
     <div class="setup-steps">
       <Step n="1" title="No CORS configuration needed">
         <p class="cors-note">
-          Wasabi automatically returns permissive CORS headers for any request that includes
-          an <code>Origin</code> header. You can skip straight to connecting.
+          Wasabi automatically returns permissive CORS headers for any request that includes an <code>Origin</code>{' '}
+          header. You can skip straight to connecting.
         </p>
       </Step>
 
       <Step n="2" title="Bucket naming — avoid dots">
         <p class="cors-note">
-          Avoid dots in Wasabi bucket names. Wasabi uses virtual-hosted style URLs
-          (<code>{'<bucket>'}.s3.{'<region>'}.wasabisys.com</code>), and dotted names like{' '}
-          <code>my.bucket</code> produce SSL SNI failures — the wildcard cert{' '}
-          <code>*.s3.wasabisys.com</code> does not cover the extra subdomain level.
-          If you must use a dotted bucket name, enable the path-style override in Settings.
+          Avoid dots in Wasabi bucket names. Wasabi uses virtual-hosted style URLs (
+          <code>
+            {'<bucket>'}.s3.{'<region>'}.wasabisys.com
+          </code>
+          ), and dotted names like <code>my.bucket</code> produce SSL SNI failures — the wildcard cert{' '}
+          <code>*.s3.wasabisys.com</code> does not cover the extra subdomain level. If you must use a dotted bucket
+          name, enable the path-style override in Settings.
         </p>
       </Step>
 
@@ -285,9 +313,7 @@ function GuideDOSpaces({ endpoint, bucket, keyId }) {
   return (
     <div class="setup-steps">
       <Step n="1" title="Configure AWS CLI with Spaces credentials">
-        <p class="cors-note">
-          Generate a Spaces access key in the DigitalOcean dashboard → API → Spaces Keys.
-        </p>
+        <p class="cors-note">Generate a Spaces access key in the DigitalOcean dashboard → API → Spaces Keys.</p>
         <Code>{`aws configure --profile bucketer
 # AWS Access Key ID:     ${keyId || '<spaces-key>'}
 # AWS Secret Access Key: <spaces-secret>
@@ -317,12 +343,14 @@ function GuideMinIO({ endpoint, bucket, keyId }) {
   return (
     <div class="setup-steps">
       <p class="cors-note cors-note-warn">
-        <strong>HTTPS required.</strong> Browsers block mixed-content requests — if your MinIO server uses <code>http://</code> and Bucketer is served over <code>https://</code>, all requests will be silently blocked. Use TLS or run MinIO behind an HTTPS reverse proxy.
+        <strong>HTTPS required.</strong> Browsers block mixed-content requests — if your MinIO server uses{' '}
+        <code>http://</code> and Bucketer is served over <code>https://</code>, all requests will be silently blocked.
+        Use TLS or run MinIO behind an HTTPS reverse proxy.
       </p>
       <Step n="1" title="Configure AWS CLI for MinIO">
         <p class="cors-note">
-          Use your MinIO access key and secret. Set the region to whatever your MinIO
-          deployment uses (<code>us-east-1</code> is the common placeholder).
+          Use your MinIO access key and secret. Set the region to whatever your MinIO deployment uses (
+          <code>us-east-1</code> is the common placeholder).
         </p>
         <Code>{`aws configure --profile bucketer
 # AWS Access Key ID:     ${keyId || '<minio-access-key>'}
@@ -333,8 +361,8 @@ function GuideMinIO({ endpoint, bucket, keyId }) {
 
       <Step n="2" title="Apply CORS rules">
         <p class="cors-note">
-          MinIO requires <code>forcePathStyle</code> — select <strong>MinIO</strong> in the Provider
-          Override dropdown so the app applies it automatically.
+          MinIO requires <code>forcePathStyle</code> — select <strong>MinIO</strong> in the Provider Override dropdown
+          so the app applies it automatically.
         </p>
         <Code>{corsCmd({ endpoint: ep, bucket: bkt, origin, profile: 'bucketer' })}</Code>
       </Step>
@@ -381,13 +409,13 @@ function GuideGeneric({ endpoint, bucket, keyId }) {
 // ── Main export ────────────────────────────────────────────────────────────
 
 const GUIDE_TITLES = {
-  [PROVIDERS.B2]:       'Backblaze B2 setup guide',
-  [PROVIDERS.R2]:       'Cloudflare R2 setup guide',
-  [PROVIDERS.WASABI]:   'Wasabi setup guide',
-  [PROVIDERS.AWS]:      'AWS S3 setup guide',
-  [PROVIDERS.DO_SPACES]:'DigitalOcean Spaces setup guide',
-  [PROVIDERS.MINIO]:    'MinIO setup guide',
-  [PROVIDERS.GENERIC]:  'S3-compatible setup guide',
+  [PROVIDERS.B2]: 'Backblaze B2 setup guide',
+  [PROVIDERS.R2]: 'Cloudflare R2 setup guide',
+  [PROVIDERS.WASABI]: 'Wasabi setup guide',
+  [PROVIDERS.AWS]: 'AWS S3 setup guide',
+  [PROVIDERS.DO_SPACES]: 'DigitalOcean Spaces setup guide',
+  [PROVIDERS.MINIO]: 'MinIO setup guide',
+  [PROVIDERS.GENERIC]: 'S3-compatible setup guide',
 };
 
 export function SetupGuide({ provider, endpoint, bucket, keyId }) {
@@ -396,22 +424,24 @@ export function SetupGuide({ provider, endpoint, bucket, keyId }) {
   const title = GUIDE_TITLES[provider] || 'Setup guide';
   const isWasabi = provider === PROVIDERS.WASABI;
 
-  const GuideComponent = {
-    [PROVIDERS.B2]:        GuideB2,
-    [PROVIDERS.R2]:        GuideR2,
-    [PROVIDERS.WASABI]:    GuideWasabi,
-    [PROVIDERS.AWS]:       GuideAWS,
-    [PROVIDERS.DO_SPACES]: GuideDOSpaces,
-    [PROVIDERS.MINIO]:     GuideMinIO,
-    [PROVIDERS.GENERIC]:   GuideGeneric,
-  }[provider] || GuideGeneric;
+  const GuideComponent =
+    {
+      [PROVIDERS.B2]: GuideB2,
+      [PROVIDERS.R2]: GuideR2,
+      [PROVIDERS.WASABI]: GuideWasabi,
+      [PROVIDERS.AWS]: GuideAWS,
+      [PROVIDERS.DO_SPACES]: GuideDOSpaces,
+      [PROVIDERS.MINIO]: GuideMinIO,
+      [PROVIDERS.GENERIC]: GuideGeneric,
+    }[provider] || GuideGeneric;
 
   const needsAttention = !isWasabi && isFileProtocol;
 
   return (
     <details class="cors-guide">
       <summary style={{ color: needsAttention ? 'var(--text-warn)' : 'var(--accent)' }}>
-        {needsAttention ? '⚠ ' : ''}{title}
+        {needsAttention ? '⚠ ' : ''}
+        {title}
       </summary>
       <div class="cors-guide-body">
         <GuideComponent endpoint={endpoint} bucket={bucket} keyId={keyId} />

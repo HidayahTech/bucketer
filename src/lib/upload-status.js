@@ -14,12 +14,11 @@
 //
 // Valid statuses: queued | uploading | resuming | paused | done | error | aborted
 
-export const isActive = (item) =>
-  item.status === 'uploading' || item.status === 'resuming' || item.status === 'queued';
+export const isActive = (item) => item.status === 'uploading' || item.status === 'resuming' || item.status === 'queued';
 
-export const isFailed  = (item) => item.status === 'error';
-export const isDone    = (item) => item.status === 'done';
-export const isPaused  = (item) => item.status === 'paused';
+export const isFailed = (item) => item.status === 'error';
+export const isDone = (item) => item.status === 'done';
+export const isPaused = (item) => item.status === 'paused';
 export const isAborted = (item) => item.status === 'aborted';
 
 // isSettled: the item is no longer going to change on its own.

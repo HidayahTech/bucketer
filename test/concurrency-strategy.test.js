@@ -32,7 +32,7 @@ describe('capConcurrencyByMemory', () => {
 
   test('3 concurrent files share the budget — total stays within limit', () => {
     // 3 files, 200 MiB total → 66 MiB per file → floor(66/50) = 1 for 50 MiB parts
-    const perFile = Math.floor(200 * MB / 3);
+    const perFile = Math.floor((200 * MB) / 3);
     const concPerFile = capConcurrencyByMemory(5, 50 * MB, perFile);
     assert.equal(concPerFile, 1);
     assert.ok(concPerFile * 50 * MB * 3 <= 200 * MB, 'total across 3 files must not exceed 200 MiB');
@@ -40,7 +40,7 @@ describe('capConcurrencyByMemory', () => {
 
   test('2 concurrent files share the budget', () => {
     // 2 files, 200 MiB total → 100 MiB per file → floor(100/50) = 2 for 50 MiB parts
-    const perFile = Math.floor(200 * MB / 2);
+    const perFile = Math.floor((200 * MB) / 2);
     const concPerFile = capConcurrencyByMemory(5, 50 * MB, perFile);
     assert.equal(concPerFile, 2);
     assert.ok(concPerFile * 50 * MB * 2 <= 200 * MB, 'total across 2 files must not exceed 200 MiB');
@@ -116,32 +116,40 @@ describe('createProbeState', () => {
 describe('resolveProbe', () => {
   test('picks candidate when >10% faster', () => {
     const s = createProbeState(4, 8);
-    s.baselineBytes  = 15_000_000; s.baselineMs  = 1000; // 15 MB/s
-    s.candidateBytes = 15_000_000; s.candidateMs = 833;  // ~18 MB/s (+20%)
+    s.baselineBytes = 15_000_000;
+    s.baselineMs = 1000; // 15 MB/s
+    s.candidateBytes = 15_000_000;
+    s.candidateMs = 833; // ~18 MB/s (+20%)
     const r = resolveProbe(s);
     assert.equal(r.winner, 8);
   });
 
   test('picks baseline when candidate is within 10% threshold', () => {
     const s = createProbeState(4, 8);
-    s.baselineBytes  = 15_000_000; s.baselineMs  = 1000; // 15 MB/s
-    s.candidateBytes = 15_000_000; s.candidateMs = 926;  // ~16.2 MB/s (+8%)
+    s.baselineBytes = 15_000_000;
+    s.baselineMs = 1000; // 15 MB/s
+    s.candidateBytes = 15_000_000;
+    s.candidateMs = 926; // ~16.2 MB/s (+8%)
     const r = resolveProbe(s);
     assert.equal(r.winner, 4);
   });
 
   test('picks baseline when candidate is slower', () => {
     const s = createProbeState(4, 8);
-    s.baselineBytes  = 15_000_000; s.baselineMs  = 1000;
-    s.candidateBytes = 15_000_000; s.candidateMs = 1200; // slower
+    s.baselineBytes = 15_000_000;
+    s.baselineMs = 1000;
+    s.candidateBytes = 15_000_000;
+    s.candidateMs = 1200; // slower
     const r = resolveProbe(s);
     assert.equal(r.winner, 4);
   });
 
   test('includes baselineMbs and candidateMbs in result', () => {
     const s = createProbeState(4, 8);
-    s.baselineBytes  = 10_000_000; s.baselineMs  = 1000;
-    s.candidateBytes = 10_000_000; s.candidateMs = 800;
+    s.baselineBytes = 10_000_000;
+    s.baselineMs = 1000;
+    s.candidateBytes = 10_000_000;
+    s.candidateMs = 800;
     const r = resolveProbe(s);
     assert.ok(typeof r.baselineMbs === 'number');
     assert.ok(typeof r.candidateMbs === 'number');
@@ -150,8 +158,10 @@ describe('resolveProbe', () => {
 
   test('marks inconclusive and uses baseline when baselineMs is too short', () => {
     const s = createProbeState(4, 8);
-    s.baselineBytes  = 15_000_000; s.baselineMs  = 2;   // 2ms — impossible speed
-    s.candidateBytes = 15_000_000; s.candidateMs = 500;
+    s.baselineBytes = 15_000_000;
+    s.baselineMs = 2; // 2ms — impossible speed
+    s.candidateBytes = 15_000_000;
+    s.candidateMs = 500;
     const r = resolveProbe(s);
     assert.equal(r.winner, 4, 'must fall back to baseline on inconclusive probe');
     assert.equal(r.inconclusive, true);
@@ -161,8 +171,10 @@ describe('resolveProbe', () => {
 
   test('marks inconclusive when candidateMs is too short', () => {
     const s = createProbeState(4, 8);
-    s.baselineBytes  = 15_000_000; s.baselineMs  = 500;
-    s.candidateBytes = 15_000_000; s.candidateMs = 3;   // 3ms — impossible speed
+    s.baselineBytes = 15_000_000;
+    s.baselineMs = 500;
+    s.candidateBytes = 15_000_000;
+    s.candidateMs = 3; // 3ms — impossible speed
     const r = resolveProbe(s);
     assert.equal(r.winner, 4, 'must fall back to baseline on inconclusive probe');
     assert.equal(r.inconclusive, true);
@@ -170,8 +182,10 @@ describe('resolveProbe', () => {
 
   test('sets inconclusive=false on a valid measurement', () => {
     const s = createProbeState(4, 8);
-    s.baselineBytes  = 15_000_000; s.baselineMs  = 1000;
-    s.candidateBytes = 15_000_000; s.candidateMs = 800;
+    s.baselineBytes = 15_000_000;
+    s.baselineMs = 1000;
+    s.candidateBytes = 15_000_000;
+    s.candidateMs = 800;
     const r = resolveProbe(s);
     assert.equal(r.inconclusive, false);
   });

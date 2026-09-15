@@ -36,9 +36,11 @@ export async function computeFileHash(file) {
     if (file.size > CHUNK) {
       parts.push(file.slice(Math.max(file.size - CHUNK, CHUNK)));
     }
-    const buf  = await new Blob(parts).arrayBuffer();
+    const buf = await new Blob(parts).arrayBuffer();
     const hash = await crypto.subtle.digest('SHA-256', buf);
-    return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+    return Array.from(new Uint8Array(hash))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
   } catch {
     return null; // SubtleCrypto unavailable (e.g. Safari + file://)
   }
@@ -53,11 +55,7 @@ export function buildFileIdentity(file) {
 }
 
 export function fileIdentityMatches(identity, file) {
-  return (
-    identity.name         === file.name &&
-    identity.size         === file.size &&
-    identity.lastModified === file.lastModified
-  );
+  return identity.name === file.name && identity.size === file.size && identity.lastModified === file.lastModified;
 }
 
 // BUG-008: contentHash must be added to fileIdentity BEFORE saveResumeRecord is called.
@@ -65,7 +63,7 @@ export function fileIdentityMatches(identity, file) {
 // so a content-changed file would not be detected on resume.
 export async function buildFileIdentityWithHash(file) {
   const identity = buildFileIdentity(file);
-  const hash     = await computeFileHash(file);
+  const hash = await computeFileHash(file);
   if (hash) identity.contentHash = hash;
   return identity;
 }

@@ -55,7 +55,9 @@ function configValue(value) {
 }
 
 function normalizePrefix(prefix) {
-  return String(prefix ?? '').replace(/^\/+/, '').replace(/\/+$/, '');
+  return String(prefix ?? '')
+    .replace(/^\/+/, '')
+    .replace(/\/+$/, '');
 }
 
 export function buildRcloneConfig({ provider, endpoint, region, keyId, secretKey, remoteName, includeSecret = false }) {
@@ -87,18 +89,21 @@ export function buildRcloneCommand({ remoteName, bucket, prefix, destDir }) {
 export function buildAwsCliCommand({ endpoint, bucket, prefix, region, destDir }) {
   const p = normalizePrefix(prefix);
   const source = `s3://${bucket}${p ? `/${p}` : ''}`;
-  const parts = [
-    'aws s3 sync',
-    shellQuote(source),
-    shellQuote(destDir),
-    `--endpoint-url ${shellQuote(endpoint)}`,
-  ];
+  const parts = ['aws s3 sync', shellQuote(source), shellQuote(destDir), `--endpoint-url ${shellQuote(endpoint)}`];
   if (region) parts.push(`--region ${shellQuote(region)}`);
   return parts.join(' ');
 }
 
 export function buildTransferRecipe({
-  provider, endpoint, region, bucket, prefix, keyId, secretKey, includeSecret = false, destDir,
+  provider,
+  endpoint,
+  region,
+  bucket,
+  prefix,
+  keyId,
+  secretKey,
+  includeSecret = false,
+  destDir,
 }) {
   const remoteName = rcloneRemoteName(bucket);
   const dest = destDir || `./${bucket || 'download'}`;

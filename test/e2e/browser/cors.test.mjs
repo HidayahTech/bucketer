@@ -6,7 +6,16 @@
 import { describe, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { ListObjectsV2Command, HeadObjectCommand } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest } from '../harness.mjs';
+import {
+  startMock,
+  startAppServer,
+  connectApp,
+  BUCKET,
+  launchBrowser,
+  newE2EContext,
+  newE2EPage,
+  e2eTest,
+} from '../harness.mjs';
 
 let ctx, app, browser;
 before(async () => {
@@ -14,7 +23,11 @@ before(async () => {
   app = await startAppServer();
   browser = await launchBrowser();
 });
-after(async () => { await browser?.close(); await app?.close(); await ctx?.mock.close(); });
+after(async () => {
+  await browser?.close();
+  await app?.close();
+  await ctx?.mock.close();
+});
 
 async function freshPage() {
   const context = await newE2EContext(browser);
@@ -27,7 +40,9 @@ async function bucketKeys() {
   return (r.Contents || []).map((o) => o.Key).sort();
 }
 async function uploadOne(page, name, content = 'data') {
-  await page.locator('[data-testid="file-input"]').setInputFiles({ name, mimeType: 'text/plain', buffer: Buffer.from(content) });
+  await page
+    .locator('[data-testid="file-input"]')
+    .setInputFiles({ name, mimeType: 'text/plain', buffer: Buffer.from(content) });
   await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: 20000 });
   await page.locator(`[data-testid="file-row:${name}"]`).waitFor({ timeout: 10000 });
 }
@@ -51,9 +66,14 @@ describe('B1 — BUG-028: custom metadata visibility depends on CORS ExposeHeade
       assert.ok(head.Metadata['file-mtime'], 'file-mtime is stored on the object server-side');
       // …but the browser cannot read it: no File Modified row.
       await openProps(page, 'meta.txt');
-      assert.equal(await page.locator('[data-testid="meta-file-modified"]').count(), 0,
-        'with x-amz-meta-* missing from ExposeHeaders, custom metadata must be invisible (BUG-028)');
-    } finally { await context.close(); }
+      assert.equal(
+        await page.locator('[data-testid="meta-file-modified"]').count(),
+        0,
+        'with x-amz-meta-* missing from ExposeHeaders, custom metadata must be invisible (BUG-028)',
+      );
+    } finally {
+      await context.close();
+    }
   });
 
   e2eTest('POSITIVE — correct ExposeHeaders reveals File Modified', async () => {
@@ -64,9 +84,13 @@ describe('B1 — BUG-028: custom metadata visibility depends on CORS ExposeHeade
       await uploadOne(page, 'meta.txt');
       await openProps(page, 'meta.txt');
       await page.locator('[data-testid="meta-file-modified"]').waitFor({ timeout: 5000 });
-      assert.ok(await page.locator('[data-testid="meta-file-modified"]').count() >= 1,
-        'with the correct ExposeHeaders, File Modified must be visible');
-    } finally { await context.close(); }
+      assert.ok(
+        (await page.locator('[data-testid="meta-file-modified"]').count()) >= 1,
+        'with the correct ExposeHeaders, File Modified must be visible',
+      );
+    } finally {
+      await context.close();
+    }
   });
 });
 
@@ -84,7 +108,9 @@ describe('B2 — BUG-012: HTTP DELETE must be in CORS AllowedMethods', () => {
       await renameRow(page, 'orig.txt', 'renamed.txt');
       // The DELETE was blocked, so the original is still present (the operation did not complete).
       assert.ok((await bucketKeys()).includes('orig.txt'), 'source must remain when DELETE is not allowed (BUG-012)');
-    } finally { await context.close(); }
+    } finally {
+      await context.close();
+    }
 
     // Positive: a fresh run with DELETE allowed → rename completes, the source is gone.
     ctx.mock.reset();
@@ -96,7 +122,9 @@ describe('B2 — BUG-012: HTTP DELETE must be in CORS AllowedMethods', () => {
       await page.locator('[data-testid="file-row:renamed.txt"]').waitFor({ timeout: 10000 });
       const keys = await bucketKeys();
       assert.ok(!keys.includes('orig.txt') && keys.includes('renamed.txt'), 'with DELETE allowed the rename completes');
-    } finally { await context.close(); }
+    } finally {
+      await context.close();
+    }
   });
 });
 
@@ -109,8 +137,12 @@ async function renameRow(page, name, newName) {
   // input actually opens.
   for (let attempt = 0; ; attempt++) {
     await row.locator('button[title="Rename"]').click();
-    try { await input.waitFor({ timeout: 2500 }); break; }
-    catch (err) { if (attempt >= 2) throw err; }
+    try {
+      await input.waitFor({ timeout: 2500 });
+      break;
+    } catch (err) {
+      if (attempt >= 2) throw err;
+    }
   }
   await input.fill(newName);
   await input.press('Enter');

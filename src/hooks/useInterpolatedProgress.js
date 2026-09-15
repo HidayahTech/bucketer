@@ -38,16 +38,18 @@ export function interpolateBytes(prev, speed, dt, floor, max, visibilityHidden) 
 // fileSize:      upper ceiling for the display value
 export function useInterpolatedProgress({ isActive, confirmedBytes, speed, fileSize }) {
   const [displayedBytes, setDisplayedBytes] = useState(confirmedBytes);
-  const animRef  = useRef(null);
+  const animRef = useRef(null);
   const speedRef = useRef(speed);
   const floorRef = useRef(confirmedBytes);
 
   // Keep refs in sync with props so the rAF closure reads fresh values.
-  useEffect(() => { speedRef.current = speed; }, [speed]);
+  useEffect(() => {
+    speedRef.current = speed;
+  }, [speed]);
 
   useEffect(() => {
     floorRef.current = confirmedBytes;
-    setDisplayedBytes(prev => Math.max(prev, confirmedBytes));
+    setDisplayedBytes((prev) => Math.max(prev, confirmedBytes));
   }, [confirmedBytes]);
 
   useEffect(() => {
@@ -66,9 +68,7 @@ export function useInterpolatedProgress({ isActive, confirmedBytes, speed, fileS
       }
       const dt = (now - last) / 1000;
       last = now;
-      setDisplayedBytes(prev =>
-        interpolateBytes(prev, speedRef.current, dt, floorRef.current, fileSize, false),
-      );
+      setDisplayedBytes((prev) => interpolateBytes(prev, speedRef.current, dt, floorRef.current, fileSize, false));
       animRef.current = requestAnimationFrame(tick);
     }
     animRef.current = requestAnimationFrame(tick);

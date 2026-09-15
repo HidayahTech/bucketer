@@ -40,20 +40,29 @@ function defaultProps(overrides = {}) {
 describe('CredentialForm — field rendering', () => {
   test('renders the Endpoint URL input', () => {
     const { query, cleanup } = mount(h(CredentialForm, defaultProps()));
-    try { assert.ok(query('#cred-endpoint'), 'endpoint input must be present'); }
-    finally { cleanup(); }
+    try {
+      assert.ok(query('#cred-endpoint'), 'endpoint input must be present');
+    } finally {
+      cleanup();
+    }
   });
 
   test('renders the Bucket Name input', () => {
     const { query, cleanup } = mount(h(CredentialForm, defaultProps()));
-    try { assert.ok(query('#cred-bucket'), 'bucket input must be present'); }
-    finally { cleanup(); }
+    try {
+      assert.ok(query('#cred-bucket'), 'bucket input must be present');
+    } finally {
+      cleanup();
+    }
   });
 
   test('renders the Key ID input', () => {
     const { query, cleanup } = mount(h(CredentialForm, defaultProps()));
-    try { assert.ok(query('#cred-keyid'), 'key ID input must be present'); }
-    finally { cleanup(); }
+    try {
+      assert.ok(query('#cred-keyid'), 'key ID input must be present');
+    } finally {
+      cleanup();
+    }
   });
 
   test('renders the Secret Key input as type="password"', () => {
@@ -62,19 +71,27 @@ describe('CredentialForm — field rendering', () => {
       const input = query('#cred-secretkey');
       assert.ok(input, 'secret key input must be present');
       assert.equal(input.type, 'password', 'secret key must be a password field');
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 
   test('renders the Provider Override select', () => {
     const { query, cleanup } = mount(h(CredentialForm, defaultProps()));
-    try { assert.ok(query('#cred-provider'), 'provider override select must be present'); }
-    finally { cleanup(); }
+    try {
+      assert.ok(query('#cred-provider'), 'provider override select must be present');
+    } finally {
+      cleanup();
+    }
   });
 
   test('renders the Region input', () => {
     const { query, cleanup } = mount(h(CredentialForm, defaultProps()));
-    try { assert.ok(query('#cred-region'), 'region input must be present'); }
-    finally { cleanup(); }
+    try {
+      assert.ok(query('#cred-region'), 'region input must be present');
+    } finally {
+      cleanup();
+    }
   });
 
   test('renders the Connect submit button', () => {
@@ -83,13 +100,18 @@ describe('CredentialForm — field rendering', () => {
       const btn = query('button[type="submit"]');
       assert.ok(btn, 'submit button must be present');
       assert.ok(btn.textContent.includes('Connect'));
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 
   test('shows the sessionStorage security hint for the secret key field', () => {
     const { text, cleanup } = mount(h(CredentialForm, defaultProps()));
-    try { assert.ok(text().includes('sessionStorage')); }
-    finally { cleanup(); }
+    try {
+      assert.ok(text().includes('sessionStorage'));
+    } finally {
+      cleanup();
+    }
   });
 
   test('required attribute is present on endpoint, bucket, keyId, and secretKey fields', () => {
@@ -101,21 +123,29 @@ describe('CredentialForm — field rendering', () => {
       assert.ok(query('#cred-bucket').required, 'bucket must be required');
       assert.ok(query('#cred-keyid').required, 'keyId must be required');
       assert.ok(query('#cred-secretkey').required, 'secretKey must be required');
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 });
 
 describe('CredentialForm — loading state', () => {
   test('shows "Connecting…" text when loading=true', () => {
     const { query, cleanup } = mount(h(CredentialForm, defaultProps({ loading: true })));
-    try { assert.ok(query('button[type="submit"]').textContent.includes('Connecting')); }
-    finally { cleanup(); }
+    try {
+      assert.ok(query('button[type="submit"]').textContent.includes('Connecting'));
+    } finally {
+      cleanup();
+    }
   });
 
   test('Connect button is disabled when loading=true', () => {
     const { query, cleanup } = mount(h(CredentialForm, defaultProps({ loading: true })));
-    try { assert.ok(query('button[type="submit"]').disabled, 'submit must be disabled while loading'); }
-    finally { cleanup(); }
+    try {
+      assert.ok(query('button[type="submit"]').disabled, 'submit must be disabled while loading');
+    } finally {
+      cleanup();
+    }
   });
 
   test('shows "Connect" (not "Connecting…") when loading=false', () => {
@@ -124,7 +154,9 @@ describe('CredentialForm — loading state', () => {
       const text = query('button[type="submit"]').textContent;
       assert.ok(text.includes('Connect'));
       assert.ok(!text.includes('Connecting'));
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 });
 
@@ -133,43 +165,77 @@ describe('CredentialForm — validation', () => {
     // credentialErrors() only flags non-empty malformed values. Empty fields rely on
     // browser-native required attribute validation (not tested in jsdom).
     const { query, cleanup } = mount(h(CredentialForm, defaultProps({ initial: EMPTY_INITIAL })));
-    try { assert.ok(!query('button[type="submit"]').disabled, 'submit is enabled for an empty form — JS validation only fires for malformed, non-empty values'); }
-    finally { cleanup(); }
+    try {
+      assert.ok(
+        !query('button[type="submit"]').disabled,
+        'submit is enabled for an empty form — JS validation only fires for malformed, non-empty values',
+      );
+    } finally {
+      cleanup();
+    }
   });
 
   test('Connect button is enabled when all required fields are validly filled', () => {
     const { query, cleanup } = mount(h(CredentialForm, defaultProps({ initial: B2_INITIAL })));
-    try { assert.ok(!query('button[type="submit"]').disabled, 'submit must be enabled when all required fields are filled'); }
-    finally { cleanup(); }
+    try {
+      assert.ok(!query('button[type="submit"]').disabled, 'submit must be enabled when all required fields are filled');
+    } finally {
+      cleanup();
+    }
   });
 
   test('shows a bucket field error when bucket contains spaces', () => {
-    const { query, cleanup } = mount(h(CredentialForm, defaultProps({
-      initial: { ...B2_INITIAL, bucket: INVALID_BUCKET },
-    })));
+    const { query, cleanup } = mount(
+      h(
+        CredentialForm,
+        defaultProps({
+          initial: { ...B2_INITIAL, bucket: INVALID_BUCKET },
+        }),
+      ),
+    );
     try {
       const bucketError = query('.field-error');
       assert.ok(bucketError, 'a .field-error element must appear for a bucket with spaces');
-      assert.ok(bucketError.textContent.toLowerCase().includes('space') || bucketError.textContent.toLowerCase().includes('bucket'));
-    } finally { cleanup(); }
+      assert.ok(
+        bucketError.textContent.toLowerCase().includes('space') ||
+          bucketError.textContent.toLowerCase().includes('bucket'),
+      );
+    } finally {
+      cleanup();
+    }
   });
 
   test('Connect button is disabled when bucket contains a space', () => {
-    const { query, cleanup } = mount(h(CredentialForm, defaultProps({
-      initial: { ...B2_INITIAL, bucket: INVALID_BUCKET },
-    })));
-    try { assert.ok(query('button[type="submit"]').disabled, 'submit must be disabled when bucket has spaces'); }
-    finally { cleanup(); }
+    const { query, cleanup } = mount(
+      h(
+        CredentialForm,
+        defaultProps({
+          initial: { ...B2_INITIAL, bucket: INVALID_BUCKET },
+        }),
+      ),
+    );
+    try {
+      assert.ok(query('button[type="submit"]').disabled, 'submit must be disabled when bucket has spaces');
+    } finally {
+      cleanup();
+    }
   });
 
   test('shows a keyId error when keyId contains spaces', () => {
-    const { query, cleanup } = mount(h(CredentialForm, defaultProps({
-      initial: { ...B2_INITIAL, keyId: 'AK ID 123' },
-    })));
+    const { query, cleanup } = mount(
+      h(
+        CredentialForm,
+        defaultProps({
+          initial: { ...B2_INITIAL, keyId: 'AK ID 123' },
+        }),
+      ),
+    );
     try {
       const err = query('.field-error');
       assert.ok(err, 'a field-error must appear for a keyId with spaces');
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 });
 
@@ -179,9 +245,11 @@ describe('CredentialForm — provider auto-detection', () => {
     try {
       assert.ok(
         text().includes('Detected') && (text().includes('Backblaze') || text().includes('B2')),
-        'provider detection hint must appear for a known B2 endpoint'
+        'provider detection hint must appear for a known B2 endpoint',
       );
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 
   test('typing a B2 endpoint shows the B2 detection hint', () => {
@@ -192,9 +260,11 @@ describe('CredentialForm — provider auto-detection', () => {
       setInput(endpointInput, 'https://s3.us-west-002.backblazeb2.com');
       assert.ok(
         text().includes('Detected') || text().includes('Backblaze') || text().includes('B2'),
-        'provider detection hint must appear after typing a B2 endpoint'
+        'provider detection hint must appear after typing a B2 endpoint',
       );
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 
   test('shows the B2 master-key warning when B2 is the detected provider', () => {
@@ -202,87 +272,139 @@ describe('CredentialForm — provider auto-detection', () => {
     try {
       assert.ok(
         text().includes('B2') && text().toLowerCase().includes('master'),
-        'B2 master key warning must appear when B2 is detected'
+        'B2 master key warning must appear when B2 is detected',
       );
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 
   test('auto-fills the region when a B2 endpoint with an embedded region is entered', () => {
-    const { query, cleanup } = mount(h(CredentialForm, defaultProps({
-      initial: { ...EMPTY_INITIAL, endpoint: 'https://s3.us-west-002.backblazeb2.com' },
-    })));
+    const { query, cleanup } = mount(
+      h(
+        CredentialForm,
+        defaultProps({
+          initial: { ...EMPTY_INITIAL, endpoint: 'https://s3.us-west-002.backblazeb2.com' },
+        }),
+      ),
+    );
     try {
       const regionInput = query('#cred-region');
       assert.ok(regionInput, '#cred-region input must be present');
       assert.ok(
         regionInput.value.includes('us-west-002'),
-        'region must be auto-filled from a B2 endpoint that embeds the region'
+        'region must be auto-filled from a B2 endpoint that embeds the region',
       );
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 
   test('shows "Auto-filled from endpoint URL" hint when region is inferred', () => {
-    const { text, cleanup } = mount(h(CredentialForm, defaultProps({
-      initial: { ...EMPTY_INITIAL, endpoint: 'https://s3.us-east-1.wasabisys.com' },
-    })));
+    const { text, cleanup } = mount(
+      h(
+        CredentialForm,
+        defaultProps({
+          initial: { ...EMPTY_INITIAL, endpoint: 'https://s3.us-east-1.wasabisys.com' },
+        }),
+      ),
+    );
     try {
       assert.ok(
         text().includes('Auto-filled from endpoint'),
-        '"Auto-filled from endpoint URL" hint must appear when region is inferred from the endpoint'
+        '"Auto-filled from endpoint URL" hint must appear when region is inferred from the endpoint',
       );
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 });
 
 describe('CredentialForm — form submission', () => {
   test('calls onSave when submitted with a valid form', () => {
     let saved = null;
-    const { query, cleanup } = mount(h(CredentialForm, defaultProps({
-      initial: B2_INITIAL,
-      onSave: data => { saved = data; },
-    })));
+    const { query, cleanup } = mount(
+      h(
+        CredentialForm,
+        defaultProps({
+          initial: B2_INITIAL,
+          onSave: (data) => {
+            saved = data;
+          },
+        }),
+      ),
+    );
     try {
       fire(query('button[type="submit"]'), 'click');
       assert.ok(saved, 'onSave must be called on submit');
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 
   test('calls onSave with trimmed endpoint (no trailing slash)', () => {
     let saved = null;
-    const { query, cleanup } = mount(h(CredentialForm, defaultProps({
-      initial: { ...B2_INITIAL, endpoint: 'https://s3.us-west-002.backblazeb2.com/' },
-      onSave: data => { saved = data; },
-    })));
+    const { query, cleanup } = mount(
+      h(
+        CredentialForm,
+        defaultProps({
+          initial: { ...B2_INITIAL, endpoint: 'https://s3.us-west-002.backblazeb2.com/' },
+          onSave: (data) => {
+            saved = data;
+          },
+        }),
+      ),
+    );
     try {
       fire(query('button[type="submit"]'), 'click');
       assert.ok(saved, 'onSave must be called');
       assert.ok(!saved.endpoint.endsWith('/'), 'trailing slash must be stripped from the endpoint');
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 
   test('calls onSave with the correct bucket and keyId', () => {
     let saved = null;
-    const { query, cleanup } = mount(h(CredentialForm, defaultProps({
-      initial: B2_INITIAL,
-      onSave: data => { saved = data; },
-    })));
+    const { query, cleanup } = mount(
+      h(
+        CredentialForm,
+        defaultProps({
+          initial: B2_INITIAL,
+          onSave: (data) => {
+            saved = data;
+          },
+        }),
+      ),
+    );
     try {
       fire(query('button[type="submit"]'), 'click');
       assert.equal(saved.bucket, 'my-bucket');
       assert.equal(saved.keyId, 'keyabc');
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 
   test('does NOT call onSave when the form has JS validation errors (spaces in bucket)', () => {
     let saveCalled = false;
-    const { query, cleanup } = mount(h(CredentialForm, defaultProps({
-      initial: { ...B2_INITIAL, bucket: INVALID_BUCKET },
-      onSave: () => { saveCalled = true; },
-    })));
+    const { query, cleanup } = mount(
+      h(
+        CredentialForm,
+        defaultProps({
+          initial: { ...B2_INITIAL, bucket: INVALID_BUCKET },
+          onSave: () => {
+            saveCalled = true;
+          },
+        }),
+      ),
+    );
     try {
       fire(query('button[type="submit"]'), 'click');
       assert.ok(!saveCalled, 'onSave must not be called when the form has JS validation errors');
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 });
 
@@ -294,74 +416,120 @@ describe('CredentialForm — base folder field (#60)', () => {
       assert.ok(input, 'base folder input must be present');
       assert.ok(!input.required, 'base folder must not be required');
       assert.equal(input.placeholder, 'photos/2024/');
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 
   test('shows the leave-blank hint', () => {
     const { text, cleanup } = mount(h(CredentialForm, defaultProps()));
-    try { assert.ok(text().includes('leave blank for full bucket access')); }
-    finally { cleanup(); }
+    try {
+      assert.ok(text().includes('leave blank for full bucket access'));
+    } finally {
+      cleanup();
+    }
   });
 
   test('shows a field error and blocks submit when the value contains ".."', () => {
     let saveCalled = false;
-    const { query, cleanup } = mount(h(CredentialForm, defaultProps({
-      initial: { ...B2_INITIAL, basePrefix: 'team/../other/' },
-      onSave: () => { saveCalled = true; },
-    })));
+    const { query, cleanup } = mount(
+      h(
+        CredentialForm,
+        defaultProps({
+          initial: { ...B2_INITIAL, basePrefix: 'team/../other/' },
+          onSave: () => {
+            saveCalled = true;
+          },
+        }),
+      ),
+    );
     try {
       assert.ok(query('.field-error'), 'a field error must render for a ".." base folder');
       fire(query('button[type="submit"]'), 'click');
       assert.ok(!saveCalled, 'onSave must not fire while base folder is invalid');
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 
   test('submit passes the normalized base folder (trailing slash appended)', () => {
     let saved = null;
-    const { query, cleanup } = mount(h(CredentialForm, defaultProps({
-      initial: { ...B2_INITIAL, basePrefix: 'team/alice' },
-      onSave: data => { saved = data; },
-    })));
+    const { query, cleanup } = mount(
+      h(
+        CredentialForm,
+        defaultProps({
+          initial: { ...B2_INITIAL, basePrefix: 'team/alice' },
+          onSave: (data) => {
+            saved = data;
+          },
+        }),
+      ),
+    );
     try {
       fire(query('button[type="submit"]'), 'click');
       assert.equal(saved.basePrefix, 'team/alice/');
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 
   test('submit passes empty basePrefix for an unscoped connection', () => {
     let saved = null;
-    const { query, cleanup } = mount(h(CredentialForm, defaultProps({
-      initial: B2_INITIAL,
-      onSave: data => { saved = data; },
-    })));
+    const { query, cleanup } = mount(
+      h(
+        CredentialForm,
+        defaultProps({
+          initial: B2_INITIAL,
+          onSave: (data) => {
+            saved = data;
+          },
+        }),
+      ),
+    );
     try {
       fire(query('button[type="submit"]'), 'click');
       assert.equal(saved.basePrefix, '');
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 
   test('the key-hygiene warning points Name-Prefix keys at the Base folder field', () => {
     const { text, cleanup } = mount(h(CredentialForm, defaultProps({ initial: B2_INITIAL })));
-    try { assert.ok(text().includes('Name Prefix'), 'warning line must bridge B2 Name Prefix vocabulary'); }
-    finally { cleanup(); }
+    try {
+      assert.ok(text().includes('Name Prefix'), 'warning line must bridge B2 Name Prefix vocabulary');
+    } finally {
+      cleanup();
+    }
   });
 });
 
 describe('CredentialForm — autofocus secret', () => {
   test('focuses the Secret Key field on mount when autoFocusSecret is set', async () => {
-    const initial = { endpoint: 'https://s3.example.com', bucket: 'b', keyId: 'AKID', secretKey: '', provider: null, regionOverride: '' };
+    const initial = {
+      endpoint: 'https://s3.example.com',
+      bucket: 'b',
+      keyId: 'AKID',
+      secretKey: '',
+      provider: null,
+      regionOverride: '',
+    };
     const { query, cleanup } = mount(h(CredentialForm, defaultProps({ initial, autoFocusSecret: true })));
     try {
-      await new Promise(r => setTimeout(r, 0));
+      await new Promise((r) => setTimeout(r, 0));
       assert.equal(document.activeElement, query('#cred-secretkey'), 'secret field must be focused');
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 
   test('does NOT focus the Secret Key field when autoFocusSecret is falsy', async () => {
     const { query, cleanup } = mount(h(CredentialForm, defaultProps()));
     try {
-      await new Promise(r => setTimeout(r, 0));
+      await new Promise((r) => setTimeout(r, 0));
       assert.notEqual(document.activeElement, query('#cred-secretkey'), 'secret field must not be auto-focused');
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 });

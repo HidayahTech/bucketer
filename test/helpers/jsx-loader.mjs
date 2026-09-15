@@ -25,7 +25,7 @@ export async function load(url, context, nextLoad) {
   if (!url.endsWith('.jsx')) return nextLoad(url, context);
 
   const filePath = fileURLToPath(url);
-  const source   = await readFile(filePath, 'utf8');
+  const source = await readFile(filePath, 'utf8');
 
   const { code } = await transform(source, {
     jsx: 'automatic',

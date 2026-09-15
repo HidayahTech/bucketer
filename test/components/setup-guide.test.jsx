@@ -2,7 +2,7 @@
 // Verifies that every provider guide renders without throwing and contains
 // the expected key content — this was previously untestable without a DOM.
 // Requires the JSX loader: run via `npm run test:ui`, not `npm test`.
-import '../helpers/with-dom.js';       // must be first — installs DOM globals
+import '../helpers/with-dom.js'; // must be first — installs DOM globals
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { h } from 'preact';
@@ -44,8 +44,10 @@ describe('SetupGuide — B2', () => {
 
   test('includes native CORS removal step (B2-specific)', () => {
     const { text, cleanup } = mount(h(SetupGuide, props));
-    assert.ok(text().includes('native CORS') || text().includes('ClearNativeCors') || text().includes('b2 bucket update'),
-      'B2 guide must include the native CORS removal step');
+    assert.ok(
+      text().includes('native CORS') || text().includes('ClearNativeCors') || text().includes('b2 bucket update'),
+      'B2 guide must include the native CORS removal step',
+    );
     cleanup();
   });
 
@@ -72,12 +74,15 @@ describe('SetupGuide — B2', () => {
   // expose the app's meta headers explicitly instead of x-amz-meta-*.
   test('CORS command has no ExposeHeaders wildcard (BUG-043)', () => {
     const { text, cleanup } = mount(h(SetupGuide, props));
-    assert.ok(!text().includes('x-amz-meta-*'),
-      'B2 guide must not emit x-amz-meta-* — B2 rejects wildcards in ExposeHeaders');
-    assert.ok(text().includes('x-amz-meta-bucketer-content-hash'),
-      'B2 guide must expose the content-hash meta header explicitly');
-    assert.ok(text().includes('x-amz-meta-file-mtime'),
-      'B2 guide must expose the file-mtime meta header explicitly');
+    assert.ok(
+      !text().includes('x-amz-meta-*'),
+      'B2 guide must not emit x-amz-meta-* — B2 rejects wildcards in ExposeHeaders',
+    );
+    assert.ok(
+      text().includes('x-amz-meta-bucketer-content-hash'),
+      'B2 guide must expose the content-hash meta header explicitly',
+    );
+    assert.ok(text().includes('x-amz-meta-file-mtime'), 'B2 guide must expose the file-mtime meta header explicitly');
     cleanup();
   });
 });
@@ -121,8 +126,10 @@ describe('SetupGuide — Wasabi', () => {
 
   test('does not include a put-bucket-cors command (Wasabi auto-configures CORS)', () => {
     const { text, cleanup } = mount(h(SetupGuide, props));
-    assert.ok(!text().includes('put-bucket-cors'),
-      'Wasabi guide must not show the CORS command — Wasabi auto-configures permissive headers');
+    assert.ok(
+      !text().includes('put-bucket-cors'),
+      'Wasabi guide must not show the CORS command — Wasabi auto-configures permissive headers',
+    );
     cleanup();
   });
 });

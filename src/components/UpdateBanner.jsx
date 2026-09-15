@@ -13,16 +13,14 @@
 // RANGE_BYTES must match UPDATE_CHECK_RANGE_BYTES in build.mjs.
 import { useState, useEffect } from 'preact/hooks';
 
-const BASE_MS     = 60_000;
-const MAX_MS      = 1_800_000;
+const BASE_MS = 60_000;
+const MAX_MS = 1_800_000;
 const FAST_CHECKS = 10;
-const JITTER      = 0.25;
+const JITTER = 0.25;
 const RANGE_BYTES = 512; // must match UPDATE_CHECK_RANGE_BYTES in build.mjs
 
 function nextDelay(attempt) {
-  const base = attempt < FAST_CHECKS
-    ? BASE_MS
-    : Math.min(BASE_MS * 2 ** (attempt - FAST_CHECKS + 1), MAX_MS);
+  const base = attempt < FAST_CHECKS ? BASE_MS : Math.min(BASE_MS * 2 ** (attempt - FAST_CHECKS + 1), MAX_MS);
   return Math.round(base + base * JITTER * (Math.random() * 2 - 1));
 }
 
@@ -41,7 +39,9 @@ async function tryHead(url) {
   try {
     const res = await fetch(url, { method: 'HEAD', cache: 'no-store' });
     return res.ok ? headKey(res.headers) : null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 async function fetchRangeMetadata(url) {
@@ -56,7 +56,9 @@ async function fetchRangeMetadata(url) {
     if (!buildIdMatch) return null;
     const versionMatch = text.match(/name="app-version"\s+content="([^"]+)"/);
     return { buildId: buildIdMatch[1], appVersion: versionMatch ? versionMatch[1] : null };
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 export function UpdateBanner({ enabled = true }) {
@@ -125,7 +127,9 @@ export function UpdateBanner({ enabled = true }) {
           Refresh to update
         </button>
       </div>
-      <button class="banner-close" onClick={() => setDismissed(true)} aria-label="Dismiss">✕</button>
+      <button class="banner-close" onClick={() => setDismissed(true)} aria-label="Dismiss">
+        ✕
+      </button>
     </div>
   );
 }

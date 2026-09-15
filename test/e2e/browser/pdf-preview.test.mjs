@@ -6,16 +6,26 @@
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest, e2eEngineName } from '../harness.mjs';
+import {
+  startMock,
+  startAppServer,
+  connectApp,
+  BUCKET,
+  launchBrowser,
+  newE2EContext,
+  newE2EPage,
+  e2eTest,
+  e2eEngineName,
+} from '../harness.mjs';
 
 // A minimal but valid single-page PDF. pdf.js reconstructs the xref if needed and renders
 // a blank page — enough for the viewer (canvas/page) to appear when scripts are allowed.
 const MINIMAL_PDF = Buffer.from(
   '%PDF-1.4\n' +
-  '1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n' +
-  '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n' +
-  '3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 300]>>endobj\n' +
-  'trailer<</Root 1 0 R>>\n%%EOF\n',
+    '1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n' +
+    '2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n' +
+    '3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 300]>>endobj\n' +
+    'trailer<</Root 1 0 R>>\n%%EOF\n',
   'latin1',
 );
 
@@ -27,13 +37,22 @@ before(async () => {
   context = await newE2EContext(browser);
   page = await newE2EPage(context);
 });
-after(async () => { await browser?.close(); await app?.close(); await ctx?.mock.close(); });
+after(async () => {
+  await browser?.close();
+  await app?.close();
+  await ctx?.mock.close();
+});
 
 describe(`browser e2e — PDF preview renders (BUG #46) [${e2eEngineName()}]`, () => {
   e2eTest('opening a PDF renders the viewer inside the sandboxed iframe', async () => {
-    await ctx.client.send(new PutObjectCommand({
-      Bucket: BUCKET, Key: 'doc.pdf', Body: MINIMAL_PDF, ContentType: 'application/pdf',
-    }));
+    await ctx.client.send(
+      new PutObjectCommand({
+        Bucket: BUCKET,
+        Key: 'doc.pdf',
+        Body: MINIMAL_PDF,
+        ContentType: 'application/pdf',
+      }),
+    );
 
     await page.goto(app.url, { waitUntil: 'domcontentloaded' });
     await connectApp(page, ctx.browserEndpoint);
@@ -53,8 +72,10 @@ describe(`browser e2e — PDF preview renders (BUG #46) [${e2eEngineName()}]`, (
     );
     // The iframe is wired to a presigned GET for the object (the real end-to-end path).
     const src = await iframe.getAttribute('src');
-    assert.ok(src && src.includes('doc.pdf') && src.includes('X-Amz-Signature'),
-      `PDF iframe src must be a presigned URL for the object; got ${src}`);
+    assert.ok(
+      src && src.includes('doc.pdf') && src.includes('X-Amz-Signature'),
+      `PDF iframe src must be a presigned URL for the object; got ${src}`,
+    );
 
     // NOTE: we deliberately do NOT assert pixel-level rendering. Playwright's bundled
     // browsers do not render embedded PDFs into an introspectable viewer frame (verified:

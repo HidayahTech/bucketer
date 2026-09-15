@@ -50,11 +50,11 @@ export function useWindowDragDrop({ enabled, addFilesRef }) {
 
     document.addEventListener('dragenter', onDragEnter);
     document.addEventListener('dragleave', onDragLeave);
-    document.addEventListener('dragover',  onDragOver);
+    document.addEventListener('dragover', onDragOver);
     return () => {
       document.removeEventListener('dragenter', onDragEnter);
       document.removeEventListener('dragleave', onDragLeave);
-      document.removeEventListener('dragover',  onDragOver);
+      document.removeEventListener('dragover', onDragOver);
       counterRef.current = 0;
       setWindowDragOver(false);
     };
@@ -65,9 +65,11 @@ export function useWindowDragDrop({ enabled, addFilesRef }) {
     e.stopPropagation();
     counterRef.current = 0;
     setWindowDragOver(false);
-    resolveDroppedFiles(e.dataTransfer).then(fileEntries => {
-      if (fileEntries.length) addFilesRef.current?.(fileEntries);
-    }).catch(() => {});
+    resolveDroppedFiles(e.dataTransfer)
+      .then((fileEntries) => {
+        if (fileEntries.length) addFilesRef.current?.(fileEntries);
+      })
+      .catch(() => {});
   }
 
   return { windowDragOver, handleWindowDrop };

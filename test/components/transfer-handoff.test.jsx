@@ -79,7 +79,15 @@ describe('TransferHandoff', () => {
 
   test('closes via the close button', () => {
     let closed = false;
-    const m = mount(<TransferHandoff credentials={CREDS} currentPrefix="" onClose={() => { closed = true; }} />);
+    const m = mount(
+      <TransferHandoff
+        credentials={CREDS}
+        currentPrefix=""
+        onClose={() => {
+          closed = true;
+        }}
+      />,
+    );
     fire(m.query('[data-testid="handoff-close"]'), 'click');
     assert.equal(closed, true);
     m.cleanup();

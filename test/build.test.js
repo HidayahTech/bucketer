@@ -20,15 +20,15 @@ import { resolve, dirname } from 'node:path';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const html = readFileSync(resolve(ROOT, 'dist/index.html'), 'utf8');
-const pkg  = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
+const pkg = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8'));
 
 // Split into HTML frame (before the injected bundle) and JS bundle content.
 // The injection point is the single <style>CSS</style><script>JS</script> block.
-const styleOpen  = html.indexOf('<style>');
+const styleOpen = html.indexOf('<style>');
 const scriptOpen = html.indexOf('<script>') + '<script>'.length;
 const scriptClose = html.lastIndexOf('</script>');
-const htmlFrame  = html.slice(0, styleOpen);   // everything before the CSS injection
-const jsBundle   = html.slice(scriptOpen, scriptClose);
+const htmlFrame = html.slice(0, styleOpen); // everything before the CSS injection
+const jsBundle = html.slice(scriptOpen, scriptClose);
 
 describe('Build output — BUG-001 (placeholder replacement)', () => {
   // BUG-001: String.prototype.replace() corrupted the bundle when the replacement
@@ -98,7 +98,7 @@ describe('Build output — single self-contained bundle', () => {
 
   test('HTML frame before the bundle has no extra script or style tags', () => {
     assert.ok(!htmlFrame.includes('<script'), 'no <script> tags before the bundle injection point');
-    assert.ok(!htmlFrame.includes('<style'),  'no <style> tags before the bundle injection point');
+    assert.ok(!htmlFrame.includes('<style'), 'no <style> tags before the bundle injection point');
   });
 
   test('file ends with the expected closing sequence', () => {
@@ -123,7 +123,7 @@ describe('Build output — no source maps in production bundle (T5-1)', () => {
     assert.ok(
       !jsBundle.includes('sourceMappingURL'),
       'production JS bundle must not contain //# sourceMappingURL — ' +
-      'source maps expose unminified source to any visitor who fetches the app'
+        'source maps expose unminified source to any visitor who fetches the app',
     );
   });
 });
@@ -140,8 +140,8 @@ describe('Build output — bundle size tripwire (T5-2)', () => {
     assert.ok(
       size <= SIZE_LIMIT_BYTES,
       `dist/index.html is ${(size / 1024).toFixed(1)} KB — exceeds the ` +
-      `${SIZE_LIMIT_BYTES / 1024} KB tripwire (T5-2); likely an accidental large ` +
-      `dependency or asset`
+        `${SIZE_LIMIT_BYTES / 1024} KB tripwire (T5-2); likely an accidental large ` +
+        `dependency or asset`,
     );
   });
 });
@@ -153,8 +153,10 @@ describe('Build output — integrity manifest', () => {
   const manifestPath = resolve(ROOT, 'dist/integrity.json');
 
   test('integrity.json exists alongside dist/index.html', () => {
-    assert.doesNotThrow(() => readFileSync(manifestPath, 'utf8'),
-      'dist/integrity.json must be emitted by production build');
+    assert.doesNotThrow(
+      () => readFileSync(manifestPath, 'utf8'),
+      'dist/integrity.json must be emitted by production build',
+    );
   });
 
   test('manifest.version matches package.json', () => {
@@ -184,8 +186,8 @@ describe('Build output — meta Content-Security-Policy for static hosting (T5-4
     assert.ok(
       html.includes('http-equiv="Content-Security-Policy"'),
       'dist/index.html must include a <meta http-equiv="Content-Security-Policy"> tag — ' +
-      'S3/R2/B2 static hosting cannot set response headers; the meta CSP provides ' +
-      'a baseline XSS defence for file-hosted deployments (T5-4)'
+        'S3/R2/B2 static hosting cannot set response headers; the meta CSP provides ' +
+        'a baseline XSS defence for file-hosted deployments (T5-4)',
     );
   });
 });
@@ -201,7 +203,7 @@ describe('Build output — Referrer-Policy for privacy (#12)', () => {
     assert.ok(
       match,
       'dist/index.html must include a <meta name="referrer"> tag — without it, ' +
-      'presigned URLs and bucket/prefix names can leak via the Referer header (#12)'
+        'presigned URLs and bucket/prefix names can leak via the Referer header (#12)',
     );
     assert.equal(match[1], 'no-referrer', 'referrer policy must be "no-referrer"');
   });
@@ -242,8 +244,9 @@ describe('Build output — assembler worker inlined as Blob URL (Task 7)', () =>
     // replacement patterns instead of literal text.
     const viaStringReplacer = template.replace("'__WORKER_SRC__'", JSON.stringify(dangerous));
     assert.notEqual(
-      viaStringReplacer, viaFunctionReplacer,
-      'a plain string replacer corrupts $-sequences, unlike the function replacer build.mjs actually uses'
+      viaStringReplacer,
+      viaFunctionReplacer,
+      'a plain string replacer corrupts $-sequences, unlike the function replacer build.mjs actually uses',
     );
   });
 
@@ -260,18 +263,15 @@ describe('Build output — changelog wrapped bullets (#50)', () => {
   // the FULL text of a known multi-line bullet.
   test('v1.38.1 entry retains its continuation lines in generated changelog.js', async () => {
     const { CHANGELOG } = await import('../src/lib/changelog.js');
-    const entry = CHANGELOG.find(e => e.version === '1.38.1');
+    const entry = CHANGELOG.find((e) => e.version === '1.38.1');
     assert.ok(entry, 'v1.38.1 entry must exist');
-    const flat = entry.changes.map(c => typeof c === 'string' ? c : [c.group, ...c.items].join(' ')).join(' ');
+    const flat = entry.changes.map((c) => (typeof c === 'string' ? c : [c.group, ...c.items].join(' '))).join(' ');
     assert.ok(
       flat.includes('x-amz-meta-file-mtime'),
       'the v1.38.1 bullet text from a continuation line must survive parsing — ' +
-      'its absence means parseChangelog is still dropping wrapped lines (#50)'
+        'its absence means parseChangelog is still dropping wrapped lines (#50)',
     );
-    assert.ok(
-      !flat.trim().endsWith('value".'),
-      'the bullet must not end at its first physical line'
-    );
+    assert.ok(!flat.trim().endsWith('value".'), 'the bullet must not end at its first physical line');
   });
 
   // Follow-up to #50: the modal renders plain text, so inline **bold** markers
@@ -284,20 +284,21 @@ describe('Build output — changelog wrapped bullets (#50)', () => {
       for (const c of entry.changes) {
         const texts = typeof c === 'string' ? [c] : [c.group, ...c.items];
         for (const t of texts) {
-          assert.ok(!/\*\*[^*]+\*\*/.test(t),
-            `v${entry.version} change retains a bold pair: "${t.slice(0, 80)}"`);
+          assert.ok(!/\*\*[^*]+\*\*/.test(t), `v${entry.version} change retains a bold pair: "${t.slice(0, 80)}"`);
         }
       }
     }
-    const flat = (v) => CHANGELOG.find(e => e.version === v).changes
-      .map(c => typeof c === 'string' ? c : [c.group, ...c.items].join(' ')).join(' ');
-    assert.ok(flat('1.38.0').includes('New Run diagnostics button'),
-      'v1.38.0 inline bold must render as plain text');
+    const flat = (v) =>
+      CHANGELOG.find((e) => e.version === v)
+        .changes.map((c) => (typeof c === 'string' ? c : [c.group, ...c.items].join(' ')))
+        .join(' ');
+    assert.ok(flat('1.38.0').includes('New Run diagnostics button'), 'v1.38.0 inline bold must render as plain text');
     // v1.33.0 has a bold span wrapped across physical lines — strippable only
     // after continuation joining, which is why cleanup runs post-join.
-    assert.ok(flat('1.33.0').includes('fixes a latent issue where'),
-      'v1.33.0 line-spanning bold must be stripped after joining');
-    assert.ok(flat('1.12.9').includes('src/**/*.js'),
-      'glob patterns must survive the bold strip');
+    assert.ok(
+      flat('1.33.0').includes('fixes a latent issue where'),
+      'v1.33.0 line-spanning bold must be stripped after joining',
+    );
+    assert.ok(flat('1.12.9').includes('src/**/*.js'), 'glob patterns must survive the bold strip');
   });
 });

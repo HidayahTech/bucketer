@@ -12,10 +12,20 @@ function makeClient(log, key = 'notes.txt') {
     send(cmd) {
       const n = cmd.constructor.name;
       if (n === 'ListObjectsV2Command') {
-        return Promise.resolve({ Contents: [{ Key: key, Size: 5, LastModified: new Date().toISOString() }], IsTruncated: false, CommonPrefixes: [] });
+        return Promise.resolve({
+          Contents: [{ Key: key, Size: 5, LastModified: new Date().toISOString() }],
+          IsTruncated: false,
+          CommonPrefixes: [],
+        });
       }
-      if (n === 'CopyObjectCommand') { log.push(['copy', cmd.input]); return Promise.resolve({}); }
-      if (n === 'DeleteObjectCommand') { log.push(['delete', cmd.input]); return Promise.resolve({}); }
+      if (n === 'CopyObjectCommand') {
+        log.push(['copy', cmd.input]);
+        return Promise.resolve({});
+      }
+      if (n === 'DeleteObjectCommand') {
+        log.push(['delete', cmd.input]);
+        return Promise.resolve({});
+      }
       return Promise.reject(new Error('unexpected ' + n));
     },
   };
@@ -24,26 +34,46 @@ function makeClient(log, key = 'notes.txt') {
 const caps = { list: 'permitted', download: 'permitted', upload: 'permitted', delete: 'permitted' };
 
 function mountBrowser(log, key) {
-  return mount(h(Browser, {
-    client: makeClient(log, key), bucket: 'b', provider: 'generic', credentials: { bucket: 'b' },
-    capabilities: caps, onCapabilityChange: () => {}, onMoveRequest: () => {},
-    onDeleteRequest: () => {}, onUploadTargetChange: () => {}, onInitialListFailed: () => {},
-  }));
+  return mount(
+    h(Browser, {
+      client: makeClient(log, key),
+      bucket: 'b',
+      provider: 'generic',
+      credentials: { bucket: 'b' },
+      capabilities: caps,
+      onCapabilityChange: () => {},
+      onMoveRequest: () => {},
+      onDeleteRequest: () => {},
+      onUploadTargetChange: () => {},
+      onInitialListFailed: () => {},
+    }),
+  );
 }
-async function tick() { await new Promise(r => setTimeout(r, 20)); }
+async function tick() {
+  await new Promise((r) => setTimeout(r, 20));
+}
 
 describe('Browser — file rename', () => {
   test('renaming a file copies to the new key, deletes the old, and updates the row', async () => {
     const log = [];
     const { query, queryAll, text, cleanup } = mountBrowser(log);
     await tick();
-    fire(queryAll('[data-testid="file-row:notes.txt"] button').find(b => b.title === 'Rename'), 'click');
+    fire(
+      queryAll('[data-testid="file-row:notes.txt"] button').find((b) => b.title === 'Rename'),
+      'click',
+    );
     setInput(query('.rename-input'), 'renamed.txt');
-    fire(queryAll('.rename-inline button').find(b => b.textContent.includes('✓')), 'click');
+    fire(
+      queryAll('.rename-inline button').find((b) => b.textContent.includes('✓')),
+      'click',
+    );
     await tick();
     const copy = log.find(([op]) => op === 'copy');
-    const del  = log.find(([op]) => op === 'delete');
-    assert.ok(copy && copy[1].Key === 'renamed.txt' && copy[1].CopySource === 'b/notes.txt', 'copies to the new key from the old');
+    const del = log.find(([op]) => op === 'delete');
+    assert.ok(
+      copy && copy[1].Key === 'renamed.txt' && copy[1].CopySource === 'b/notes.txt',
+      'copies to the new key from the old',
+    );
     assert.ok(del && del[1].Key === 'notes.txt', 'deletes the old key');
     assert.ok(text().includes('renamed.txt'), 'the row shows the new name');
     cleanup();
@@ -57,9 +87,15 @@ describe('Browser — file rename', () => {
     const log = [];
     const { query, queryAll, cleanup } = mountBrowser(log, 'Anwar ｜ x.opus');
     await tick();
-    fire(queryAll('button').find(b => b.title === 'Rename'), 'click');
+    fire(
+      queryAll('button').find((b) => b.title === 'Rename'),
+      'click',
+    );
     setInput(query('.rename-input'), 'renamed.opus');
-    fire(queryAll('.rename-inline button').find(b => b.textContent.includes('✓')), 'click');
+    fire(
+      queryAll('.rename-inline button').find((b) => b.textContent.includes('✓')),
+      'click',
+    );
     await tick();
     const copy = log.find(([op]) => op === 'copy');
     assert.ok(copy, 'a copy is issued');
@@ -73,9 +109,15 @@ describe('Browser — file rename', () => {
     // add a sibling by re-listing? Simpler: rename onto itself's sibling isn't set up here;
     // instead assert an invalid (slash) name is rejected without any Copy/Delete.
     await tick();
-    fire(queryAll('[data-testid="file-row:notes.txt"] button').find(b => b.title === 'Rename'), 'click');
+    fire(
+      queryAll('[data-testid="file-row:notes.txt"] button').find((b) => b.title === 'Rename'),
+      'click',
+    );
     setInput(query('.rename-input'), 'a/b');
-    fire(queryAll('.rename-inline button').find(b => b.textContent.includes('✓')), 'click');
+    fire(
+      queryAll('.rename-inline button').find((b) => b.textContent.includes('✓')),
+      'click',
+    );
     await tick();
     assert.equal(log.length, 0, 'no copy/delete on an invalid name');
     assert.ok(query('.rename-error'), 'an error is shown');

@@ -1,8 +1,14 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  MULTIPART_THRESHOLD, LARGE_FILE_WARN, DEFAULT_FILE_CONCURRENCY, PART_CONCURRENCY,
-  PRESIGN_EXPIRES, TEXT_PREVIEW_LIMIT, COPY_LINK_PRESETS, COPY_MULTIPART_THRESHOLD,
+  MULTIPART_THRESHOLD,
+  LARGE_FILE_WARN,
+  DEFAULT_FILE_CONCURRENCY,
+  PART_CONCURRENCY,
+  PRESIGN_EXPIRES,
+  TEXT_PREVIEW_LIMIT,
+  COPY_LINK_PRESETS,
+  COPY_MULTIPART_THRESHOLD,
 } from '../src/lib/constants.js';
 
 describe('constants', () => {
@@ -45,7 +51,7 @@ describe('constants', () => {
   });
 
   test('COPY_LINK_PRESETS max is at most 7 days (604800 s)', () => {
-    const max = Math.max(...COPY_LINK_PRESETS.map(p => p.seconds));
+    const max = Math.max(...COPY_LINK_PRESETS.map((p) => p.seconds));
     assert.ok(max <= 7 * 24 * 3600, `max preset (${max}s) exceeds 7 days`);
   });
 });

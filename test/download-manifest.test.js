@@ -12,8 +12,13 @@ import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { enumerateJob } from '../src/lib/download-manifest.js';
 import {
-  saveJob, loadJob, loadAllJobs, deleteJob,
-  countItemsByStatus, eachItemByStatus, ITEM_STATUS,
+  saveJob,
+  loadJob,
+  loadAllJobs,
+  deleteJob,
+  countItemsByStatus,
+  eachItemByStatus,
+  ITEM_STATUS,
 } from '../src/lib/download-records.js';
 import { NAMING_MODES } from '../src/lib/download-naming.js';
 
@@ -23,7 +28,7 @@ function mockClient(pages) {
     calls,
     async send(cmd) {
       calls.push({ ...cmd.input });
-      const idx = pages.findIndex(p => (p.token ?? undefined) === cmd.input.ContinuationToken);
+      const idx = pages.findIndex((p) => (p.token ?? undefined) === cmd.input.ContinuationToken);
       const page = pages[idx === -1 ? 0 : idx];
       return { Contents: page.contents, IsTruncated: !!page.next, NextContinuationToken: page.next };
     },
@@ -33,8 +38,14 @@ function mockClient(pages) {
 const obj = (Key, Size = 10) => ({ Key, Size, ETag: `"${Key}"`, LastModified: new Date(1700000000000) });
 
 const job = (over = {}) => ({
-  id: 'job-1', bucket: 'bkt', prefix: '', mode: NAMING_MODES.LEAF,
-  status: 'enumerating', enumeration: {}, counters: { total: 0, bytesTotal: 0 }, ...over,
+  id: 'job-1',
+  bucket: 'bkt',
+  prefix: '',
+  mode: NAMING_MODES.LEAF,
+  status: 'enumerating',
+  enumeration: {},
+  counters: { total: 0, bytesTotal: 0 },
+  ...over,
 });
 
 // Multi-prefix crawls need pages keyed by (Prefix, token), not token alone.
@@ -45,15 +56,21 @@ function mockClientByPrefix(byPrefix) {
     async send(cmd) {
       calls.push({ ...cmd.input });
       const pages = byPrefix[cmd.input.Prefix ?? ''] || [{ contents: [] }];
-      const idx = pages.findIndex(p => (p.token ?? undefined) === cmd.input.ContinuationToken);
+      const idx = pages.findIndex((p) => (p.token ?? undefined) === cmd.input.ContinuationToken);
       const page = pages[idx === -1 ? 0 : idx];
       return { Contents: page.contents, IsTruncated: !!page.next, NextContinuationToken: page.next };
     },
   };
 }
 
-const fRoot = (key, size = 10, storageClass = null) =>
-  ({ type: 'file', key, size, etag: `"${key}"`, lastModified: 1700000000000, storageClass });
+const fRoot = (key, size = 10, storageClass = null) => ({
+  type: 'file',
+  key,
+  size,
+  etag: `"${key}"`,
+  lastModified: 1700000000000,
+  storageClass,
+});
 const pRoot = (prefix) => ({ type: 'prefix', prefix });
 
 async function reset() {
@@ -62,7 +79,9 @@ async function reset() {
 
 async function keysOf(jobId, status = ITEM_STATUS.PENDING) {
   const out = [];
-  await eachItemByStatus(jobId, status, it => { out.push(it.key); });
+  await eachItemByStatus(jobId, status, (it) => {
+    out.push(it.key);
+  });
   return out.sort();
 }
 
@@ -86,7 +105,9 @@ describe('enumerateJob', () => {
     await enumerateJob(client, await loadJob('job-1'), {});
 
     let found;
-    await eachItemByStatus('job-1', ITEM_STATUS.PENDING, it => { found = it; });
+    await eachItemByStatus('job-1', ITEM_STATUS.PENDING, (it) => {
+      found = it;
+    });
     assert.equal(found.size, 42);
     assert.equal(found.etag, '"a"');
     assert.equal(found.lastModified, 1700000000000);
@@ -108,7 +129,9 @@ describe('enumerateJob', () => {
     await enumerateJob(client, await loadJob('job-1'), {});
 
     let found;
-    await eachItemByStatus('job-1', ITEM_STATUS.PENDING, it => { found = it; });
+    await eachItemByStatus('job-1', ITEM_STATUS.PENDING, (it) => {
+      found = it;
+    });
     assert.equal(found.localName, 'videos__2024__a.mp4');
   });
 
@@ -135,7 +158,9 @@ describe('enumerateJob', () => {
 
     let pages = 0;
     const result = await enumerateJob(client, await loadJob('job-1'), {
-      onProgress: () => { pages += 1; },
+      onProgress: () => {
+        pages += 1;
+      },
       shouldCancel: () => pages >= 1,
     });
 
@@ -155,7 +180,7 @@ describe('enumerateJob', () => {
     ]);
 
     const seen = [];
-    await enumerateJob(client, await loadJob('job-1'), { onProgress: p => seen.push({ ...p }) });
+    await enumerateJob(client, await loadJob('job-1'), { onProgress: (p) => seen.push({ ...p }) });
 
     assert.equal(seen.length, 2);
     assert.deepEqual(seen[seen.length - 1], { objects: 2, bytes: 12 });
@@ -213,21 +238,28 @@ describe('enumerateJob', () => {
   });
 
   test('resumes between roots: a completed root is never re-crawled', async () => {
-    await saveJob(job({
-      roots: [pRoot('done/'), pRoot('todo/')],
-      enumeration: { rootIndex: 1 },   // checkpoint says done/ already committed
-    }));
+    await saveJob(
+      job({
+        roots: [pRoot('done/'), pRoot('todo/')],
+        enumeration: { rootIndex: 1 }, // checkpoint says done/ already committed
+      }),
+    );
     const client = mockClientByPrefix({ 'todo/': [{ token: undefined, contents: [obj('todo/x')] }] });
     await enumerateJob(client, await loadJob('job-1'), {});
-    assert.ok(client.calls.every(c => c.Prefix === 'todo/'), 'done/ must not be re-listed');
+    assert.ok(
+      client.calls.every((c) => c.Prefix === 'todo/'),
+      'done/ must not be re-listed',
+    );
     assert.deepEqual(await keysOf('job-1'), ['todo/x']);
   });
 
   test('resumes mid-prefix within a root using the stored token', async () => {
-    await saveJob(job({
-      roots: [pRoot('p/')],
-      enumeration: { rootIndex: 0, continuationToken: 't2' },
-    }));
+    await saveJob(
+      job({
+        roots: [pRoot('p/')],
+        enumeration: { rootIndex: 0, continuationToken: 't2' },
+      }),
+    );
     const client = mockClientByPrefix({
       'p/': [
         { token: undefined, contents: [obj('p/page1')], next: 't2' },
@@ -240,7 +272,7 @@ describe('enumerateJob', () => {
   });
 
   test('a legacy prefix-only job still enumerates (read-path shim)', async () => {
-    await saveJob(job({ prefix: 'old/' }));  // no roots field at all
+    await saveJob(job({ prefix: 'old/' })); // no roots field at all
     const client = mockClientByPrefix({ 'old/': [{ token: undefined, contents: [obj('old/a')] }] });
     const result = await enumerateJob(client, await loadJob('job-1'), {});
     assert.deepEqual(await keysOf('job-1'), ['old/a']);
@@ -266,14 +298,21 @@ describe('enumerateJob — archived objects', () => {
 
   const archived = (Key, StorageClass) => ({ ...obj(Key), StorageClass });
   // The provider is recorded on the job at creation; enumeration reads it from there.
-  const seed = async (provider) => { await saveJob(job({ provider })); return loadJob('job-1'); };
+  const seed = async (provider) => {
+    await saveJob(job({ provider }));
+    return loadJob('job-1');
+  };
 
   test('marks GLACIER and DEEP_ARCHIVE objects skipped on AWS, leaving the rest pending', async () => {
-    const client = mockClient([{ contents: [
-      archived('cold.bin', 'GLACIER'),
-      archived('frozen.bin', 'DEEP_ARCHIVE'),
-      archived('warm.bin', 'STANDARD'),
-    ] }]);
+    const client = mockClient([
+      {
+        contents: [
+          archived('cold.bin', 'GLACIER'),
+          archived('frozen.bin', 'DEEP_ARCHIVE'),
+          archived('warm.bin', 'STANDARD'),
+        ],
+      },
+    ]);
 
     const result = await enumerateJob(client, await seed('aws'), {});
 
@@ -314,10 +353,14 @@ describe('enumerateJob — archived objects', () => {
   // enumerated); sendable/bytesSendable describe only what can actually be issued, and
   // both UI surfaces read the sendable pair.
   test('archived items are counted in the manifest totals but not the sendable counters', async () => {
-    const client = mockClient([{ contents: [
-      { ...archived('cold.bin', 'GLACIER'), Size: 100 },
-      { ...archived('warm.bin', 'STANDARD'), Size: 7 },
-    ] }]);
+    const client = mockClient([
+      {
+        contents: [
+          { ...archived('cold.bin', 'GLACIER'), Size: 100 },
+          { ...archived('warm.bin', 'STANDARD'), Size: 7 },
+        ],
+      },
+    ]);
 
     const result = await enumerateJob(client, await seed('aws'), {});
     const j = await loadJob('job-1');

@@ -10,9 +10,7 @@ import { computeZipLayout } from './zip-layout.js';
 import { createAssemblerClient } from './assembler-client.js';
 import { runPool } from './upload-queue.js';
 import { PROBE_KIND } from './download-preflight.js';
-import {
-  takeItemsPage, updateItem, countItemsByStatus, eachItemByStatus, ITEM_STATUS,
-} from './download-records.js';
+import { takeItemsPage, updateItem, countItemsByStatus, eachItemByStatus, ITEM_STATUS } from './download-records.js';
 import { stagingName } from './zip-naming.js';
 
 // Mirrors zip-job.js's own constant of the same name — see its comment for why only the
@@ -40,10 +38,20 @@ async function loadAllItems(jobId) {
   return items;
 }
 
-export async function runInPlaceJob(job, {
-  presign, probe, fetchImpl = fetch, root, concurrency, makeWorker, onProgress, shouldCancel = () => false,
-  writeWindowBytes,
-}) {
+export async function runInPlaceJob(
+  job,
+  {
+    presign,
+    probe,
+    fetchImpl = fetch,
+    root,
+    concurrency,
+    makeWorker,
+    onProgress,
+    shouldCancel = () => false,
+    writeWindowBytes,
+  },
+) {
   const prefix = job.prefix ?? '';
 
   // 1. All non-SKIPPED items in key order -> the layout every offset is computed from.
@@ -70,12 +78,18 @@ export async function runInPlaceJob(job, {
   if (doneItems.length > 0) {
     const fh = await root.getFileHandle(stagingName(job.id)).catch(() => null);
     const size = fh ? (await fh.getFile()).size : 0;
-    const offsetMismatch = doneItems.some((it) => it.zipOffset == null
-      || it.zipOffset !== layoutByKey.get(it.key)?.headerOffset);
+    const offsetMismatch = doneItems.some(
+      (it) => it.zipOffset == null || it.zipOffset !== layoutByKey.get(it.key)?.headerOffset,
+    );
     if (size < layout.totalDataEnd || offsetMismatch) {
       for (const it of doneItems) {
         await updateItem(job.id, it.key, {
-          status: ITEM_STATUS.PENDING, zipOffset: null, zipEnd: null, crc: null, time: null, date: null,
+          status: ITEM_STATUS.PENDING,
+          zipOffset: null,
+          zipEnd: null,
+          crc: null,
+          time: null,
+          date: null,
         });
         it.status = ITEM_STATUS.PENDING; // keep the in-memory copy in sync for the rest of this run
       }
@@ -83,9 +97,7 @@ export async function runInPlaceJob(job, {
   }
 
   const priorCompleted = allItems.filter((it) => it.status === ITEM_STATUS.DONE).length;
-  const priorBytes = allItems
-    .filter((it) => it.status === ITEM_STATUS.DONE)
-    .reduce((n, it) => n + (it.size || 0), 0);
+  const priorBytes = allItems.filter((it) => it.status === ITEM_STATUS.DONE).reduce((n, it) => n + (it.size || 0), 0);
   const pendingItems = allItems.filter((it) => it.status === ITEM_STATUS.PENDING);
   const freshKeys = pendingItems.map((it) => it.key);
 
@@ -102,11 +114,17 @@ export async function runInPlaceJob(job, {
 
   const inFlightControllers = new Set();
   const abortAllInFlight = () => {
-    for (const c of inFlightControllers) { try { c.abort(); } catch { /* already settled */ } }
+    for (const c of inFlightControllers) {
+      try {
+        c.abort();
+      } catch {
+        /* already settled */
+      }
+    }
   };
 
   let quotaBlocked = null; // set by client.onFatal — STORAGE for QuotaExceededError, else a generic block
-  let jobBlocked = null;   // set on a NETWORK probe result
+  let jobBlocked = null; // set on a NETWORK probe result
   let denied = false;
   let consecutiveDenied = 0;
   let stopIntake = false;
@@ -135,9 +153,10 @@ export async function runInPlaceJob(job, {
 
     client.onFatal(({ name, message }) => {
       if (quotaBlocked) return;
-      quotaBlocked = name === 'QuotaExceededError'
-        ? { kind: 'STORAGE', message: 'Ran out of temporary browser storage while building the ZIP.' }
-        : { kind: 'FATAL', message: message || 'A fatal problem stopped the ZIP.' };
+      quotaBlocked =
+        name === 'QuotaExceededError'
+          ? { kind: 'STORAGE', message: 'Ran out of temporary browser storage while building the ZIP.' }
+          : { kind: 'FATAL', message: message || 'A fatal problem stopped the ZIP.' };
       stopIntake = true;
       abortAllInFlight();
     });
@@ -245,9 +264,10 @@ export async function runInPlaceJob(job, {
 
     // A worker-fatal pause always wins: it is a real error, never reported as "cancelled".
     const cancelled = quotaBlocked ? false : cancelledFlag;
-    const blocked = quotaBlocked
-      || jobBlocked
-      || (denied ? { kind: PROBE_KIND.DENIED, status: null, message: 'Too many files in a row were denied.' } : null);
+    const blocked =
+      quotaBlocked ||
+      jobBlocked ||
+      (denied ? { kind: PROBE_KIND.DENIED, status: null, message: 'Too many files in a row were denied.' } : null);
 
     const errors = [];
     for (const { item, message } of failed) {
@@ -261,7 +281,9 @@ export async function runInPlaceJob(job, {
     let doneByKey = null;
     if (!cancelled && !blocked && pending === 0 && failedCount === 0) {
       doneByKey = new Map();
-      await eachItemByStatus(job.id, ITEM_STATUS.DONE, (it) => { doneByKey.set(it.key, it); });
+      await eachItemByStatus(job.id, ITEM_STATUS.DONE, (it) => {
+        doneByKey.set(it.key, it);
+      });
     }
     // Defensive: `pending===0 && failedCount===0` only proves no item is PENDING or FAILED —
     // a legacy ITEM_STATUS.ISSUED record (the two engines share job records, and only

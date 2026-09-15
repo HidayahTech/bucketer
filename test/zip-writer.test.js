@@ -15,12 +15,17 @@ function memSink() {
   const chunks = [];
   return {
     chunks,
-    write(u8) { chunks.push(Uint8Array.from(u8)); },
+    write(u8) {
+      chunks.push(Uint8Array.from(u8));
+    },
     bytes() {
       const total = chunks.reduce((n, c) => n + c.length, 0);
       const out = new Uint8Array(total);
       let o = 0;
-      for (const c of chunks) { out.set(c, o); o += c.length; }
+      for (const c of chunks) {
+        out.set(c, o);
+        o += c.length;
+      }
       return out;
     },
   };
@@ -47,17 +52,26 @@ describe('zip-writer', () => {
     const sink = memSink();
     const w = createZipWriter(sink);
     const records = [];
-    for (const [path, body] of [['a.txt', 'alpha'], ['dir/b.bin', 'bravo-bytes']]) {
+    for (const [path, body] of [
+      ['a.txt', 'alpha'],
+      ['dir/b.bin', 'bravo-bytes'],
+    ]) {
       await w.beginEntry(path, { declaredSize: enc(body).length, mtime: 1700000000000 });
       await w.update(enc(body));
       records.push(await w.endEntry());
     }
     await w.finish(records);
     const entries = readZip(sink.bytes());
-    assert.deepEqual(entries.map(e => e.name), ['a.txt', 'dir/b.bin']);
+    assert.deepEqual(
+      entries.map((e) => e.name),
+      ['a.txt', 'dir/b.bin'],
+    );
     assert.equal(new TextDecoder().decode(entries[0].data), 'alpha');
     assert.equal(new TextDecoder().decode(entries[1].data), 'bravo-bytes');
-    assert.ok(entries.every(e => e.method === 0), 'store-only');
+    assert.ok(
+      entries.every((e) => e.method === 0),
+      'store-only',
+    );
   });
 
   test('entry records carry offsets usable for resume', async () => {

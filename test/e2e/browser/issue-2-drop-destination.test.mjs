@@ -9,7 +9,16 @@
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest } from '../harness.mjs';
+import {
+  startMock,
+  startAppServer,
+  connectApp,
+  BUCKET,
+  launchBrowser,
+  newE2EContext,
+  newE2EPage,
+  e2eTest,
+} from '../harness.mjs';
 
 let ctx, app, browser;
 before(async () => {
@@ -17,7 +26,11 @@ before(async () => {
   app = await startAppServer();
   browser = await launchBrowser();
 });
-after(async () => { await browser?.close(); await app?.close(); await ctx?.mock.close(); });
+after(async () => {
+  await browser?.close();
+  await app?.close();
+  await ctx?.mock.close();
+});
 
 async function bucketKeys() {
   const r = await ctx.client.send(new ListObjectsV2Command({ Bucket: BUCKET }));
@@ -26,12 +39,15 @@ async function bucketKeys() {
 // Dispatch a real file drop onto the Browser drop container, the way the OS does when
 // FileSystemEntry isn't exposed (handleTableDrop falls back to e.dataTransfer.files).
 async function dropFile(page, name, content = 'x') {
-  await page.evaluate(({ name, content }) => {
-    const dt = new DataTransfer();
-    dt.items.add(new File([content], name, { type: 'text/plain' }));
-    const el = document.querySelector('[data-testid="browser-drop"]');
-    el.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
-  }, { name, content });
+  await page.evaluate(
+    ({ name, content }) => {
+      const dt = new DataTransfer();
+      dt.items.add(new File([content], name, { type: 'text/plain' }));
+      const el = document.querySelector('[data-testid="browser-drop"]');
+      el.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+    },
+    { name, content },
+  );
 }
 
 describe('issue #2 — drag-dropped uploads target the current folder, not root', () => {
@@ -46,14 +62,17 @@ describe('issue #2 — drag-dropped uploads target the current folder, not root'
       // Create and enter a nested folder.
       await page.locator('button[title="Create a new folder"]').click();
       const ni = page.locator('.modal-overlay input.form-input');
-      await ni.waitFor({ timeout: 5000 }); await ni.fill('sub'); await ni.press('Enter');
+      await ni.waitFor({ timeout: 5000 });
+      await ni.fill('sub');
+      await ni.press('Enter');
       await page.locator('[data-testid="folder-row:sub"]').click();
       await page.locator('.breadcrumb .current', { hasText: 'sub' }).waitFor({ timeout: 5000 });
       // Wait for the upload destination to reflect the folder (a real user takes far longer than this
       // to start a drag). The bug is the STALE CLOSURE: even fully settled, the captured addFiles read
       // the mount-time root prefix — waiting proves the fix, not the unrelated propagation lag.
       const dest = page.locator('input[placeholder="(root of bucket)"]');
-      for (let i = 0; i < 50 && (await dest.inputValue().catch(() => '')) !== 'sub/'; i++) await page.waitForTimeout(100);
+      for (let i = 0; i < 50 && (await dest.inputValue().catch(() => '')) !== 'sub/'; i++)
+        await page.waitForTimeout(100);
 
       // Drag-drop a file onto the browser (the path that used the stale closure).
       await dropFile(page, 'dropped.txt');
@@ -62,10 +81,13 @@ describe('issue #2 — drag-dropped uploads target the current folder, not root'
       const deadline = Date.now() + 15000;
       let keys = await bucketKeys();
       while (!keys.includes('sub/dropped.txt') && !keys.includes('dropped.txt') && Date.now() < deadline) {
-        await page.waitForTimeout(150); keys = await bucketKeys();
+        await page.waitForTimeout(150);
+        keys = await bucketKeys();
       }
       assert.ok(keys.includes('sub/dropped.txt'), `expected sub/dropped.txt, got ${JSON.stringify(keys)}`);
       assert.ok(!keys.includes('dropped.txt'), 'must NOT land at the bucket root (issue #2)');
-    } finally { await context.close(); }
+    } finally {
+      await context.close();
+    }
   });
 });

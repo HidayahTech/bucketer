@@ -6,7 +6,12 @@ import { mount, fire } from '../helpers/render.js';
 import { ToastHost } from '../../src/components/ToastHost.jsx';
 import { toastStore, showToast } from '../../src/lib/toast.js';
 
-function clearToasts() { toastStore.get().slice().forEach(t => toastStore.dismiss(t.id)); }
+function clearToasts() {
+  toastStore
+    .get()
+    .slice()
+    .forEach((t) => toastStore.dismiss(t.id));
+}
 
 describe('ToastHost (#15)', () => {
   beforeEach(clearToasts);
@@ -27,14 +32,18 @@ describe('ToastHost (#15)', () => {
 
   test('renders a toast pushed via showToast', () => {
     const { text, cleanup } = mount(<ToastHost />);
-    act(() => { showToast('Renamed to "x"', { duration: 0 }); });
+    act(() => {
+      showToast('Renamed to "x"', { duration: 0 });
+    });
     assert.ok(text().includes('Renamed to "x"'));
     cleanup();
   });
 
   test('clicking a toast dismisses it', () => {
     const { query, cleanup } = mount(<ToastHost />);
-    act(() => { showToast('Deleted 2 items', { duration: 0 }); });
+    act(() => {
+      showToast('Deleted 2 items', { duration: 0 });
+    });
     const toast = query('.toast');
     assert.ok(toast);
     fire(toast, 'click');

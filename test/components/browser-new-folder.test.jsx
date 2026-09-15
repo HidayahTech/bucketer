@@ -14,7 +14,10 @@ function makeClient(puts) {
       if (cmd.constructor.name === 'ListObjectsV2Command') {
         return Promise.resolve({ Contents: [], IsTruncated: false, CommonPrefixes: [{ Prefix: 'photos/' }] });
       }
-      if (cmd.constructor.name === 'PutObjectCommand') { puts.push(cmd.input); return Promise.resolve({}); }
+      if (cmd.constructor.name === 'PutObjectCommand') {
+        puts.push(cmd.input);
+        return Promise.resolve({});
+      }
       return Promise.reject(new Error('unexpected ' + cmd.constructor.name));
     },
   };
@@ -23,22 +26,39 @@ function makeClient(puts) {
 const caps = { list: 'permitted', download: 'permitted', upload: 'permitted', delete: 'permitted' };
 
 function mountBrowser(puts) {
-  return mount(h(Browser, {
-    client: makeClient(puts), bucket: 'b', provider: 'generic', credentials: { bucket: 'b' },
-    capabilities: caps, onCapabilityChange: () => {}, onMoveRequest: () => {},
-    onDeleteRequest: () => {}, onUploadTargetChange: () => {}, onInitialListFailed: () => {},
-  }));
+  return mount(
+    h(Browser, {
+      client: makeClient(puts),
+      bucket: 'b',
+      provider: 'generic',
+      credentials: { bucket: 'b' },
+      capabilities: caps,
+      onCapabilityChange: () => {},
+      onMoveRequest: () => {},
+      onDeleteRequest: () => {},
+      onUploadTargetChange: () => {},
+      onInitialListFailed: () => {},
+    }),
+  );
 }
-async function tick() { await new Promise(r => setTimeout(r, 20)); }
+async function tick() {
+  await new Promise((r) => setTimeout(r, 20));
+}
 
 describe('Browser — new folder', () => {
   test('creating a folder PUTs the marker key and shows the new folder', async () => {
     const puts = [];
     const { query, queryAll, text, cleanup } = mountBrowser(puts);
     await tick();
-    fire(queryAll('button').find(b => b.title === 'Create a new folder'), 'click');
+    fire(
+      queryAll('button').find((b) => b.title === 'Create a new folder'),
+      'click',
+    );
     setInput(query('input[placeholder="Folder name"]'), 'reports');
-    fire(queryAll('.modal-actions button').find(b => b.textContent.includes('Create')), 'click');
+    fire(
+      queryAll('.modal-actions button').find((b) => b.textContent.includes('Create')),
+      'click',
+    );
     await tick();
     assert.equal(puts.length, 1, 'one PutObject for the folder marker');
     assert.equal(puts[0].Key, 'reports/', 'marker key is prefix + name + /');
@@ -50,9 +70,15 @@ describe('Browser — new folder', () => {
     const puts = [];
     const { query, queryAll, cleanup } = mountBrowser(puts);
     await tick();
-    fire(queryAll('button').find(b => b.title === 'Create a new folder'), 'click');
+    fire(
+      queryAll('button').find((b) => b.title === 'Create a new folder'),
+      'click',
+    );
     setInput(query('input[placeholder="Folder name"]'), 'photos'); // 'photos/' already exists
-    fire(queryAll('.modal-actions button').find(b => b.textContent.includes('Create')), 'click');
+    fire(
+      queryAll('.modal-actions button').find((b) => b.textContent.includes('Create')),
+      'click',
+    );
     await tick();
     assert.equal(puts.length, 0, 'no PUT on a colliding name');
     assert.ok(query('.modal-error'), 'a collision error is shown');

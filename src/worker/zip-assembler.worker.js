@@ -9,9 +9,15 @@ let handle = null;
 
 function syncSink(sync) {
   return {
-    write(u8, at) { sync.write(u8, { at }); },
-    truncate(n) { sync.truncate(n); },
-    flush() { sync.flush(); },
+    write(u8, at) {
+      sync.write(u8, { at });
+    },
+    truncate(n) {
+      sync.truncate(n);
+    },
+    flush() {
+      sync.flush();
+    },
   };
 }
 
@@ -46,14 +52,32 @@ self.onmessage = async (e) => {
       // reclaims the now-orphaned buffer. See docs/review-download-parity/probe/inplace-memory-finding.md.
       self.postMessage({ type: 'ack', bytes, buffer: m.buffer }, [m.buffer]);
     } else if (m.type === 'entryEnd') {
-      try { const r = await asm.endEntry(m.key); self.postMessage({ type: 'written', key: m.key, crc: r.crc, size: r.size }); }
-      catch (err) { self.postMessage({ type: 'entryError', key: m.key, name: err?.name || 'Error', message: err?.message || String(err) }); }
+      try {
+        const r = await asm.endEntry(m.key);
+        self.postMessage({ type: 'written', key: m.key, crc: r.crc, size: r.size });
+      } catch (err) {
+        self.postMessage({
+          type: 'entryError',
+          key: m.key,
+          name: err?.name || 'Error',
+          message: err?.message || String(err),
+        });
+      }
     } else if (m.type === 'finish') {
       const r = await asm.finish(m.records);
-      try { handle.close(); } catch { /* best effort */ }
+      try {
+        handle.close();
+      } catch {
+        /* best effort */
+      }
       self.postMessage({ type: 'finished', totalBytes: r.totalBytes });
     } else if (m.type === 'abort') {
-      try { handle?.flush(); handle?.close(); } catch { /* best effort */ }
+      try {
+        handle?.flush();
+        handle?.close();
+      } catch {
+        /* best effort */
+      }
     }
   } catch (err) {
     self.postMessage({ type: 'fatal', name: err?.name || 'Error', message: err?.message || String(err) });

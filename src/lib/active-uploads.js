@@ -14,11 +14,15 @@
 //
 // Best-effort: private mode silently disables detection rather than crashing.
 
-const TAB_ID    = Math.random().toString(36).slice(2);
+const TAB_ID = Math.random().toString(36).slice(2);
 const ACTIVE_KEY = 's3b_active_uploads';
 
 function getActiveUploads() {
-  try { return JSON.parse(localStorage.getItem(ACTIVE_KEY) || '{}'); } catch { return {}; }
+  try {
+    return JSON.parse(localStorage.getItem(ACTIVE_KEY) || '{}');
+  } catch {
+    return {};
+  }
 }
 
 export function markUploadActive(destinationKey) {
@@ -26,7 +30,9 @@ export function markUploadActive(destinationKey) {
     const active = getActiveUploads();
     active[destinationKey] = TAB_ID;
     localStorage.setItem(ACTIVE_KEY, JSON.stringify(active));
-  } catch { /* */ }
+  } catch {
+    /* */
+  }
 }
 
 export function markUploadInactive(destinationKey) {
@@ -36,14 +42,18 @@ export function markUploadInactive(destinationKey) {
       delete active[destinationKey];
       localStorage.setItem(ACTIVE_KEY, JSON.stringify(active));
     }
-  } catch { /* */ }
+  } catch {
+    /* */
+  }
 }
 
 export function isUploadActiveElsewhere(destinationKey) {
   try {
     const active = getActiveUploads();
     return active[destinationKey] !== undefined && active[destinationKey] !== TAB_ID;
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 }
 
 export function loadActiveUploads() {
@@ -51,5 +61,9 @@ export function loadActiveUploads() {
 }
 
 export function clearActiveUploads() {
-  try { localStorage.removeItem(ACTIVE_KEY); } catch { /* */ }
+  try {
+    localStorage.removeItem(ACTIVE_KEY);
+  } catch {
+    /* */
+  }
 }

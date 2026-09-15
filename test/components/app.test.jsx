@@ -13,10 +13,23 @@ import { webcrypto } from 'node:crypto';
 import { h } from 'preact';
 import { mount, fire, setInput } from '../helpers/render.js';
 import { App } from '../../src/components/App.jsx';
-import { saveConnectionCapabilities, saveConnectionRecord, findOrCreateCredential, deleteConnectionRecord } from '../../src/lib/connections.js';
+import {
+  saveConnectionCapabilities,
+  saveConnectionRecord,
+  findOrCreateCredential,
+  deleteConnectionRecord,
+} from '../../src/lib/connections.js';
 import { deleteAllProfiles } from '../../src/lib/storage.js';
 import { buildShareUrl, readUrlParams } from '../../src/lib/url-params.js';
-import { createVault, rememberSecret, recallSecret, vaultExists, isUnlocked, SS_KEY_VAULT_KEY, VAULT_ENABLED } from '../../src/lib/vault.js';
+import {
+  createVault,
+  rememberSecret,
+  recallSecret,
+  vaultExists,
+  isUnlocked,
+  SS_KEY_VAULT_KEY,
+  VAULT_ENABLED,
+} from '../../src/lib/vault.js';
 import { VAULT_USERNAME } from '../../src/components/VaultUnlock.jsx';
 
 // jsdom does not implement SubtleCrypto — patch in Node's real WebCrypto, the same
@@ -27,14 +40,23 @@ const getRandomValues = webcrypto.getRandomValues.bind(webcrypto);
 const PASSPHRASE = 'correct horse battery staple';
 
 const CRED_KEYS = [
-  's3b_endpoint', 's3b_bucket', 's3b_key_id', 's3b_provider',
-  's3b_region_override', 's3b_capabilities', 's3b_profiles',
-  's3b_last_profile_id', 's3b_connections', 's3b_credentials',
-  's3b_connections_migrated', 's3b_vault', 's3b_vault_offer_dismissed',
+  's3b_endpoint',
+  's3b_bucket',
+  's3b_key_id',
+  's3b_provider',
+  's3b_region_override',
+  's3b_capabilities',
+  's3b_profiles',
+  's3b_last_profile_id',
+  's3b_connections',
+  's3b_credentials',
+  's3b_connections_migrated',
+  's3b_vault',
+  's3b_vault_offer_dismissed',
 ];
 
 function clearAppStorage() {
-  CRED_KEYS.forEach(k => localStorage.removeItem(k));
+  CRED_KEYS.forEach((k) => localStorage.removeItem(k));
   sessionStorage.removeItem('s3b_secret_key');
   sessionStorage.removeItem(SS_KEY_VAULT_KEY);
 }
@@ -63,7 +85,11 @@ describe('App — disconnected state', () => {
   test('does NOT show the Browser file listing when disconnected', () => {
     clearAppStorage();
     const { query, cleanup } = mount(h(App, {}));
-    assert.equal(query('.browser-table') || query('.file-table'), null, 'file browser must not render in disconnected state');
+    assert.equal(
+      query('.browser-table') || query('.file-table'),
+      null,
+      'file browser must not render in disconnected state',
+    );
     cleanup();
     clearAppStorage();
   });
@@ -85,10 +111,14 @@ describe('App — shared-link pre-fill banner', () => {
     window.location.hash = '#endpoint=https%3A%2F%2Fs3.example.com&bucket=my-bucket&keyId=AKID999';
     const { text, cleanup } = mount(h(App, {}));
     try {
-      assert.ok(text().includes('enter your Secret Key to connect'),
-        'banner must prompt for only the Secret Key when the link supplied a key ID');
+      assert.ok(
+        text().includes('enter your Secret Key to connect'),
+        'banner must prompt for only the Secret Key when the link supplied a key ID',
+      );
     } finally {
-      cleanup(); window.location.hash = ''; clearAppStorage();
+      cleanup();
+      window.location.hash = '';
+      clearAppStorage();
     }
   });
 
@@ -97,10 +127,14 @@ describe('App — shared-link pre-fill banner', () => {
     window.location.hash = '#endpoint=https%3A%2F%2Fs3.example.com&bucket=my-bucket';
     const { text, cleanup } = mount(h(App, {}));
     try {
-      assert.ok(text().includes('enter your Key ID and Secret Key'),
-        'banner must prompt for both fields when the link omitted the key ID');
+      assert.ok(
+        text().includes('enter your Key ID and Secret Key'),
+        'banner must prompt for both fields when the link omitted the key ID',
+      );
     } finally {
-      cleanup(); window.location.hash = ''; clearAppStorage();
+      cleanup();
+      window.location.hash = '';
+      clearAppStorage();
     }
   });
 });
@@ -176,13 +210,13 @@ describe('App — saving a profile does not clobber capabilities written directl
       fire(query('.bucket-save-form button[type="submit"]'), 'click');
 
       const after = JSON.parse(localStorage.getItem('s3b_connections'));
-      const conn = after.connections.find(c => c.id === beforeId);
+      const conn = after.connections.find((c) => c.id === beforeId);
       assert.equal(after.connections.length, 1, 'the rename must update in place, not create a second connection');
       assert.equal(conn.name, 'Renamed connection', 'the rename must still take effect');
       assert.deepEqual(
         conn.capabilities,
         learned,
-        'capabilities written directly to storage must survive a later profile save'
+        'capabilities written directly to storage must survive a later profile save',
       );
     } finally {
       cleanup();
@@ -205,14 +239,23 @@ describe('App — first load after migration pre-fills the form (regression)', (
     // Exactly the pre-upgrade state: a legacy s3b_profiles record and a pointer to
     // it, but no s3b_connections/s3b_credentials yet (migration hasn't run) and no
     // flat credential keys (no prior direct-credential session either).
-    localStorage.setItem('s3b_profiles', JSON.stringify({
-      version: 1,
-      profiles: [{
-        id: 1, name: 'Backups',
-        endpoint: 'https://s3.us-west-004.backblazeb2.com',
-        bucket: 'backups', keyId: 'k1', provider: 'b2', regionOverride: 'us-west-004',
-      }],
-    }));
+    localStorage.setItem(
+      's3b_profiles',
+      JSON.stringify({
+        version: 1,
+        profiles: [
+          {
+            id: 1,
+            name: 'Backups',
+            endpoint: 'https://s3.us-west-004.backblazeb2.com',
+            bucket: 'backups',
+            keyId: 'k1',
+            provider: 'b2',
+            regionOverride: 'us-west-004',
+          },
+        ],
+      }),
+    );
     localStorage.setItem('s3b_last_profile_id', '1');
 
     const { query, text, cleanup } = mount(h(App, {}));
@@ -220,15 +263,24 @@ describe('App — first load after migration pre-fills the form (regression)', (
       // The mount effect's work is synchronous, but poll a bounded number of ticks
       // rather than assuming — mirrors the pattern used for StorageModal's async load.
       for (let i = 0; i < 20 && query('#cred-endpoint')?.value !== 'https://s3.us-west-004.backblazeb2.com'; i++) {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
       }
 
-      assert.equal(query('#cred-endpoint')?.value, 'https://s3.us-west-004.backblazeb2.com',
-        'endpoint must be pre-filled from the migrated connection on first load');
-      assert.equal(query('#cred-bucket')?.value, 'backups',
-        'bucket must be pre-filled from the migrated connection on first load');
-      assert.equal(query('#cred-keyid')?.value, 'k1',
-        'key ID must be pre-filled from the migrated connection on first load');
+      assert.equal(
+        query('#cred-endpoint')?.value,
+        'https://s3.us-west-004.backblazeb2.com',
+        'endpoint must be pre-filled from the migrated connection on first load',
+      );
+      assert.equal(
+        query('#cred-bucket')?.value,
+        'backups',
+        'bucket must be pre-filled from the migrated connection on first load',
+      );
+      assert.equal(
+        query('#cred-keyid')?.value,
+        'k1',
+        'key ID must be pre-filled from the migrated connection on first load',
+      );
       assert.ok(text().includes('backups'), 'the migrated bucket must still show in the accounts manager');
     } finally {
       cleanup();
@@ -256,8 +308,11 @@ describe('App — legacy flat-key migration chain is restored (Finding 4)', () =
     const { cleanup } = mount(h(App, {}));
     try {
       const { connections } = JSON.parse(localStorage.getItem('s3b_connections') || '{"connections":[]}');
-      assert.equal(connections.length, 1,
-        'a connection must be created from the flat legacy keys via the restored migration chain');
+      assert.equal(
+        connections.length,
+        1,
+        'a connection must be created from the flat legacy keys via the restored migration chain',
+      );
       assert.equal(connections[0].bucket, 'legacy-bucket');
     } finally {
       cleanup();
@@ -272,19 +327,34 @@ describe('App — legacy flat-key migration chain is restored (Finding 4)', () =
 // stored.endpoint was set and then forced a form remount to adopt them — flipping the
 // pre-fill source away from the connection the picker highlights.
 describe("App — the selected connection's values win over stale flat credentials on reload (Finding 5)", () => {
-  test('form shows the selected connection\'s endpoint/bucket/keyId, not differing flat credentials left over from a previous connect', async () => {
+  test("form shows the selected connection's endpoint/bucket/keyId, not differing flat credentials left over from a previous connect", async () => {
     clearAppStorage();
     // Connections already exist — an ordinary reload, not first-load-after-migration —
     // so mark migration done and seed connection B directly.
     localStorage.setItem('s3b_connections_migrated', '1');
-    localStorage.setItem('s3b_credentials', JSON.stringify({
-      version: 1,
-      credentials: [{ id: 'credB', label: 'B', endpoint: 'https://s3.example-b.com', keyId: 'kB', provider: null, regionOverride: '' }],
-    }));
-    localStorage.setItem('s3b_connections', JSON.stringify({
-      version: 2,
-      connections: [{ id: 42, name: 'Conn B', credentialId: 'credB', bucket: 'bucket-b', capabilities: null }],
-    }));
+    localStorage.setItem(
+      's3b_credentials',
+      JSON.stringify({
+        version: 1,
+        credentials: [
+          {
+            id: 'credB',
+            label: 'B',
+            endpoint: 'https://s3.example-b.com',
+            keyId: 'kB',
+            provider: null,
+            regionOverride: '',
+          },
+        ],
+      }),
+    );
+    localStorage.setItem(
+      's3b_connections',
+      JSON.stringify({
+        version: 2,
+        connections: [{ id: 42, name: 'Conn B', credentialId: 'credB', bucket: 'bucket-b', capabilities: null }],
+      }),
+    );
     localStorage.setItem('s3b_last_profile_id', '42');
     // Flat credentials left over from a DIFFERENT, previously-connected profile (A) —
     // saveCredentials() writes these on every connect, and clearCredentials() only
@@ -297,10 +367,13 @@ describe("App — the selected connection's values win over stale flat credentia
     const { query, cleanup } = mount(h(App, {}));
     try {
       for (let i = 0; i < 20 && query('#cred-endpoint')?.value !== 'https://s3.example-b.com'; i++) {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
       }
-      assert.equal(query('#cred-endpoint')?.value, 'https://s3.example-b.com',
-        "the selected connection (B) must win — the mount effect must not override it with stale flat credentials (A)");
+      assert.equal(
+        query('#cred-endpoint')?.value,
+        'https://s3.example-b.com',
+        'the selected connection (B) must win — the mount effect must not override it with stale flat credentials (A)',
+      );
       assert.equal(query('#cred-bucket')?.value, 'bucket-b');
       assert.equal(query('#cred-keyid')?.value, 'kB');
     } finally {
@@ -325,17 +398,37 @@ describe('App — capabilities reset to unknown on every connect (Finding 2)', (
     // afterward, asynchronously, and fails immediately with ECONNREFUSED on the
     // loopback interface — no real network dependency, no delay.
     localStorage.setItem('s3b_connections_migrated', '1');
-    localStorage.setItem('s3b_credentials', JSON.stringify({
-      version: 1,
-      credentials: [{ id: 'cred1', label: 'Test', endpoint: 'http://127.0.0.1:1', keyId: 'AKIDEXAMPLE1234', provider: null, regionOverride: '' }],
-    }));
-    localStorage.setItem('s3b_connections', JSON.stringify({
-      version: 2,
-      connections: [{
-        id: 7, name: 'Test conn', credentialId: 'cred1', bucket: 'test-bucket',
-        capabilities: { list: 'permitted', download: 'permitted', upload: 'permitted', delete: 'denied' },
-      }],
-    }));
+    localStorage.setItem(
+      's3b_credentials',
+      JSON.stringify({
+        version: 1,
+        credentials: [
+          {
+            id: 'cred1',
+            label: 'Test',
+            endpoint: 'http://127.0.0.1:1',
+            keyId: 'AKIDEXAMPLE1234',
+            provider: null,
+            regionOverride: '',
+          },
+        ],
+      }),
+    );
+    localStorage.setItem(
+      's3b_connections',
+      JSON.stringify({
+        version: 2,
+        connections: [
+          {
+            id: 7,
+            name: 'Test conn',
+            credentialId: 'cred1',
+            bucket: 'test-bucket',
+            capabilities: { list: 'permitted', download: 'permitted', upload: 'permitted', delete: 'denied' },
+          },
+        ],
+      }),
+    );
     localStorage.setItem('s3b_last_profile_id', '7');
 
     const { query, queryAll, cleanup } = mount(h(App, {}));
@@ -344,10 +437,12 @@ describe('App — capabilities reset to unknown on every connect (Finding 2)', (
       fire(query('button[type="submit"]'), 'click');
 
       assert.ok(query('.cap-list'), 'connecting must render the sidebar CapabilityPanel');
-      assert.equal(queryAll('.cap-denied').length, 0,
-        'no capability may read as denied immediately after connecting');
-      assert.equal(queryAll('.cap-unknown').length, 4,
-        'all four capabilities must reset to unknown on connect, even though the stored connection record has delete: denied');
+      assert.equal(queryAll('.cap-denied').length, 0, 'no capability may read as denied immediately after connecting');
+      assert.equal(
+        queryAll('.cap-unknown').length,
+        4,
+        'all four capabilities must reset to unknown on connect, even though the stored connection record has delete: denied',
+      );
     } finally {
       cleanup();
       clearAppStorage();
@@ -375,14 +470,29 @@ describe('App — legacy migration does not hijack an established connections-mo
     // stale flat credential keys left over from that connect. Deliberately NO
     // s3b_profiles: handleSaveProfile never writes it.
     localStorage.setItem('s3b_connections_migrated', '1');
-    localStorage.setItem('s3b_credentials', JSON.stringify({
-      version: 1,
-      credentials: [{ id: 'credX', label: 'X', endpoint: 'https://s3.example-x.com', keyId: 'kX', provider: null, regionOverride: '' }],
-    }));
-    localStorage.setItem('s3b_connections', JSON.stringify({
-      version: 2,
-      connections: [{ id: 42, name: 'Real conn', credentialId: 'credX', bucket: 'bucket-x', capabilities: null }],
-    }));
+    localStorage.setItem(
+      's3b_credentials',
+      JSON.stringify({
+        version: 1,
+        credentials: [
+          {
+            id: 'credX',
+            label: 'X',
+            endpoint: 'https://s3.example-x.com',
+            keyId: 'kX',
+            provider: null,
+            regionOverride: '',
+          },
+        ],
+      }),
+    );
+    localStorage.setItem(
+      's3b_connections',
+      JSON.stringify({
+        version: 2,
+        connections: [{ id: 42, name: 'Real conn', credentialId: 'credX', bucket: 'bucket-x', capabilities: null }],
+      }),
+    );
     localStorage.setItem('s3b_last_profile_id', '42');
     localStorage.setItem('s3b_endpoint', 'https://s3.example-x.com');
     localStorage.setItem('s3b_bucket', 'bucket-x');
@@ -390,13 +500,21 @@ describe('App — legacy migration does not hijack an established connections-mo
 
     const { cleanup } = mount(h(App, {}));
     try {
-      assert.equal(localStorage.getItem('s3b_last_profile_id'), '42',
-        'the real connection pointer must survive mount, not be clobbered by a phantom profile id');
+      assert.equal(
+        localStorage.getItem('s3b_last_profile_id'),
+        '42',
+        'the real connection pointer must survive mount, not be clobbered by a phantom profile id',
+      );
       const { connections } = JSON.parse(localStorage.getItem('s3b_connections'));
-      assert.ok(connections.some(c => String(c.id) === '42'),
-        'the pointer must still resolve to a real connection');
-      assert.equal(localStorage.getItem('s3b_profiles'), null,
-        'no phantom profile should be synthesised for a user who never had s3b_profiles');
+      assert.ok(
+        connections.some((c) => String(c.id) === '42'),
+        'the pointer must still resolve to a real connection',
+      );
+      assert.equal(
+        localStorage.getItem('s3b_profiles'),
+        null,
+        'no phantom profile should be synthesised for a user who never had s3b_profiles',
+      );
     } finally {
       cleanup();
       clearAppStorage();
@@ -421,8 +539,11 @@ describe('App — legacy migration still runs for a genuine pre-profiles user (F
     const { cleanup } = mount(h(App, {}));
     try {
       const { connections } = JSON.parse(localStorage.getItem('s3b_connections') || '{"connections":[]}');
-      assert.equal(connections.length, 1,
-        'gating migrateProfilesFromLegacy() on the marker must not prevent it from running for an un-migrated user');
+      assert.equal(
+        connections.length,
+        1,
+        'gating migrateProfilesFromLegacy() on the marker must not prevent it from running for an un-migrated user',
+      );
       assert.equal(connections[0].bucket, 'another-legacy-bucket');
     } finally {
       cleanup();
@@ -453,14 +574,29 @@ describe('App — a freshly saved connection survives the very next reload (Find
     // connection (as handleSaveProfile would have just created) plus live flat
     // credential keys matching it (as saveCredentials leaves them after connect),
     // and deliberately no s3b_profiles.
-    localStorage.setItem('s3b_credentials', JSON.stringify({
-      version: 1,
-      credentials: [{ id: 'credY', label: 'Y', endpoint: 'https://s3.example-y.com', keyId: 'kY', provider: null, regionOverride: '' }],
-    }));
-    localStorage.setItem('s3b_connections', JSON.stringify({
-      version: 2,
-      connections: [{ id: 77, name: 'Freshly saved', credentialId: 'credY', bucket: 'bucket-y', capabilities: null }],
-    }));
+    localStorage.setItem(
+      's3b_credentials',
+      JSON.stringify({
+        version: 1,
+        credentials: [
+          {
+            id: 'credY',
+            label: 'Y',
+            endpoint: 'https://s3.example-y.com',
+            keyId: 'kY',
+            provider: null,
+            regionOverride: '',
+          },
+        ],
+      }),
+    );
+    localStorage.setItem(
+      's3b_connections',
+      JSON.stringify({
+        version: 2,
+        connections: [{ id: 77, name: 'Freshly saved', credentialId: 'credY', bucket: 'bucket-y', capabilities: null }],
+      }),
+    );
     localStorage.setItem('s3b_last_profile_id', '77');
     localStorage.setItem('s3b_endpoint', 'https://s3.example-y.com');
     localStorage.setItem('s3b_bucket', 'bucket-y');
@@ -468,13 +604,21 @@ describe('App — a freshly saved connection survives the very next reload (Find
 
     const { cleanup } = mount(h(App, {}));
     try {
-      assert.equal(localStorage.getItem('s3b_last_profile_id'), '77',
-        'the real connection pointer must survive the very next reload, not be clobbered by a phantom profile id');
+      assert.equal(
+        localStorage.getItem('s3b_last_profile_id'),
+        '77',
+        'the real connection pointer must survive the very next reload, not be clobbered by a phantom profile id',
+      );
       const { connections } = JSON.parse(localStorage.getItem('s3b_connections'));
-      assert.ok(connections.some(c => String(c.id) === '77'),
-        'the pointer must still resolve to the real connection');
-      assert.equal(localStorage.getItem('s3b_profiles'), null,
-        'no phantom profile should be synthesised — the legacy chain must recognize this user is already on the connection model');
+      assert.ok(
+        connections.some((c) => String(c.id) === '77'),
+        'the pointer must still resolve to the real connection',
+      );
+      assert.equal(
+        localStorage.getItem('s3b_profiles'),
+        null,
+        'no phantom profile should be synthesised — the legacy chain must recognize this user is already on the connection model',
+      );
     } finally {
       cleanup();
       clearAppStorage();
@@ -498,17 +642,37 @@ describe('App — connecting resets the stored capability record, not just in-me
     // 'connected' synchronously, and the async listing probe fails immediately
     // with ECONNREFUSED with no real network dependency.
     localStorage.setItem('s3b_connections_migrated', '1');
-    localStorage.setItem('s3b_credentials', JSON.stringify({
-      version: 1,
-      credentials: [{ id: 'credB2', label: 'B2', endpoint: 'http://127.0.0.1:1', keyId: 'AKIDEXAMPLE9999', provider: null, regionOverride: '' }],
-    }));
-    localStorage.setItem('s3b_connections', JSON.stringify({
-      version: 2,
-      connections: [{
-        id: 9, name: 'Test conn 2', credentialId: 'credB2', bucket: 'test-bucket-2',
-        capabilities: { list: 'permitted', download: 'permitted', upload: 'permitted', delete: 'denied' },
-      }],
-    }));
+    localStorage.setItem(
+      's3b_credentials',
+      JSON.stringify({
+        version: 1,
+        credentials: [
+          {
+            id: 'credB2',
+            label: 'B2',
+            endpoint: 'http://127.0.0.1:1',
+            keyId: 'AKIDEXAMPLE9999',
+            provider: null,
+            regionOverride: '',
+          },
+        ],
+      }),
+    );
+    localStorage.setItem(
+      's3b_connections',
+      JSON.stringify({
+        version: 2,
+        connections: [
+          {
+            id: 9,
+            name: 'Test conn 2',
+            credentialId: 'credB2',
+            bucket: 'test-bucket-2',
+            capabilities: { list: 'permitted', download: 'permitted', upload: 'permitted', delete: 'denied' },
+          },
+        ],
+      }),
+    );
     localStorage.setItem('s3b_last_profile_id', '9');
 
     const { query, cleanup } = mount(h(App, {}));
@@ -517,9 +681,12 @@ describe('App — connecting resets the stored capability record, not just in-me
       fire(query('button[type="submit"]'), 'click');
 
       const { connections } = JSON.parse(localStorage.getItem('s3b_connections'));
-      const stored = connections.find(c => c.id === 9).capabilities;
-      assert.deepEqual(stored, { list: 'unknown', download: 'unknown', upload: 'unknown', delete: 'unknown' },
-        'the stored capability record must reset to unknown on connect too, not just the in-memory copy');
+      const stored = connections.find((c) => c.id === 9).capabilities;
+      assert.deepEqual(
+        stored,
+        { list: 'unknown', download: 'unknown', upload: 'unknown', delete: 'unknown' },
+        'the stored capability record must reset to unknown on connect too, not just the in-memory copy',
+      );
     } finally {
       cleanup();
       clearAppStorage();
@@ -550,7 +717,12 @@ describe('App — a deleted connection does not resurrect after this sequence: c
     localStorage.setItem('s3b_bucket', 'buck-1');
     localStorage.setItem('s3b_key_id', 'kF1');
     // "Save the connection under a name" — the real handleSaveProfile call chain.
-    const cred = findOrCreateCredential({ endpoint: 'https://s3.example-f1.com', keyId: 'kF1', provider: null, regionOverride: '' });
+    const cred = findOrCreateCredential({
+      endpoint: 'https://s3.example-f1.com',
+      keyId: 'kF1',
+      provider: null,
+      regionOverride: '',
+    });
     saveConnectionRecord({ id: 501, name: 'My Bucket', credentialId: cred.id, bucket: 'buck-1', capabilities: null });
     localStorage.setItem('s3b_last_profile_id', '501');
     // "Delete it" — the real handleDeleteProfile call chain.
@@ -560,10 +732,16 @@ describe('App — a deleted connection does not resurrect after this sequence: c
     const { cleanup } = mount(h(App, {}));
     try {
       const { connections } = JSON.parse(localStorage.getItem('s3b_connections') || '{"connections":[]}');
-      assert.deepEqual(connections, [],
-        'the deleted connection must not be resurrected as a phantom from stale flat keys');
-      assert.equal(localStorage.getItem('s3b_profiles'), null,
-        'no phantom profile should be synthesised — saveConnectionRecord recorded that this user is already on the connection model');
+      assert.deepEqual(
+        connections,
+        [],
+        'the deleted connection must not be resurrected as a phantom from stale flat keys',
+      );
+      assert.equal(
+        localStorage.getItem('s3b_profiles'),
+        null,
+        'no phantom profile should be synthesised — saveConnectionRecord recorded that this user is already on the connection model',
+      );
     } finally {
       cleanup();
       clearAppStorage();
@@ -582,7 +760,12 @@ describe('App — a deleted connection does not resurrect after this sequence: c
 describe('App — post-wipe resurrection from surviving flat keys is preserved (Finding A, case 4 — must not change)', () => {
   test('deleteAllProfiles() followed by a reload still resurrects one connection from the flat keys it leaves behind', () => {
     clearAppStorage();
-    const cred = findOrCreateCredential({ endpoint: 'https://s3.example-f1.com', keyId: 'kF1', provider: null, regionOverride: '' });
+    const cred = findOrCreateCredential({
+      endpoint: 'https://s3.example-f1.com',
+      keyId: 'kF1',
+      provider: null,
+      regionOverride: '',
+    });
     saveConnectionRecord({ id: 501, name: 'My Bucket', credentialId: cred.id, bucket: 'buck-1', capabilities: null });
     localStorage.setItem('s3b_last_profile_id', '501');
     localStorage.setItem('s3b_endpoint', 'https://s3.example-f1.com');
@@ -594,8 +777,11 @@ describe('App — post-wipe resurrection from surviving flat keys is preserved (
     const { cleanup } = mount(h(App, {}));
     try {
       const { connections } = JSON.parse(localStorage.getItem('s3b_connections') || '{"connections":[]}');
-      assert.equal(connections.length, 1,
-        'this is intentional pre-branch parity — a full wipe followed by a reload resurrects a connection from surviving flat keys, and must keep doing so');
+      assert.equal(
+        connections.length,
+        1,
+        'this is intentional pre-branch parity — a full wipe followed by a reload resurrects a connection from surviving flat keys, and must keep doing so',
+      );
       assert.equal(connections[0].bucket, 'buck-1');
     } finally {
       cleanup();
@@ -635,17 +821,28 @@ describe('App — a storage write that silently fails does not blank the form (B
       // Simulate Safari private browsing / blocked site data / quota exhaustion —
       // every localStorage write handleSaveProfile makes goes through safeSetRaw,
       // which swallows exactly this.
-      proto.setItem = function () { throw new Error('simulated storage failure'); };
+      proto.setItem = function () {
+        throw new Error('simulated storage failure');
+      };
 
       fire(query('.bucket-save-trigger'), 'click');
       fire(query('.bucket-save-form button[type="submit"]'), 'click');
 
-      assert.equal(query('#cred-endpoint')?.value, 'https://s3.us-east-1.amazonaws.com',
-        'endpoint must survive a save attempt that silently failed to persist');
-      assert.equal(query('#cred-bucket')?.value, 'my-bucket',
-        'bucket must survive a save attempt that silently failed to persist');
-      assert.equal(query('#cred-keyid')?.value, 'AKIDEXAMPLE1234',
-        'key ID must survive a save attempt that silently failed to persist');
+      assert.equal(
+        query('#cred-endpoint')?.value,
+        'https://s3.us-east-1.amazonaws.com',
+        'endpoint must survive a save attempt that silently failed to persist',
+      );
+      assert.equal(
+        query('#cred-bucket')?.value,
+        'my-bucket',
+        'bucket must survive a save attempt that silently failed to persist',
+      );
+      assert.equal(
+        query('#cred-keyid')?.value,
+        'AKIDEXAMPLE1234',
+        'key ID must survive a save attempt that silently failed to persist',
+      );
     } finally {
       // Restore before cleanup/clearAppStorage — both call localStorage methods,
       // and this stub is on the shared prototype every other test relies on.
@@ -668,11 +865,11 @@ describe('App — a storage write that silently fails does not blank the form (B
 // effect: a link arriving at someone who already has a saved connection.
 describe('App — connection share links', () => {
   const SHARED = {
-    endpoint:       'https://s3.eu-central-003.backblazeb2.com',
-    bucket:         'shared-bucket',
-    provider:       'b2',
+    endpoint: 'https://s3.eu-central-003.backblazeb2.com',
+    bucket: 'shared-bucket',
+    provider: 'b2',
     regionOverride: 'eu-central-003',
-    keyId:          'SHAREDKEY123',
+    keyId: 'SHAREDKEY123',
   };
 
   function setShareHash(creds, opts) {
@@ -681,10 +878,23 @@ describe('App — connection share links', () => {
   }
 
   function seedOwnConnection() {
-    localStorage.setItem('s3b_profiles', JSON.stringify({ version: 1, profiles: [
-      { id: 5, name: 'Mine', endpoint: 'https://s3.us-west-004.backblazeb2.com',
-        bucket: 'my-bucket', keyId: 'MYKEY', provider: 'b2', regionOverride: 'us-west-004' },
-    ]}));
+    localStorage.setItem(
+      's3b_profiles',
+      JSON.stringify({
+        version: 1,
+        profiles: [
+          {
+            id: 5,
+            name: 'Mine',
+            endpoint: 'https://s3.us-west-004.backblazeb2.com',
+            bucket: 'my-bucket',
+            keyId: 'MYKEY',
+            provider: 'b2',
+            regionOverride: 'us-west-004',
+          },
+        ],
+      }),
+    );
     localStorage.setItem('s3b_last_profile_id', '5');
   }
 
@@ -692,10 +902,10 @@ describe('App — connection share links', () => {
     clearAppStorage();
     setShareHash(SHARED, { includeKeyId: true });
     try {
-      assert.deepEqual(readUrlParams(), SHARED,
-        'a link must round-trip endpoint, bucket, provider, region and key ID');
+      assert.deepEqual(readUrlParams(), SHARED, 'a link must round-trip endpoint, bucket, provider, region and key ID');
     } finally {
-      window.location.hash = ''; clearAppStorage();
+      window.location.hash = '';
+      clearAppStorage();
     }
   });
 
@@ -704,21 +914,32 @@ describe('App — connection share links', () => {
     assert.equal(url.includes('TOPSECRET'), false, 'secret key must never reach the URL');
   });
 
-  test('a share link overrides the recipient\'s own saved connection in the form', async () => {
+  test("a share link overrides the recipient's own saved connection in the form", async () => {
     clearAppStorage();
     seedOwnConnection();
     setShareHash(SHARED, { includeKeyId: true });
     const { query, cleanup } = mount(h(App, {}));
     try {
-      await new Promise(resolve => setTimeout(resolve, 0));
-      assert.equal(query('#cred-endpoint')?.value, SHARED.endpoint,
-        'endpoint must come from the link, not the saved connection');
-      assert.equal(query('#cred-bucket')?.value, SHARED.bucket,
-        'bucket must come from the link, not the saved connection');
-      assert.equal(query('#cred-keyid')?.value, SHARED.keyId,
-        'key ID must come from the link, not the saved connection');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      assert.equal(
+        query('#cred-endpoint')?.value,
+        SHARED.endpoint,
+        'endpoint must come from the link, not the saved connection',
+      );
+      assert.equal(
+        query('#cred-bucket')?.value,
+        SHARED.bucket,
+        'bucket must come from the link, not the saved connection',
+      );
+      assert.equal(
+        query('#cred-keyid')?.value,
+        SHARED.keyId,
+        'key ID must come from the link, not the saved connection',
+      );
     } finally {
-      cleanup(); window.location.hash = ''; clearAppStorage();
+      cleanup();
+      window.location.hash = '';
+      clearAppStorage();
     }
   });
 
@@ -728,13 +949,14 @@ describe('App — connection share links', () => {
     setShareHash(SHARED, { includeKeyId: true });
     const { cleanup } = mount(h(App, {}));
     try {
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
       const { connections } = JSON.parse(localStorage.getItem('s3b_connections'));
       assert.equal(connections.length, 1, 'the link must not create a second connection');
-      assert.equal(connections[0].bucket, 'my-bucket',
-        'the recipient\'s stored connection must keep its own bucket');
+      assert.equal(connections[0].bucket, 'my-bucket', "the recipient's stored connection must keep its own bucket");
     } finally {
-      cleanup(); window.location.hash = ''; clearAppStorage();
+      cleanup();
+      window.location.hash = '';
+      clearAppStorage();
     }
   });
 
@@ -747,21 +969,22 @@ describe('App — connection share links', () => {
     window.location.hash = '';
     const { query, cleanup } = mount(h(App, {}));
     try {
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
       assert.equal(query('#cred-endpoint')?.value, '', 'precondition: form starts empty');
 
       // Exactly what the browser does for a fragment-only navigation.
       setShareHash(SHARED, { includeKeyId: true });
       window.dispatchEvent(new window.HashChangeEvent('hashchange'));
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
 
-      assert.equal(query('#cred-endpoint')?.value, SHARED.endpoint,
-        'endpoint must be applied without a page reload');
+      assert.equal(query('#cred-endpoint')?.value, SHARED.endpoint, 'endpoint must be applied without a page reload');
       assert.equal(query('#cred-bucket')?.value, SHARED.bucket);
       assert.equal(query('#cred-keyid')?.value, SHARED.keyId);
       assert.equal(query('#cred-region')?.value, SHARED.regionOverride);
     } finally {
-      cleanup(); window.location.hash = ''; clearAppStorage();
+      cleanup();
+      window.location.hash = '';
+      clearAppStorage();
     }
   });
 
@@ -770,29 +993,35 @@ describe('App — connection share links', () => {
     setShareHash(SHARED, { includeKeyId: true });
     const { query, cleanup } = mount(h(App, {}));
     try {
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
       // Folder navigation rewrites the fragment with only a prefix param.
       window.location.hash = '#prefix=some/folder/';
       window.dispatchEvent(new window.HashChangeEvent('hashchange'));
-      await new Promise(resolve => setTimeout(resolve, 0));
-      assert.equal(query('#cred-endpoint')?.value, SHARED.endpoint,
-        'a prefix-only hash must not clear connection details already in the form');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      assert.equal(
+        query('#cred-endpoint')?.value,
+        SHARED.endpoint,
+        'a prefix-only hash must not clear connection details already in the form',
+      );
     } finally {
-      cleanup(); window.location.hash = ''; clearAppStorage();
+      cleanup();
+      window.location.hash = '';
+      clearAppStorage();
     }
   });
 
   test('a link without a key ID leaves that field empty for the recipient', async () => {
     clearAppStorage();
-    setShareHash(SHARED);   // no includeKeyId
+    setShareHash(SHARED); // no includeKeyId
     const { query, cleanup } = mount(h(App, {}));
     try {
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
       assert.equal(query('#cred-endpoint')?.value, SHARED.endpoint);
-      assert.equal(query('#cred-keyid')?.value, '',
-        'a link that omitted the key ID must not pre-fill one');
+      assert.equal(query('#cred-keyid')?.value, '', 'a link that omitted the key ID must not pre-fill one');
     } finally {
-      cleanup(); window.location.hash = ''; clearAppStorage();
+      cleanup();
+      window.location.hash = '';
+      clearAppStorage();
     }
   });
 });
@@ -805,231 +1034,322 @@ describe('App — connection share links', () => {
 // autocomplete="current-password" (matching VaultUnlock's passphrase field by
 // design), so that attribute alone cannot tell the two screens apart once both
 // exist in the same file.
-describe('App — vault lock screen (Task 6)', { skip: !VAULT_ENABLED && 'vault gated off — see VAULT_ENABLED in src/lib/vault.js' }, () => {
-  test('a vault present and locked renders VaultUnlock, not the connect form', async () => {
-    clearAppStorage();
-    await createVault(PASSPHRASE, window.crypto.subtle, getRandomValues);
-    sessionStorage.removeItem(SS_KEY_VAULT_KEY); // createVault leaves it unlocked — start locked
-    const { query, cleanup } = mount(h(App, {}));
-    try {
-      assert.ok(query('#vault-passphrase'),
-        'the vault passphrase field must render when a vault exists and is locked');
-      assert.equal(query('#cred-endpoint'), null,
-        'the connect form must not render while locked');
-    } finally { cleanup(); clearAppStorage(); }
-  });
-
-  test('no vault renders the connect form exactly as today, not the unlock screen', () => {
-    clearAppStorage();
-    const { query, cleanup } = mount(h(App, {}));
-    try {
-      assert.ok(query('#cred-endpoint'), 'the connect form must render when there is no vault');
-      assert.equal(query('#vault-passphrase'), null,
-        'the vault unlock screen must not render when there is no vault');
-    } finally { cleanup(); clearAppStorage(); }
-  });
-
-  test('unlocking reveals the connect form', async () => {
-    clearAppStorage();
-    await createVault(PASSPHRASE, window.crypto.subtle, getRandomValues);
-    sessionStorage.removeItem(SS_KEY_VAULT_KEY);
-    const { query, cleanup } = mount(h(App, {}));
-    try {
-      const passInput = query('#vault-passphrase');
-      assert.ok(passInput, 'precondition: starts locked');
-      setInput(passInput, PASSPHRASE);
-      fire(passInput.closest('form'), 'submit');
-
-      let revealed = false;
-      for (let i = 0; i < 60 && !revealed; i++) {
-        await new Promise(r => setTimeout(r, 10));
-        revealed = !!query('#cred-endpoint');
-      }
-      assert.ok(revealed, 'the connect form must appear after a successful unlock');
-    } finally { cleanup(); clearAppStorage(); }
-  });
-});
-
-describe('App — vault-backed auto-connect (Task 6)', { skip: !VAULT_ENABLED && 'vault gated off — see VAULT_ENABLED in src/lib/vault.js' }, () => {
-  test('a connection whose secret is remembered auto-connects on mount without the user typing anything', async () => {
-    clearAppStorage();
-    await createVault(PASSPHRASE, window.crypto.subtle, getRandomValues);
-    // Leave sessionStorage's vault key intact — this is the "already unlocked, page
-    // reloaded in the same tab" scenario the mount-effect recall path exists for
-    // (sessionStorage survives a same-tab reload; it does not survive a fresh tab).
-    localStorage.setItem('s3b_connections_migrated', '1');
-    localStorage.setItem('s3b_credentials', JSON.stringify({
-      version: 1,
-      credentials: [{ id: 'credV', label: 'V', endpoint: 'http://127.0.0.1:1', keyId: 'AKIDVAULT', provider: null, regionOverride: '' }],
-    }));
-    localStorage.setItem('s3b_connections', JSON.stringify({
-      version: 2,
-      connections: [{ id: 501, name: 'Vault conn', credentialId: 'credV', bucket: 'vault-bucket', capabilities: null }],
-    }));
-    localStorage.setItem('s3b_last_profile_id', '501');
-    await rememberSecret('credV', 'sekrit-value', window.crypto.subtle);
-
-    const { query, cleanup } = mount(h(App, {}));
-    try {
-      let connected = false;
-      for (let i = 0; i < 80 && !connected; i++) {
-        await new Promise(r => setTimeout(r, 10));
-        connected = !!query('[data-testid="app-connected"]');
-      }
-      assert.ok(connected, 'the app must auto-connect using the remembered secret without any typing');
-    } finally { cleanup(); clearAppStorage(); }
-  });
-
-  // Design doc: "Clicking a connection focuses the passphrase; Enter unlocks and
-  // connects into that connection in one motion" — unlocking must not merely reveal
-  // the connect form, it must attempt the same recall-and-connect the mount effect
-  // does, immediately, for a genuinely fresh tab (no prior sessionStorage) too.
-  test('unlocking auto-connects into the selected connection when its secret is remembered (one motion)', async () => {
-    clearAppStorage();
-    await createVault(PASSPHRASE, window.crypto.subtle, getRandomValues);
-    localStorage.setItem('s3b_connections_migrated', '1');
-    localStorage.setItem('s3b_credentials', JSON.stringify({
-      version: 1,
-      credentials: [{ id: 'credU', label: 'U', endpoint: 'http://127.0.0.1:1', keyId: 'AKIDUNLOCK', provider: null, regionOverride: '' }],
-    }));
-    localStorage.setItem('s3b_connections', JSON.stringify({
-      version: 2,
-      connections: [{ id: 777, name: 'Unlock conn', credentialId: 'credU', bucket: 'unlock-bucket', capabilities: null }],
-    }));
-    localStorage.setItem('s3b_last_profile_id', '777');
-    await rememberSecret('credU', 'unlocked-secret', window.crypto.subtle);
-    sessionStorage.removeItem(SS_KEY_VAULT_KEY); // re-lock before mounting — fresh-tab scenario
-
-    const { query, cleanup } = mount(h(App, {}));
-    try {
-      const passInput = query('#vault-passphrase');
-      assert.ok(passInput, 'precondition: starts locked');
-      setInput(passInput, PASSPHRASE);
-      fire(passInput.closest('form'), 'submit');
-
-      let connected = false;
-      for (let i = 0; i < 80 && !connected; i++) {
-        await new Promise(r => setTimeout(r, 10));
-        connected = !!query('[data-testid="app-connected"]');
-      }
-      assert.ok(connected, 'unlocking must auto-connect into the selected connection in one motion');
-    } finally { cleanup(); clearAppStorage(); }
-  });
-});
-
-describe('App — post-connect vault offer (Task 6)', { skip: !VAULT_ENABLED && 'vault gated off — see VAULT_ENABLED in src/lib/vault.js' }, () => {
-  test('the offer appears after the first successful connect when no vault exists', () => {
-    clearAppStorage();
-    const { query, text, cleanup } = mount(h(App, {}));
-    try {
-      setInput(query('#cred-endpoint'), 'http://127.0.0.1:1');
-      setInput(query('#cred-bucket'), 'offer-bucket');
-      setInput(query('#cred-keyid'), 'AKIDOFFER');
-      setInput(query('#cred-secretkey'), 'offer-secret');
-      fire(query('button[type="submit"]'), 'click');
-      assert.ok(/retype it/i.test(text()),
-        'the post-connect vault offer must appear after a successful connect with no vault present');
-    } finally { cleanup(); clearAppStorage(); }
-  });
-
-  test('the offer never appears once a vault already exists', () => {
-    clearAppStorage();
-    localStorage.setItem('s3b_vault', JSON.stringify({
-      version: 1, salt: 'c2FsdA==', iterations: 1, check: { iv: 'aXY=', ct: 'Y3Q=' }, entries: {},
-    }));
-    // Simulate "already unlocked" directly rather than awaiting createVault — the
-    // condition under test (vaultExists()) does not depend on the record being
-    // real/decryptable, only present, so an ordinary (non-async) seed keeps this
-    // test fast and lock-state-independent of a real derivation.
-    sessionStorage.setItem(SS_KEY_VAULT_KEY, 'irrelevant-for-this-test');
-    const { query, text, cleanup } = mount(h(App, {}));
-    try {
-      setInput(query('#cred-endpoint'), 'http://127.0.0.1:1');
-      setInput(query('#cred-bucket'), 'offer-bucket-2');
-      setInput(query('#cred-keyid'), 'AKIDOFFER2');
-      setInput(query('#cred-secretkey'), 'offer-secret-2');
-      fire(query('button[type="submit"]'), 'click');
-      assert.ok(!/retype it/i.test(text()),
-        'the offer must never appear once a vault already exists');
-    } finally { cleanup(); clearAppStorage(); }
-  });
-
-  test('dismissing the offer persists so it never reappears, even after a fresh mount', () => {
-    clearAppStorage();
-    {
-      const { query, text, cleanup } = mount(h(App, {}));
-      setInput(query('#cred-endpoint'), 'http://127.0.0.1:1');
-      setInput(query('#cred-bucket'), 'dismiss-bucket');
-      setInput(query('#cred-keyid'), 'AKIDDISMISS');
-      setInput(query('#cred-secretkey'), 'dismiss-secret');
-      fire(query('button[type="submit"]'), 'click');
-      assert.ok(/retype it/i.test(text()), 'precondition: the offer is showing');
-      const closeBtn = query('.banner-close');
-      assert.ok(closeBtn, 'the offer banner must use the existing banner-close dismiss control');
-      fire(closeBtn, 'click');
-      assert.ok(!/retype it/i.test(text()), 'the offer must disappear once dismissed');
-      cleanup();
-    }
-    try {
-      const { query, text, cleanup } = mount(h(App, {}));
-      setInput(query('#cred-endpoint'), 'http://127.0.0.1:1');
-      setInput(query('#cred-bucket'), 'dismiss-bucket-2');
-      setInput(query('#cred-keyid'), 'AKIDDISMISS2');
-      setInput(query('#cred-secretkey'), 'dismiss-secret-2');
-      fire(query('button[type="submit"]'), 'click');
-      assert.ok(!/retype it/i.test(text()),
-        'a dismissed offer must never reappear, even after a fresh App mount');
-      cleanup();
-    } finally {
+describe(
+  'App — vault lock screen (Task 6)',
+  { skip: !VAULT_ENABLED && 'vault gated off — see VAULT_ENABLED in src/lib/vault.js' },
+  () => {
+    test('a vault present and locked renders VaultUnlock, not the connect form', async () => {
       clearAppStorage();
-    }
-  });
-
-  test('accepting the offer creates the vault and remembers the just-connected secret', async () => {
-    clearAppStorage();
-    const { query, cleanup } = mount(h(App, {}));
-    try {
-      setInput(query('#cred-endpoint'), 'http://127.0.0.1:1');
-      setInput(query('#cred-bucket'), 'accept-bucket');
-      setInput(query('#cred-keyid'), 'AKIDACCEPT');
-      setInput(query('#cred-secretkey'), 'accept-secret');
-      fire(query('button[type="submit"]'), 'click');
-
-      const userInput = query('#vault-offer-username');
-      assert.ok(userInput, 'the offer must include the vault username field so password managers save it correctly matched to the unlock screen');
-      assert.equal(userInput.value, VAULT_USERNAME, 'the offer username must be the exact same constant VaultUnlock uses');
-      assert.equal(userInput.readOnly, true);
-
-      const passInput = query('input[autocomplete="new-password"]');
-      assert.ok(passInput, 'the offer must include a new-password passphrase field so managers offer to generate one');
-      setInput(passInput, PASSPHRASE);
-      fire(passInput.closest('form'), 'submit');
-
-      let created = false;
-      for (let i = 0; i < 80 && !created; i++) {
-        await new Promise(r => setTimeout(r, 10));
-        created = vaultExists();
+      await createVault(PASSPHRASE, window.crypto.subtle, getRandomValues);
+      sessionStorage.removeItem(SS_KEY_VAULT_KEY); // createVault leaves it unlocked — start locked
+      const { query, cleanup } = mount(h(App, {}));
+      try {
+        assert.ok(
+          query('#vault-passphrase'),
+          'the vault passphrase field must render when a vault exists and is locked',
+        );
+        assert.equal(query('#cred-endpoint'), null, 'the connect form must not render while locked');
+      } finally {
+        cleanup();
+        clearAppStorage();
       }
-      assert.ok(created, 'accepting the offer must create the vault');
+    });
 
-      const { credentials } = JSON.parse(localStorage.getItem('s3b_credentials'));
-      const cred = credentials.find(c => c.endpoint === 'http://127.0.0.1:1' && c.keyId === 'AKIDACCEPT');
-      assert.ok(cred, 'a credential must be persisted for the just-connected values');
-
-      // vaultExists() flips true as soon as createVault's own write lands, but
-      // rememberSecret is a SEPARATE await after that inside handleAcceptVaultOffer
-      // — poll recallSecret itself rather than assuming it has landed the instant
-      // vaultExists() does (the vaultExists() poll above caught this as a real,
-      // reproducible flake before this loop was added).
-      let recalled = null;
-      for (let i = 0; i < 80 && recalled === null; i++) {
-        recalled = await recallSecret(cred.id, window.crypto.subtle);
-        if (!recalled) await new Promise(r => setTimeout(r, 10));
+    test('no vault renders the connect form exactly as today, not the unlock screen', () => {
+      clearAppStorage();
+      const { query, cleanup } = mount(h(App, {}));
+      try {
+        assert.ok(query('#cred-endpoint'), 'the connect form must render when there is no vault');
+        assert.equal(
+          query('#vault-passphrase'),
+          null,
+          'the vault unlock screen must not render when there is no vault',
+        );
+      } finally {
+        cleanup();
+        clearAppStorage();
       }
-      assert.equal(recalled, 'accept-secret', 'the just-typed secret must be remembered under the new credential');
-    } finally { cleanup(); clearAppStorage(); }
-  });
-});
+    });
+
+    test('unlocking reveals the connect form', async () => {
+      clearAppStorage();
+      await createVault(PASSPHRASE, window.crypto.subtle, getRandomValues);
+      sessionStorage.removeItem(SS_KEY_VAULT_KEY);
+      const { query, cleanup } = mount(h(App, {}));
+      try {
+        const passInput = query('#vault-passphrase');
+        assert.ok(passInput, 'precondition: starts locked');
+        setInput(passInput, PASSPHRASE);
+        fire(passInput.closest('form'), 'submit');
+
+        let revealed = false;
+        for (let i = 0; i < 60 && !revealed; i++) {
+          await new Promise((r) => setTimeout(r, 10));
+          revealed = !!query('#cred-endpoint');
+        }
+        assert.ok(revealed, 'the connect form must appear after a successful unlock');
+      } finally {
+        cleanup();
+        clearAppStorage();
+      }
+    });
+  },
+);
+
+describe(
+  'App — vault-backed auto-connect (Task 6)',
+  { skip: !VAULT_ENABLED && 'vault gated off — see VAULT_ENABLED in src/lib/vault.js' },
+  () => {
+    test('a connection whose secret is remembered auto-connects on mount without the user typing anything', async () => {
+      clearAppStorage();
+      await createVault(PASSPHRASE, window.crypto.subtle, getRandomValues);
+      // Leave sessionStorage's vault key intact — this is the "already unlocked, page
+      // reloaded in the same tab" scenario the mount-effect recall path exists for
+      // (sessionStorage survives a same-tab reload; it does not survive a fresh tab).
+      localStorage.setItem('s3b_connections_migrated', '1');
+      localStorage.setItem(
+        's3b_credentials',
+        JSON.stringify({
+          version: 1,
+          credentials: [
+            {
+              id: 'credV',
+              label: 'V',
+              endpoint: 'http://127.0.0.1:1',
+              keyId: 'AKIDVAULT',
+              provider: null,
+              regionOverride: '',
+            },
+          ],
+        }),
+      );
+      localStorage.setItem(
+        's3b_connections',
+        JSON.stringify({
+          version: 2,
+          connections: [
+            { id: 501, name: 'Vault conn', credentialId: 'credV', bucket: 'vault-bucket', capabilities: null },
+          ],
+        }),
+      );
+      localStorage.setItem('s3b_last_profile_id', '501');
+      await rememberSecret('credV', 'sekrit-value', window.crypto.subtle);
+
+      const { query, cleanup } = mount(h(App, {}));
+      try {
+        let connected = false;
+        for (let i = 0; i < 80 && !connected; i++) {
+          await new Promise((r) => setTimeout(r, 10));
+          connected = !!query('[data-testid="app-connected"]');
+        }
+        assert.ok(connected, 'the app must auto-connect using the remembered secret without any typing');
+      } finally {
+        cleanup();
+        clearAppStorage();
+      }
+    });
+
+    // Design doc: "Clicking a connection focuses the passphrase; Enter unlocks and
+    // connects into that connection in one motion" — unlocking must not merely reveal
+    // the connect form, it must attempt the same recall-and-connect the mount effect
+    // does, immediately, for a genuinely fresh tab (no prior sessionStorage) too.
+    test('unlocking auto-connects into the selected connection when its secret is remembered (one motion)', async () => {
+      clearAppStorage();
+      await createVault(PASSPHRASE, window.crypto.subtle, getRandomValues);
+      localStorage.setItem('s3b_connections_migrated', '1');
+      localStorage.setItem(
+        's3b_credentials',
+        JSON.stringify({
+          version: 1,
+          credentials: [
+            {
+              id: 'credU',
+              label: 'U',
+              endpoint: 'http://127.0.0.1:1',
+              keyId: 'AKIDUNLOCK',
+              provider: null,
+              regionOverride: '',
+            },
+          ],
+        }),
+      );
+      localStorage.setItem(
+        's3b_connections',
+        JSON.stringify({
+          version: 2,
+          connections: [
+            { id: 777, name: 'Unlock conn', credentialId: 'credU', bucket: 'unlock-bucket', capabilities: null },
+          ],
+        }),
+      );
+      localStorage.setItem('s3b_last_profile_id', '777');
+      await rememberSecret('credU', 'unlocked-secret', window.crypto.subtle);
+      sessionStorage.removeItem(SS_KEY_VAULT_KEY); // re-lock before mounting — fresh-tab scenario
+
+      const { query, cleanup } = mount(h(App, {}));
+      try {
+        const passInput = query('#vault-passphrase');
+        assert.ok(passInput, 'precondition: starts locked');
+        setInput(passInput, PASSPHRASE);
+        fire(passInput.closest('form'), 'submit');
+
+        let connected = false;
+        for (let i = 0; i < 80 && !connected; i++) {
+          await new Promise((r) => setTimeout(r, 10));
+          connected = !!query('[data-testid="app-connected"]');
+        }
+        assert.ok(connected, 'unlocking must auto-connect into the selected connection in one motion');
+      } finally {
+        cleanup();
+        clearAppStorage();
+      }
+    });
+  },
+);
+
+describe(
+  'App — post-connect vault offer (Task 6)',
+  { skip: !VAULT_ENABLED && 'vault gated off — see VAULT_ENABLED in src/lib/vault.js' },
+  () => {
+    test('the offer appears after the first successful connect when no vault exists', () => {
+      clearAppStorage();
+      const { query, text, cleanup } = mount(h(App, {}));
+      try {
+        setInput(query('#cred-endpoint'), 'http://127.0.0.1:1');
+        setInput(query('#cred-bucket'), 'offer-bucket');
+        setInput(query('#cred-keyid'), 'AKIDOFFER');
+        setInput(query('#cred-secretkey'), 'offer-secret');
+        fire(query('button[type="submit"]'), 'click');
+        assert.ok(
+          /retype it/i.test(text()),
+          'the post-connect vault offer must appear after a successful connect with no vault present',
+        );
+      } finally {
+        cleanup();
+        clearAppStorage();
+      }
+    });
+
+    test('the offer never appears once a vault already exists', () => {
+      clearAppStorage();
+      localStorage.setItem(
+        's3b_vault',
+        JSON.stringify({
+          version: 1,
+          salt: 'c2FsdA==',
+          iterations: 1,
+          check: { iv: 'aXY=', ct: 'Y3Q=' },
+          entries: {},
+        }),
+      );
+      // Simulate "already unlocked" directly rather than awaiting createVault — the
+      // condition under test (vaultExists()) does not depend on the record being
+      // real/decryptable, only present, so an ordinary (non-async) seed keeps this
+      // test fast and lock-state-independent of a real derivation.
+      sessionStorage.setItem(SS_KEY_VAULT_KEY, 'irrelevant-for-this-test');
+      const { query, text, cleanup } = mount(h(App, {}));
+      try {
+        setInput(query('#cred-endpoint'), 'http://127.0.0.1:1');
+        setInput(query('#cred-bucket'), 'offer-bucket-2');
+        setInput(query('#cred-keyid'), 'AKIDOFFER2');
+        setInput(query('#cred-secretkey'), 'offer-secret-2');
+        fire(query('button[type="submit"]'), 'click');
+        assert.ok(!/retype it/i.test(text()), 'the offer must never appear once a vault already exists');
+      } finally {
+        cleanup();
+        clearAppStorage();
+      }
+    });
+
+    test('dismissing the offer persists so it never reappears, even after a fresh mount', () => {
+      clearAppStorage();
+      {
+        const { query, text, cleanup } = mount(h(App, {}));
+        setInput(query('#cred-endpoint'), 'http://127.0.0.1:1');
+        setInput(query('#cred-bucket'), 'dismiss-bucket');
+        setInput(query('#cred-keyid'), 'AKIDDISMISS');
+        setInput(query('#cred-secretkey'), 'dismiss-secret');
+        fire(query('button[type="submit"]'), 'click');
+        assert.ok(/retype it/i.test(text()), 'precondition: the offer is showing');
+        const closeBtn = query('.banner-close');
+        assert.ok(closeBtn, 'the offer banner must use the existing banner-close dismiss control');
+        fire(closeBtn, 'click');
+        assert.ok(!/retype it/i.test(text()), 'the offer must disappear once dismissed');
+        cleanup();
+      }
+      try {
+        const { query, text, cleanup } = mount(h(App, {}));
+        setInput(query('#cred-endpoint'), 'http://127.0.0.1:1');
+        setInput(query('#cred-bucket'), 'dismiss-bucket-2');
+        setInput(query('#cred-keyid'), 'AKIDDISMISS2');
+        setInput(query('#cred-secretkey'), 'dismiss-secret-2');
+        fire(query('button[type="submit"]'), 'click');
+        assert.ok(!/retype it/i.test(text()), 'a dismissed offer must never reappear, even after a fresh App mount');
+        cleanup();
+      } finally {
+        clearAppStorage();
+      }
+    });
+
+    test('accepting the offer creates the vault and remembers the just-connected secret', async () => {
+      clearAppStorage();
+      const { query, cleanup } = mount(h(App, {}));
+      try {
+        setInput(query('#cred-endpoint'), 'http://127.0.0.1:1');
+        setInput(query('#cred-bucket'), 'accept-bucket');
+        setInput(query('#cred-keyid'), 'AKIDACCEPT');
+        setInput(query('#cred-secretkey'), 'accept-secret');
+        fire(query('button[type="submit"]'), 'click');
+
+        const userInput = query('#vault-offer-username');
+        assert.ok(
+          userInput,
+          'the offer must include the vault username field so password managers save it correctly matched to the unlock screen',
+        );
+        assert.equal(
+          userInput.value,
+          VAULT_USERNAME,
+          'the offer username must be the exact same constant VaultUnlock uses',
+        );
+        assert.equal(userInput.readOnly, true);
+
+        const passInput = query('input[autocomplete="new-password"]');
+        assert.ok(
+          passInput,
+          'the offer must include a new-password passphrase field so managers offer to generate one',
+        );
+        setInput(passInput, PASSPHRASE);
+        fire(passInput.closest('form'), 'submit');
+
+        let created = false;
+        for (let i = 0; i < 80 && !created; i++) {
+          await new Promise((r) => setTimeout(r, 10));
+          created = vaultExists();
+        }
+        assert.ok(created, 'accepting the offer must create the vault');
+
+        const { credentials } = JSON.parse(localStorage.getItem('s3b_credentials'));
+        const cred = credentials.find((c) => c.endpoint === 'http://127.0.0.1:1' && c.keyId === 'AKIDACCEPT');
+        assert.ok(cred, 'a credential must be persisted for the just-connected values');
+
+        // vaultExists() flips true as soon as createVault's own write lands, but
+        // rememberSecret is a SEPARATE await after that inside handleAcceptVaultOffer
+        // — poll recallSecret itself rather than assuming it has landed the instant
+        // vaultExists() does (the vaultExists() poll above caught this as a real,
+        // reproducible flake before this loop was added).
+        let recalled = null;
+        for (let i = 0; i < 80 && recalled === null; i++) {
+          recalled = await recallSecret(cred.id, window.crypto.subtle);
+          if (!recalled) await new Promise((r) => setTimeout(r, 10));
+        }
+        assert.equal(recalled, 'accept-secret', 'the just-typed secret must be remembered under the new credential');
+      } finally {
+        cleanup();
+        clearAppStorage();
+      }
+    });
+  },
+);
 
 // ── Vault kill switch ─────────────────────────────────────────────────────────────
 // The vault's creation flow failed its design review (2 Critical + 5 Important, all
@@ -1040,62 +1360,102 @@ describe('App — post-connect vault offer (Task 6)', { skip: !VAULT_ENABLED && 
 // The re-wrap and disconnect suites below stay active either way: the record layer
 // keeps honoring a pre-existing vault, it just can't be created, unlocked, or
 // auto-connected from while gated.
-describe('App — vault gated off (VAULT_ENABLED=false)', { skip: VAULT_ENABLED && 'vault is enabled — the Task 6 suites cover these paths' }, () => {
-  test('a vault present and locked still renders the connect form, never the unlock screen', async () => {
-    clearAppStorage();
-    await createVault(PASSPHRASE, window.crypto.subtle, getRandomValues);
-    sessionStorage.removeItem(SS_KEY_VAULT_KEY); // start locked, as a returning user would
-    const { query, cleanup } = mount(h(App, {}));
-    try {
-      assert.ok(query('#cred-endpoint'),
-        'the connect form must render even when a locked vault exists (C1: no lockout while gated)');
-      assert.equal(query('#vault-passphrase'), null,
-        'the unlock screen must be unreachable while the vault is gated off');
-    } finally { cleanup(); clearAppStorage(); }
-  });
-
-  test('a successful connect never shows the vault offer', () => {
-    clearAppStorage();
-    const { query, text, cleanup } = mount(h(App, {}));
-    try {
-      setInput(query('#cred-endpoint'), 'http://127.0.0.1:1');
-      setInput(query('#cred-bucket'), 'gated-bucket');
-      setInput(query('#cred-keyid'), 'AKIDGATED');
-      setInput(query('#cred-secretkey'), 'gated-secret');
-      fire(query('button[type="submit"]'), 'click');
-      assert.ok(!/retype it/i.test(text()),
-        'the post-connect vault offer must not appear while the vault is gated off');
-    } finally { cleanup(); clearAppStorage(); }
-  });
-
-  test('a remembered secret does not auto-connect on mount', async () => {
-    clearAppStorage();
-    await createVault(PASSPHRASE, window.crypto.subtle, getRandomValues);
-    // Same seed as the Task 6 auto-connect test: unlocked vault, remembered secret,
-    // last-used connection selected — the strongest possible auto-connect setup.
-    localStorage.setItem('s3b_connections_migrated', '1');
-    localStorage.setItem('s3b_credentials', JSON.stringify({
-      version: 1,
-      credentials: [{ id: 'credG', label: 'G', endpoint: 'http://127.0.0.1:1', keyId: 'AKIDGATE2', provider: null, regionOverride: '' }],
-    }));
-    localStorage.setItem('s3b_connections', JSON.stringify({
-      version: 2,
-      connections: [{ id: 601, name: 'Gated conn', credentialId: 'credG', bucket: 'gated-bucket-2', capabilities: null }],
-    }));
-    localStorage.setItem('s3b_last_profile_id', '601');
-    await rememberSecret('credG', 'gated-secret-2', window.crypto.subtle);
-
-    const { query, cleanup } = mount(h(App, {}));
-    try {
-      for (let i = 0; i < 30; i++) {
-        await new Promise(r => setTimeout(r, 10));
-        assert.equal(query('[data-testid="app-connected"]'), null,
-          'the app must not auto-connect from the vault while gated off');
+describe(
+  'App — vault gated off (VAULT_ENABLED=false)',
+  { skip: VAULT_ENABLED && 'vault is enabled — the Task 6 suites cover these paths' },
+  () => {
+    test('a vault present and locked still renders the connect form, never the unlock screen', async () => {
+      clearAppStorage();
+      await createVault(PASSPHRASE, window.crypto.subtle, getRandomValues);
+      sessionStorage.removeItem(SS_KEY_VAULT_KEY); // start locked, as a returning user would
+      const { query, cleanup } = mount(h(App, {}));
+      try {
+        assert.ok(
+          query('#cred-endpoint'),
+          'the connect form must render even when a locked vault exists (C1: no lockout while gated)',
+        );
+        assert.equal(
+          query('#vault-passphrase'),
+          null,
+          'the unlock screen must be unreachable while the vault is gated off',
+        );
+      } finally {
+        cleanup();
+        clearAppStorage();
       }
-      assert.ok(query('#cred-endpoint'), 'the ordinary connect form must be what renders');
-    } finally { cleanup(); clearAppStorage(); }
-  });
-});
+    });
+
+    test('a successful connect never shows the vault offer', () => {
+      clearAppStorage();
+      const { query, text, cleanup } = mount(h(App, {}));
+      try {
+        setInput(query('#cred-endpoint'), 'http://127.0.0.1:1');
+        setInput(query('#cred-bucket'), 'gated-bucket');
+        setInput(query('#cred-keyid'), 'AKIDGATED');
+        setInput(query('#cred-secretkey'), 'gated-secret');
+        fire(query('button[type="submit"]'), 'click');
+        assert.ok(
+          !/retype it/i.test(text()),
+          'the post-connect vault offer must not appear while the vault is gated off',
+        );
+      } finally {
+        cleanup();
+        clearAppStorage();
+      }
+    });
+
+    test('a remembered secret does not auto-connect on mount', async () => {
+      clearAppStorage();
+      await createVault(PASSPHRASE, window.crypto.subtle, getRandomValues);
+      // Same seed as the Task 6 auto-connect test: unlocked vault, remembered secret,
+      // last-used connection selected — the strongest possible auto-connect setup.
+      localStorage.setItem('s3b_connections_migrated', '1');
+      localStorage.setItem(
+        's3b_credentials',
+        JSON.stringify({
+          version: 1,
+          credentials: [
+            {
+              id: 'credG',
+              label: 'G',
+              endpoint: 'http://127.0.0.1:1',
+              keyId: 'AKIDGATE2',
+              provider: null,
+              regionOverride: '',
+            },
+          ],
+        }),
+      );
+      localStorage.setItem(
+        's3b_connections',
+        JSON.stringify({
+          version: 2,
+          connections: [
+            { id: 601, name: 'Gated conn', credentialId: 'credG', bucket: 'gated-bucket-2', capabilities: null },
+          ],
+        }),
+      );
+      localStorage.setItem('s3b_last_profile_id', '601');
+      await rememberSecret('credG', 'gated-secret-2', window.crypto.subtle);
+
+      const { query, cleanup } = mount(h(App, {}));
+      try {
+        for (let i = 0; i < 30; i++) {
+          await new Promise((r) => setTimeout(r, 10));
+          assert.equal(
+            query('[data-testid="app-connected"]'),
+            null,
+            'the app must not auto-connect from the vault while gated off',
+          );
+        }
+        assert.ok(query('#cred-endpoint'), 'the ordinary connect form must be what renders');
+      } finally {
+        cleanup();
+        clearAppStorage();
+      }
+    });
+  },
+);
 
 // Task 1 (#53) collects the credential a re-pointed connection stops using. Without
 // this Task 6 addition, a secret the user just typed to replace an old key would be
@@ -1105,8 +1465,19 @@ describe('App — re-wrap on credential change while the vault is unlocked (Task
   test('pointing a saved connection at a new credential while a secret is typed remembers it under the new credential id', async () => {
     clearAppStorage();
     await createVault(PASSPHRASE, window.crypto.subtle, getRandomValues);
-    const oldCred = findOrCreateCredential({ endpoint: 'https://s3.old.example.com', keyId: 'kOld', provider: null, regionOverride: '' });
-    saveConnectionRecord({ id: 900, name: 'Rewrap conn', credentialId: oldCred.id, bucket: 'buck', capabilities: null });
+    const oldCred = findOrCreateCredential({
+      endpoint: 'https://s3.old.example.com',
+      keyId: 'kOld',
+      provider: null,
+      regionOverride: '',
+    });
+    saveConnectionRecord({
+      id: 900,
+      name: 'Rewrap conn',
+      credentialId: oldCred.id,
+      bucket: 'buck',
+      capabilities: null,
+    });
     localStorage.setItem('s3b_last_profile_id', '900');
     // Deliberately no rememberSecret call for oldCred's entry — nothing to
     // auto-connect with, so the splash form (not the connected view) is what
@@ -1115,10 +1486,13 @@ describe('App — re-wrap on credential change while the vault is unlocked (Task
     const { query, cleanup } = mount(h(App, {}));
     try {
       for (let i = 0; i < 20 && query('#cred-endpoint')?.value !== 'https://s3.old.example.com'; i++) {
-        await new Promise(r => setTimeout(r, 0));
+        await new Promise((r) => setTimeout(r, 0));
       }
-      assert.equal(query('#cred-endpoint')?.value, 'https://s3.old.example.com',
-        'precondition: form pre-filled from the saved connection');
+      assert.equal(
+        query('#cred-endpoint')?.value,
+        'https://s3.old.example.com',
+        'precondition: form pre-filled from the saved connection',
+      );
 
       setInput(query('#cred-endpoint'), 'https://s3.new.example.com');
       setInput(query('#cred-keyid'), 'kNew');
@@ -1128,26 +1502,39 @@ describe('App — re-wrap on credential change while the vault is unlocked (Task
       fire(query('.bucket-save-form button[type="submit"]'), 'click');
 
       const { credentials } = JSON.parse(localStorage.getItem('s3b_credentials'));
-      const newCred = credentials.find(c => c.endpoint === 'https://s3.new.example.com');
+      const newCred = credentials.find((c) => c.endpoint === 'https://s3.new.example.com');
       assert.ok(newCred, 'a new credential must be created for the new endpoint/key');
 
       let recalled = null;
       for (let i = 0; i < 60 && recalled === null; i++) {
         recalled = await recallSecret(newCred.id, window.crypto.subtle);
-        if (!recalled) await new Promise(r => setTimeout(r, 10));
+        if (!recalled) await new Promise((r) => setTimeout(r, 10));
       }
-      assert.equal(recalled, 'new-secret',
-        'the typed secret must be wrapped under the new credential id, not silently forgotten');
-    } finally { cleanup(); clearAppStorage(); }
+      assert.equal(
+        recalled,
+        'new-secret',
+        'the typed secret must be wrapped under the new credential id, not silently forgotten',
+      );
+    } finally {
+      cleanup();
+      clearAppStorage();
+    }
   });
 });
 
 describe('App — disconnect does not lock the vault (Task 6)', () => {
   test('disconnecting leaves the vault unlocked', () => {
     clearAppStorage();
-    localStorage.setItem('s3b_vault', JSON.stringify({
-      version: 1, salt: 'c2FsdA==', iterations: 1, check: { iv: 'aXY=', ct: 'Y3Q=' }, entries: {},
-    }));
+    localStorage.setItem(
+      's3b_vault',
+      JSON.stringify({
+        version: 1,
+        salt: 'c2FsdA==',
+        iterations: 1,
+        check: { iv: 'aXY=', ct: 'Y3Q=' },
+        entries: {},
+      }),
+    );
     sessionStorage.setItem(SS_KEY_VAULT_KEY, 'irrelevant-for-this-test'); // vault starts unlocked
     const { query, cleanup } = mount(h(App, {}));
     try {
@@ -1158,12 +1545,15 @@ describe('App — disconnect does not lock the vault (Task 6)', () => {
       fire(query('button[type="submit"]'), 'click');
       assert.ok(isUnlocked(), 'precondition: the vault is unlocked while connected');
 
-      const disconnectBtn = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Sign out');
+      const disconnectBtn = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Sign out');
       assert.ok(disconnectBtn, 'the Sign out button must be present once connected');
       fire(disconnectBtn, 'click');
 
       assert.ok(isUnlocked(), 'disconnecting must not lock the vault — only a tab close should end the session');
-    } finally { cleanup(); clearAppStorage(); }
+    } finally {
+      cleanup();
+      clearAppStorage();
+    }
   });
 });
 
@@ -1174,14 +1564,29 @@ describe('App — disconnect does not lock the vault (Task 6)', () => {
 describe('App — "+ bucket" pre-fills the form from the account', () => {
   test('endpoint and key ID come from the account; the bucket is left empty', () => {
     clearAppStorage();
-    localStorage.setItem('s3b_credentials', JSON.stringify({
-      version: 1,
-      credentials: [{ id: 'credA', endpoint: 'https://s3.us-west-002.backblazeb2.com', keyId: 'K1ABCDEF', provider: 'b2', regionOverride: 'us-west-002', label: 'B2 — K1' }],
-    }));
-    localStorage.setItem('s3b_connections', JSON.stringify({
-      version: 2,
-      connections: [{ id: 1, name: 'B2 — photos', credentialId: 'credA', bucket: 'photos', capabilities: null }],
-    }));
+    localStorage.setItem(
+      's3b_credentials',
+      JSON.stringify({
+        version: 1,
+        credentials: [
+          {
+            id: 'credA',
+            endpoint: 'https://s3.us-west-002.backblazeb2.com',
+            keyId: 'K1ABCDEF',
+            provider: 'b2',
+            regionOverride: 'us-west-002',
+            label: 'B2 — K1',
+          },
+        ],
+      }),
+    );
+    localStorage.setItem(
+      's3b_connections',
+      JSON.stringify({
+        version: 2,
+        connections: [{ id: 1, name: 'B2 — photos', credentialId: 'credA', bucket: 'photos', capabilities: null }],
+      }),
+    );
     localStorage.setItem('s3b_connections_migrated', '1');
 
     const { query, cleanup } = mount(h(App, {}));
@@ -1190,10 +1595,17 @@ describe('App — "+ bucket" pre-fills the form from the account', () => {
       assert.ok(addBtn, '+ bucket button should render for the saved account');
       fire(addBtn, 'click');
 
-      assert.equal(query('#cred-endpoint').value, 'https://s3.us-west-002.backblazeb2.com', 'endpoint prefilled from the account');
+      assert.equal(
+        query('#cred-endpoint').value,
+        'https://s3.us-west-002.backblazeb2.com',
+        'endpoint prefilled from the account',
+      );
       assert.equal(query('#cred-keyid').value, 'K1ABCDEF', 'key ID prefilled from the account');
       assert.equal(query('#cred-bucket').value, '', 'bucket is left empty for the user to fill');
-    } finally { cleanup(); clearAppStorage(); }
+    } finally {
+      cleanup();
+      clearAppStorage();
+    }
   });
 });
 
@@ -1202,14 +1614,29 @@ describe('App — "+ bucket" pre-fills the form from the account', () => {
 describe('App — re-adding a saved bucket does not duplicate it', () => {
   test('saving a bucket already present under the account keeps one connection', () => {
     clearAppStorage();
-    localStorage.setItem('s3b_credentials', JSON.stringify({
-      version: 1,
-      credentials: [{ id: 'credA', endpoint: 'https://s3.us-west-002.backblazeb2.com', keyId: 'K1', provider: 'b2', regionOverride: 'us-west-002', label: 'B2 — K1' }],
-    }));
-    localStorage.setItem('s3b_connections', JSON.stringify({
-      version: 2,
-      connections: [{ id: 1, name: 'B2 — photos', credentialId: 'credA', bucket: 'photos', capabilities: null }],
-    }));
+    localStorage.setItem(
+      's3b_credentials',
+      JSON.stringify({
+        version: 1,
+        credentials: [
+          {
+            id: 'credA',
+            endpoint: 'https://s3.us-west-002.backblazeb2.com',
+            keyId: 'K1',
+            provider: 'b2',
+            regionOverride: 'us-west-002',
+            label: 'B2 — K1',
+          },
+        ],
+      }),
+    );
+    localStorage.setItem(
+      's3b_connections',
+      JSON.stringify({
+        version: 2,
+        connections: [{ id: 1, name: 'B2 — photos', credentialId: 'credA', bucket: 'photos', capabilities: null }],
+      }),
+    );
     localStorage.setItem('s3b_connections_migrated', '1');
 
     const { query, cleanup } = mount(h(App, {}));
@@ -1222,7 +1649,10 @@ describe('App — re-adding a saved bucket does not duplicate it', () => {
 
       const { connections } = JSON.parse(localStorage.getItem('s3b_connections'));
       assert.equal(connections.length, 1, 're-adding the same bucket must not create a duplicate connection');
-    } finally { cleanup(); clearAppStorage(); }
+    } finally {
+      cleanup();
+      clearAppStorage();
+    }
   });
 });
 
@@ -1232,12 +1662,29 @@ describe('App — re-adding a saved bucket does not duplicate it', () => {
 describe('App — connected sidebar switcher (quick-switch)', () => {
   test('sidebar shows the accounts tree + Sign out, and a cached-secret switch stays connected', () => {
     clearAppStorage();
-    localStorage.setItem('s3b_credentials', JSON.stringify({
-      version: 1, credentials: [{ id: 'credA', endpoint: 'http://127.0.0.1:1', keyId: 'K1', provider: 'b2', regionOverride: '', label: 'B2 — K1' }],
-    }));
-    localStorage.setItem('s3b_connections', JSON.stringify({
-      version: 2, connections: [{ id: 1, name: 'B2 — photos', credentialId: 'credA', bucket: 'photos', capabilities: null }],
-    }));
+    localStorage.setItem(
+      's3b_credentials',
+      JSON.stringify({
+        version: 1,
+        credentials: [
+          {
+            id: 'credA',
+            endpoint: 'http://127.0.0.1:1',
+            keyId: 'K1',
+            provider: 'b2',
+            regionOverride: '',
+            label: 'B2 — K1',
+          },
+        ],
+      }),
+    );
+    localStorage.setItem(
+      's3b_connections',
+      JSON.stringify({
+        version: 2,
+        connections: [{ id: 1, name: 'B2 — photos', credentialId: 'credA', bucket: 'photos', capabilities: null }],
+      }),
+    );
     localStorage.setItem('s3b_last_profile_id', '1');
     localStorage.setItem('s3b_connections_migrated', '1');
 
@@ -1246,15 +1693,20 @@ describe('App — connected sidebar switcher (quick-switch)', () => {
       setInput(query('#cred-secretkey'), 'sekret');
       fire(query('button[type="submit"]'), 'click'); // connect (caches the secret)
 
-      const signOut = () => [...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'Sign out');
+      const signOut = () => [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Sign out');
       assert.ok(signOut(), 'Sign out button present when connected');
-      assert.ok([...document.querySelectorAll('.bucket-name')].some(n => n.textContent.includes('photos')),
-        'the sidebar accounts tree shows the connected bucket');
+      assert.ok(
+        [...document.querySelectorAll('.bucket-name')].some((n) => n.textContent.includes('photos')),
+        'the sidebar accounts tree shows the connected bucket',
+      );
 
-      const row = [...document.querySelectorAll('.bucket-row')].find(r => r.textContent.includes('photos'));
+      const row = [...document.querySelectorAll('.bucket-row')].find((r) => r.textContent.includes('photos'));
       fire(row, 'click'); // switch via the cached secret
       assert.ok(signOut(), 'still connected after switching via the cached secret (no splash)');
-    } finally { cleanup(); clearAppStorage(); }
+    } finally {
+      cleanup();
+      clearAppStorage();
+    }
   });
 });
 
@@ -1263,12 +1715,29 @@ describe('App — connected sidebar switcher (quick-switch)', () => {
 describe('App — header quick-switch tab-strip', () => {
   test('the connected bucket appears as a header tab and clicking it stays connected', async () => {
     clearAppStorage();
-    localStorage.setItem('s3b_credentials', JSON.stringify({
-      version: 1, credentials: [{ id: 'credA', endpoint: 'http://127.0.0.1:1', keyId: 'K1', provider: 'b2', regionOverride: '', label: 'B2 — K1' }],
-    }));
-    localStorage.setItem('s3b_connections', JSON.stringify({
-      version: 2, connections: [{ id: 1, name: 'B2 — photos', credentialId: 'credA', bucket: 'photos', capabilities: null }],
-    }));
+    localStorage.setItem(
+      's3b_credentials',
+      JSON.stringify({
+        version: 1,
+        credentials: [
+          {
+            id: 'credA',
+            endpoint: 'http://127.0.0.1:1',
+            keyId: 'K1',
+            provider: 'b2',
+            regionOverride: '',
+            label: 'B2 — K1',
+          },
+        ],
+      }),
+    );
+    localStorage.setItem(
+      's3b_connections',
+      JSON.stringify({
+        version: 2,
+        connections: [{ id: 1, name: 'B2 — photos', credentialId: 'credA', bucket: 'photos', capabilities: null }],
+      }),
+    );
     localStorage.setItem('s3b_last_profile_id', '1');
     localStorage.setItem('s3b_connections_migrated', '1');
 
@@ -1280,14 +1749,19 @@ describe('App — header quick-switch tab-strip', () => {
       // The MRU strip is seeded by an effect, so poll a few ticks for the tab to appear.
       let tab;
       for (let i = 0; i < 20 && !tab; i++) {
-        tab = [...document.querySelectorAll('.connection-tab')].find(t => t.textContent.includes('photos'));
-        if (!tab) await new Promise(r => setTimeout(r, 0));
+        tab = [...document.querySelectorAll('.connection-tab')].find((t) => t.textContent.includes('photos'));
+        if (!tab) await new Promise((r) => setTimeout(r, 0));
       }
       assert.ok(tab, 'the connected bucket appears as a header tab');
 
       fire(tab, 'click');
-      assert.ok([...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'Sign out'),
-        'still connected after clicking the header tab');
-    } finally { cleanup(); clearAppStorage(); }
+      assert.ok(
+        [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Sign out'),
+        'still connected after clicking the header tab',
+      );
+    } finally {
+      cleanup();
+      clearAppStorage();
+    }
   });
 });

@@ -11,13 +11,13 @@
 // WHAT DOES NOT BELONG HERE: business logic, domain functions, or anything that
 // reads/writes a specific object store. Those belong in the domain modules.
 
-export const DB_NAME    = 's3browser';
+export const DB_NAME = 's3browser';
 const DB_VERSION = 6;
 
-export const STORE       = 's3browser_uploads';
-export const LOG_STORE   = 'bucketer_upload_log';
+export const STORE = 's3browser_uploads';
+export const LOG_STORE = 'bucketer_upload_log';
 export const DEDUP_STORE = 'bucketer_dedup_scans';
-export const DL_JOB_STORE  = 'bucketer_download_jobs';
+export const DL_JOB_STORE = 'bucketer_download_jobs';
 export const DL_ITEM_STORE = 'bucketer_download_items';
 export const MOVE_JOB_STORE = 'bucketer_move_jobs';
 
@@ -27,10 +27,10 @@ export async function openDB() {
   if (_db) return _db;
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = e => {
+    req.onupgradeneeded = (e) => {
       const db = e.target.result;
-      if (!db.objectStoreNames.contains(STORE))       db.createObjectStore(STORE);
-      if (!db.objectStoreNames.contains(LOG_STORE))   db.createObjectStore(LOG_STORE, { autoIncrement: true });
+      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
+      if (!db.objectStoreNames.contains(LOG_STORE)) db.createObjectStore(LOG_STORE, { autoIncrement: true });
       if (!db.objectStoreNames.contains(DEDUP_STORE)) db.createObjectStore(DEDUP_STORE);
       if (!db.objectStoreNames.contains(DL_JOB_STORE)) db.createObjectStore(DL_JOB_STORE, { keyPath: 'id' });
       if (!db.objectStoreNames.contains(DL_ITEM_STORE)) {
@@ -54,12 +54,18 @@ export async function openDB() {
       // moves are far smaller than million-object downloads, so no per-item store.
       if (!db.objectStoreNames.contains(MOVE_JOB_STORE)) db.createObjectStore(MOVE_JOB_STORE, { keyPath: 'id' });
     };
-    req.onsuccess = e => { _db = e.target.result; resolve(_db); };
-    req.onerror   = () => reject(req.error);
+    req.onsuccess = (e) => {
+      _db = e.target.result;
+      resolve(_db);
+    };
+    req.onerror = () => reject(req.error);
   });
 }
 
 // Closes and clears the cached connection. Required before deleteDatabase().
 export function closeDB() {
-  if (_db) { _db.close(); _db = null; }
+  if (_db) {
+    _db.close();
+    _db = null;
+  }
 }

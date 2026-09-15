@@ -30,11 +30,14 @@ function formatCompletedAt(ts) {
   if (completedAtCache.has(ts)) return completedAtCache.get(ts);
   try {
     const result = new Date(ts).toLocaleString(undefined, {
-      dateStyle: 'short', timeStyle: 'medium',
+      dateStyle: 'short',
+      timeStyle: 'medium',
     });
     completedAtCache.set(ts, result);
     return result;
-  } catch { return '—'; }
+  } catch {
+    return '—';
+  }
 }
 
 // Returns a short human-readable string for the probe result, or null if none.
@@ -56,7 +59,7 @@ export function formatStrategyAnnotation(entry) {
   const probe = formatProbeAnnotation(entry.probeResult);
   if (probe) return probe + (entry.sharded ? ' · sharded ×2' : '');
   if (!entry.concurrencyMode) return '—';
-  const size  = entry.partSize != null ? ` · ${formatBytes(entry.partSize)}` : '';
+  const size = entry.partSize != null ? ` · ${formatBytes(entry.partSize)}` : '';
   const conns = entry.peakPartConcurrency != null ? ` · ${entry.peakPartConcurrency} conns` : '';
   const shard = entry.sharded ? ' · sharded ×2' : '';
   return `${entry.concurrencyMode}${size}${conns}${shard}`;
@@ -71,7 +74,10 @@ export function strategyDetails(entry) {
   if (entry.partSize != null) rows.push(['Part size', formatBytes(entry.partSize)]);
   if (entry.totalParts != null) rows.push(['Parts', entry.totalParts.toLocaleString()]);
   if (entry.peakPartConcurrency != null) {
-    rows.push(['Peak concurrency', entry.sharded ? `${entry.peakPartConcurrency} (across 2 origins)` : String(entry.peakPartConcurrency)]);
+    rows.push([
+      'Peak concurrency',
+      entry.sharded ? `${entry.peakPartConcurrency} (across 2 origins)` : String(entry.peakPartConcurrency),
+    ]);
   }
   if (entry.retries != null) rows.push(['Transient retries', String(entry.retries)]);
   if (entry.avgSpeedBps != null) rows.push(['Avg speed', formatSpeed(entry.avgSpeedBps)]);
@@ -91,9 +97,10 @@ export function UploadLog({ refreshKey }) {
   const [expanded, setExpanded] = useState(() => new Set());
 
   function toggle(key) {
-    setExpanded(prev => {
+    setExpanded((prev) => {
       const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   }
@@ -113,7 +120,7 @@ export function UploadLog({ refreshKey }) {
   if (!initialLoadDone || entries.length === 0) return null;
 
   const totalBytes = entries.reduce((s, e) => s + (e.fileSize || 0), 0);
-  const errorCount = entries.filter(e => e.status !== 'done').length;
+  const errorCount = entries.filter((e) => e.status !== 'done').length;
   const summary = `${entries.length} file${entries.length !== 1 ? 's' : ''} · ${formatBytes(totalBytes)}${errorCount > 0 ? ` · ${errorCount} failed` : ''}`;
 
   const displayEntries = entries.length > MAX_DISPLAY ? entries.slice(0, MAX_DISPLAY) : entries;
@@ -122,12 +129,16 @@ export function UploadLog({ refreshKey }) {
   return (
     <details class="upload-log">
       <summary class="upload-log-summary">
-        <span class="section-heading" style={{ margin: 0, display: 'inline' }}>Upload history</span>
+        <span class="section-heading" style={{ margin: 0, display: 'inline' }}>
+          Upload history
+        </span>
         <span class="upload-log-summary-meta">{summary}</span>
       </summary>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '.5rem' }}>
-        <button class="btn btn-ghost btn-sm" onClick={handleClear}>Clear</button>
+        <button class="btn btn-ghost btn-sm" onClick={handleClear}>
+          Clear
+        </button>
       </div>
 
       {truncated && (
@@ -155,27 +166,53 @@ export function UploadLog({ refreshKey }) {
             const isOpen = expanded.has(key);
             return (
               <Fragment key={key}>
-                <tr class="file-row" style={{ cursor: 'pointer' }} onClick={() => toggle(key)} title="Click for full upload diagnostics">
+                <tr
+                  class="file-row"
+                  style={{ cursor: 'pointer' }}
+                  onClick={() => toggle(key)}
+                  title="Click for full upload diagnostics"
+                >
                   <td class="log-status">
-                    {e.status === 'done'
-                      ? <span class="log-done">✓</span>
-                      : <span class="log-error" title={e.errorMessage}>✗</span>}
+                    {e.status === 'done' ? (
+                      <span class="log-done">✓</span>
+                    ) : (
+                      <span class="log-error" title={e.errorMessage}>
+                        ✗
+                      </span>
+                    )}
                   </td>
-                  <td class="log-name" title={e.fileName}>{e.fileName}</td>
-                  <td class="log-dest" title={e.destinationKey}>{e.destinationKey}</td>
+                  <td class="log-name" title={e.fileName}>
+                    {e.fileName}
+                  </td>
+                  <td class="log-dest" title={e.destinationKey}>
+                    {e.destinationKey}
+                  </td>
                   <td class="log-num">{formatBytes(e.fileSize)}</td>
                   <td class="log-num">{formatCompletedAt(e.completedAt)}</td>
                   <td class="log-num">{formatDuration(e.durationSec)}</td>
                   <td class="log-num">{e.avgSpeedBps != null ? formatSpeed(e.avgSpeedBps) : '—'}</td>
                   <td class="log-strategy">
-                    <span aria-hidden="true" style={{ display: 'inline-block', width: '1.1em', opacity: 0.6 }}>{isOpen ? '▾' : '▸'}</span>
+                    <span aria-hidden="true" style={{ display: 'inline-block', width: '1.1em', opacity: 0.6 }}>
+                      {isOpen ? '▾' : '▸'}
+                    </span>
                     {formatStrategyAnnotation(e)}
                   </td>
                 </tr>
                 {isOpen && (
                   <tr class="log-detail-row">
-                    <td colspan="8" style={{ padding: '.4rem 1rem .7rem 2.2rem', background: 'rgba(127,127,127,0.08)' }}>
-                      <dl style={{ display: 'grid', gridTemplateColumns: 'max-content minmax(0, 1fr)', gap: '.15rem .75rem', margin: 0, fontSize: '.82rem' }}>
+                    <td
+                      colspan="8"
+                      style={{ padding: '.4rem 1rem .7rem 2.2rem', background: 'rgba(127,127,127,0.08)' }}
+                    >
+                      <dl
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'max-content minmax(0, 1fr)',
+                          gap: '.15rem .75rem',
+                          margin: 0,
+                          fontSize: '.82rem',
+                        }}
+                      >
                         {strategyDetails(e).map(([label, value]) => (
                           <Fragment key={label}>
                             <dt style={{ opacity: 0.65, fontWeight: 600 }}>{label}</dt>

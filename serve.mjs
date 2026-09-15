@@ -2,19 +2,19 @@
 // Dev server: builds in dev mode, then serves dist/ from http://localhost:3000
 // Run with: npm run serve
 
-import { execFileSync }                    from 'child_process';
-import { readFileSync, existsSync }        from 'fs';
-import { createServer }                    from 'http';
-import { fileURLToPath }                   from 'url';
-import { dirname, join }                   from 'path';
+import { execFileSync } from 'child_process';
+import { readFileSync, existsSync } from 'fs';
+import { createServer } from 'http';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const PORT      = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3000;
 
 // Delegate the build to build.mjs in dev mode — single source of build config.
 execFileSync(process.execPath, [join(__dirname, 'build.mjs'), '--mode=dev'], {
   stdio: 'inherit',
-  cwd:   __dirname,
+  cwd: __dirname,
 });
 
 const html = readFileSync(join(__dirname, 'dist', 'index.html'), 'utf8');

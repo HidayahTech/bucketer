@@ -16,7 +16,7 @@ test('localHeaderBytes: length fixed at 30 + name regardless of zip64; version-n
   assert.equal(nonZip64.length, 30 + nameLen);
   assert.equal(zip64.length, 30 + nameLen);
   assert.equal(new DataView(nonZip64.buffer).getUint16(4, true), 20); // version needed
-  assert.equal(new DataView(zip64.buffer).getUint16(4, true), 45);    // version needed
+  assert.equal(new DataView(zip64.buffer).getUint16(4, true), 45); // version needed
 });
 
 test('dataDescriptorBytes: 16 non-zip64, 24 zip64', () => {
@@ -58,7 +58,14 @@ test('computeZipLayout matches serial writer entry offsets for same order', asyn
   ];
   const { entries } = computeZipLayout(items, '', {});
   const chunks = [];
-  const w = createZipWriter({ write: (u8) => { chunks.push(u8.slice()); } }, {});
+  const w = createZipWriter(
+    {
+      write: (u8) => {
+        chunks.push(u8.slice());
+      },
+    },
+    {},
+  );
   const recs = [];
   for (const it of items) {
     const off = w.offset;

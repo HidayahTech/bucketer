@@ -5,7 +5,10 @@
 // Split a comma-separated env value into trimmed non-empty entries; null/'' → defaults.
 export function parseListEnv(value, defaults) {
   if (!value) return defaults;
-  const list = value.split(',').map((s) => s.trim()).filter(Boolean);
+  const list = value
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
   return list.length ? list : defaults;
 }
 
@@ -35,7 +38,9 @@ export function comboLabel({ engine, device }) {
 export function imageTagFromLock(lockJson) {
   const version = lockJson?.packages?.['node_modules/playwright']?.version;
   if (!/^\d+\.\d+\.\d+$/.test(version || '')) {
-    throw new Error(`Cannot derive Playwright image: package-lock.json has no exact version for node_modules/playwright (got ${JSON.stringify(version)})`);
+    throw new Error(
+      `Cannot derive Playwright image: package-lock.json has no exact version for node_modules/playwright (got ${JSON.stringify(version)})`,
+    );
   }
   // noble, not jammy. jammy's C library predates the change that makes reading an
   // environment variable safe against another thread writing one; Chromium loses that race

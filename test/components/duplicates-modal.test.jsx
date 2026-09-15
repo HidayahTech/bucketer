@@ -32,14 +32,23 @@ const handlers = { onSelectKeeper: noop, onVerify: noop, onDownload: noop, onPre
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
 const savedRecord = (extra = {}) => ({
-  scope: 'bucket', prefix: '', scannedAt: 1700000000000, objectCount: 30000,
+  scope: 'bucket',
+  prefix: '',
+  scannedAt: 1700000000000,
+  objectCount: 30000,
   groups: [group('g0', ['a', 'b'])],
   ...extra,
 });
 const modalProps = (over = {}) => ({
   client: { send: () => Promise.resolve({}) },
-  bucket: 'bk', endpoint: 'https://e', currentPrefix: '', provider: 'aws',
-  capabilities: CAPS, onDeleteRequest: noop, onClose: noop, ...over,
+  bucket: 'bk',
+  endpoint: 'https://e',
+  currentPrefix: '',
+  provider: 'aws',
+  capabilities: CAPS,
+  onDeleteRequest: noop,
+  onClose: noop,
+  ...over,
 });
 
 describe('DuplicatesReport — empty', () => {
@@ -59,15 +68,21 @@ describe('DuplicatesReport — groups', () => {
   });
 
   test('renders one member row per object in a group', () => {
-    const { queryAll, cleanup } = mount(h(DuplicatesReport, { groups: [group('g1', ['a', 'b', 'c'])], capabilities: CAPS, ...handlers }));
+    const { queryAll, cleanup } = mount(
+      h(DuplicatesReport, { groups: [group('g1', ['a', 'b', 'c'])], capabilities: CAPS, ...handlers }),
+    );
     assert.equal(queryAll('.dup-member').length, 3);
     cleanup();
   });
 
   test('marks the keeper radio checked and reports a keeper change', () => {
     let picked = null;
-    const onSelectKeeper = (gid, key) => { picked = [gid, key]; };
-    const { queryAll, cleanup } = mount(h(DuplicatesReport, { groups: [group('g1', ['a', 'b'])], capabilities: CAPS, ...handlers, onSelectKeeper }));
+    const onSelectKeeper = (gid, key) => {
+      picked = [gid, key];
+    };
+    const { queryAll, cleanup } = mount(
+      h(DuplicatesReport, { groups: [group('g1', ['a', 'b'])], capabilities: CAPS, ...handlers, onSelectKeeper }),
+    );
     const radios = queryAll('input[type="radio"]');
     assert.equal(radios.length, 2);
     assert.equal(radios[0].checked, true, 'oldest member is the default keeper');
@@ -77,26 +92,40 @@ describe('DuplicatesReport — groups', () => {
   });
 
   test('shows a candidate badge, and a verified badge once verified', () => {
-    const candidate = mount(h(DuplicatesReport, { groups: [group('g1', ['a', 'b'])], capabilities: CAPS, ...handlers }));
+    const candidate = mount(
+      h(DuplicatesReport, { groups: [group('g1', ['a', 'b'])], capabilities: CAPS, ...handlers }),
+    );
     assert.ok(/candidate/i.test(candidate.text()));
     candidate.cleanup();
 
-    const verified = mount(h(DuplicatesReport, { groups: [group('g2', ['a', 'b'], { confidence: 'verified', verified: true })], capabilities: CAPS, ...handlers }));
+    const verified = mount(
+      h(DuplicatesReport, {
+        groups: [group('g2', ['a', 'b'], { confidence: 'verified', verified: true })],
+        capabilities: CAPS,
+        ...handlers,
+      }),
+    );
     assert.ok(/verified/i.test(verified.text()));
     verified.cleanup();
   });
 
   test('Verify reports the group id', () => {
     let verified = null;
-    const onVerify = (gid) => { verified = gid; };
-    const { query, cleanup } = mount(h(DuplicatesReport, { groups: [group('g1', ['a', 'b'])], capabilities: CAPS, ...handlers, onVerify }));
+    const onVerify = (gid) => {
+      verified = gid;
+    };
+    const { query, cleanup } = mount(
+      h(DuplicatesReport, { groups: [group('g1', ['a', 'b'])], capabilities: CAPS, ...handlers, onVerify }),
+    );
     fire(query('.dup-verify'), 'click');
     assert.equal(verified, 'g1');
     cleanup();
   });
 
   test('Delete and Move render as disabled stubs in iteration 1', () => {
-    const { query, cleanup } = mount(h(DuplicatesReport, { groups: [group('g1', ['a', 'b'])], capabilities: CAPS, ...handlers }));
+    const { query, cleanup } = mount(
+      h(DuplicatesReport, { groups: [group('g1', ['a', 'b'])], capabilities: CAPS, ...handlers }),
+    );
     assert.equal(query('.dup-delete').disabled, true, 'Delete others must be a disabled stub');
     assert.equal(query('.dup-move').disabled, true, 'Move others must be a disabled stub');
     cleanup();
@@ -104,7 +133,9 @@ describe('DuplicatesReport — groups', () => {
 
   test('download action is disabled when download capability is denied', () => {
     const caps = { ...CAPS, download: 'denied' };
-    const { queryAll, cleanup } = mount(h(DuplicatesReport, { groups: [group('g1', ['a', 'b'])], capabilities: caps, ...handlers }));
+    const { queryAll, cleanup } = mount(
+      h(DuplicatesReport, { groups: [group('g1', ['a', 'b'])], capabilities: caps, ...handlers }),
+    );
     for (const btn of queryAll('.dup-download')) assert.equal(btn.disabled, true);
     cleanup();
   });
@@ -113,10 +144,17 @@ describe('DuplicatesReport — groups', () => {
 describe('DuplicatesModal — idle container', () => {
   test('renders scan controls before any scan', () => {
     const client = { send: () => Promise.resolve({}) };
-    const { query, text, cleanup } = mount(h(DuplicatesModal, {
-      client, bucket: 'bk', currentPrefix: '', provider: 'aws',
-      capabilities: CAPS, onDeleteRequest: noop, onClose: noop,
-    }));
+    const { query, text, cleanup } = mount(
+      h(DuplicatesModal, {
+        client,
+        bucket: 'bk',
+        currentPrefix: '',
+        provider: 'aws',
+        capabilities: CAPS,
+        onDeleteRequest: noop,
+        onClose: noop,
+      }),
+    );
     assert.ok(query('.dup-scan'), 'a Scan button must be present');
     assert.ok(/duplicate/i.test(text()), 'modal should be titled around duplicates');
     cleanup();
@@ -126,11 +164,22 @@ describe('DuplicatesModal — idle container', () => {
 describe('DuplicatesModal — base prefix floor (#60)', () => {
   test('scoped "entire scope" scan targets the floor, never the bucket root', async () => {
     let scanned = null;
-    const scan = async (args) => { scanned = args; return []; };
-    const view = mount(h(DuplicatesModal, modalProps({
-      basePrefix: 'team/alice/', currentPrefix: 'team/alice/',
-      load: async () => null, scan, save: async () => {},
-    })));
+    const scan = async (args) => {
+      scanned = args;
+      return [];
+    };
+    const view = mount(
+      h(
+        DuplicatesModal,
+        modalProps({
+          basePrefix: 'team/alice/',
+          currentPrefix: 'team/alice/',
+          load: async () => null,
+          scan,
+          save: async () => {},
+        }),
+      ),
+    );
     await tick();
     view.query('.dup-scope').value = 'bucket';
     fire(view.query('.dup-scope'), 'change');
@@ -146,12 +195,17 @@ describe('DuplicatesModal — base prefix floor (#60)', () => {
     try {
       assert.ok(view.text().includes('Entire scope'), '"Whole bucket" is a promise a scoped key cannot keep');
       assert.ok(!view.text().includes('Whole bucket'));
-    } finally { view.cleanup(); }
+    } finally {
+      view.cleanup();
+    }
   });
 
   test('unscoped modal keeps "Whole bucket" wording and root-prefix scans (regression anchor)', async () => {
     let scanned = null;
-    const scan = async (args) => { scanned = args; return []; };
+    const scan = async (args) => {
+      scanned = args;
+      return [];
+    };
     const view = mount(h(DuplicatesModal, modalProps({ load: async () => null, scan, save: async () => {} })));
     await tick();
     assert.ok(view.text().includes('Whole bucket'));
@@ -177,7 +231,18 @@ describe('DuplicatesModal — durable results', () => {
   test('persists the result after a scan', async () => {
     let saved = null;
     const scan = async () => [group('g0', ['a', 'b'])];
-    const view = mount(h(DuplicatesModal, modalProps({ load: async () => null, scan, save: async (rec) => { saved = rec; } })));
+    const view = mount(
+      h(
+        DuplicatesModal,
+        modalProps({
+          load: async () => null,
+          scan,
+          save: async (rec) => {
+            saved = rec;
+          },
+        }),
+      ),
+    );
     await tick(); // initial (empty) restore settles
     fire(view.query('.dup-scan'), 'click');
     for (let i = 0; i < 20 && !saved; i++) await tick(); // scan resolves → render → persist effect
@@ -189,7 +254,18 @@ describe('DuplicatesModal — durable results', () => {
 
   test('Clear saved discards the stored scan and returns to idle', async () => {
     let deleted = false;
-    const view = mount(h(DuplicatesModal, modalProps({ load: async () => savedRecord(), save: async () => {}, del: async () => { deleted = true; } })));
+    const view = mount(
+      h(
+        DuplicatesModal,
+        modalProps({
+          load: async () => savedRecord(),
+          save: async () => {},
+          del: async () => {
+            deleted = true;
+          },
+        }),
+      ),
+    );
     await tick();
     fire(view.query('.dup-clear'), 'click');
     await tick();

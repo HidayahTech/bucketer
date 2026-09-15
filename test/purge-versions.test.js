@@ -32,8 +32,12 @@ describe('purgeAllVersions', () => {
     const client = makeMockClient();
 
     const errors = await purgeAllVersions(client, {
-      bucket: 'my-bucket', prefix: '', initialRows,
-      nextKeyMarker: null, nextVersionIdMarker: null, isTruncated: false,
+      bucket: 'my-bucket',
+      prefix: '',
+      initialRows,
+      nextKeyMarker: null,
+      nextVersionIdMarker: null,
+      isTruncated: false,
     });
 
     assert.deepEqual(errors, []);
@@ -52,20 +56,25 @@ describe('purgeAllVersions', () => {
           Versions: [{ Key: 'b.txt', VersionId: 'v2', IsLatest: false, Size: 0, LastModified: new Date() }],
           DeleteMarkers: [],
           IsTruncated: false,
-          NextKeyMarker: null, NextVersionIdMarker: null,
+          NextKeyMarker: null,
+          NextVersionIdMarker: null,
         },
       ],
     });
 
     const errors = await purgeAllVersions(client, {
-      bucket: 'my-bucket', prefix: 'docs/', initialRows,
-      nextKeyMarker: 'a.txt', nextVersionIdMarker: 'v1', isTruncated: true,
+      bucket: 'my-bucket',
+      prefix: 'docs/',
+      initialRows,
+      nextKeyMarker: 'a.txt',
+      nextVersionIdMarker: 'v1',
+      isTruncated: true,
     });
 
     assert.deepEqual(errors, []);
     assert.equal(client.deletedBatches.length, 1);
     assert.equal(client.deletedBatches[0].length, 2);
-    assert.deepEqual(client.deletedBatches[0].map(o => o.Key).sort(), ['a.txt', 'b.txt']);
+    assert.deepEqual(client.deletedBatches[0].map((o) => o.Key).sort(), ['a.txt', 'b.txt']);
   });
 
   test('batches in chunks of 1000', async () => {
@@ -73,8 +82,12 @@ describe('purgeAllVersions', () => {
     const client = makeMockClient();
 
     const errors = await purgeAllVersions(client, {
-      bucket: 'b', prefix: '', initialRows,
-      nextKeyMarker: null, nextVersionIdMarker: null, isTruncated: false,
+      bucket: 'b',
+      prefix: '',
+      initialRows,
+      nextKeyMarker: null,
+      nextVersionIdMarker: null,
+      isTruncated: false,
     });
 
     assert.deepEqual(errors, []);
@@ -88,8 +101,12 @@ describe('purgeAllVersions', () => {
     const client = makeMockClient({ deleteErrors: [{ Key: 'bad.txt', Message: 'AccessDenied' }] });
 
     const errors = await purgeAllVersions(client, {
-      bucket: 'b', prefix: '', initialRows,
-      nextKeyMarker: null, nextVersionIdMarker: null, isTruncated: false,
+      bucket: 'b',
+      prefix: '',
+      initialRows,
+      nextKeyMarker: null,
+      nextVersionIdMarker: null,
+      isTruncated: false,
     });
 
     assert.equal(errors.length, 1);
@@ -107,8 +124,12 @@ describe('purgeAllVersions', () => {
     };
 
     const errors = await purgeAllVersions(failingClient, {
-      bucket: 'b', prefix: '', initialRows,
-      nextKeyMarker: null, nextVersionIdMarker: null, isTruncated: false,
+      bucket: 'b',
+      prefix: '',
+      initialRows,
+      nextKeyMarker: null,
+      nextVersionIdMarker: null,
+      isTruncated: false,
     });
 
     assert.equal(errors.length, 1);
@@ -118,8 +139,12 @@ describe('purgeAllVersions', () => {
   test('returns empty errors array when there are no rows to delete', async () => {
     const client = makeMockClient();
     const errors = await purgeAllVersions(client, {
-      bucket: 'b', prefix: '', initialRows: [],
-      nextKeyMarker: null, nextVersionIdMarker: null, isTruncated: false,
+      bucket: 'b',
+      prefix: '',
+      initialRows: [],
+      nextKeyMarker: null,
+      nextVersionIdMarker: null,
+      isTruncated: false,
     });
     assert.deepEqual(errors, []);
     assert.equal(client.deletedBatches.length, 0);

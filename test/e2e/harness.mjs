@@ -33,9 +33,13 @@ export const BUCKET = 'test-bucket';
 //   E2E_DEVICE = a playwright.devices key, e.g. "Pixel 5" / "iPhone 13"  (default desktop)
 const ENGINES = { chromium, firefox, webkit };
 
-export function e2eEngineName() { return process.env.E2E_ENGINE || 'chromium'; }
+export function e2eEngineName() {
+  return process.env.E2E_ENGINE || 'chromium';
+}
 
-export function e2eDeviceName() { return process.env.E2E_DEVICE || null; }
+export function e2eDeviceName() {
+  return process.env.E2E_DEVICE || null;
+}
 
 // Launch the selected engine. Throws if the engine's binary/deps are missing (e.g. WebKit on
 // a stock host — see GitLab #47); in CI the Playwright image ships all three engines + deps.
@@ -75,7 +79,13 @@ export async function startMock(opts = {}) {
   // browser must use a localhost endpoint; the mock (listening on 127.0.0.1) still receives it.
   const browserEndpoint = `http://localhost:${port}`;
   const httpsBrowserEndpoint = `https://localhost:${tlsPort}`;
-  const client = createS3Client({ endpoint, keyId: 'test', secretKey: 'test', provider: 'minio', regionOverride: 'us-east-1' });
+  const client = createS3Client({
+    endpoint,
+    keyId: 'test',
+    secretKey: 'test',
+    provider: 'minio',
+    regionOverride: 'us-east-1',
+  });
   return { mock, port, tlsPort, endpoint, browserEndpoint, httpsBrowserEndpoint, client };
 }
 
@@ -132,7 +142,9 @@ export function collectDownloads(page) {
       })();
     },
     // Fixed grace period for stragglers, for arms where the count itself is the assertion.
-    settle(ms = 3000) { return new Promise((r) => setTimeout(r, ms)); },
+    settle(ms = 3000) {
+      return new Promise((r) => setTimeout(r, ms));
+    },
   };
 }
 
@@ -162,7 +174,13 @@ export function waitForHttp(url, timeoutMs = 15000) {
   const deadline = Date.now() + timeoutMs;
   return (async () => {
     while (Date.now() < deadline) {
-      try { const c = new AbortController(); const id = setTimeout(() => c.abort(), 1000); await fetch(url, { signal: c.signal }); clearTimeout(id); return; } catch {}
+      try {
+        const c = new AbortController();
+        const id = setTimeout(() => c.abort(), 1000);
+        await fetch(url, { signal: c.signal });
+        clearTimeout(id);
+        return;
+      } catch {}
       await new Promise((r) => setTimeout(r, 200));
     }
     throw new Error(`Timed out waiting for ${url}`);
@@ -204,8 +222,11 @@ function slug(name) {
 export async function captureFailure(basename, page, logs, dir = ARTIFACTS_DIR) {
   mkdirSync(dir, { recursive: true });
   writeFileSync(join(dir, `${basename}.log`), (logs || []).join('\n') + '\n');
-  try { if (page) await page.screenshot({ path: join(dir, `${basename}.png`), fullPage: true }); }
-  catch { /* page closed / screenshot unavailable — the log is enough */ }
+  try {
+    if (page) await page.screenshot({ path: join(dir, `${basename}.png`), fullPage: true });
+  } catch {
+    /* page closed / screenshot unavailable — the log is enough */
+  }
 }
 
 // opts.skipOn = { engineName: 'documented reason' } skips the test on that engine

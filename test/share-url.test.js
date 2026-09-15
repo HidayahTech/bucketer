@@ -4,11 +4,16 @@ import assert from 'node:assert/strict';
 // share-url.js reads window.location at call time, so setting global.window before
 // any function calls is sufficient — no dynamic import needed.
 const loc = { protocol: 'https:', origin: 'https://app.example.com', pathname: '/', hash: '' };
-global.window = { get location() { return loc; } };
+global.window = {
+  get location() {
+    return loc;
+  },
+};
 
 import { encodePresignedUrl, decodePresignedUrl, buildShareLink, readShareLink } from '../src/lib/share-url.js';
 
-const SAMPLE_URL = 'https://s3.us-west-000.backblazeb2.com/my-bucket/week-7/file.braw?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKID%2F20260611%2Fus-west-000%2Fs3%2Faws4_request&X-Amz-Date=20260611T203417Z&X-Amz-Expires=604800&X-Amz-Signature=abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890&X-Amz-SignedHeaders=host&x-id=GetObject';
+const SAMPLE_URL =
+  'https://s3.us-west-000.backblazeb2.com/my-bucket/week-7/file.braw?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKID%2F20260611%2Fus-west-000%2Fs3%2Faws4_request&X-Amz-Date=20260611T203417Z&X-Amz-Expires=604800&X-Amz-Signature=abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890&X-Amz-SignedHeaders=host&x-id=GetObject';
 
 describe('encodePresignedUrl / decodePresignedUrl', () => {
   test('round-trips a presigned URL without modification', () => {
@@ -28,8 +33,11 @@ describe('encodePresignedUrl / decodePresignedUrl', () => {
 
   test('decodePresignedUrl throws on non-HTTPS decoded value', () => {
     // Encode a non-HTTPS string manually
-    const malicious = Buffer.from('http://example.com/evil').toString('base64')
-      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    const malicious = Buffer.from('http://example.com/evil')
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
     assert.throws(() => decodePresignedUrl(malicious), /https/i);
   });
 
@@ -38,14 +46,20 @@ describe('encodePresignedUrl / decodePresignedUrl', () => {
   });
 
   test('decodePresignedUrl throws on ftp:// URL', () => {
-    const ftpEncoded = Buffer.from('ftp://evil.example.com/file').toString('base64')
-      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+    const ftpEncoded = Buffer.from('ftp://evil.example.com/file')
+      .toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
     assert.throws(() => decodePresignedUrl(ftpEncoded), /https/i);
   });
 });
 
 describe('buildShareLink', () => {
-  beforeEach(() => { loc.hash = ''; loc.protocol = 'https:'; });
+  beforeEach(() => {
+    loc.hash = '';
+    loc.protocol = 'https:';
+  });
 
   test('places encoded blob in the hash fragment, never the query string', () => {
     const link = buildShareLink(SAMPLE_URL);
@@ -79,7 +93,10 @@ describe('buildShareLink', () => {
 });
 
 describe('readShareLink', () => {
-  beforeEach(() => { loc.hash = ''; loc.protocol = 'https:'; });
+  beforeEach(() => {
+    loc.hash = '';
+    loc.protocol = 'https:';
+  });
 
   test('returns the decoded presigned URL when dl= is in the hash', () => {
     const encoded = encodePresignedUrl(SAMPLE_URL);

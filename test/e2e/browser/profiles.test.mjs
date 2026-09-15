@@ -3,7 +3,15 @@
 // screen, so the mock S3 server is only needed for the connect→disconnect flow (BUG-027).
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { startMock, startAppServer, connectApp, launchBrowser, newE2EContext, newE2EPage, e2eTest } from '../harness.mjs';
+import {
+  startMock,
+  startAppServer,
+  connectApp,
+  launchBrowser,
+  newE2EContext,
+  newE2EPage,
+  e2eTest,
+} from '../harness.mjs';
 
 let ctx, app, browser;
 before(async () => {
@@ -11,7 +19,11 @@ before(async () => {
   app = await startAppServer();
   browser = await launchBrowser();
 });
-after(async () => { await browser?.close(); await app?.close(); await ctx?.mock.close(); });
+after(async () => {
+  await browser?.close();
+  await app?.close();
+  await ctx?.mock.close();
+});
 
 async function freshPage() {
   const context = await newE2EContext(browser); // empty localStorage → no saved profiles/creds
@@ -37,8 +49,7 @@ describe('BUG-047 — a share link survives disconnect', () => {
     const context = await newE2EContext(browser);
     const page = await newE2EPage(context);
     try {
-      const hash = '#endpoint=' + encodeURIComponent(ctx.browserEndpoint)
-                 + '&bucket=test-bucket&keyId=k';
+      const hash = '#endpoint=' + encodeURIComponent(ctx.browserEndpoint) + '&bucket=test-bucket&keyId=k';
       await page.goto(app.url + hash, { waitUntil: 'domcontentloaded' });
 
       // The link supplies everything but the secret, which is the whole point of it.
@@ -51,13 +62,24 @@ describe('BUG-047 — a share link survives disconnect', () => {
       await page.locator('button:has-text("Sign out")').click();
       await page.locator('input[type="url"]').waitFor({ timeout: 5000 });
 
-      assert.equal(await page.locator('input[type="url"]').inputValue(), ctx.browserEndpoint,
-        'endpoint from the share link must survive disconnect (BUG-047)');
-      assert.equal(await page.locator('input[placeholder="my-bucket"]').inputValue(), 'test-bucket',
-        'bucket from the share link must survive disconnect (BUG-047)');
-      assert.equal(await page.locator('input[placeholder="Access Key ID"]').inputValue(), 'k',
-        'key ID from the share link must survive disconnect (BUG-047)');
-    } finally { await context.close(); }
+      assert.equal(
+        await page.locator('input[type="url"]').inputValue(),
+        ctx.browserEndpoint,
+        'endpoint from the share link must survive disconnect (BUG-047)',
+      );
+      assert.equal(
+        await page.locator('input[placeholder="my-bucket"]').inputValue(),
+        'test-bucket',
+        'bucket from the share link must survive disconnect (BUG-047)',
+      );
+      assert.equal(
+        await page.locator('input[placeholder="Access Key ID"]').inputValue(),
+        'k',
+        'key ID from the share link must survive disconnect (BUG-047)',
+      );
+    } finally {
+      await context.close();
+    }
   });
 });
 
@@ -73,9 +95,11 @@ describe('BUG-018 — Save-as-profile enablement', () => {
       await assert.doesNotReject(trigger.waitFor({ state: 'visible' }));
       // poll for enablement (onFormChange propagates through App → AccountsManager)
       const deadline = Date.now() + 5000;
-      while (await trigger.isDisabled() && Date.now() < deadline) await page.waitForTimeout(100);
+      while ((await trigger.isDisabled()) && Date.now() < deadline) await page.waitForTimeout(100);
       assert.ok(!(await trigger.isDisabled()), 'enabled once required fields are valid (BUG-018)');
-    } finally { await context.close(); }
+    } finally {
+      await context.close();
+    }
   });
 });
 
@@ -84,10 +108,15 @@ describe('BUG-020 — save profile pre-connect', () => {
   e2eTest('the saved profile holds the typed values and the form keeps them', async () => {
     const { context, page } = await freshPage();
     try {
-      await fillCreds(page, { endpoint: 'https://s3.example.com', bucket: 'realbucket', keyId: 'AKIAREAL', secret: 'sekret' });
+      await fillCreds(page, {
+        endpoint: 'https://s3.example.com',
+        bucket: 'realbucket',
+        keyId: 'AKIAREAL',
+        secret: 'sekret',
+      });
       const trigger = page.locator('.bucket-save-trigger');
       const deadline = Date.now() + 5000;
-      while (await trigger.isDisabled() && Date.now() < deadline) await page.waitForTimeout(100);
+      while ((await trigger.isDisabled()) && Date.now() < deadline) await page.waitForTimeout(100);
       await trigger.click();
       const nameInput = page.locator('input[placeholder="Name"]');
       await nameInput.waitFor({ timeout: 5000 });
@@ -97,9 +126,15 @@ describe('BUG-020 — save profile pre-connect', () => {
       // A profile row now exists…
       await page.locator('.bucket-row', { hasText: 'realbucket' }).waitFor({ timeout: 5000 });
       // …and the form was NOT cleared (BUG-020 cleared it and stored empties).
-      assert.equal(await page.locator('input[placeholder="my-bucket"]').inputValue(), 'realbucket', 'form retained its values');
+      assert.equal(
+        await page.locator('input[placeholder="my-bucket"]').inputValue(),
+        'realbucket',
+        'form retained its values',
+      );
       assert.equal(await page.locator('input[type="url"]').inputValue(), 'https://s3.example.com');
-    } finally { await context.close(); }
+    } finally {
+      await context.close();
+    }
   });
 });
 
@@ -115,10 +150,11 @@ describe('BUG-027 — post-disconnect form is populated', () => {
       if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
       const trigger = page.locator('.bucket-save-trigger');
       const deadline = Date.now() + 5000;
-      while (await trigger.isDisabled() && Date.now() < deadline) await page.waitForTimeout(100);
+      while ((await trigger.isDisabled()) && Date.now() < deadline) await page.waitForTimeout(100);
       await trigger.click();
       const nameInput = page.locator('input[placeholder="Name"]');
-      await nameInput.waitFor({ timeout: 5000 }); await nameInput.fill('Mock');
+      await nameInput.waitFor({ timeout: 5000 });
+      await nameInput.fill('Mock');
       await page.locator('button[type="submit"]:has-text("Save")').click();
       await page.locator('.bucket-row', { hasText: 'test-bucket' }).waitFor({ timeout: 5000 });
 
@@ -128,10 +164,20 @@ describe('BUG-027 — post-disconnect form is populated', () => {
       // Disconnect → the splash returns with the profile's fields pre-filled (minus secret).
       await page.locator('button:has-text("Sign out")').click();
       await page.locator('input[type="url"]').waitFor({ timeout: 5000 });
-      assert.equal(await page.locator('input[type="url"]').inputValue(), ctx.browserEndpoint, 'endpoint pre-filled after disconnect (BUG-027)');
-      assert.equal(await page.locator('input[placeholder="my-bucket"]').inputValue(), 'test-bucket', 'bucket pre-filled');
-      assert.ok(await page.locator('.bucket-row-selected').count() >= 1, 'the profile stays highlighted');
-    } finally { await context.close(); }
+      assert.equal(
+        await page.locator('input[type="url"]').inputValue(),
+        ctx.browserEndpoint,
+        'endpoint pre-filled after disconnect (BUG-027)',
+      );
+      assert.equal(
+        await page.locator('input[placeholder="my-bucket"]').inputValue(),
+        'test-bucket',
+        'bucket pre-filled',
+      );
+      assert.ok((await page.locator('.bucket-row-selected').count()) >= 1, 'the profile stays highlighted');
+    } finally {
+      await context.close();
+    }
   });
 });
 
@@ -144,10 +190,11 @@ describe('BUG-026 — region re-inference after profile load', () => {
       await fillCreds(page, { endpoint: 'https://s3.us-west-004.backblazeb2.com', bucket: 'b2bucket', keyId: 'b2key' });
       const trigger = page.locator('.bucket-save-trigger');
       const deadline = Date.now() + 5000;
-      while (await trigger.isDisabled() && Date.now() < deadline) await page.waitForTimeout(100);
+      while ((await trigger.isDisabled()) && Date.now() < deadline) await page.waitForTimeout(100);
       await trigger.click();
       const nameInput = page.locator('input[placeholder="Name"]');
-      await nameInput.waitFor({ timeout: 5000 }); await nameInput.fill('B2');
+      await nameInput.waitFor({ timeout: 5000 });
+      await nameInput.fill('B2');
       await page.locator('button[type="submit"]:has-text("Save")').click();
       await page.locator('.bucket-row', { hasText: 'b2bucket' }).waitFor({ timeout: 5000 });
 
@@ -164,7 +211,7 @@ describe('BUG-026 — region re-inference after profile load', () => {
       // saved endpoint first.
       const urlInput = page.locator('input[type="url"]');
       const settle = Date.now() + 10000;
-      while (await urlInput.inputValue() !== 'https://s3.us-west-004.backblazeb2.com' && Date.now() < settle) {
+      while ((await urlInput.inputValue()) !== 'https://s3.us-west-004.backblazeb2.com' && Date.now() < settle) {
         await page.waitForTimeout(100);
       }
       assert.equal(await regionInput.inputValue(), 'us-west-004', 'region inferred from the loaded B2 endpoint');
@@ -172,8 +219,15 @@ describe('BUG-026 — region re-inference after profile load', () => {
       // Change the endpoint to a different B2 region → the region must re-infer.
       await urlInput.fill('https://s3.eu-central-003.backblazeb2.com');
       const deadline2 = Date.now() + 10000;
-      while (await regionInput.inputValue() !== 'eu-central-003' && Date.now() < deadline2) await page.waitForTimeout(100);
-      assert.equal(await regionInput.inputValue(), 'eu-central-003', 'region re-inferred after endpoint change (BUG-026)');
-    } finally { await context.close(); }
+      while ((await regionInput.inputValue()) !== 'eu-central-003' && Date.now() < deadline2)
+        await page.waitForTimeout(100);
+      assert.equal(
+        await regionInput.inputValue(),
+        'eu-central-003',
+        'region re-inferred after endpoint change (BUG-026)',
+      );
+    } finally {
+      await context.close();
+    }
   });
 });

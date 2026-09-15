@@ -105,9 +105,9 @@ export const TEXT_PREVIEW_LIMIT = 100 * 1024;
 // Preset durations shown in the copy-link popover. Max is 7 days — the upper
 // bound enforced by the presigner's allowed range for most providers.
 export const COPY_LINK_PRESETS = [
-  { label: '1 hour',   seconds: 3600 },
+  { label: '1 hour', seconds: 3600 },
   { label: '24 hours', seconds: 86400 },
-  { label: '7 days',   seconds: 604800 },
+  { label: '7 days', seconds: 604800 },
 ];
 
 // S3 custom metadata key for the original file modification time.

@@ -14,27 +14,34 @@ import { validateMove, validateCopy } from '../lib/move-guards.js';
 import { clampToFloor } from '../lib/base-prefix.js';
 
 export function MovePickerModal({ client, bucket, selection, initialPrefix = '', onCancel, onMove, mode = 'move' }) {
-  const [prefix, setPrefix]   = useState(initialPrefix);
+  const [prefix, setPrefix] = useState(initialPrefix);
   const [folders, setFolders] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState(null);
+  const [error, setError] = useState(null);
   const genRef = useRef(0);
 
   // List the subfolders of the current picker prefix. genRef guards against a slow
   // earlier fetch overwriting a newer one when the user drills quickly.
   useEffect(() => {
     const gen = ++genRef.current;
-    setLoading(true); setError(null); setFolders([]);
+    setLoading(true);
+    setError(null);
+    setFolders([]);
     (async () => {
       try {
         const all = [];
         let token;
         do {
-          const resp = await client.send(new ListObjectsV2Command({
-            Bucket: bucket, Prefix: prefix || undefined, Delimiter: '/',
-            MaxKeys: 1000, ContinuationToken: token,
-          }));
-          (resp.CommonPrefixes || []).forEach(cp => all.push(cp.Prefix));
+          const resp = await client.send(
+            new ListObjectsV2Command({
+              Bucket: bucket,
+              Prefix: prefix || undefined,
+              Delimiter: '/',
+              MaxKeys: 1000,
+              ContinuationToken: token,
+            }),
+          );
+          (resp.CommonPrefixes || []).forEach((cp) => all.push(cp.Prefix));
           token = resp.IsTruncated ? resp.NextContinuationToken : undefined;
         } while (token);
         if (gen !== genRef.current) return;
@@ -48,32 +55,39 @@ export function MovePickerModal({ client, bucket, selection, initialPrefix = '',
     })();
   }, [prefix, client, bucket]);
 
-  const fileKeys = (selection.files || []).map(f => (typeof f === 'string' ? f : f.key));
-  const isCopy   = mode === 'copy';
-  const verb     = isCopy ? 'Copy' : 'Move';
-  const reason   = isCopy
+  const fileKeys = (selection.files || []).map((f) => (typeof f === 'string' ? f : f.key));
+  const isCopy = mode === 'copy';
+  const verb = isCopy ? 'Copy' : 'Move';
+  const reason = isCopy
     ? validateCopy({ prefixes: selection.prefixes || [], dest: prefix })
     : validateMove({ files: fileKeys, prefixes: selection.prefixes || [], dest: prefix });
-  const count    = (selection.files?.length || 0) + (selection.prefixes?.length || 0);
+  const count = (selection.files?.length || 0) + (selection.prefixes?.length || 0);
 
   return (
     <Modal onClose={onCancel} class="move-dialog">
-      <div class="modal-title">{verb} {count} item{count !== 1 ? 's' : ''} to…</div>
+      <div class="modal-title">
+        {verb} {count} item{count !== 1 ? 's' : ''} to…
+      </div>
       {/* initialPrefix doubles as the floor (#60): the picker must never list above
           the connection's base prefix, so the breadcrumb is pinned and navigation
           clamped — its ListObjectsV2 must never see Prefix: undefined while scoped. */}
-      <Breadcrumb prefix={prefix} floor={initialPrefix} onNavigate={p => setPrefix(clampToFloor(p, initialPrefix))} />
+      <Breadcrumb prefix={prefix} floor={initialPrefix} onNavigate={(p) => setPrefix(clampToFloor(p, initialPrefix))} />
       <div class="move-picker-list">
-        {loading && <div class="move-picker-loading"><span class="spinner" /> Loading…</div>}
-        {error && <div class="move-picker-error">{error}</div>}
-        {!loading && !error && folders.length === 0 && (
-          <div class="move-picker-empty">No subfolders here.</div>
+        {loading && (
+          <div class="move-picker-loading">
+            <span class="spinner" /> Loading…
+          </div>
         )}
-        {!loading && !error && folders.map(f => (
-          <button key={f} type="button" class="move-picker-folder" onClick={() => setPrefix(f)}>
-            <span class="file-icon">📁</span>{leafName(f.replace(/\/$/, ''))}/
-          </button>
-        ))}
+        {error && <div class="move-picker-error">{error}</div>}
+        {!loading && !error && folders.length === 0 && <div class="move-picker-empty">No subfolders here.</div>}
+        {!loading &&
+          !error &&
+          folders.map((f) => (
+            <button key={f} type="button" class="move-picker-folder" onClick={() => setPrefix(f)}>
+              <span class="file-icon">📁</span>
+              {leafName(f.replace(/\/$/, ''))}/
+            </button>
+          ))}
       </div>
       <div class="modal-body">
         <p class="move-picker-dest">
@@ -82,7 +96,9 @@ export function MovePickerModal({ client, bucket, selection, initialPrefix = '',
         {reason && <p class="modal-caveat move-picker-reason">{reason}</p>}
       </div>
       <div class="modal-actions">
-        <button type="button" class="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
+        <button type="button" class="btn btn-ghost btn-sm" onClick={onCancel}>
+          Cancel
+        </button>
         <button
           type="button"
           class="btn btn-primary btn-sm move-here"

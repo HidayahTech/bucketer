@@ -18,15 +18,24 @@ import crypto from 'node:crypto';
 const md5hex = (buf) => crypto.createHash('md5').update(buf).digest('hex');
 const md5buf = (buf) => crypto.createHash('md5').update(buf).digest();
 const nowISO = () => new Date().toISOString();
-const newId  = () => crypto.randomBytes(16).toString('hex');
-const xmlEsc = (s) => String(s).replace(/[<>&'"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[c]));
+const newId = () => crypto.randomBytes(16).toString('hex');
+const xmlEsc = (s) =>
+  String(s).replace(/[<>&'"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' })[c]);
 
 // Default CORS mirrors src/lib/cors-config.js corsJson(). allowedHeaders may contain wildcard
 // entries (e.g. 'x-amz-*'); the preflight matches requested headers against them (like real S3).
 const DEFAULT_CORS = () => ({
   allowedMethods: ['GET', 'PUT', 'HEAD', 'POST', 'DELETE'],
-  allowedHeaders: ['authorization', 'content-type', 'content-md5', 'x-amz-*', 'amz-sdk-invocation-id', 'amz-sdk-request', 'etag'],
-  exposeHeaders:  ['ETag', 'Content-Length', 'Content-Type', 'x-amz-meta-*'],
+  allowedHeaders: [
+    'authorization',
+    'content-type',
+    'content-md5',
+    'x-amz-*',
+    'amz-sdk-invocation-id',
+    'amz-sdk-request',
+    'etag',
+  ],
+  exposeHeaders: ['ETag', 'Content-Length', 'Content-Type', 'x-amz-meta-*'],
   maxAge: 3600,
 });
 
@@ -49,13 +58,13 @@ function readBody(req) {
 }
 
 export function createMockS3(opts = {}) {
-  const baseHost  = opts.host ?? '127.0.0.1';
+  const baseHost = opts.host ?? '127.0.0.1';
   const bootLatencyMs = opts.latencyMs ?? 0;
-  let latencyMs   = bootLatencyMs;   // runtime-settable via configure({ latencyMs }) so a
-                                     // matched pair (0 ms vs slow) can share one boot
-  const buckets   = new Map(); // name -> { versioning, objects: Map<key, Version[]>, uploads: Map<id,…> }
-  let cors        = DEFAULT_CORS();
-  let faults      = [];        // [{ op?, method?, keyPrefix?, status, code, message, times }]
+  let latencyMs = bootLatencyMs; // runtime-settable via configure({ latencyMs }) so a
+  // matched pair (0 ms vs slow) can share one boot
+  const buckets = new Map(); // name -> { versioning, objects: Map<key, Version[]>, uploads: Map<id,…> }
+  let cors = DEFAULT_CORS();
+  let faults = []; // [{ op?, method?, keyPrefix?, status, code, message, times }]
 
   // Request log: the presence-assertion side of the harness. An e2e that asserts only an
   // absence ("the page did not navigate") passes just as happily when the feature is
@@ -74,18 +83,27 @@ export function createMockS3(opts = {}) {
     if (req.url.startsWith('/__admin/')) return;
     const signed = req.url.includes('X-Amz-Signature');
     const range = req.headers.range || null;
-    const isNavGet = req.method === 'GET' && signed
-      && !req.url.includes('list-type') && range !== 'bytes=0-0';
+    const isNavGet = req.method === 'GET' && signed && !req.url.includes('list-type') && range !== 'bytes=0-0';
     // isList/listPrefix (#60): the query string is otherwise stripped from `path`,
     // which would make "no root-level List ever happened" an unwritable assertion.
     const q = new URL(req.url, 'http://mock').searchParams;
     const isList = req.method === 'GET' && q.get('list-type') === '2';
-    requestEntries.push({ method: req.method, path: req.url.split('?')[0], signed, range, isNavGet, isList, listPrefix: isList ? (q.get('prefix') || '') : null });
+    requestEntries.push({
+      method: req.method,
+      path: req.url.split('?')[0],
+      signed,
+      range,
+      isNavGet,
+      isList,
+      listPrefix: isList ? q.get('prefix') || '' : null,
+    });
     if (requestEntries.length > REQUEST_LOG_CAP) requestEntries.shift();
   }
   const requestLog = {
     list: () => requestEntries.slice(),
-    reset: () => { requestEntries.length = 0; },
+    reset: () => {
+      requestEntries.length = 0;
+    },
   };
 
   function bkt(name) {
@@ -102,13 +120,24 @@ export function createMockS3(opts = {}) {
   function putVersion(b, key, ver) {
     if (!b.objects.has(key)) b.objects.set(key, []);
     const vs = b.objects.get(key);
-    if (b.versioning) { vs.push(ver); } else { b.objects.set(key, [ver]); }
+    if (b.versioning) {
+      vs.push(ver);
+    } else {
+      b.objects.set(key, [ver]);
+    }
     return ver;
   }
 
-  function reset()        { buckets.clear(); faults = []; cors = DEFAULT_CORS(); latencyMs = bootLatencyMs; scopePrefix = null; requestLog.reset(); }
+  function reset() {
+    buckets.clear();
+    faults = [];
+    cors = DEFAULT_CORS();
+    latencyMs = bootLatencyMs;
+    scopePrefix = null;
+    requestLog.reset();
+  }
   function configure(cfg) {
-    if (cfg.cors)   cors = { ...DEFAULT_CORS(), ...cfg.cors };
+    if (cfg.cors) cors = { ...DEFAULT_CORS(), ...cfg.cors };
     if (cfg.faults) faults = cfg.faults;
     if (typeof cfg.latencyMs === 'number') latencyMs = cfg.latencyMs;
     if (cfg.bucket && typeof cfg.versioning === 'boolean') bkt(cfg.bucket).versioning = cfg.versioning;
@@ -121,19 +150,25 @@ export function createMockS3(opts = {}) {
   // under the scope; object ops must target keys under it. Checked BEFORE faults —
   // deny takes precedence, mirroring real IAM semantics.
   let scopePrefix = null; // e.g. 'clients/acme/' — null = unscoped (default)
-  function inScope(key) { return !scopePrefix || (key || '').startsWith(scopePrefix); }
-  function denyScope(req, res) { return sendError(req, res, 403, 'AccessDenied', 'Access Denied'); }
+  function inScope(key) {
+    return !scopePrefix || (key || '').startsWith(scopePrefix);
+  }
+  function denyScope(req, res) {
+    return sendError(req, res, 403, 'AccessDenied', 'Access Denied');
+  }
   // `skipRange: true` makes a fault ignore ranged requests. Exists so a spec can fail the
   // download GET while the one-byte pre-flight probe (a Range GET on the same key)
   // succeeds — the "object vanished between probe and issue" scenario, which is the case
   // BUG-050's containment still has to handle now that probed failures never reach a frame.
   function matchFault(op, method, key, { hasRange = false } = {}) {
-    const i = faults.findIndex((f) =>
-      (f.op ? f.op === op : true) &&
-      (f.method ? f.method === method : true) &&
-      (f.keyPrefix ? (key || '').startsWith(f.keyPrefix) : true) &&
-      (f.skipRange ? !hasRange : true) &&
-      (f.times == null || f.times > 0));
+    const i = faults.findIndex(
+      (f) =>
+        (f.op ? f.op === op : true) &&
+        (f.method ? f.method === method : true) &&
+        (f.keyPrefix ? (key || '').startsWith(f.keyPrefix) : true) &&
+        (f.skipRange ? !hasRange : true) &&
+        (f.times == null || f.times > 0),
+    );
     if (i === -1) return null;
     const f = faults[i];
     if (f.times != null) f.times -= 1;
@@ -144,7 +179,8 @@ export function createMockS3(opts = {}) {
   function parseTarget(req) {
     const hostHdr = (req.headers.host || baseHost).split(':')[0];
     const url = new URL(req.url, `http://${hostHdr}`);
-    const virtualHosted = hostHdr !== baseHost && hostHdr !== 'localhost' && !/^127\./.test(hostHdr) && hostHdr.includes('.');
+    const virtualHosted =
+      hostHdr !== baseHost && hostHdr !== 'localhost' && !/^127\./.test(hostHdr) && hostHdr.includes('.');
     let bucket, key;
     if (virtualHosted) {
       bucket = hostHdr.split('.')[0];
@@ -173,8 +209,15 @@ export function createMockS3(opts = {}) {
     // Accept-Ranges and Content-Range are always exposed: a ranged reader cannot verify what
     // it received without them, and a browser silently withholds any response header not
     // listed here (BUG-028's failure mode — invisible, not an error).
-    const expose = new Set(['ETag', 'Content-Length', 'Content-Type', 'x-amz-request-id',
-      'x-amz-version-id', 'Accept-Ranges', 'Content-Range']);
+    const expose = new Set([
+      'ETag',
+      'Content-Length',
+      'Content-Type',
+      'x-amz-request-id',
+      'x-amz-version-id',
+      'Accept-Ranges',
+      'Content-Range',
+    ]);
     for (const e of cors.exposeHeaders) if (!e.endsWith('*')) expose.add(e);
     const metaExposed = cors.exposeHeaders.some((e) => e === '*' || e.toLowerCase() === 'x-amz-meta-*');
     if (metaExposed) for (const k of metadataKeys) expose.add(`x-amz-meta-${k}`);
@@ -183,7 +226,10 @@ export function createMockS3(opts = {}) {
   }
 
   function preflight(req, res) {
-    const reqHeaders = (req.headers['access-control-request-headers'] || '').split(',').map((s) => s.trim()).filter(Boolean);
+    const reqHeaders = (req.headers['access-control-request-headers'] || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
     const allowed = reqHeaders.filter((name) => headerAllowed(cors.allowedHeaders, name));
     // If the app requested a header the rule doesn't allow, omit it → browser blocks the real request.
     res.writeHead(200, {
@@ -215,11 +261,27 @@ export function createMockS3(opts = {}) {
       // Admin control plane (tests only).
       if (req.url.startsWith('/__admin/')) {
         const body = await readBody(req);
-        if (req.url === '/__admin/reset') { reset(); res.writeHead(200, corsHeaders(req)); return res.end('{"ok":true}'); }
-        if (req.url === '/__admin/config') { configure(body.length ? JSON.parse(body) : {}); res.writeHead(200, corsHeaders(req)); return res.end('{"ok":true}'); }
-        if (req.url === '/__admin/requests' && method === 'GET') { res.writeHead(200, { ...corsHeaders(req), 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ requests: requestLog.list() })); }
-        if (req.url === '/__admin/requests/reset') { requestLog.reset(); res.writeHead(200, corsHeaders(req)); return res.end('{"ok":true}'); }
-        res.writeHead(404, corsHeaders(req)); return res.end();
+        if (req.url === '/__admin/reset') {
+          reset();
+          res.writeHead(200, corsHeaders(req));
+          return res.end('{"ok":true}');
+        }
+        if (req.url === '/__admin/config') {
+          configure(body.length ? JSON.parse(body) : {});
+          res.writeHead(200, corsHeaders(req));
+          return res.end('{"ok":true}');
+        }
+        if (req.url === '/__admin/requests' && method === 'GET') {
+          res.writeHead(200, { ...corsHeaders(req), 'Content-Type': 'application/json' });
+          return res.end(JSON.stringify({ requests: requestLog.list() }));
+        }
+        if (req.url === '/__admin/requests/reset') {
+          requestLog.reset();
+          res.writeHead(200, corsHeaders(req));
+          return res.end('{"ok":true}');
+        }
+        res.writeHead(404, corsHeaders(req));
+        return res.end();
       }
 
       const { bucket, key, url } = parseTarget(req);
@@ -228,24 +290,28 @@ export function createMockS3(opts = {}) {
 
       // ── Bucket-level GETs ───────────────────────────────────────────────────
       if (method === 'GET' && q.get('list-type') === '2') return listObjectsV2(req, res, b, q);
-      if (method === 'GET' && q.has('versions'))          return listVersions(req, res, b, q);
-      if (method === 'GET' && q.has('uploads'))           return listMultipartUploads(req, res, b, q);
+      if (method === 'GET' && q.has('versions')) return listVersions(req, res, b, q);
+      if (method === 'GET' && q.has('uploads')) return listMultipartUploads(req, res, b, q);
 
       // ── Multipart ──────────────────────────────────────────────────────────
-      if (method === 'POST' && q.has('uploads'))   return initiateMultipart(req, res, b, key);
-      if (method === 'PUT'  && q.has('uploadId') && q.has('partNumber')) return uploadPart(req, res, b, key, q);
-      if (method === 'POST' && q.has('uploadId'))  return completeMultipart(req, res, b, key, q);
-      if (method === 'DELETE' && q.has('uploadId')) { b.uploads.delete(q.get('uploadId')); res.writeHead(204, corsHeaders(req)); return res.end(); }
-      if (method === 'GET' && q.has('uploadId'))   return listParts(req, res, b, key, q);
+      if (method === 'POST' && q.has('uploads')) return initiateMultipart(req, res, b, key);
+      if (method === 'PUT' && q.has('uploadId') && q.has('partNumber')) return uploadPart(req, res, b, key, q);
+      if (method === 'POST' && q.has('uploadId')) return completeMultipart(req, res, b, key, q);
+      if (method === 'DELETE' && q.has('uploadId')) {
+        b.uploads.delete(q.get('uploadId'));
+        res.writeHead(204, corsHeaders(req));
+        return res.end();
+      }
+      if (method === 'GET' && q.has('uploadId')) return listParts(req, res, b, key, q);
 
       // ── Batch delete ─────────────────────────────────────────────────────────
       if (method === 'POST' && q.has('delete')) return deleteObjects(req, res, b);
 
       // ── Object ops ───────────────────────────────────────────────────────────
       if (method === 'PUT' && req.headers['x-amz-copy-source']) return copyObject(req, res, b, key, q);
-      if (method === 'PUT')    return putObject(req, res, b, key);
-      if (method === 'HEAD')   return headObject(req, res, b, key);
-      if (method === 'GET')    return getObject(req, res, b, key, q);
+      if (method === 'PUT') return putObject(req, res, b, key);
+      if (method === 'HEAD') return headObject(req, res, b, key);
+      if (method === 'GET') return getObject(req, res, b, key, q);
       if (method === 'DELETE') return deleteObject(req, res, b, key, q);
 
       sendError(req, res, 400, 'NotImplemented', `${method} ${req.url}`);
@@ -260,7 +326,8 @@ export function createMockS3(opts = {}) {
   // ── Handlers ───────────────────────────────────────────────────────────────
   function listObjectsV2(req, res, b, q) {
     if (scopePrefix && !(q.get('prefix') || '').startsWith(scopePrefix)) return denyScope(req, res);
-    const f = matchFault('ListObjectsV2', 'GET'); if (f) return sendError(req, res, f.status, f.code, f.message);
+    const f = matchFault('ListObjectsV2', 'GET');
+    if (f) return sendError(req, res, f.status, f.code, f.message);
     const prefix = q.get('prefix') || '';
     const delimiter = q.get('delimiter') || '';
     const maxKeys = parseInt(q.get('max-keys') || '1000', 10);
@@ -273,7 +340,10 @@ export function createMockS3(opts = {}) {
       if (delimiter) {
         const rest = k.slice(prefix.length);
         const di = rest.indexOf(delimiter);
-        if (di !== -1) { commonPrefixes.add(prefix + rest.slice(0, di + 1)); continue; }
+        if (di !== -1) {
+          commonPrefixes.add(prefix + rest.slice(0, di + 1));
+          continue;
+        }
       }
       contents.push(k);
     }
@@ -283,29 +353,49 @@ export function createMockS3(opts = {}) {
     const truncated = start + maxKeys < merged.length;
     const next = truncated ? merged[start + maxKeys] : null;
 
-    const objXml = page.map((k) => {
-      const o = current(b, k);
-      return `<Contents><Key>${xmlEsc(k)}</Key><LastModified>${o.lastModified}</LastModified><ETag>${xmlEsc(o.etag)}</ETag><Size>${o.body.length}</Size><StorageClass>${xmlEsc(o.storageClass || 'STANDARD')}</StorageClass></Contents>`;
-    }).join('');
-    const cpXml = (token ? '' : [...commonPrefixes].sort().map((p) => `<CommonPrefixes><Prefix>${xmlEsc(p)}</Prefix></CommonPrefixes>`).join(''));
-    sendXml(req, res, 200,
-      `<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Name>bucket</Name><Prefix>${xmlEsc(prefix)}</Prefix><KeyCount>${page.length}</KeyCount><MaxKeys>${maxKeys}</MaxKeys><Delimiter>${xmlEsc(delimiter)}</Delimiter><IsTruncated>${truncated}</IsTruncated>${next ? `<NextContinuationToken>${xmlEsc(next)}</NextContinuationToken>` : ''}${objXml}${cpXml}</ListBucketResult>`);
+    const objXml = page
+      .map((k) => {
+        const o = current(b, k);
+        return `<Contents><Key>${xmlEsc(k)}</Key><LastModified>${o.lastModified}</LastModified><ETag>${xmlEsc(o.etag)}</ETag><Size>${o.body.length}</Size><StorageClass>${xmlEsc(o.storageClass || 'STANDARD')}</StorageClass></Contents>`;
+      })
+      .join('');
+    const cpXml = token
+      ? ''
+      : [...commonPrefixes]
+          .sort()
+          .map((p) => `<CommonPrefixes><Prefix>${xmlEsc(p)}</Prefix></CommonPrefixes>`)
+          .join('');
+    sendXml(
+      req,
+      res,
+      200,
+      `<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Name>bucket</Name><Prefix>${xmlEsc(prefix)}</Prefix><KeyCount>${page.length}</KeyCount><MaxKeys>${maxKeys}</MaxKeys><Delimiter>${xmlEsc(delimiter)}</Delimiter><IsTruncated>${truncated}</IsTruncated>${next ? `<NextContinuationToken>${xmlEsc(next)}</NextContinuationToken>` : ''}${objXml}${cpXml}</ListBucketResult>`,
+    );
   }
 
   function listVersions(req, res, b, q) {
     if (scopePrefix && !(q.get('prefix') || '').startsWith(scopePrefix)) return denyScope(req, res);
     const prefix = q.get('prefix') || '';
-    const versions = [], markers = [];
+    const versions = [],
+      markers = [];
     for (const [k, vs] of b.objects) {
       if (!k.startsWith(prefix)) continue;
       vs.forEach((v, i) => {
         const isLatest = i === vs.length - 1;
         const entry = `<Key>${xmlEsc(k)}</Key><VersionId>${v.versionId || 'null'}</VersionId><IsLatest>${isLatest}</IsLatest><LastModified>${v.lastModified}</LastModified>`;
         if (v.deleteMarker) markers.push(`<DeleteMarker>${entry}</DeleteMarker>`);
-        else versions.push(`<Version>${entry}<ETag>${xmlEsc(v.etag)}</ETag><Size>${v.body.length}</Size><StorageClass>${xmlEsc(v.storageClass || 'STANDARD')}</StorageClass></Version>`);
+        else
+          versions.push(
+            `<Version>${entry}<ETag>${xmlEsc(v.etag)}</ETag><Size>${v.body.length}</Size><StorageClass>${xmlEsc(v.storageClass || 'STANDARD')}</StorageClass></Version>`,
+          );
       });
     }
-    sendXml(req, res, 200, `<ListVersionsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Name>bucket</Name><Prefix>${xmlEsc(prefix)}</Prefix><IsTruncated>false</IsTruncated>${versions.join('')}${markers.join('')}</ListVersionsResult>`);
+    sendXml(
+      req,
+      res,
+      200,
+      `<ListVersionsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Name>bucket</Name><Prefix>${xmlEsc(prefix)}</Prefix><IsTruncated>false</IsTruncated>${versions.join('')}${markers.join('')}</ListVersionsResult>`,
+    );
   }
 
   function metaFromHeaders(req) {
@@ -318,25 +408,50 @@ export function createMockS3(opts = {}) {
 
   async function putObject(req, res, b, key) {
     if (!inScope(key)) return denyScope(req, res);
-    const f = matchFault('PutObject', 'PUT', key); if (f) return sendError(req, res, f.status, f.code, f.message);
+    const f = matchFault('PutObject', 'PUT', key);
+    if (f) return sendError(req, res, f.status, f.code, f.message);
     const body = await readBody(req);
     const etag = `"${md5hex(body)}"`;
     // x-amz-storage-class rides along like real S3 (the SDK sends it for
     // PutObjectCommand({ StorageClass })). Listings echo it, and a GET against an
     // archived class fails — which is the whole reason archived-object flagging exists.
     const storageClass = req.headers['x-amz-storage-class'] || 'STANDARD';
-    const ver = { versionId: b.versioning ? newId() : null, body, metadata: metaFromHeaders(req), contentType: req.headers['content-type'] || 'application/octet-stream', etag, lastModified: nowISO(), storageClass };
+    const ver = {
+      versionId: b.versioning ? newId() : null,
+      body,
+      metadata: metaFromHeaders(req),
+      contentType: req.headers['content-type'] || 'application/octet-stream',
+      etag,
+      lastModified: nowISO(),
+      storageClass,
+    };
     putVersion(b, key, ver);
-    res.writeHead(200, { ...corsHeaders(req), ETag: etag, ...(ver.versionId ? { 'x-amz-version-id': ver.versionId } : {}) });
+    res.writeHead(200, {
+      ...corsHeaders(req),
+      ETag: etag,
+      ...(ver.versionId ? { 'x-amz-version-id': ver.versionId } : {}),
+    });
     res.end();
   }
 
   function headObject(req, res, b, key) {
     if (!inScope(key)) return denyScope(req, res);
     const o = current(b, key);
-    if (!o) { res.writeHead(404, corsHeaders(req)); return res.end(); }
-    const metaHeaders = {}; for (const [k, v] of Object.entries(o.metadata)) metaHeaders[`x-amz-meta-${k}`] = v;
-    res.writeHead(200, { ...corsHeaders(req, Object.keys(o.metadata)), 'Content-Type': o.contentType, 'Content-Length': String(o.body.length), 'Accept-Ranges': 'bytes', ETag: o.etag, 'Last-Modified': new Date(o.lastModified).toUTCString(), ...metaHeaders });
+    if (!o) {
+      res.writeHead(404, corsHeaders(req));
+      return res.end();
+    }
+    const metaHeaders = {};
+    for (const [k, v] of Object.entries(o.metadata)) metaHeaders[`x-amz-meta-${k}`] = v;
+    res.writeHead(200, {
+      ...corsHeaders(req, Object.keys(o.metadata)),
+      'Content-Type': o.contentType,
+      'Content-Length': String(o.body.length),
+      'Accept-Ranges': 'bytes',
+      ETag: o.etag,
+      'Last-Modified': new Date(o.lastModified).toUTCString(),
+      ...metaHeaders,
+    });
     res.end();
   }
 
@@ -378,18 +493,30 @@ export function createMockS3(opts = {}) {
     // Real S3: a GET against GLACIER or DEEP_ARCHIVE fails with 403 InvalidObjectState
     // until a RestoreObject completes. GLACIER_IR serves reads normally.
     if (o.storageClass === 'GLACIER' || o.storageClass === 'DEEP_ARCHIVE') {
-      return sendError(req, res, 403, 'InvalidObjectState',
-        "The operation is not valid for the object's storage class");
+      return sendError(
+        req,
+        res,
+        403,
+        'InvalidObjectState',
+        "The operation is not valid for the object's storage class",
+      );
     }
 
     // A transfer that spans a change to the object must fail rather than silently splice two
     // versions together. If-Match is how a client asks for that guarantee.
     const ifMatch = req.headers['if-match'];
     if (ifMatch && ifMatch !== '*' && ifMatch.replace(/^W\//, '') !== o.etag) {
-      return sendError(req, res, 412, 'PreconditionFailed', 'At least one of the pre-conditions you specified did not hold');
+      return sendError(
+        req,
+        res,
+        412,
+        'PreconditionFailed',
+        'At least one of the pre-conditions you specified did not hold',
+      );
     }
 
-    const metaHeaders = {}; for (const [k, v] of Object.entries(o.metadata)) metaHeaders[`x-amz-meta-${k}`] = v;
+    const metaHeaders = {};
+    for (const [k, v] of Object.entries(o.metadata)) metaHeaders[`x-amz-meta-${k}`] = v;
     // Presigned response overrides (the SDK puts these in the query string): let a download set
     // Content-Disposition so the browser treats a cross-origin GET as an attachment, not a navigation.
     const overrides = {};
@@ -415,7 +542,7 @@ export function createMockS3(opts = {}) {
     // client's partial file is stale, and the correct answer is the whole object, not a slice.
     const ifRange = req.headers['if-range'];
     const rangeStale = ifRange && ifRange.replace(/^W\//, '') !== o.etag;
-    const range = (req.headers.range && !rangeStale) ? parseRange(req.headers.range, o.body.length) : null;
+    const range = req.headers.range && !rangeStale ? parseRange(req.headers.range, o.body.length) : null;
 
     if (range === 'unsatisfiable') {
       res.writeHead(416, { ...base, 'Content-Range': `bytes */${o.body.length}` });
@@ -424,7 +551,11 @@ export function createMockS3(opts = {}) {
 
     const bodyOut = range ? o.body.subarray(range.start, range.end + 1) : o.body;
     const head = range
-      ? { ...base, 'Content-Length': String(bodyOut.length), 'Content-Range': `bytes ${range.start}-${range.end}/${o.body.length}` }
+      ? {
+          ...base,
+          'Content-Length': String(bodyOut.length),
+          'Content-Range': `bytes ${range.start}-${range.end}/${o.body.length}`,
+        }
       : { ...base, 'Content-Length': String(bodyOut.length) };
 
     res.writeHead(range ? 206 : 200, head);
@@ -438,7 +569,8 @@ export function createMockS3(opts = {}) {
 
   function deleteObject(req, res, b, key, q) {
     if (!inScope(key)) return denyScope(req, res);
-    const f = matchFault('DeleteObject', 'DELETE', key); if (f) return sendError(req, res, f.status, f.code, f.message);
+    const f = matchFault('DeleteObject', 'DELETE', key);
+    if (f) return sendError(req, res, f.status, f.code, f.message);
     const versionId = q.get('versionId');
     const vs = b.objects.get(key);
     if (b.versioning && !versionId) {
@@ -450,7 +582,8 @@ export function createMockS3(opts = {}) {
     }
     if (versionId && vs) {
       const left = vs.filter((v) => v.versionId !== versionId);
-      if (left.length) b.objects.set(key, left); else b.objects.delete(key);
+      if (left.length) b.objects.set(key, left);
+      else b.objects.delete(key);
     } else {
       b.objects.delete(key);
     }
@@ -466,29 +599,57 @@ export function createMockS3(opts = {}) {
     const reqFault = matchFault('DeleteObjects', 'POST');
     if (reqFault) return sendError(req, res, reqFault.status, reqFault.code, reqFault.message);
     const keys = [...body.matchAll(/<Key>([\s\S]*?)<\/Key>/g)].map((m) => m[1]);
-    if (keys.length > 1000) return sendError(req, res, 400, 'MalformedXML', 'The batch delete request contained more than 1000 keys');
+    if (keys.length > 1000)
+      return sendError(req, res, 400, 'MalformedXML', 'The batch delete request contained more than 1000 keys');
     const quiet = /<Quiet>true<\/Quiet>/.test(body);
-    const deleted = [], errors = [];
+    const deleted = [],
+      errors = [];
     for (const k of keys) {
       const key = k.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
-      if (!inScope(key)) { errors.push(`<Error><Key>${xmlEsc(key)}</Key><Code>AccessDenied</Code><Message>Access Denied</Message></Error>`); continue; }
+      if (!inScope(key)) {
+        errors.push(
+          `<Error><Key>${xmlEsc(key)}</Key><Code>AccessDenied</Code><Message>Access Denied</Message></Error>`,
+        );
+        continue;
+      }
       const f = matchFault('DeleteObject', 'POST', key);
-      if (f) { errors.push(`<Error><Key>${xmlEsc(key)}</Key><Code>${xmlEsc(f.code)}</Code><Message>${xmlEsc(f.message)}</Message></Error>`); continue; }
+      if (f) {
+        errors.push(
+          `<Error><Key>${xmlEsc(key)}</Key><Code>${xmlEsc(f.code)}</Code><Message>${xmlEsc(f.message)}</Message></Error>`,
+        );
+        continue;
+      }
       // On a versioned bucket a batch delete (no per-key VersionId) creates a delete marker, same as
       // a single DeleteObject — the current version is hidden but retained (so it can be undeleted).
       if (b.versioning) putVersion(b, key, { versionId: newId(), deleteMarker: true, lastModified: nowISO() });
       else b.objects.delete(key);
       if (!quiet) deleted.push(`<Deleted><Key>${xmlEsc(key)}</Key></Deleted>`);
     }
-    sendXml(req, res, 200, `<DeleteResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">${deleted.join('')}${errors.join('')}</DeleteResult>`);
+    sendXml(
+      req,
+      res,
+      200,
+      `<DeleteResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">${deleted.join('')}${errors.join('')}</DeleteResult>`,
+    );
   }
 
   function initiateMultipart(req, res, b, key) {
     // Part ops need no separate guard: no uploadId can exist for a key denied here.
     if (!inScope(key)) return denyScope(req, res);
     const id = `mock-${newId()}`;
-    b.uploads.set(id, { key, initiated: nowISO(), metadata: metaFromHeaders(req), contentType: req.headers['content-type'] || 'application/octet-stream', parts: new Map() });
-    sendXml(req, res, 200, `<InitiateMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Bucket>bucket</Bucket><Key>${xmlEsc(key)}</Key><UploadId>${id}</UploadId></InitiateMultipartUploadResult>`);
+    b.uploads.set(id, {
+      key,
+      initiated: nowISO(),
+      metadata: metaFromHeaders(req),
+      contentType: req.headers['content-type'] || 'application/octet-stream',
+      parts: new Map(),
+    });
+    sendXml(
+      req,
+      res,
+      200,
+      `<InitiateMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Bucket>bucket</Bucket><Key>${xmlEsc(key)}</Key><UploadId>${id}</UploadId></InitiateMultipartUploadResult>`,
+    );
   }
 
   // GET /?uploads — list in-progress (incomplete) multipart uploads, optionally under ?prefix=.
@@ -496,9 +657,17 @@ export function createMockS3(opts = {}) {
     const prefix = q.get('prefix') || '';
     const uploadsXml = [...b.uploads.entries()]
       .filter(([, up]) => up.key.startsWith(prefix))
-      .map(([id, up]) => `<Upload><Key>${xmlEsc(up.key)}</Key><UploadId>${xmlEsc(id)}</UploadId><Initiated>${up.initiated || nowISO()}</Initiated></Upload>`)
+      .map(
+        ([id, up]) =>
+          `<Upload><Key>${xmlEsc(up.key)}</Key><UploadId>${xmlEsc(id)}</UploadId><Initiated>${up.initiated || nowISO()}</Initiated></Upload>`,
+      )
       .join('');
-    sendXml(req, res, 200, `<ListMultipartUploadsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Bucket>bucket</Bucket><IsTruncated>false</IsTruncated>${uploadsXml}</ListMultipartUploadsResult>`);
+    sendXml(
+      req,
+      res,
+      200,
+      `<ListMultipartUploadsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Bucket>bucket</Bucket><IsTruncated>false</IsTruncated>${uploadsXml}</ListMultipartUploadsResult>`,
+    );
   }
 
   async function uploadPart(req, res, b, key, q) {
@@ -509,19 +678,31 @@ export function createMockS3(opts = {}) {
     const f = matchFault(copySource ? 'UploadPartCopy' : 'UploadPart', 'PUT', up.key);
     if (f) return sendError(req, res, f.status, f.code, f.message);
     let body;
-    if (copySource) { // UploadPartCopy
+    if (copySource) {
+      // UploadPartCopy
       const src = resolveCopySource(b, copySource);
       if (!src) return sendError(req, res, 404, 'NoSuchKey', copySource);
       const rng = req.headers['x-amz-copy-source-range'];
-      if (rng) { const m = /bytes=(\d+)-(\d+)/.exec(rng); body = src.body.subarray(parseInt(m[1], 10), parseInt(m[2], 10) + 1); }
-      else body = src.body;
+      if (rng) {
+        const m = /bytes=(\d+)-(\d+)/.exec(rng);
+        body = src.body.subarray(parseInt(m[1], 10), parseInt(m[2], 10) + 1);
+      } else body = src.body;
     } else {
       body = await readBody(req);
     }
     const etag = `"${md5hex(body)}"`;
     up.parts.set(partNumber, { etag, md5: md5buf(body), body: Buffer.from(body) });
-    if (copySource) sendXml(req, res, 200, `<CopyPartResult><ETag>${etag}</ETag><LastModified>${nowISO()}</LastModified></CopyPartResult>`);
-    else { res.writeHead(200, { ...corsHeaders(req), ETag: etag }); res.end(); }
+    if (copySource)
+      sendXml(
+        req,
+        res,
+        200,
+        `<CopyPartResult><ETag>${etag}</ETag><LastModified>${nowISO()}</LastModified></CopyPartResult>`,
+      );
+    else {
+      res.writeHead(200, { ...corsHeaders(req), ETag: etag });
+      res.end();
+    }
   }
 
   async function completeMultipart(req, res, b, key, q) {
@@ -538,23 +719,44 @@ export function createMockS3(opts = {}) {
     }));
     // STRICT: parts must be ascending and each must match a stored part's ETag.
     const ns = requested.map((p) => p.n);
-    if (ns.some((n, i) => i > 0 && n <= ns[i - 1])) return sendError(req, res, 400, 'InvalidPartOrder', 'Parts must be in ascending order');
-    const normEtag = (e) => e.replace(/&quot;/g, '').replace(/&amp;/g, '&').replace(/"/g, '').trim();
+    if (ns.some((n, i) => i > 0 && n <= ns[i - 1]))
+      return sendError(req, res, 400, 'InvalidPartOrder', 'Parts must be in ascending order');
+    const normEtag = (e) =>
+      e
+        .replace(/&quot;/g, '')
+        .replace(/&amp;/g, '&')
+        .replace(/"/g, '')
+        .trim();
     for (const p of requested) {
       const stored = up.parts.get(p.n);
       if (!stored) return sendError(req, res, 400, 'InvalidPart', `Part ${p.n} not found`);
-      if (normEtag(stored.etag) !== normEtag(p.etag)) return sendError(req, res, 400, 'InvalidPart', `ETag mismatch for part ${p.n}`);
+      if (normEtag(stored.etag) !== normEtag(p.etag))
+        return sendError(req, res, 400, 'InvalidPart', `ETag mismatch for part ${p.n}`);
     }
     // STRICT: every part except the last must be >= 5 MB.
     for (let i = 0; i < requested.length - 1; i++) {
-      if (up.parts.get(requested[i].n).body.length < 5 * 1024 * 1024) return sendError(req, res, 400, 'EntityTooSmall', `Part ${requested[i].n} smaller than 5 MB`);
+      if (up.parts.get(requested[i].n).body.length < 5 * 1024 * 1024)
+        return sendError(req, res, 400, 'EntityTooSmall', `Part ${requested[i].n} smaller than 5 MB`);
     }
     const full = Buffer.concat(requested.map((p) => up.parts.get(p.n).body));
     const etag = `"${md5hex(Buffer.concat(requested.map((p) => up.parts.get(p.n).md5)))}-${requested.length}"`;
-    const ver = { versionId: b.versioning ? newId() : null, body: full, metadata: up.metadata, contentType: up.contentType, etag, lastModified: nowISO() };
+    const ver = {
+      versionId: b.versioning ? newId() : null,
+      body: full,
+      metadata: up.metadata,
+      contentType: up.contentType,
+      etag,
+      lastModified: nowISO(),
+    };
     putVersion(b, key, ver);
     b.uploads.delete(q.get('uploadId'));
-    sendXml(req, res, 200, `<CompleteMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Location>http://${baseHost}/${xmlEsc(key)}</Location><Bucket>bucket</Bucket><Key>${xmlEsc(key)}</Key><ETag>${etag}</ETag></CompleteMultipartUploadResult>`, ver.versionId ? { 'x-amz-version-id': ver.versionId } : {});
+    sendXml(
+      req,
+      res,
+      200,
+      `<CompleteMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Location>http://${baseHost}/${xmlEsc(key)}</Location><Bucket>bucket</Bucket><Key>${xmlEsc(key)}</Key><ETag>${etag}</ETag></CompleteMultipartUploadResult>`,
+      ver.versionId ? { 'x-amz-version-id': ver.versionId } : {},
+    );
   }
 
   function listParts(req, res, b, key, q) {
@@ -564,12 +766,22 @@ export function createMockS3(opts = {}) {
     // Real S3 paginates ListParts at 1000 parts/page (the BUG-007 trap). max-parts is the SDK-driven
     // page size; cap it so the resume path must loop until IsTruncated is false.
     const maxParts = Math.min(parseInt(q.get('max-parts') || '1000', 10), 1000);
-    const sorted = [...up.parts.entries()].map(([n, p]) => ({ n, etag: p.etag, size: p.body.length })).sort((a, b2) => a.n - b2.n).filter((p) => p.n > marker);
+    const sorted = [...up.parts.entries()]
+      .map(([n, p]) => ({ n, etag: p.etag, size: p.body.length }))
+      .sort((a, b2) => a.n - b2.n)
+      .filter((p) => p.n > marker);
     const page = sorted.slice(0, maxParts);
     const truncated = sorted.length > maxParts;
     const nextMarker = truncated ? page[page.length - 1].n : null;
-    const partsXml = page.map((p) => `<Part><PartNumber>${p.n}</PartNumber><ETag>${xmlEsc(p.etag)}</ETag><Size>${p.size}</Size></Part>`).join('');
-    sendXml(req, res, 200, `<ListPartsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Bucket>bucket</Bucket><Key>${xmlEsc(key)}</Key><UploadId>${xmlEsc(q.get('uploadId'))}</UploadId><MaxParts>${maxParts}</MaxParts><IsTruncated>${truncated}</IsTruncated>${nextMarker != null ? `<NextPartNumberMarker>${nextMarker}</NextPartNumberMarker>` : ''}${partsXml}</ListPartsResult>`);
+    const partsXml = page
+      .map((p) => `<Part><PartNumber>${p.n}</PartNumber><ETag>${xmlEsc(p.etag)}</ETag><Size>${p.size}</Size></Part>`)
+      .join('');
+    sendXml(
+      req,
+      res,
+      200,
+      `<ListPartsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Bucket>bucket</Bucket><Key>${xmlEsc(key)}</Key><UploadId>${xmlEsc(q.get('uploadId'))}</UploadId><MaxParts>${maxParts}</MaxParts><IsTruncated>${truncated}</IsTruncated>${nextMarker != null ? `<NextPartNumberMarker>${nextMarker}</NextPartNumberMarker>` : ''}${partsXml}</ListPartsResult>`,
+    );
   }
 
   function resolveCopySource(b, header) {
@@ -586,18 +798,38 @@ export function createMockS3(opts = {}) {
     // B2 gates CopyObject under readFiles (source) AND writeFiles (dest) — a scoped
     // key can neither read outside its prefix nor write outside it (#60).
     if (!inScope(destKey) || !inScope(srcKey)) return denyScope(req, res);
-    const f = matchFault('CopyObject', 'PUT', destKey); if (f) return sendError(req, res, f.status, f.code, f.message);
+    const f = matchFault('CopyObject', 'PUT', destKey);
+    if (f) return sendError(req, res, f.status, f.code, f.message);
     const src = resolveCopySource(b, header);
     if (!src) return sendError(req, res, 404, 'NoSuchKey', header);
     const directive = (req.headers['x-amz-metadata-directive'] || 'COPY').toUpperCase();
     // STRICT: real S3 rejects a same-key copy that doesn't change metadata.
-    if (srcKey === destKey && directive === 'COPY') return sendError(req, res, 400, 'InvalidRequest', 'This copy request is illegal because it is trying to copy an object to itself without changing metadata');
+    if (srcKey === destKey && directive === 'COPY')
+      return sendError(
+        req,
+        res,
+        400,
+        'InvalidRequest',
+        'This copy request is illegal because it is trying to copy an object to itself without changing metadata',
+      );
     const metadata = directive === 'REPLACE' ? metaFromHeaders(req) : src.metadata;
-    const contentType = directive === 'REPLACE' ? (req.headers['content-type'] || src.contentType) : src.contentType;
+    const contentType = directive === 'REPLACE' ? req.headers['content-type'] || src.contentType : src.contentType;
     const body = Buffer.from(src.body);
     const etag = `"${md5hex(body)}"`;
-    putVersion(b, destKey, { versionId: b.versioning ? newId() : null, body, metadata, contentType, etag, lastModified: nowISO() });
-    sendXml(req, res, 200, `<CopyObjectResult><ETag>${etag}</ETag><LastModified>${nowISO()}</LastModified></CopyObjectResult>`);
+    putVersion(b, destKey, {
+      versionId: b.versioning ? newId() : null,
+      body,
+      metadata,
+      contentType,
+      etag,
+      lastModified: nowISO(),
+    });
+    sendXml(
+      req,
+      res,
+      200,
+      `<CopyObjectResult><ETag>${etag}</ETag><LastModified>${nowISO()}</LastModified></CopyObjectResult>`,
+    );
   }
 
   return {
@@ -605,8 +837,12 @@ export function createMockS3(opts = {}) {
     reset,
     configure,
     requestLog,
-    get buckets() { return buckets; },
-    listen(port) { return new Promise((resolve) => server.listen(port, baseHost, () => resolve(server.address().port))); },
+    get buckets() {
+      return buckets;
+    },
+    listen(port) {
+      return new Promise((resolve) => server.listen(port, baseHost, () => resolve(server.address().port)));
+    },
     // Same handler over TLS. Exists because the app's CSP treats transports differently
     // (frame-src) and production endpoints are https — an http-only harness let BUG-052
     // pass unnoticed. Callers supply { key, cert } (see test/e2e/tls-cert.mjs).
@@ -626,6 +862,9 @@ export function createMockS3(opts = {}) {
 // CLI entry: `node test/e2e/mock-s3/server.mjs` (used by the e2e runner and perf harness).
 if (import.meta.url === `file://${process.argv[1]}`) {
   const port = parseInt(process.env.MOCK_S3_PORT ?? '9090', 10);
-  const mock = createMockS3({ host: process.env.MOCK_S3_HOST ?? '127.0.0.1', latencyMs: parseInt(process.env.MOCK_S3_LATENCY_MS ?? '0', 10) });
+  const mock = createMockS3({
+    host: process.env.MOCK_S3_HOST ?? '127.0.0.1',
+    latencyMs: parseInt(process.env.MOCK_S3_LATENCY_MS ?? '0', 10),
+  });
   mock.listen(port).then((p) => process.stdout.write(`mock-s3 ready on http://127.0.0.1:${p}\n`));
 }

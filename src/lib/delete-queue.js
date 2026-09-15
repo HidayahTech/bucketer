@@ -1,30 +1,38 @@
 import { ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3';
 
-const BATCH_SIZE    = 1000;
-const CONCURRENCY   = 8;
-const MAX_RETRIES   = 4;
+const BATCH_SIZE = 1000;
+const CONCURRENCY = 8;
+const MAX_RETRIES = 4;
 const RETRY_BASE_MS = 500;
 
 function isThrottlingError(err) {
-  const code   = err.Code || err.code || err.name || '';
+  const code = err.Code || err.code || err.name || '';
   const status = err.$metadata?.httpStatusCode;
-  return code === 'SlowDown' || code === 'ServiceUnavailable' ||
-         code === 'ThrottlingException' || status === 503 || status === 429;
+  return (
+    code === 'SlowDown' ||
+    code === 'ServiceUnavailable' ||
+    code === 'ThrottlingException' ||
+    status === 503 ||
+    status === 429
+  );
 }
 
 async function sendBatchWithRetry(client, bucket, batch) {
   let attempt = 0;
   while (true) {
     try {
-      const resp = await client.send(new DeleteObjectsCommand({
-        Bucket: bucket, Delete: { Objects: batch, Quiet: true },
-      }));
+      const resp = await client.send(
+        new DeleteObjectsCommand({
+          Bucket: bucket,
+          Delete: { Objects: batch, Quiet: true },
+        }),
+      );
       return { batch, respErrors: resp.Errors || [] };
     } catch (err) {
       if (attempt < MAX_RETRIES && isThrottlingError(err)) {
-        const base  = RETRY_BASE_MS * 2 ** attempt;
+        const base = RETRY_BASE_MS * 2 ** attempt;
         const delay = Math.round(base * (0.75 + Math.random() * 0.5));
-        await new Promise(r => setTimeout(r, delay));
+        await new Promise((r) => setTimeout(r, delay));
         attempt++;
       } else {
         return { batch, networkError: err };
@@ -37,10 +45,15 @@ async function listAllKeysForPrefix(client, bucket, pfx) {
   const keys = [];
   let token;
   do {
-    const resp = await client.send(new ListObjectsV2Command({
-      Bucket: bucket, Prefix: pfx, MaxKeys: 1000, ContinuationToken: token,
-    }));
-    (resp.Contents || []).forEach(o => keys.push(o.Key));
+    const resp = await client.send(
+      new ListObjectsV2Command({
+        Bucket: bucket,
+        Prefix: pfx,
+        MaxKeys: 1000,
+        ContinuationToken: token,
+      }),
+    );
+    (resp.Contents || []).forEach((o) => keys.push(o.Key));
     token = resp.IsTruncated ? resp.NextContinuationToken : undefined;
   } while (token);
   return keys;
@@ -77,16 +90,22 @@ async function discoverPrefixKeys(client, bucket, prefixes, shouldCancel = () =>
 // shouldCancel() is polled between prefix crawls and batch groups; work already
 // in flight completes. cancelled:true on the done update means work was skipped.
 export async function runDeleteOperation(client, bucket, op, onProgress, shouldCancel = () => false) {
-  const allKeys    = [...op.files];
-  let prefixKeys   = new Map();
+  const allKeys = [...op.files];
+  let prefixKeys = new Map();
 
   if (op.prefixes.length > 0) {
     onProgress({ phase: 'discovering' });
     try {
       prefixKeys = await discoverPrefixKeys(client, bucket, op.prefixes, shouldCancel);
-      prefixKeys.forEach(keys => allKeys.push(...keys));
+      prefixKeys.forEach((keys) => allKeys.push(...keys));
     } catch (err) {
-      onProgress({ phase: 'done', deleted: 0, errors: [{ key: '(listing)', message: err.message }], deletedPrefixes: [], cancelled: false });
+      onProgress({
+        phase: 'done',
+        deleted: 0,
+        errors: [{ key: '(listing)', message: err.message }],
+        deletedPrefixes: [],
+        cancelled: false,
+      });
       return;
     }
   }
@@ -108,7 +127,7 @@ export async function runDeleteOperation(client, bucket, op, onProgress, shouldC
   let deleted = 0;
   const batches = [];
   for (let i = 0; i < allKeys.length; i += BATCH_SIZE) {
-    batches.push(allKeys.slice(i, i + BATCH_SIZE).map(Key => ({ Key })));
+    batches.push(allKeys.slice(i, i + BATCH_SIZE).map((Key) => ({ Key })));
   }
 
   // Cancellation is cooperative and batch-boundary honest: a group already in
@@ -118,30 +137,33 @@ export async function runDeleteOperation(client, bucket, op, onProgress, shouldC
   let cancelled = false;
   for (let i = 0; i < batches.length; i += CONCURRENCY) {
     await Promise.all(
-      batches.slice(i, i + CONCURRENCY).map(async batch => {
+      batches.slice(i, i + CONCURRENCY).map(async (batch) => {
         const { respErrors = [], networkError } = await sendBatchWithRetry(client, bucket, batch);
         const batchDeletedKeys = [];
         if (networkError) {
-          batch.forEach(o => errors.push({ key: o.Key, message: networkError.message }));
+          batch.forEach((o) => errors.push({ key: o.Key, message: networkError.message }));
         } else {
-          const errorKeySet = new Set(respErrors.map(e => e.Key));
-          errors.push(...respErrors.map(e => ({ key: e.Key, message: e.Message || e.Code })));
-          batch.forEach(o => { if (!errorKeySet.has(o.Key)) batchDeletedKeys.push(o.Key); });
+          const errorKeySet = new Set(respErrors.map((e) => e.Key));
+          errors.push(...respErrors.map((e) => ({ key: e.Key, message: e.Message || e.Code })));
+          batch.forEach((o) => {
+            if (!errorKeySet.has(o.Key)) batchDeletedKeys.push(o.Key);
+          });
           deleted += batch.length - respErrors.length;
         }
-        batchDeletedKeys.forEach(k => deletedKeySet.add(k));
+        batchDeletedKeys.forEach((k) => deletedKeySet.add(k));
         onProgress({ deleted, errors: [...errors], deletedKeys: batchDeletedKeys });
-      })
+      }),
     );
-    if (shouldCancel() && i + CONCURRENCY < batches.length) { cancelled = true; break; }
+    if (shouldCancel() && i + CONCURRENCY < batches.length) {
+      cancelled = true;
+      break;
+    }
   }
 
   // A prefix is complete only when every key in it was confirmed deleted.
   // (Equivalent to the old "no errors" rule when the run wasn't cancelled;
   // strictly safer when it was — unattempted keys are neither errors nor deleted.)
-  const deletedPrefixes = op.prefixes.filter(pfx =>
-    (prefixKeys.get(pfx) || []).every(k => deletedKeySet.has(k))
-  );
+  const deletedPrefixes = op.prefixes.filter((pfx) => (prefixKeys.get(pfx) || []).every((k) => deletedKeySet.has(k)));
 
   onProgress({ phase: 'done', deleted, errors: [...errors], deletedPrefixes, cancelled });
 }

@@ -26,7 +26,7 @@ export function BucketerLogo(props) {
   function handleTap() {
     if (animatingRef.current) return;
     const now = performance.now();
-    const recent = tapsRef.current.filter(t => now - t <= TRIPLE_TAP_WINDOW_MS);
+    const recent = tapsRef.current.filter((t) => now - t <= TRIPLE_TAP_WINDOW_MS);
     recent.push(now);
     tapsRef.current = recent;
     if (recent.length < 3) return;
@@ -234,66 +234,116 @@ export function BucketerLogo(props) {
       `}</style>
 
       {/* Handle */}
-      <path d="M18,32 L50,10 L82,32" fill="none" stroke="#38BDF8" strokeWidth="5" strokeLinejoin="round" strokeLinecap="round"/>
+      <path
+        d="M18,32 L50,10 L82,32"
+        fill="none"
+        stroke="#38BDF8"
+        strokeWidth="5"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
 
       {/* Bucket body */}
-      <path d="M8,36 L22,104 L78,104 L92,36 Z" fill="#111827" stroke="#2D3748" strokeWidth="0.5"/>
+      <path d="M8,36 L22,104 L78,104 L92,36 Z" fill="#111827" stroke="#2D3748" strokeWidth="0.5" />
 
       {/* Objects (clipped to bucket body) */}
       <g clipPath="url(#bk-cc)">
         <g class="bk-icon bk-icon-1" transform="translate(24,47) rotate(-9 6 8)">
           <g class="bk-icon-inner">
-            <rect width="12" height="16" rx="1.5" fill="#0F2033" stroke="#38BDF8" strokeWidth=".7"/>
-            <line x1="1.5" y1="5"   x2="10.5" y2="5"   stroke="#38BDF8" strokeWidth="1.3" strokeLinecap="round" opacity=".9"/>
-            <line x1="1.5" y1="8.5" x2="9"    y2="8.5" stroke="#38BDF8" strokeWidth="1.3" strokeLinecap="round" opacity=".9"/>
-            <line x1="1.5" y1="12"  x2="10.5" y2="12"  stroke="#38BDF8" strokeWidth="1.3" strokeLinecap="round" opacity=".9"/>
+            <rect width="12" height="16" rx="1.5" fill="#0F2033" stroke="#38BDF8" strokeWidth=".7" />
+            <line
+              x1="1.5"
+              y1="5"
+              x2="10.5"
+              y2="5"
+              stroke="#38BDF8"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+              opacity=".9"
+            />
+            <line
+              x1="1.5"
+              y1="8.5"
+              x2="9"
+              y2="8.5"
+              stroke="#38BDF8"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+              opacity=".9"
+            />
+            <line
+              x1="1.5"
+              y1="12"
+              x2="10.5"
+              y2="12"
+              stroke="#38BDF8"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+              opacity=".9"
+            />
           </g>
         </g>
 
         <g class="bk-icon bk-icon-2" transform="translate(54,43) rotate(7 9 6.5)">
           <g class="bk-icon-inner">
-            <rect width="18" height="13" rx="1.5" fill="#0F2033" stroke="#38BDF8" strokeWidth=".7"/>
-            <polygon points="2,11 9,3 16,11" fill="#38BDF8" opacity=".82"/>
-            <circle cx="15.5" cy="3.5" r="1.8" fill="#38BDF8" opacity=".82"/>
+            <rect width="18" height="13" rx="1.5" fill="#0F2033" stroke="#38BDF8" strokeWidth=".7" />
+            <polygon points="2,11 9,3 16,11" fill="#38BDF8" opacity=".82" />
+            <circle cx="15.5" cy="3.5" r="1.8" fill="#38BDF8" opacity=".82" />
           </g>
         </g>
 
         <g class="bk-icon bk-icon-3" transform="translate(32,62) rotate(-5 10 6.5)">
           <g class="bk-icon-inner">
-            <rect width="20" height="13" rx="1.5" fill="#0F2033" stroke="#38BDF8" strokeWidth=".7"/>
-            <polygon points="5,1.5 5,11.5 16.5,6.5" fill="#38BDF8" opacity=".88"/>
+            <rect width="20" height="13" rx="1.5" fill="#0F2033" stroke="#38BDF8" strokeWidth=".7" />
+            <polygon points="5,1.5 5,11.5 16.5,6.5" fill="#38BDF8" opacity=".88" />
           </g>
         </g>
 
         <g class="bk-icon bk-icon-4" transform="translate(26,73) rotate(11 5 8)">
           <g class="bk-icon-inner">
-            <rect width="10" height="16" rx="1.5" fill="#0F2033" stroke="#38BDF8" strokeWidth=".7"/>
-            <rect x="1"   y="7"   width="2.2" height="7"    rx=".8" fill="#38BDF8" opacity=".75"/>
-            <rect x="3.9" y="2.5" width="2.2" height="11.5" rx=".8" fill="#38BDF8" opacity=".92"/>
-            <rect x="6.8" y="5"   width="2.2" height="9"    rx=".8" fill="#38BDF8" opacity=".82"/>
+            <rect width="10" height="16" rx="1.5" fill="#0F2033" stroke="#38BDF8" strokeWidth=".7" />
+            <rect x="1" y="7" width="2.2" height="7" rx=".8" fill="#38BDF8" opacity=".75" />
+            <rect x="3.9" y="2.5" width="2.2" height="11.5" rx=".8" fill="#38BDF8" opacity=".92" />
+            <rect x="6.8" y="5" width="2.2" height="9" rx=".8" fill="#38BDF8" opacity=".82" />
           </g>
         </g>
 
         <g class="bk-icon bk-icon-5" transform="translate(59,68) rotate(-7 7 7)">
           <g class="bk-icon-inner">
-            <rect width="14" height="14" rx="1.5" fill="#0F2033" stroke="#38BDF8" strokeWidth=".7"/>
-            <line x1="7"   y1="1.5" x2="7"    y2="12.5" stroke="#38BDF8" strokeWidth="1.1" opacity=".88"/>
-            <line x1="1.5" y1="5"   x2="12.5" y2="5"    stroke="#38BDF8" strokeWidth="1.1" opacity=".88"/>
-            <line x1="1.5" y1="9"   x2="12.5" y2="9"    stroke="#38BDF8" strokeWidth="1.1" opacity=".88"/>
+            <rect width="14" height="14" rx="1.5" fill="#0F2033" stroke="#38BDF8" strokeWidth=".7" />
+            <line x1="7" y1="1.5" x2="7" y2="12.5" stroke="#38BDF8" strokeWidth="1.1" opacity=".88" />
+            <line x1="1.5" y1="5" x2="12.5" y2="5" stroke="#38BDF8" strokeWidth="1.1" opacity=".88" />
+            <line x1="1.5" y1="9" x2="12.5" y2="9" stroke="#38BDF8" strokeWidth="1.1" opacity=".88" />
           </g>
         </g>
 
         <g class="bk-icon bk-icon-6" transform="translate(47,82) rotate(5 6 8)">
           <g class="bk-icon-inner">
-            <rect width="12" height="16" rx="1.5" fill="#0F2033" stroke="#38BDF8" strokeWidth=".7"/>
-            <path d="M5,3.5 L2,8 L5,12.5"  fill="none" stroke="#38BDF8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity=".88"/>
-            <path d="M7,3.5 L10,8 L7,12.5" fill="none" stroke="#38BDF8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" opacity=".88"/>
+            <rect width="12" height="16" rx="1.5" fill="#0F2033" stroke="#38BDF8" strokeWidth=".7" />
+            <path
+              d="M5,3.5 L2,8 L5,12.5"
+              fill="none"
+              stroke="#38BDF8"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity=".88"
+            />
+            <path
+              d="M7,3.5 L10,8 L7,12.5"
+              fill="none"
+              stroke="#38BDF8"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity=".88"
+            />
           </g>
         </g>
       </g>
 
       {/* Rim (drawn last, on top of icons but below hole) */}
-      <rect x="4" y="26" width="92" height="14" rx="7" fill="#1E293B"/>
+      <rect x="4" y="26" width="92" height="14" rx="7" fill="#1E293B" />
 
       {/* Hole on lower-left bucket wall — jagged rim for "punched through" look */}
       <g class="bk-hole">
@@ -314,57 +364,69 @@ export function BucketerLogo(props) {
       {/* Bandages — slide in from the left during the bandage phase, form X over hole */}
       <g transform="translate(24 87.5)">
         <g class="bk-bandaid bk-bandaid-1">
-          <rect x="-5" y="-1.5" width="10" height="3" rx="1.5" fill="#E5C9A6" stroke="#8B6B3D" strokeWidth="0.3"/>
-          <rect x="-1.6" y="-1" width="3.2" height="2" fill="#F5E8D0" stroke="#8B6B3D" strokeWidth="0.2"/>
-          <circle cx="-3.2" cy="-0.5" r="0.18" fill="#8B6B3D"/>
-          <circle cx="-3.2" cy="0.5"  r="0.18" fill="#8B6B3D"/>
-          <circle cx="3.2"  cy="-0.5" r="0.18" fill="#8B6B3D"/>
-          <circle cx="3.2"  cy="0.5"  r="0.18" fill="#8B6B3D"/>
+          <rect x="-5" y="-1.5" width="10" height="3" rx="1.5" fill="#E5C9A6" stroke="#8B6B3D" strokeWidth="0.3" />
+          <rect x="-1.6" y="-1" width="3.2" height="2" fill="#F5E8D0" stroke="#8B6B3D" strokeWidth="0.2" />
+          <circle cx="-3.2" cy="-0.5" r="0.18" fill="#8B6B3D" />
+          <circle cx="-3.2" cy="0.5" r="0.18" fill="#8B6B3D" />
+          <circle cx="3.2" cy="-0.5" r="0.18" fill="#8B6B3D" />
+          <circle cx="3.2" cy="0.5" r="0.18" fill="#8B6B3D" />
         </g>
         <g class="bk-bandaid bk-bandaid-2">
-          <rect x="-5" y="-1.5" width="10" height="3" rx="1.5" fill="#E5C9A6" stroke="#8B6B3D" strokeWidth="0.3"/>
-          <rect x="-1.6" y="-1" width="3.2" height="2" fill="#F5E8D0" stroke="#8B6B3D" strokeWidth="0.2"/>
-          <circle cx="-3.2" cy="-0.5" r="0.18" fill="#8B6B3D"/>
-          <circle cx="-3.2" cy="0.5"  r="0.18" fill="#8B6B3D"/>
-          <circle cx="3.2"  cy="-0.5" r="0.18" fill="#8B6B3D"/>
-          <circle cx="3.2"  cy="0.5"  r="0.18" fill="#8B6B3D"/>
+          <rect x="-5" y="-1.5" width="10" height="3" rx="1.5" fill="#E5C9A6" stroke="#8B6B3D" strokeWidth="0.3" />
+          <rect x="-1.6" y="-1" width="3.2" height="2" fill="#F5E8D0" stroke="#8B6B3D" strokeWidth="0.2" />
+          <circle cx="-3.2" cy="-0.5" r="0.18" fill="#8B6B3D" />
+          <circle cx="-3.2" cy="0.5" r="0.18" fill="#8B6B3D" />
+          <circle cx="3.2" cy="-0.5" r="0.18" fill="#8B6B3D" />
+          <circle cx="3.2" cy="0.5" r="0.18" fill="#8B6B3D" />
         </g>
       </g>
 
       {/* Drips falling from hole */}
       <g>
-        <circle class="bk-drip bk-drip-1" cx="24" cy="90" r="1.4" fill="#38BDF8"/>
-        <circle class="bk-drip bk-drip-2" cx="24" cy="90" r="1.4" fill="#38BDF8"/>
-        <circle class="bk-drip bk-drip-3" cx="24" cy="90" r="1.4" fill="#38BDF8"/>
-        <circle class="bk-drip bk-drip-4" cx="24" cy="90" r="1.4" fill="#38BDF8"/>
-        <circle class="bk-drip bk-drip-5" cx="24" cy="90" r="1.4" fill="#38BDF8"/>
-        <circle class="bk-drip bk-drip-6" cx="24" cy="90" r="1.4" fill="#38BDF8"/>
+        <circle class="bk-drip bk-drip-1" cx="24" cy="90" r="1.4" fill="#38BDF8" />
+        <circle class="bk-drip bk-drip-2" cx="24" cy="90" r="1.4" fill="#38BDF8" />
+        <circle class="bk-drip bk-drip-3" cx="24" cy="90" r="1.4" fill="#38BDF8" />
+        <circle class="bk-drip bk-drip-4" cx="24" cy="90" r="1.4" fill="#38BDF8" />
+        <circle class="bk-drip bk-drip-5" cx="24" cy="90" r="1.4" fill="#38BDF8" />
+        <circle class="bk-drip bk-drip-6" cx="24" cy="90" r="1.4" fill="#38BDF8" />
       </g>
 
       {/* Puddle — concentric growth centered near drip landing zone */}
       <g class="bk-puddle-group">
-        <ellipse class="bk-puddle bk-puddle-6" cx="32" cy="120" rx="30" ry="7"   fill="#38BDF8"/>
-        <ellipse class="bk-puddle bk-puddle-5" cx="30" cy="120" rx="25" ry="6"   fill="#38BDF8"/>
-        <ellipse class="bk-puddle bk-puddle-4" cx="28" cy="120" rx="20" ry="5.2" fill="#38BDF8"/>
-        <ellipse class="bk-puddle bk-puddle-3" cx="26" cy="120" rx="15" ry="4.4" fill="#38BDF8"/>
-        <ellipse class="bk-puddle bk-puddle-2" cx="23" cy="120" rx="10" ry="3.6" fill="#38BDF8"/>
-        <ellipse class="bk-puddle bk-puddle-1" cx="20" cy="120" rx="5"  ry="2.8" fill="#38BDF8"/>
+        <ellipse class="bk-puddle bk-puddle-6" cx="32" cy="120" rx="30" ry="7" fill="#38BDF8" />
+        <ellipse class="bk-puddle bk-puddle-5" cx="30" cy="120" rx="25" ry="6" fill="#38BDF8" />
+        <ellipse class="bk-puddle bk-puddle-4" cx="28" cy="120" rx="20" ry="5.2" fill="#38BDF8" />
+        <ellipse class="bk-puddle bk-puddle-3" cx="26" cy="120" rx="15" ry="4.4" fill="#38BDF8" />
+        <ellipse class="bk-puddle bk-puddle-2" cx="23" cy="120" rx="10" ry="3.6" fill="#38BDF8" />
+        <ellipse class="bk-puddle bk-puddle-1" cx="20" cy="120" rx="5" ry="2.8" fill="#38BDF8" />
         {/* Highlight shine on top of puddle */}
-        <ellipse class="bk-puddle bk-puddle-6" cx="34" cy="118" rx="14" ry="1.3" fill="#7DD3FC" opacity="0.5"/>
+        <ellipse class="bk-puddle bk-puddle-6" cx="34" cy="118" rx="14" ry="1.3" fill="#7DD3FC" opacity="0.5" />
       </g>
 
       {/* Mop — wooden stick, collar, and hanging wet strands */}
       <g class="bk-mop">
         {/* Stick */}
-        <line x1="50" y1="96" x2="50" y2="115" stroke="#38BDF8" strokeWidth="1.9" strokeLinecap="round"/>
+        <line x1="50" y1="96" x2="50" y2="115" stroke="#38BDF8" strokeWidth="1.9" strokeLinecap="round" />
         {/* Collar holding the strands */}
-        <ellipse cx="50" cy="115.5" rx="4.2" ry="1.7" fill="#38BDF8"/>
+        <ellipse cx="50" cy="115.5" rx="4.2" ry="1.7" fill="#38BDF8" />
         {/* Strands — slightly wavy, varied lengths, bunched */}
-        <path d="M46.8,116.5 Q46.2,121 47,124.5"   stroke="#38BDF8" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
-        <path d="M48.4,116.8 Q48.1,122 48.6,125.5" stroke="#38BDF8" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
-        <path d="M50,117    Q49.8,123 50.2,126"    stroke="#38BDF8" strokeWidth="1.4" strokeLinecap="round" fill="none"/>
-        <path d="M51.6,116.8 Q51.9,122 51.4,125.5" stroke="#38BDF8" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
-        <path d="M53.2,116.5 Q53.8,121 53,124.5"   stroke="#38BDF8" strokeWidth="1.3" strokeLinecap="round" fill="none"/>
+        <path d="M46.8,116.5 Q46.2,121 47,124.5" stroke="#38BDF8" strokeWidth="1.3" strokeLinecap="round" fill="none" />
+        <path
+          d="M48.4,116.8 Q48.1,122 48.6,125.5"
+          stroke="#38BDF8"
+          strokeWidth="1.3"
+          strokeLinecap="round"
+          fill="none"
+        />
+        <path d="M50,117    Q49.8,123 50.2,126" stroke="#38BDF8" strokeWidth="1.4" strokeLinecap="round" fill="none" />
+        <path
+          d="M51.6,116.8 Q51.9,122 51.4,125.5"
+          stroke="#38BDF8"
+          strokeWidth="1.3"
+          strokeLinecap="round"
+          fill="none"
+        />
+        <path d="M53.2,116.5 Q53.8,121 53,124.5" stroke="#38BDF8" strokeWidth="1.3" strokeLinecap="round" fill="none" />
       </g>
     </svg>
   );

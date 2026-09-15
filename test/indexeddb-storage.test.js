@@ -11,9 +11,13 @@ global.indexedDB = indexedDB;
 global.localStorage = (() => {
   const s = {};
   return {
-    getItem:  k     => Object.prototype.hasOwnProperty.call(s, k) ? s[k] : null,
-    setItem:  (k,v) => { s[k] = String(v); },
-    removeItem: k   => { delete s[k]; },
+    getItem: (k) => (Object.prototype.hasOwnProperty.call(s, k) ? s[k] : null),
+    setItem: (k, v) => {
+      s[k] = String(v);
+    },
+    removeItem: (k) => {
+      delete s[k];
+    },
   };
 })();
 
@@ -47,10 +51,10 @@ describe('saveResumeRecord / loadResumeRecord', () => {
   test('round-trips a full resume record', async () => {
     await saveResumeRecord(BASE);
     const rec = await loadResumeRecord(BASE);
-    assert.equal(rec.uploadId,  BASE.uploadId);
-    assert.equal(rec.partSize,  BASE.partSize);
-    assert.equal(rec.provider,  BASE.provider);
-    assert.equal(rec.bucket,    BASE.bucket);
+    assert.equal(rec.uploadId, BASE.uploadId);
+    assert.equal(rec.partSize, BASE.partSize);
+    assert.equal(rec.provider, BASE.provider);
+    assert.equal(rec.bucket, BASE.bucket);
     assert.deepEqual(rec.fileIdentity, BASE.fileIdentity);
   });
 
@@ -87,9 +91,7 @@ describe('deleteResumeRecord', () => {
   });
 
   test('delete of a non-existent key resolves without error', async () => {
-    await assert.doesNotReject(() =>
-      deleteResumeRecord({ ...BASE, destinationKey: 'ghost/file.mp4' })
-    );
+    await assert.doesNotReject(() => deleteResumeRecord({ ...BASE, destinationKey: 'ghost/file.mp4' }));
   });
 
   test('deleting one key leaves others intact', async () => {
@@ -109,8 +111,7 @@ describe('computeFileHash', () => {
   test('returns a 64-character hex string for a non-empty file', async () => {
     const blob = new Blob([new Uint8Array(1024).fill(1)]);
     const hash = await computeFileHash(blob);
-    assert.ok(typeof hash === 'string' && /^[0-9a-f]{64}$/.test(hash),
-      `expected 64-char hex string, got: ${hash}`);
+    assert.ok(typeof hash === 'string' && /^[0-9a-f]{64}$/.test(hash), `expected 64-char hex string, got: ${hash}`);
   });
 
   test('same content produces the same hash', async () => {
@@ -135,8 +136,11 @@ describe('computeFileHash', () => {
     const middleB = new Uint8Array(CHUNK).fill(20);
     const blobA = new Blob([head, middleA, tail]);
     const blobB = new Blob([head, middleB, tail]);
-    assert.equal(await computeFileHash(blobA), await computeFileHash(blobB),
-      'files with identical head+tail but different middle must hash the same');
+    assert.equal(
+      await computeFileHash(blobA),
+      await computeFileHash(blobB),
+      'files with identical head+tail but different middle must hash the same',
+    );
   });
 });
 
@@ -184,23 +188,32 @@ describe('buildFileIdentityWithHash', () => {
 // ── Upload log ────────────────────────────────────────────────────────────────
 
 const LOG_ENTRY = {
-  fileName: 'video.mp4', destinationKey: 'uploads/video.mp4', fileSize: 104857600,
-  status: 'done', startedAt: 1700000000000, completedAt: 1700000060000,
-  durationSec: 60, avgSpeedBps: 1747626, errorMessage: null,
+  fileName: 'video.mp4',
+  destinationKey: 'uploads/video.mp4',
+  fileSize: 104857600,
+  status: 'done',
+  startedAt: 1700000000000,
+  completedAt: 1700000060000,
+  durationSec: 60,
+  avgSpeedBps: 1747626,
+  errorMessage: null,
 };
 
 describe('saveUploadLogEntry / loadUploadLog', () => {
   test('saved entry appears in loaded log', async () => {
     await saveUploadLogEntry(LOG_ENTRY);
     const log = await loadUploadLog();
-    assert.ok(log.some(e => e.fileName === 'video.mp4'), 'saved entry must appear in log');
+    assert.ok(
+      log.some((e) => e.fileName === 'video.mp4'),
+      'saved entry must appear in log',
+    );
   });
 
   test('loadUploadLog returns newest entries first', async () => {
     await saveUploadLogEntry({ ...LOG_ENTRY, fileName: 'first.mp4' });
     await saveUploadLogEntry({ ...LOG_ENTRY, fileName: 'second.mp4' });
     const log = await loadUploadLog();
-    const names = log.map(e => e.fileName);
+    const names = log.map((e) => e.fileName);
     const firstIdx = names.indexOf('first.mp4');
     const secondIdx = names.indexOf('second.mp4');
     assert.ok(secondIdx < firstIdx, 'second entry must appear before first (newest first)');
@@ -209,10 +222,10 @@ describe('saveUploadLogEntry / loadUploadLog', () => {
   test('all entry fields are preserved', async () => {
     await saveUploadLogEntry(LOG_ENTRY);
     const log = await loadUploadLog();
-    const entry = log.find(e => e.fileName === 'video.mp4');
+    const entry = log.find((e) => e.fileName === 'video.mp4');
     assert.ok(entry, 'entry must be found');
-    assert.equal(entry.fileSize,  LOG_ENTRY.fileSize);
-    assert.equal(entry.status,    LOG_ENTRY.status);
+    assert.equal(entry.fileSize, LOG_ENTRY.fileSize);
+    assert.equal(entry.status, LOG_ENTRY.status);
     assert.equal(entry.durationSec, LOG_ENTRY.durationSec);
   });
 });

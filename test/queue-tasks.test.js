@@ -1,7 +1,11 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  subjectLabel, createDeleteTask, createTransferTask, createDownloadTask, engineUpdateToPatch,
+  subjectLabel,
+  createDeleteTask,
+  createTransferTask,
+  createDownloadTask,
+  engineUpdateToPatch,
   createResumableMoveTask,
 } from '../src/lib/queue-tasks.js';
 
@@ -19,7 +23,10 @@ describe('subjectLabel', () => {
 describe('createDeleteTask', () => {
   test('builds a running delete task with counters zeroed', () => {
     const t = createDeleteTask({
-      files: ['a.txt', 'b.txt'], prefixes: ['p/'], capturedPrefix: 'x/', bucket: 'bkt',
+      files: ['a.txt', 'b.txt'],
+      prefixes: ['p/'],
+      capturedPrefix: 'x/',
+      bucket: 'bkt',
     });
     assert.equal(t.kind, 'delete');
     assert.equal(t.status, 'running');
@@ -48,23 +55,42 @@ describe('createTransferTask', () => {
 
 describe('createTransferTask — rename', () => {
   test('builds a rename task with a "old → new" subject', () => {
-    const t = createTransferTask({ files: [], prefixes: ['photos/2024/'], renameTo: 'memories', capturedPrefix: 'photos/', bucket: 'b', mode: 'rename' });
+    const t = createTransferTask({
+      files: [],
+      prefixes: ['photos/2024/'],
+      renameTo: 'memories',
+      capturedPrefix: 'photos/',
+      bucket: 'b',
+      mode: 'rename',
+    });
     assert.equal(t.kind, 'rename');
     assert.equal(t.subject, '2024 → memories');
     assert.equal(t.renameTo, 'memories');
     assert.deepEqual(t.prefixes, ['photos/2024/']);
   });
   test('move/copy tasks are unchanged', () => {
-    assert.equal(createTransferTask({ files: ['a'], prefixes: [], dest: 'd/', capturedPrefix: '', bucket: 'b', mode: 'move' }).kind, 'move');
-    assert.equal(createTransferTask({ files: ['a'], prefixes: [], dest: 'd/', capturedPrefix: '', bucket: 'b', mode: 'copy' }).kind, 'copy');
+    assert.equal(
+      createTransferTask({ files: ['a'], prefixes: [], dest: 'd/', capturedPrefix: '', bucket: 'b', mode: 'move' })
+        .kind,
+      'move',
+    );
+    assert.equal(
+      createTransferTask({ files: ['a'], prefixes: [], dest: 'd/', capturedPrefix: '', bucket: 'b', mode: 'copy' })
+        .kind,
+      'copy',
+    );
   });
 });
 
 describe('createDownloadTask', () => {
   test('stores jobId and bytesTotal when provided', () => {
     const t = createDownloadTask({
-      fileCount: 5, bucket: 'bkt', capturedPrefix: 'x/', delivery: 'zip',
-      jobId: 'job-1', bytesTotal: 4096,
+      fileCount: 5,
+      bucket: 'bkt',
+      capturedPrefix: 'x/',
+      delivery: 'zip',
+      jobId: 'job-1',
+      bytesTotal: 4096,
     });
     assert.equal(t.jobId, 'job-1');
     assert.equal(t.bytesTotal, 4096);
@@ -118,8 +144,14 @@ describe('engineUpdateToPatch', () => {
 describe('createResumableMoveTask', () => {
   test('builds a paused move task from a persisted job record', () => {
     const t = createResumableMoveTask({
-      id: 'mv-1', bucket: 'b', dest: 'arch/', capturedPrefix: 'src/',
-      items: [{ sourceKey: 'a', destKey: 'arch/a', size: 100 }, { sourceKey: 'b', destKey: 'arch/b', size: 200 }],
+      id: 'mv-1',
+      bucket: 'b',
+      dest: 'arch/',
+      capturedPrefix: 'src/',
+      items: [
+        { sourceKey: 'a', destKey: 'arch/a', size: 100 },
+        { sourceKey: 'b', destKey: 'arch/b', size: 200 },
+      ],
     });
     assert.equal(t.status, 'paused');
     assert.equal(t.kind, 'move');
@@ -145,15 +177,46 @@ describe('task factories — origin tagging', () => {
     check(createDeleteTask({ files: ['a'], prefixes: [], capturedPrefix: '', bucket: 'b', ...origin }));
   });
   test('createTransferTask (move) carries the origin', () => {
-    check(createTransferTask({ files: ['a'], prefixes: [], dest: 'd/', capturedPrefix: '', bucket: 'b', mode: 'move', ...origin }));
+    check(
+      createTransferTask({
+        files: ['a'],
+        prefixes: [],
+        dest: 'd/',
+        capturedPrefix: '',
+        bucket: 'b',
+        mode: 'move',
+        ...origin,
+      }),
+    );
   });
   test('createTransferTask (rename) carries the origin', () => {
-    check(createTransferTask({ files: [], prefixes: ['photos/2024/'], renameTo: 'x', capturedPrefix: 'photos/', bucket: 'b', mode: 'rename', ...origin }));
+    check(
+      createTransferTask({
+        files: [],
+        prefixes: ['photos/2024/'],
+        renameTo: 'x',
+        capturedPrefix: 'photos/',
+        bucket: 'b',
+        mode: 'rename',
+        ...origin,
+      }),
+    );
   });
   test('createDownloadTask carries the origin', () => {
     check(createDownloadTask({ fileCount: 2, capturedPrefix: '', bucket: 'b', ...origin }));
   });
   test('createResumableMoveTask reads the origin from the record', () => {
-    check(createResumableMoveTask({ id: 'm1', items: [{ size: 1 }], dest: 'd/', capturedPrefix: '', bucket: 'b', provider: 'b2', endpoint: 'https://e', connectionId: 'c1' }));
+    check(
+      createResumableMoveTask({
+        id: 'm1',
+        items: [{ size: 1 }],
+        dest: 'd/',
+        capturedPrefix: '',
+        bucket: 'b',
+        provider: 'b2',
+        endpoint: 'https://e',
+        connectionId: 'c1',
+      }),
+    );
   });
 });

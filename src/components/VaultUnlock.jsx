@@ -24,8 +24,8 @@ function connectionHint(conn) {
 // tampered ciphertext, and why that split is delegated to this UI layer instead.
 const ERROR_TEXT = {
   'wrong-passphrase': 'Wrong passphrase — try again.',
-  'corrupt':           "This vault's data is corrupt and can't be unlocked with any passphrase.",
-  'no-vault':          'No vault was found on this device.',
+  corrupt: "This vault's data is corrupt and can't be unlocked with any passphrase.",
+  'no-vault': 'No vault was found on this device.',
 };
 
 export function VaultUnlock({ connections = [], onUnlock, onReset }) {
@@ -74,7 +74,7 @@ export function VaultUnlock({ connections = [], onUnlock, onReset }) {
         <div class="profile-picker">
           <div class="profile-picker-heading">Your buckets</div>
           <ul class="profile-list">
-            {connections.map(c => (
+            {connections.map((c) => (
               <li key={c.id} class="profile-row" onClick={() => passphraseRef.current?.focus()}>
                 <span aria-hidden="true">🔒</span>
                 <span class="profile-row-name">{c.name}</span>
@@ -106,7 +106,7 @@ export function VaultUnlock({ connections = [], onUnlock, onReset }) {
             ref={passphraseRef}
             type="password"
             value={passphrase}
-            onInput={e => setPassphrase(e.target.value)}
+            onInput={(e) => setPassphrase(e.target.value)}
             autocomplete="current-password"
             required
           />
@@ -115,12 +115,18 @@ export function VaultUnlock({ connections = [], onUnlock, onReset }) {
 
         <div class="btn-row">
           <button type="submit" class="btn btn-primary" disabled={unlocking}>
-            {unlocking ? <><span class="spinner" /> Unlocking…</> : 'Unlock'}
+            {unlocking ? (
+              <>
+                <span class="spinner" /> Unlocking…
+              </>
+            ) : (
+              'Unlock'
+            )}
           </button>
         </div>
 
-        {error === 'corrupt' && (
-          confirmingReset ? (
+        {error === 'corrupt' &&
+          (confirmingReset ? (
             <div class="form-group">
               <span class="hint" style={{ color: 'var(--text-warn)' }}>
                 Resetting destroys every stored secret permanently. Your connections are kept.
@@ -138,8 +144,7 @@ export function VaultUnlock({ connections = [], onUnlock, onReset }) {
             <button type="button" class="btn btn-ghost btn-sm" onClick={() => setConfirmingReset(true)}>
               Reset vault…
             </button>
-          )
-        )}
+          ))}
       </form>
     </>
   );

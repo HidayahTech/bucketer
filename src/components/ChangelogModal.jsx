@@ -7,9 +7,9 @@ import { CHANGELOG, CURRENT_VERSION } from '../lib/changelog.js';
 import { Modal } from './Modal.jsx';
 import { IntegrityCheck } from './IntegrityCheck.jsx';
 
-const RELEASES_URL  = 'https://gitlab.com/hidayahtech/bucketer/-/releases';
-const RELEASES_API  = 'https://gitlab.com/api/v4/projects/hidayahtech%2Fbucketer/releases?per_page=1';
-const BADGE_URL     = 'https://gitlab.com/hidayahtech/bucketer/-/badges/release.svg';
+const RELEASES_URL = 'https://gitlab.com/hidayahtech/bucketer/-/releases';
+const RELEASES_API = 'https://gitlab.com/api/v4/projects/hidayahtech%2Fbucketer/releases?per_page=1';
+const BADGE_URL = 'https://gitlab.com/hidayahtech/bucketer/-/badges/release.svg';
 
 function semverGt(a, b) {
   const pa = a.split('.').map(Number);
@@ -29,7 +29,9 @@ export function ChangelogModal({ onClose }) {
   const [checkResult, setCheckResult] = useState(sessionCache);
 
   useEffect(() => {
-    const handler = (e) => { if (e.key === 'Escape') onClose(); };
+    const handler = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, []);
@@ -55,60 +57,69 @@ export function ChangelogModal({ onClose }) {
 
   return (
     <Modal onClose={onClose} class="changelog-dialog">
-        <div class="modal-title">What's new in Bucketer</div>
-        <div class="changelog-body">
-          {CHANGELOG.map(entry => (
-            <div key={entry.version} class="changelog-entry">
-              <div class="changelog-version-row">
-                <span class="changelog-version-num">v{entry.version}</span>
-                <span class="changelog-version-date">{entry.date}</span>
-                {entry.version === CURRENT_VERSION && (
-                  <span class="changelog-current-badge">current</span>
-                )}
-              </div>
-              {entry.title && <div class="changelog-entry-title">{entry.title}</div>}
-              <ul class="changelog-changes">
-                {entry.changes.map((c, i) =>
-                  typeof c === 'string'
-                    ? <li key={i}>{c}</li>
-                    : (
-                        <li key={i} class="changelog-group">
-                          <span class="changelog-group-label">{c.group}</span>
-                          <ul>{c.items.map((item, j) => <li key={j}>{item}</li>)}</ul>
-                        </li>
-                      )
-                )}
-              </ul>
+      <div class="modal-title">What's new in Bucketer</div>
+      <div class="changelog-body">
+        {CHANGELOG.map((entry) => (
+          <div key={entry.version} class="changelog-entry">
+            <div class="changelog-version-row">
+              <span class="changelog-version-num">v{entry.version}</span>
+              <span class="changelog-version-date">{entry.date}</span>
+              {entry.version === CURRENT_VERSION && <span class="changelog-current-badge">current</span>}
             </div>
-          ))}
-        </div>
-        <div class="changelog-upstream">
-          {checkState === 'idle' && (
-            <button class="btn btn-ghost btn-sm" onClick={checkUpstream}>Check for upstream release</button>
-          )}
-          {checkState === 'loading' && (
-            <span class="upstream-status">Checking…</span>
-          )}
-          {checkState === 'done' && (
-            <div class="upstream-result">
-              <a href={`${RELEASES_URL}/${checkResult.tag}`} target="_blank" rel="noopener noreferrer">
-                <img src={BADGE_URL} alt="Latest release" class="upstream-badge" />
-              </a>
-              {isNewer
-                ? <span class="upstream-new">{checkResult.tag} available — <a href={`${RELEASES_URL}/${checkResult.tag}`} target="_blank" rel="noopener noreferrer">View release</a></span>
-                : <span class="upstream-ok">You're up to date</span>}
-            </div>
-          )}
-          {checkState === 'error' && (
-            <span class="upstream-status upstream-err">Upstream check failed</span>
-          )}
-        </div>
-        <div class="changelog-integrity">
-          <IntegrityCheck />
-        </div>
-        <div class="modal-actions">
-          <button class="btn btn-ghost btn-sm" onClick={onClose}>Close</button>
-        </div>
+            {entry.title && <div class="changelog-entry-title">{entry.title}</div>}
+            <ul class="changelog-changes">
+              {entry.changes.map((c, i) =>
+                typeof c === 'string' ? (
+                  <li key={i}>{c}</li>
+                ) : (
+                  <li key={i} class="changelog-group">
+                    <span class="changelog-group-label">{c.group}</span>
+                    <ul>
+                      {c.items.map((item, j) => (
+                        <li key={j}>{item}</li>
+                      ))}
+                    </ul>
+                  </li>
+                ),
+              )}
+            </ul>
+          </div>
+        ))}
+      </div>
+      <div class="changelog-upstream">
+        {checkState === 'idle' && (
+          <button class="btn btn-ghost btn-sm" onClick={checkUpstream}>
+            Check for upstream release
+          </button>
+        )}
+        {checkState === 'loading' && <span class="upstream-status">Checking…</span>}
+        {checkState === 'done' && (
+          <div class="upstream-result">
+            <a href={`${RELEASES_URL}/${checkResult.tag}`} target="_blank" rel="noopener noreferrer">
+              <img src={BADGE_URL} alt="Latest release" class="upstream-badge" />
+            </a>
+            {isNewer ? (
+              <span class="upstream-new">
+                {checkResult.tag} available —{' '}
+                <a href={`${RELEASES_URL}/${checkResult.tag}`} target="_blank" rel="noopener noreferrer">
+                  View release
+                </a>
+              </span>
+            ) : (
+              <span class="upstream-ok">You're up to date</span>
+            )}
+          </div>
+        )}
+        {checkState === 'error' && <span class="upstream-status upstream-err">Upstream check failed</span>}
+      </div>
+      <div class="changelog-integrity">
+        <IntegrityCheck />
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost btn-sm" onClick={onClose}>
+          Close
+        </button>
+      </div>
     </Modal>
   );
 }

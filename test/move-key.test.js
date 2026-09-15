@@ -1,6 +1,16 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { destKeyForFile, folderBase, destKeyForFolderObject, suffixName, freeFileKey, freeFolderPrefix, renamedFolderPrefix, renameFolderKey, copySource } from '../src/lib/move-key.js';
+import {
+  destKeyForFile,
+  folderBase,
+  destKeyForFolderObject,
+  suffixName,
+  freeFileKey,
+  freeFolderPrefix,
+  renamedFolderPrefix,
+  renameFolderKey,
+  copySource,
+} from '../src/lib/move-key.js';
 
 // S3 has no move/rename — a move recomputes each object's key under a new prefix.
 // These pure functions are the heart of that remapping. Getting them wrong silently
@@ -34,17 +44,11 @@ describe('destKeyForFolderObject', () => {
   const dest = 'archive/';
 
   test('preserves the moved folder name under the destination', () => {
-    assert.equal(
-      destKeyForFolderObject('photos/2024/', 'photos/2024/jan/a.jpg', dest),
-      'archive/2024/jan/a.jpg',
-    );
+    assert.equal(destKeyForFolderObject('photos/2024/', 'photos/2024/jan/a.jpg', dest), 'archive/2024/jan/a.jpg');
   });
 
   test('remaps the folder-marker object itself', () => {
-    assert.equal(
-      destKeyForFolderObject('photos/2024/', 'photos/2024/', dest),
-      'archive/2024/',
-    );
+    assert.equal(destKeyForFolderObject('photos/2024/', 'photos/2024/', dest), 'archive/2024/');
   });
 
   test('preserves deeply nested sub-prefix structure', () => {
@@ -55,17 +59,11 @@ describe('destKeyForFolderObject', () => {
   });
 
   test('preserves a top-level folder name when moved', () => {
-    assert.equal(
-      destKeyForFolderObject('docs/', 'docs/readme.md', dest),
-      'archive/docs/readme.md',
-    );
+    assert.equal(destKeyForFolderObject('docs/', 'docs/readme.md', dest), 'archive/docs/readme.md');
   });
 
   test('moves a folder into the root (empty destination)', () => {
-    assert.equal(
-      destKeyForFolderObject('photos/2024/', 'photos/2024/a.jpg', ''),
-      '2024/a.jpg',
-    );
+    assert.equal(destKeyForFolderObject('photos/2024/', 'photos/2024/a.jpg', ''), '2024/a.jpg');
   });
 });
 
@@ -85,29 +83,47 @@ describe('suffixName (#17)', () => {
 
 describe('freeFileKey (#17)', () => {
   test('returns the key unchanged when not taken', () => {
-    assert.equal(freeFileKey('archive/a.txt', () => false), 'archive/a.txt');
+    assert.equal(
+      freeFileKey('archive/a.txt', () => false),
+      'archive/a.txt',
+    );
   });
   test('suffixes until a free name is found', () => {
     const taken = new Set(['archive/a.txt', 'archive/a (1).txt']);
-    assert.equal(freeFileKey('archive/a.txt', k => taken.has(k)), 'archive/a (2).txt');
+    assert.equal(
+      freeFileKey('archive/a.txt', (k) => taken.has(k)),
+      'archive/a (2).txt',
+    );
   });
   test('suffixes a root-level file', () => {
     const taken = new Set(['a.txt']);
-    assert.equal(freeFileKey('a.txt', k => taken.has(k)), 'a (1).txt');
+    assert.equal(
+      freeFileKey('a.txt', (k) => taken.has(k)),
+      'a (1).txt',
+    );
   });
 });
 
 describe('freeFolderPrefix (#17)', () => {
   test('returns the prefix unchanged when not taken', () => {
-    assert.equal(freeFolderPrefix('archive/2024/', () => false), 'archive/2024/');
+    assert.equal(
+      freeFolderPrefix('archive/2024/', () => false),
+      'archive/2024/',
+    );
   });
   test('suffixes the leaf folder name until free', () => {
     const taken = new Set(['archive/2024/', 'archive/2024 (1)/']);
-    assert.equal(freeFolderPrefix('archive/2024/', p => taken.has(p)), 'archive/2024 (2)/');
+    assert.equal(
+      freeFolderPrefix('archive/2024/', (p) => taken.has(p)),
+      'archive/2024 (2)/',
+    );
   });
   test('suffixes a root-level folder', () => {
     const taken = new Set(['docs/']);
-    assert.equal(freeFolderPrefix('docs/', p => taken.has(p)), 'docs (1)/');
+    assert.equal(
+      freeFolderPrefix('docs/', (p) => taken.has(p)),
+      'docs (1)/',
+    );
   });
 });
 
@@ -128,10 +144,7 @@ describe('renameFolderKey', () => {
     );
   });
   test('the folder marker itself is remapped', () => {
-    assert.equal(
-      renameFolderKey('photos/2024/', 'photos/2024/', 'photos/memories/'),
-      'photos/memories/',
-    );
+    assert.equal(renameFolderKey('photos/2024/', 'photos/2024/', 'photos/memories/'), 'photos/memories/');
   });
 });
 
@@ -149,7 +162,10 @@ describe('copySource', () => {
     const key = 'audio/Anwar al-Tafsir ｜ Week 1 [kPJPC9SbAjA].opus';
     const result = copySource('bk', key);
     // The exact failure mode: every character must be within ByteString range (<= 255).
-    assert.ok([...result].every(c => c.charCodeAt(0) <= 255), 'must be Latin-1 safe');
+    assert.ok(
+      [...result].every((c) => c.charCodeAt(0) <= 255),
+      'must be Latin-1 safe',
+    );
     assert.ok(result.includes('%EF%BD%9C'), 'U+FF5C must be percent-encoded');
     assert.ok(result.includes('%20'), 'spaces must be percent-encoded');
   });

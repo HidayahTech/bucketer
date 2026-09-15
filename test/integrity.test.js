@@ -35,13 +35,19 @@ function errorResponse(status) {
   return {
     ok: false,
     status,
-    arrayBuffer: async () => { throw new Error('not ok'); },
-    json: async () => { throw new Error('not ok'); },
+    arrayBuffer: async () => {
+      throw new Error('not ok');
+    },
+    json: async () => {
+      throw new Error('not ok');
+    },
     text: async () => '',
   };
 }
 
-function utf8(s) { return new TextEncoder().encode(s).buffer; }
+function utf8(s) {
+  return new TextEncoder().encode(s).buffer;
+}
 function nodeSha256(bytes) {
   return createHash('sha256').update(Buffer.from(bytes)).digest('hex');
 }
@@ -59,7 +65,7 @@ const fakeSubtle = {
 };
 
 const PAGE_URL = 'https://bucketer.example.test/';
-const VERSION  = '1.21.1';
+const VERSION = '1.21.1';
 const MANIFEST_URL_RE = /packages\/generic\/bucketer\/1\.21\.1\/bucketer-v1\.21\.1\.integrity\.json/;
 
 describe('verifyIntegrity — match', () => {
@@ -125,7 +131,12 @@ describe('verifyIntegrity — no manifest', () => {
 describe('verifyIntegrity — network errors', () => {
   test('returns status:network-error when page fetch throws', async () => {
     const fetchFn = mockFetch([
-      [PAGE_URL, () => { throw new TypeError('Failed to fetch'); }],
+      [
+        PAGE_URL,
+        () => {
+          throw new TypeError('Failed to fetch');
+        },
+      ],
       [MANIFEST_URL_RE, () => okResponse(utf8('{}'))],
     ]);
 
@@ -137,7 +148,12 @@ describe('verifyIntegrity — network errors', () => {
   test('returns status:network-error when manifest fetch throws', async () => {
     const fetchFn = mockFetch([
       [PAGE_URL, () => okResponse(utf8('<html></html>'))],
-      [MANIFEST_URL_RE, () => { throw new TypeError('CORS error'); }],
+      [
+        MANIFEST_URL_RE,
+        () => {
+          throw new TypeError('CORS error');
+        },
+      ],
     ]);
 
     const result = await verifyIntegrity({ version: VERSION, pageUrl: PAGE_URL, fetchFn, subtle: fakeSubtle });
@@ -213,13 +229,19 @@ describe('verifyIntegrity — request shape', () => {
       hashes: { sha256: nodeSha256(new Uint8Array(pageBytes)) },
     });
     const fetchFn = async (url, init) => {
-      if (url === PAGE_URL) { pageInit = init; return okResponse(pageBytes); }
+      if (url === PAGE_URL) {
+        pageInit = init;
+        return okResponse(pageBytes);
+      }
       return okResponse(utf8(manifest));
     };
 
     await verifyIntegrity({ version: VERSION, pageUrl: PAGE_URL, fetchFn, subtle: fakeSubtle });
-    assert.equal(pageInit?.cache, 'no-store',
-      'page self-fetch must bypass cache so we hash the served bytes, not a cached snapshot');
+    assert.equal(
+      pageInit?.cache,
+      'no-store',
+      'page self-fetch must bypass cache so we hash the served bytes, not a cached snapshot',
+    );
   });
 
   test('manifest URL targets the GitLab Generic Package Registry for the given version', async () => {
@@ -237,9 +259,13 @@ describe('verifyIntegrity — request shape', () => {
     };
 
     await verifyIntegrity({ version: VERSION, pageUrl: PAGE_URL, fetchFn, subtle: fakeSubtle });
-    assert.ok(manifestUrl.startsWith('https://gitlab.com/api/v4/projects/hidayahtech%2Fbucketer/packages/generic/bucketer/'),
-      `manifest URL must point at the project's GitLab Generic Package Registry, got: ${manifestUrl}`);
-    assert.ok(manifestUrl.endsWith(`/${VERSION}/bucketer-v${VERSION}.integrity.json`),
-      `manifest URL must follow bucketer-v{VERSION}.integrity.json convention, got: ${manifestUrl}`);
+    assert.ok(
+      manifestUrl.startsWith('https://gitlab.com/api/v4/projects/hidayahtech%2Fbucketer/packages/generic/bucketer/'),
+      `manifest URL must point at the project's GitLab Generic Package Registry, got: ${manifestUrl}`,
+    );
+    assert.ok(
+      manifestUrl.endsWith(`/${VERSION}/bucketer-v${VERSION}.integrity.json`),
+      `manifest URL must follow bucketer-v{VERSION}.integrity.json convention, got: ${manifestUrl}`,
+    );
   });
 });

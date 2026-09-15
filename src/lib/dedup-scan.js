@@ -18,12 +18,14 @@ export async function enumerateObjects(client, bucket, prefix, { maxKeys = 1000,
   const objects = [];
   let token;
   do {
-    const resp = await client.send(new ListObjectsV2Command({
-      Bucket: bucket,
-      Prefix: prefix || undefined,
-      MaxKeys: maxKeys,
-      ContinuationToken: token,
-    }));
+    const resp = await client.send(
+      new ListObjectsV2Command({
+        Bucket: bucket,
+        Prefix: prefix || undefined,
+        MaxKeys: maxKeys,
+        ContinuationToken: token,
+      }),
+    );
     for (const o of resp.Contents || []) {
       objects.push({ Key: o.Key, Size: o.Size, LastModified: o.LastModified });
     }
@@ -56,7 +58,7 @@ export function deriveSignals(head) {
   const rawEtag = String(head?.ETag || '').replace(/"/g, '');
   const multipart = /-\d+$/.test(rawEtag);
   const encrypted = head?.ServerSideEncryption === 'aws:kms' || !!head?.SSECustomerAlgorithm;
-  const etagMd5 = (!multipart && !encrypted && /^[0-9a-f]{32}$/.test(rawEtag)) ? rawEtag : null;
+  const etagMd5 = !multipart && !encrypted && /^[0-9a-f]{32}$/.test(rawEtag) ? rawEtag : null;
   const stampHash = parseContentHash(head?.Metadata?.[CONTENT_HASH_KEY]);
   return { etagMd5, multipart, stampHash };
 }
@@ -107,8 +109,16 @@ function concreteKeys(m) {
 // carrying two signals bridges clusters that would otherwise be separate.
 function clusterByKeys(members) {
   const parent = members.map((_, i) => i);
-  const find = (i) => { while (parent[i] !== i) { parent[i] = parent[parent[i]]; i = parent[i]; } return i; };
-  const union = (a, b) => { parent[find(a)] = find(b); };
+  const find = (i) => {
+    while (parent[i] !== i) {
+      parent[i] = parent[parent[i]];
+      i = parent[i];
+    }
+    return i;
+  };
+  const union = (a, b) => {
+    parent[find(a)] = find(b);
+  };
 
   const keyToIdx = new Map();
   members.forEach((m, i) => {

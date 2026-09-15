@@ -29,7 +29,9 @@ function runLayer(layer, env) {
 
 const results = [];
 
-console.log(`\n══ e2e matrix: node layer + ${combos.length} browser combo(s) (${engines.join(', ')} × ${devices.map((d) => d || 'desktop').join(', ')}) ══`);
+console.log(
+  `\n══ e2e matrix: node layer + ${combos.length} browser combo(s) (${engines.join(', ')} × ${devices.map((d) => d || 'desktop').join(', ')}) ══`,
+);
 
 const nodeOk = runLayer('node', process.env);
 results.push({ label: 'node layer', ok: nodeOk });
@@ -37,12 +39,15 @@ results.push({ label: 'node layer', ok: nodeOk });
 for (const combo of combos) {
   console.log(`\n══ browser combo: ${comboLabel(combo)} ══`);
   const env = { ...process.env, E2E_ENGINE: combo.engine };
-  if (combo.device) env.E2E_DEVICE = combo.device; else delete env.E2E_DEVICE;
+  if (combo.device) env.E2E_DEVICE = combo.device;
+  else delete env.E2E_DEVICE;
   results.push({ label: comboLabel(combo), ok: runLayer('browser', env) });
 }
 
 const failed = results.filter((r) => !r.ok);
 console.log('\n══ e2e matrix summary ══');
 for (const r of results) console.log(`  ${r.ok ? '✓' : '✗'} ${r.label}`);
-console.log(failed.length ? `\n${failed.length} of ${results.length} lanes FAILED` : `\nAll ${results.length} lanes passed`);
+console.log(
+  failed.length ? `\n${failed.length} of ${results.length} lanes FAILED` : `\nAll ${results.length} lanes passed`,
+);
 process.exit(failed.length ? 1 : 0);

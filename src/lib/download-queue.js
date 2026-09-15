@@ -49,7 +49,7 @@ const DEFAULT_MAX_ERRORS = 50;
 // keys surfacing as 403 (above); three unrelated keys all denied is credentials/clock.
 const DENIED_BLOCK_STREAK = 3;
 
-const defaultWait = (ms) => new Promise(r => setTimeout(r, ms));
+const defaultWait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // runDownloadJob(job, { presign, issue, probe, onProgress, shouldCancel, wait },
 //                     { delayMs, maxErrors })
@@ -60,17 +60,11 @@ const defaultWait = (ms) => new Promise(r => setTimeout(r, ms));
 // `probe` is optional. Without it the engine issues without pre-checking, which keeps it
 // runnable in plain Node with no network — but also without BUG-053's pacing protection,
 // so the real app always passes one.
-export async function runDownloadJob(job, {
-  presign,
-  issue,
-  probe,
-  onProgress,
-  shouldCancel = () => false,
-  wait = defaultWait,
-} = {}, {
-  delayMs = 0,
-  maxErrors = DEFAULT_MAX_ERRORS,
-} = {}) {
+export async function runDownloadJob(
+  job,
+  { presign, issue, probe, onProgress, shouldCancel = () => false, wait = defaultWait } = {},
+  { delayMs = 0, maxErrors = DEFAULT_MAX_ERRORS } = {},
+) {
   let issued = 0;
   let failed = 0;
   let consecutiveDenied = 0;
@@ -171,5 +165,5 @@ export async function runDownloadJob(job, {
 // Discard by the classifier's reachability invariant (download-lifecycle.js), which is
 // the guarantee whose absence made this retention a defect the first time it shipped.
 export function jobOutcome({ cancelled = false, failed = 0, blocked = null, issued = 0 } = {}) {
-  return (cancelled || failed > 0 || blocked || issued > 0) ? { keep: true } : { keep: false };
+  return cancelled || failed > 0 || blocked || issued > 0 ? { keep: true } : { keep: false };
 }

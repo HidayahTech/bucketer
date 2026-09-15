@@ -46,7 +46,7 @@ export function suffixName(name, n) {
 export function freeFileKey(destKey, isTaken) {
   if (!isTaken(destKey)) return destKey;
   const leaf = leafName(destKey);
-  const dir  = destKey.slice(0, destKey.length - leaf.length);
+  const dir = destKey.slice(0, destKey.length - leaf.length);
   for (let n = 1; ; n++) {
     const candidate = dir + suffixName(leaf, n);
     if (!isTaken(candidate)) return candidate;
@@ -59,8 +59,8 @@ export function freeFileKey(destKey, isTaken) {
 export function freeFolderPrefix(folderTop, isTakenPrefix) {
   if (!isTakenPrefix(folderTop)) return folderTop;
   const inner = folderTop.slice(0, -1);
-  const leaf  = leafName(inner);
-  const base  = inner.slice(0, inner.length - leaf.length);
+  const leaf = leafName(inner);
+  const base = inner.slice(0, inner.length - leaf.length);
   for (let n = 1; ; n++) {
     const candidate = `${base}${leaf} (${n})/`;
     if (!isTakenPrefix(candidate)) return candidate;

@@ -21,7 +21,7 @@ describe('AboutModal — content', () => {
     const { text, cleanup } = mount(h(AboutModal, { onClose: () => {} }));
     assert.ok(
       text().includes('sessionStorage'),
-      'About page must mention sessionStorage as the security model for the secret key'
+      'About page must mention sessionStorage as the security model for the secret key',
     );
     cleanup();
   });
@@ -36,7 +36,13 @@ describe('AboutModal — content', () => {
 describe('AboutModal — close mechanisms', () => {
   test('clicking the backdrop overlay calls onClose', () => {
     let closed = false;
-    const { query, cleanup } = mount(h(AboutModal, { onClose: () => { closed = true; } }));
+    const { query, cleanup } = mount(
+      h(AboutModal, {
+        onClose: () => {
+          closed = true;
+        },
+      }),
+    );
     fire(query('.modal-overlay'), 'click');
     assert.ok(closed, 'backdrop click must call onClose');
     cleanup();
@@ -44,7 +50,13 @@ describe('AboutModal — close mechanisms', () => {
 
   test('clicking inside the dialog does NOT call onClose', () => {
     let closed = false;
-    const { query, cleanup } = mount(h(AboutModal, { onClose: () => { closed = true; } }));
+    const { query, cleanup } = mount(
+      h(AboutModal, {
+        onClose: () => {
+          closed = true;
+        },
+      }),
+    );
     fire(query('.modal-dialog'), 'click');
     assert.ok(!closed, 'clicking inside the dialog must NOT call onClose (stopPropagation)');
     cleanup();
@@ -52,7 +64,13 @@ describe('AboutModal — close mechanisms', () => {
 
   test('pressing Escape calls onClose', () => {
     let closed = false;
-    const { cleanup } = mount(h(AboutModal, { onClose: () => { closed = true; } }));
+    const { cleanup } = mount(
+      h(AboutModal, {
+        onClose: () => {
+          closed = true;
+        },
+      }),
+    );
     fire(document, 'keydown', { key: 'Escape' });
     assert.ok(closed, 'Escape key must call onClose');
     cleanup();
@@ -60,7 +78,13 @@ describe('AboutModal — close mechanisms', () => {
 
   test('pressing a non-Escape key does NOT call onClose', () => {
     let closed = false;
-    const { cleanup } = mount(h(AboutModal, { onClose: () => { closed = true; } }));
+    const { cleanup } = mount(
+      h(AboutModal, {
+        onClose: () => {
+          closed = true;
+        },
+      }),
+    );
     fire(document, 'keydown', { key: 'Enter' });
     fire(document, 'keydown', { key: 'Tab' });
     assert.ok(!closed, 'non-Escape keys must not close the modal');
@@ -69,7 +93,13 @@ describe('AboutModal — close mechanisms', () => {
 
   test('cleanup removes the Escape key listener (no ghost listener after unmount)', () => {
     let closedAfterUnmount = false;
-    const { cleanup } = mount(h(AboutModal, { onClose: () => { closedAfterUnmount = true; } }));
+    const { cleanup } = mount(
+      h(AboutModal, {
+        onClose: () => {
+          closedAfterUnmount = true;
+        },
+      }),
+    );
     cleanup(); // unmount — should remove the keydown listener
     fire(document, 'keydown', { key: 'Escape' });
     assert.ok(!closedAfterUnmount, 'Escape key must not fire after the modal is unmounted');

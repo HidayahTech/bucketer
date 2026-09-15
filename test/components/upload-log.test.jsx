@@ -10,7 +10,12 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { h } from 'preact';
 import { mount } from '../helpers/render.js';
-import { UploadLog, formatProbeAnnotation, formatStrategyAnnotation, strategyDetails } from '../../src/components/UploadLog.jsx';
+import {
+  UploadLog,
+  formatProbeAnnotation,
+  formatStrategyAnnotation,
+  strategyDetails,
+} from '../../src/components/UploadLog.jsx';
 
 describe('UploadLog — empty state', () => {
   test('mounts without throwing', () => {
@@ -38,7 +43,10 @@ describe('UploadLog — empty state', () => {
 describe('formatStrategyAnnotation — compact default line', () => {
   test('shows mode, part size, concurrency, and sharding', () => {
     const s = formatStrategyAnnotation({
-      concurrencyMode: 'manual', partSize: 32 * 1024 * 1024, peakPartConcurrency: 32, sharded: true,
+      concurrencyMode: 'manual',
+      partSize: 32 * 1024 * 1024,
+      peakPartConcurrency: 32,
+      sharded: true,
     });
     assert.ok(s.includes('manual'), 'mode');
     assert.ok(s.includes('MiB'), 'part size present');
@@ -54,22 +62,37 @@ describe('formatStrategyAnnotation — compact default line', () => {
 describe('strategyDetails — expanded diagnostics', () => {
   test('includes the key diagnostic fields', () => {
     const rows = strategyDetails({
-      concurrencyMode: 'manual', partSize: 32 * 1024 * 1024, totalParts: 3770,
-      peakPartConcurrency: 32, sharded: true, retries: 5, avgSpeedBps: 180e6,
-      durationSec: 1405, provider: 'b2', bucket: 'mybucket',
-      endpoint: 'https://s3.us-west-004.backblazeb2.com', status: 'done',
+      concurrencyMode: 'manual',
+      partSize: 32 * 1024 * 1024,
+      totalParts: 3770,
+      peakPartConcurrency: 32,
+      sharded: true,
+      retries: 5,
+      avgSpeedBps: 180e6,
+      durationSec: 1405,
+      provider: 'b2',
+      bucket: 'mybucket',
+      endpoint: 'https://s3.us-west-004.backblazeb2.com',
+      status: 'done',
     });
-    const labels = rows.map(r => r[0]);
+    const labels = rows.map((r) => r[0]);
     for (const l of ['Part size', 'Parts', 'Transient retries', 'Provider', 'Bucket']) {
       assert.ok(labels.includes(l), `expanded details must include "${l}"`);
     }
-    const partsRow = rows.find(r => r[0] === 'Parts');
+    const partsRow = rows.find((r) => r[0] === 'Parts');
     assert.ok(/3,?770/.test(partsRow[1]), 'part count is formatted');
   });
 
   test('surfaces the error message for a failed entry', () => {
-    const rows = strategyDetails({ concurrencyMode: 'manual', status: 'error', errorMessage: 'NetworkError when attempting to fetch resource.' });
-    assert.ok(rows.some(r => r[0] === 'Error' && r[1].includes('NetworkError')), 'failed entry must surface its error');
+    const rows = strategyDetails({
+      concurrencyMode: 'manual',
+      status: 'error',
+      errorMessage: 'NetworkError when attempting to fetch resource.',
+    });
+    assert.ok(
+      rows.some((r) => r[0] === 'Error' && r[1].includes('NetworkError')),
+      'failed entry must surface its error',
+    );
   });
 });
 
@@ -80,8 +103,11 @@ describe('formatProbeAnnotation', () => {
 
   test('formats a winner=candidate result with positive delta', () => {
     const result = formatProbeAnnotation({
-      baseline: 4, candidate: 8, winner: 8,
-      baselineMbs: 10, candidateMbs: 14,
+      baseline: 4,
+      candidate: 8,
+      winner: 8,
+      baselineMbs: 10,
+      candidateMbs: 14,
     });
     assert.ok(result.includes('4→8'), 'must show part concurrency range');
     assert.ok(result.includes('+40%') || result.includes('40'), 'must show improvement percentage');
@@ -89,17 +115,28 @@ describe('formatProbeAnnotation', () => {
 
   test('formats a winner=baseline result (no improvement)', () => {
     const result = formatProbeAnnotation({
-      baseline: 4, candidate: 8, winner: 4,
-      baselineMbs: 10, candidateMbs: 9, inconclusive: false,
+      baseline: 4,
+      candidate: 8,
+      winner: 4,
+      baselineMbs: 10,
+      candidateMbs: 9,
+      inconclusive: false,
     });
     assert.ok(result.includes('4→8'), 'must show part concurrency range');
-    assert.ok(result.includes('held') || result.includes('baseline') || result.includes('4'), 'must indicate baseline was kept');
+    assert.ok(
+      result.includes('held') || result.includes('baseline') || result.includes('4'),
+      'must indicate baseline was kept',
+    );
   });
 
   test('formats an inconclusive probe result', () => {
     const result = formatProbeAnnotation({
-      baseline: 4, candidate: 8, winner: 4,
-      baselineMbs: null, candidateMbs: null, inconclusive: true,
+      baseline: 4,
+      candidate: 8,
+      winner: 4,
+      baselineMbs: null,
+      candidateMbs: null,
+      inconclusive: true,
     });
     assert.ok(result.includes('4→8'), 'must show part concurrency range');
     assert.ok(result.includes('unreliable') || result.includes('inconclusive'), 'must indicate unreliable measurement');

@@ -18,7 +18,11 @@ import { GetObjectAttributesCommand } from '@aws-sdk/client-s3';
 import { PROVIDERS } from './provider.js';
 
 function defaultWarn(info) {
-  try { console.warn('[bucketer:dedup] unexpected provider checksum shape', info); } catch { /* no console */ }
+  try {
+    console.warn('[bucketer:dedup] unexpected provider checksum shape', info);
+  } catch {
+    /* no console */
+  }
 }
 
 // AWS checksum fields in priority order. CRC64NVME first: it is the default and is the one
@@ -37,12 +41,18 @@ const AWS_ALGOS = [
 // of is unexpected (null + warning).
 export function parseAwsChecksum(attrs, { warn = defaultWarn, key } = {}) {
   const ck = attrs?.Checksum;
-  if (!ck) return null;                       // no additional checksum — routine
+  if (!ck) return null; // no additional checksum — routine
   if (ck.ChecksumType !== 'FULL_OBJECT') return null; // composite is not comparable — routine
 
   const present = AWS_ALGOS.filter(([field]) => ck[field] != null);
   if (present.length !== 1) {
-    warn({ provider: 'aws', op: 'GetObjectAttributes', key, expected: 'exactly one FULL_OBJECT checksum algorithm', got: present.map((p) => p[0]) });
+    warn({
+      provider: 'aws',
+      op: 'GetObjectAttributes',
+      key,
+      expected: 'exactly one FULL_OBJECT checksum algorithm',
+      got: present.map((p) => p[0]),
+    });
     return null;
   }
   const [field, algo] = present[0];
@@ -59,12 +69,22 @@ export function parseAwsChecksum(attrs, { warn = defaultWarn, key } = {}) {
 // needed headers for body reads) suffices — no CORS change required.
 export async function awsAdapter(client, bucket, key, _head, { warn = defaultWarn } = {}) {
   try {
-    const attrs = await client.send(new GetObjectAttributesCommand({
-      Bucket: bucket, Key: key, ObjectAttributes: ['Checksum'],
-    }));
+    const attrs = await client.send(
+      new GetObjectAttributesCommand({
+        Bucket: bucket,
+        Key: key,
+        ObjectAttributes: ['Checksum'],
+      }),
+    );
     return parseAwsChecksum(attrs, { warn, key });
   } catch (err) {
-    warn({ provider: 'aws', op: 'GetObjectAttributes', key, expected: 'a checksum response', got: `error: ${err?.name || err?.message || err}` });
+    warn({
+      provider: 'aws',
+      op: 'GetObjectAttributes',
+      key,
+      expected: 'a checksum response',
+      got: `error: ${err?.name || err?.message || err}`,
+    });
     return null;
   }
 }

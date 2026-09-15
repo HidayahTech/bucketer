@@ -11,7 +11,7 @@ export function useConnectionTabs(connections, selectedId) {
   const [mru, setMru] = useState([]);
   useEffect(() => {
     if (selectedId == null) return;
-    setMru(prev => touchMru(prev, selectedId));
+    setMru((prev) => touchMru(prev, selectedId));
   }, [selectedId]);
   return deriveTabs(mru, connections, TAB_CAP);
 }

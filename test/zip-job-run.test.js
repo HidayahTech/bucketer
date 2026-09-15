@@ -19,8 +19,16 @@ import assert from 'node:assert/strict';
 import { openZipStaging, discardZipStaging, runZipJob, zipEntryPath } from '../src/lib/zip-job.js';
 import { createZipWriter } from '../src/lib/zip-writer.js';
 import {
-  saveJob, loadJob, loadAllJobs, deleteJob, appendManifestPage,
-  updateItem, countItemsByStatus, eachItemByStatus, resetFailedToPending, ITEM_STATUS,
+  saveJob,
+  loadJob,
+  loadAllJobs,
+  deleteJob,
+  appendManifestPage,
+  updateItem,
+  countItemsByStatus,
+  eachItemByStatus,
+  resetFailedToPending,
+  ITEM_STATUS,
 } from '../src/lib/download-records.js';
 import { readZip } from './helpers/zip-reader.js';
 
@@ -47,7 +55,11 @@ function fakeOpfsRoot() {
     },
     async getFileHandle(name, { create = false } = {}) {
       if (!files.has(name)) {
-        if (!create) { const e = new Error('missing'); e.name = 'NotFoundError'; throw e; }
+        if (!create) {
+          const e = new Error('missing');
+          e.name = 'NotFoundError';
+          throw e;
+        }
         files.set(name, new Uint8Array(0));
       }
       return {
@@ -68,17 +80,35 @@ function fakeOpfsRoot() {
                 fault.count += 1;
               }
               const grown = new Uint8Array(Math.max(buf.length, pos + u8.length));
-              grown.set(buf); grown.set(u8, pos); buf = grown; pos += u8.length;
+              grown.set(buf);
+              grown.set(u8, pos);
+              buf = grown;
+              pos += u8.length;
             },
-            async truncate(n) { if (errored) throw new Error('truncate on an errored stream'); buf = buf.slice(0, n); pos = Math.min(pos, n); },
-            async seek(n) { if (errored) throw new Error('seek on an errored stream'); pos = n; },
-            async close() { if (errored) throw new Error('close on an errored stream'); files.set(name, buf); },
+            async truncate(n) {
+              if (errored) throw new Error('truncate on an errored stream');
+              buf = buf.slice(0, n);
+              pos = Math.min(pos, n);
+            },
+            async seek(n) {
+              if (errored) throw new Error('seek on an errored stream');
+              pos = n;
+            },
+            async close() {
+              if (errored) throw new Error('close on an errored stream');
+              files.set(name, buf);
+            },
           };
         },
-        async getFile() { const b = files.get(name); return { size: b.length, arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.length) }; },
+        async getFile() {
+          const b = files.get(name);
+          return { size: b.length, arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.length) };
+        },
       };
     },
-    async removeEntry(name) { files.delete(name); },
+    async removeEntry(name) {
+      files.delete(name);
+    },
   };
 }
 
@@ -86,13 +116,23 @@ const enc = (s) => new TextEncoder().encode(s);
 const dec = (u8) => new TextDecoder().decode(u8);
 
 const job = (over = {}) => ({
-  id: 'zjob-1', bucket: 'bkt', prefix: 'videos/', status: 'running',
-  enumeration: { done: true }, counters: { total: 0, bytesTotal: 0 }, ...over,
+  id: 'zjob-1',
+  bucket: 'bkt',
+  prefix: 'videos/',
+  status: 'running',
+  enumeration: { done: true },
+  counters: { total: 0, bytesTotal: 0 },
+  ...over,
 });
 
 const item = (key, body, over = {}) => ({
-  key, size: enc(body).length, etag: `"${key}"`, localName: key.split('/').pop(),
-  lastModified: 1700000000000, status: ITEM_STATUS.PENDING, ...over,
+  key,
+  size: enc(body).length,
+  etag: `"${key}"`,
+  localName: key.split('/').pop(),
+  lastModified: 1700000000000,
+  status: ITEM_STATUS.PENDING,
+  ...over,
 });
 
 async function reset() {
@@ -151,11 +191,11 @@ describe('runZipJob', () => {
 
   test('1. a clean 3-item run produces a valid, complete zip and truthful DONE records', async () => {
     await saveJob(job());
-    await appendManifestPage('zjob-1', [
-      item('videos/a.txt', 'alpha'),
-      item('videos/b.txt', 'bravo-body'),
-      item('videos/c.txt', 'charlie!!'),
-    ], {});
+    await appendManifestPage(
+      'zjob-1',
+      [item('videos/a.txt', 'alpha'), item('videos/b.txt', 'bravo-body'), item('videos/c.txt', 'charlie!!')],
+      {},
+    );
 
     const root = fakeOpfsRoot();
     const fetchImpl = fetchFake({
@@ -165,7 +205,10 @@ describe('runZipJob', () => {
     });
     const progress = [];
     const result = await runZipJob(await loadJob('zjob-1'), {
-      presign, fetchImpl, root, onProgress: (p) => progress.push({ ...p }),
+      presign,
+      fetchImpl,
+      root,
+      onProgress: (p) => progress.push({ ...p }),
     });
 
     assert.equal(result.finished, true);
@@ -176,13 +219,13 @@ describe('runZipJob', () => {
     assert.equal(statuses[ITEM_STATUS.DONE], 3);
     assert.equal(statuses[ITEM_STATUS.PENDING], 0);
     assert.equal(statuses[ITEM_STATUS.FAILED], 0);
-    assert.equal(statuses[ITEM_STATUS.ISSUED], 0, 'no item may be left at the engine\'s interim ISSUED status');
+    assert.equal(statuses[ITEM_STATUS.ISSUED], 0, "no item may be left at the engine's interim ISSUED status");
 
     const staging = await root.getFileHandle('bucketer-zip-zjob-1.zip');
     const file = await staging.getFile();
     const entries = readZip(new Uint8Array(await file.arrayBuffer()));
-    assert.deepEqual(entries.map(e => e.name).sort(), ['a.txt', 'b.txt', 'c.txt']);
-    const byName = Object.fromEntries(entries.map(e => [e.name, e]));
+    assert.deepEqual(entries.map((e) => e.name).sort(), ['a.txt', 'b.txt', 'c.txt']);
+    const byName = Object.fromEntries(entries.map((e) => [e.name, e]));
     assert.equal(dec(byName['a.txt'].data), 'alpha');
     assert.equal(dec(byName['b.txt'].data), 'bravo-body');
     assert.equal(dec(byName['c.txt'].data), 'charlie!!');
@@ -197,11 +240,11 @@ describe('runZipJob', () => {
 
   test('2. interrupting after item 1 leaves a resumable partial zip; the second run finishes it', async () => {
     await saveJob(job());
-    await appendManifestPage('zjob-1', [
-      item('videos/a.txt', 'alpha'),
-      item('videos/b.txt', 'bravo-body'),
-      item('videos/c.txt', 'charlie!!'),
-    ], {});
+    await appendManifestPage(
+      'zjob-1',
+      [item('videos/a.txt', 'alpha'), item('videos/b.txt', 'bravo-body'), item('videos/c.txt', 'charlie!!')],
+      {},
+    );
 
     const root = fakeOpfsRoot();
     const fetchImpl = fetchFake({
@@ -212,9 +255,13 @@ describe('runZipJob', () => {
 
     let doneCount = 0;
     const result1 = await runZipJob(await loadJob('zjob-1'), {
-      presign, fetchImpl, root,
+      presign,
+      fetchImpl,
+      root,
       shouldCancel: () => doneCount >= 1,
-      onProgress: (p) => { doneCount = p.done; },
+      onProgress: (p) => {
+        doneCount = p.done;
+      },
     });
 
     assert.equal(result1.cancelled, true);
@@ -224,7 +271,9 @@ describe('runZipJob', () => {
     assert.equal(mid[ITEM_STATUS.PENDING], 2);
 
     let doneItem;
-    await eachItemByStatus('zjob-1', ITEM_STATUS.DONE, (it) => { doneItem = it; });
+    await eachItemByStatus('zjob-1', ITEM_STATUS.DONE, (it) => {
+      doneItem = it;
+    });
     const staging = await root.getFileHandle('bucketer-zip-zjob-1.zip');
     assert.equal((await staging.getFile()).size, doneItem.zipEnd, 'run 1 committed exactly its one entry');
 
@@ -239,26 +288,23 @@ describe('runZipJob', () => {
 
     const file = await staging.getFile();
     const entries = readZip(new Uint8Array(await file.arrayBuffer()));
-    assert.deepEqual(entries.map(e => e.name).sort(), ['a.txt', 'b.txt', 'c.txt']);
+    assert.deepEqual(entries.map((e) => e.name).sort(), ['a.txt', 'b.txt', 'c.txt']);
   });
 
   test('3. a mid-body fetch failure fails only that item and recovers the writer for the next entry', async () => {
     await saveJob(job());
-    await appendManifestPage('zjob-1', [
-      item('videos/a.txt', 'alpha'),
-      item('videos/b.txt', 'bravo-body'),
-      item('videos/c.txt', 'charlie!!'),
-    ], {});
+    await appendManifestPage(
+      'zjob-1',
+      [item('videos/a.txt', 'alpha'), item('videos/b.txt', 'bravo-body'), item('videos/c.txt', 'charlie!!')],
+      {},
+    );
 
     const root = fakeOpfsRoot();
     const fetchImpl = fetchFake({
       'videos/a.txt': [[enc('alpha')]],
       // First attempt: one good chunk, then the stream dies. Second attempt (after
       // resetFailedToPending): succeeds cleanly.
-      'videos/b.txt': [
-        [enc('brav'), new Error('stream reset')],
-        [enc('bravo-body')],
-      ],
+      'videos/b.txt': [[enc('brav'), new Error('stream reset')], [enc('bravo-body')]],
       'videos/c.txt': [[enc('charlie!!')]],
     });
 
@@ -274,7 +320,9 @@ describe('runZipJob', () => {
     assert.equal(afterRun1[ITEM_STATUS.DONE], 2);
     assert.equal(afterRun1[ITEM_STATUS.FAILED], 1);
     let failedItem;
-    await eachItemByStatus('zjob-1', ITEM_STATUS.FAILED, (it) => { failedItem = it; });
+    await eachItemByStatus('zjob-1', ITEM_STATUS.FAILED, (it) => {
+      failedItem = it;
+    });
     assert.equal(failedItem.key, 'videos/b.txt');
     assert.ok(failedItem.error, 'the failure reason must be recorded');
 
@@ -285,7 +333,9 @@ describe('runZipJob', () => {
     // Not yet finished (no central directory), but the partial 'b' bytes must be gone:
     // reconstruct what a fresh writer would need by checking size == max(DONE zipEnd).
     let maxEnd = 0;
-    await eachItemByStatus('zjob-1', ITEM_STATUS.DONE, (it) => { maxEnd = Math.max(maxEnd, it.zipEnd); });
+    await eachItemByStatus('zjob-1', ITEM_STATUS.DONE, (it) => {
+      maxEnd = Math.max(maxEnd, it.zipEnd);
+    });
     assert.equal(midFile.size, maxEnd, 'a failed entry must not leave a partial tail after it');
 
     const reset1 = await resetFailedToPending('zjob-1');
@@ -300,25 +350,31 @@ describe('runZipJob', () => {
 
     const file = await staging.getFile();
     const entries = readZip(new Uint8Array(await file.arrayBuffer()));
-    assert.deepEqual(entries.map(e => e.name).sort(), ['a.txt', 'b.txt', 'c.txt']);
-    const byName = Object.fromEntries(entries.map(e => [e.name, e]));
+    assert.deepEqual(entries.map((e) => e.name).sort(), ['a.txt', 'b.txt', 'c.txt']);
+    const byName = Object.fromEntries(entries.map((e) => [e.name, e]));
     // The central directory is built in key order (a, b, c) regardless of physical
     // layout — zip-writer's finish() accepts records out of order by design. Physical
     // placement (each entry's local header offset, `lho`) is what actually proves the
     // recovery path: c occupies the space b's failed first attempt vacated (run 1), and
     // b — retried in run 2 — lands after everything already committed to disk.
-    assert.ok(byName['a.txt'].lho < byName['c.txt'].lho, 'c must reuse the offset b\'s failed attempt was truncated back from');
-    assert.ok(byName['c.txt'].lho < byName['b.txt'].lho, 'the retried b must be appended after everything already on disk');
+    assert.ok(
+      byName['a.txt'].lho < byName['c.txt'].lho,
+      "c must reuse the offset b's failed attempt was truncated back from",
+    );
+    assert.ok(
+      byName['c.txt'].lho < byName['b.txt'].lho,
+      'the retried b must be appended after everything already on disk',
+    );
     assert.equal(dec(byName['b.txt'].data), 'bravo-body');
   });
 
   test('4. staging vanishing between runs resets every recorded DONE item back to PENDING', async () => {
     await saveJob(job());
-    await appendManifestPage('zjob-1', [
-      item('videos/a.txt', 'alpha'),
-      item('videos/b.txt', 'bravo-body'),
-      item('videos/c.txt', 'charlie!!'),
-    ], {});
+    await appendManifestPage(
+      'zjob-1',
+      [item('videos/a.txt', 'alpha'), item('videos/b.txt', 'bravo-body'), item('videos/c.txt', 'charlie!!')],
+      {},
+    );
 
     const root = fakeOpfsRoot();
     const fetchImpl = fetchFake({
@@ -329,9 +385,13 @@ describe('runZipJob', () => {
 
     let doneCount = 0;
     await runZipJob(await loadJob('zjob-1'), {
-      presign, fetchImpl, root,
+      presign,
+      fetchImpl,
+      root,
       shouldCancel: () => doneCount >= 2,
-      onProgress: (p) => { doneCount = p.done; },
+      onProgress: (p) => {
+        doneCount = p.done;
+      },
     });
     const afterRun1 = await statusesOf('zjob-1');
     assert.equal(afterRun1[ITEM_STATUS.DONE], 2);
@@ -355,8 +415,8 @@ describe('runZipJob', () => {
     const staging = await root.getFileHandle('bucketer-zip-zjob-1.zip');
     const file = await staging.getFile();
     const entries = readZip(new Uint8Array(await file.arrayBuffer()));
-    assert.deepEqual(entries.map(e => e.name).sort(), ['a.txt', 'b.txt', 'c.txt']);
-    const byName = Object.fromEntries(entries.map(e => [e.name, e]));
+    assert.deepEqual(entries.map((e) => e.name).sort(), ['a.txt', 'b.txt', 'c.txt']);
+    const byName = Object.fromEntries(entries.map((e) => [e.name, e]));
     assert.equal(dec(byName['a.txt'].data), 'alpha');
     assert.equal(dec(byName['b.txt'].data), 'bravo-body');
     assert.equal(dec(byName['c.txt'].data), 'charlie!!');
@@ -364,11 +424,11 @@ describe('runZipJob', () => {
 
   test('5. a DENIED streak trips the shared 3-consecutive-denial breaker through the injected probe', async () => {
     await saveJob(job());
-    await appendManifestPage('zjob-1', [
-      item('videos/a.txt', 'alpha'),
-      item('videos/b.txt', 'bravo-body'),
-      item('videos/c.txt', 'charlie!!'),
-    ], {});
+    await appendManifestPage(
+      'zjob-1',
+      [item('videos/a.txt', 'alpha'), item('videos/b.txt', 'bravo-body'), item('videos/c.txt', 'charlie!!')],
+      {},
+    );
 
     const root = fakeOpfsRoot();
     const fetchImpl = fetchFake({
@@ -407,10 +467,7 @@ describe('runZipJob', () => {
   // documented shape.
   test('7. a mid-entry OPFS write failure (not a fetch failure) recovers cleanly and resolves', async () => {
     await saveJob(job());
-    await appendManifestPage('zjob-1', [
-      item('videos/m.txt', 'mno-body'),
-      item('videos/n.txt', 'november'),
-    ], {});
+    await appendManifestPage('zjob-1', [item('videos/m.txt', 'mno-body'), item('videos/n.txt', 'november')], {});
 
     const root = fakeOpfsRoot();
     const fetchImpl = fetchFake({
@@ -428,21 +485,35 @@ describe('runZipJob', () => {
     // concurrency: 1 guarantees m is written first (key order) so the armed fault lands
     // on m's write, not n's — the scenario this test is built around.
     let rejected = false;
-    const result = await runZipJob(await loadJob('zjob-1'), { presign, fetchImpl, root, concurrency: 1 })
-      .catch((e) => { rejected = true; throw e; });
-    assert.equal(rejected, false, 'runZipJob must resolve, not reject, even when close() on the errored stream also fails');
+    const result = await runZipJob(await loadJob('zjob-1'), { presign, fetchImpl, root, concurrency: 1 }).catch((e) => {
+      rejected = true;
+      throw e;
+    });
+    assert.equal(
+      rejected,
+      false,
+      'runZipJob must resolve, not reject, even when close() on the errored stream also fails',
+    );
 
     assert.equal(result.failed, 1);
     const statuses = await statusesOf('zjob-1');
     assert.equal(statuses[ITEM_STATUS.FAILED], 1);
     assert.equal(statuses[ITEM_STATUS.DONE], 1, 'no cascade: only the item that hit the fault failed');
     let failedItem;
-    await eachItemByStatus('zjob-1', ITEM_STATUS.FAILED, (it) => { failedItem = it; });
+    await eachItemByStatus('zjob-1', ITEM_STATUS.FAILED, (it) => {
+      failedItem = it;
+    });
     assert.equal(failedItem.key, 'videos/m.txt');
     assert.ok(failedItem.error, 'the failure reason must be recorded');
     let doneItem;
-    await eachItemByStatus('zjob-1', ITEM_STATUS.DONE, (it) => { doneItem = it; });
-    assert.equal(doneItem.key, 'videos/n.txt', 'the item after the fault must be written by the recovered writer, not skipped');
+    await eachItemByStatus('zjob-1', ITEM_STATUS.DONE, (it) => {
+      doneItem = it;
+    });
+    assert.equal(
+      doneItem.key,
+      'videos/n.txt',
+      'the item after the fault must be written by the recovered writer, not skipped',
+    );
 
     // Prove "written correctly" (not just "recorded DONE"): retry m and confirm the
     // final archive parses, with both entries byte-correct.
@@ -452,8 +523,8 @@ describe('runZipJob', () => {
 
     const staging = await root.getFileHandle('bucketer-zip-zjob-1.zip');
     const entries = readZip(new Uint8Array(await (await staging.getFile()).arrayBuffer()));
-    assert.deepEqual(entries.map(e => e.name).sort(), ['m.txt', 'n.txt']);
-    const byName = Object.fromEntries(entries.map(e => [e.name, e]));
+    assert.deepEqual(entries.map((e) => e.name).sort(), ['m.txt', 'n.txt']);
+    const byName = Object.fromEntries(entries.map((e) => [e.name, e]));
     assert.equal(dec(byName['m.txt'].data), 'mno-body');
     assert.equal(dec(byName['n.txt'].data), 'november');
   });
@@ -466,10 +537,7 @@ describe('runZipJob', () => {
   // runDownloadJob returning and that run's OWN end-of-run promotion call.
   test('8. a stray ISSUED item from a crashed prior run is promoted to DONE at the start of the next run', async () => {
     await saveJob(job());
-    await appendManifestPage('zjob-1', [
-      item('videos/p.txt', 'papa'),
-      item('videos/q.txt', 'quebec'),
-    ], {});
+    await appendManifestPage('zjob-1', [item('videos/p.txt', 'papa'), item('videos/q.txt', 'quebec')], {});
 
     const root = fakeOpfsRoot();
     // Simulate the crash: physically write p's entry into the staging file (exactly what
@@ -485,12 +553,19 @@ describe('runZipJob', () => {
     await setupOut.close();
     await updateItem('zjob-1', 'videos/p.txt', { status: ITEM_STATUS.ISSUED, ...rec });
 
-    assert.equal((await statusesOf('zjob-1'))[ITEM_STATUS.ISSUED], 1, 'setup sanity: p really is stranded at ISSUED before the run');
+    assert.equal(
+      (await statusesOf('zjob-1'))[ITEM_STATUS.ISSUED],
+      1,
+      'setup sanity: p really is stranded at ISSUED before the run',
+    );
 
     const fetchImpl = fetchFake({ 'videos/q.txt': [[enc('quebec')]] });
     const progress = [];
     const result = await runZipJob(await loadJob('zjob-1'), {
-      presign, fetchImpl, root, onProgress: (p) => progress.push({ ...p }),
+      presign,
+      fetchImpl,
+      root,
+      onProgress: (p) => progress.push({ ...p }),
     });
 
     assert.equal(result.finished, true);
@@ -519,8 +594,8 @@ describe('runZipJob', () => {
     // Included in the finished archive's central directory, byte-correct.
     const file = await staging.getFile();
     const entries = readZip(new Uint8Array(await file.arrayBuffer()));
-    assert.deepEqual(entries.map(e => e.name).sort(), ['p.txt', 'q.txt']);
-    const byName = Object.fromEntries(entries.map(e => [e.name, e]));
+    assert.deepEqual(entries.map((e) => e.name).sort(), ['p.txt', 'q.txt']);
+    const byName = Object.fromEntries(entries.map((e) => [e.name, e]));
     assert.equal(dec(byName['p.txt'].data), 'papa');
     assert.equal(dec(byName['q.txt'].data), 'quebec');
   });
@@ -535,10 +610,7 @@ describe('runZipJob', () => {
   // the eventual resume regardless of which way the error is rethrown afterward.
   test('9. a mid-entry QuotaExceededError pauses the job (STORAGE block), not fails the item, and leaves staging intact for a resume', async () => {
     await saveJob(job());
-    await appendManifestPage('zjob-1', [
-      item('videos/x.txt', 'xray-body'),
-      item('videos/y.txt', 'yankee'),
-    ], {});
+    await appendManifestPage('zjob-1', [item('videos/x.txt', 'xray-body'), item('videos/y.txt', 'yankee')], {});
 
     const root = fakeOpfsRoot();
     const fetchImpl = fetchFake({
@@ -563,14 +635,18 @@ describe('runZipJob', () => {
     assert.ok(/storage/i.test(result.blocked.message), 'the block must explain it was a storage problem');
 
     const statuses = await statusesOf('zjob-1');
-    assert.equal(statuses[ITEM_STATUS.PENDING], 2, 'both items — including the one that hit the fault — stay PENDING, not FAILED');
-    assert.equal(statuses[ITEM_STATUS.FAILED], 0, 'a job-wide block is not this item\'s fault');
+    assert.equal(
+      statuses[ITEM_STATUS.PENDING],
+      2,
+      'both items — including the one that hit the fault — stay PENDING, not FAILED',
+    );
+    assert.equal(statuses[ITEM_STATUS.FAILED], 0, "a job-wide block is not this item's fault");
     assert.equal(statuses[ITEM_STATUS.DONE], 0);
 
     // Staging must not be left corrupt: the failed entry's partial bytes are truncated
     // away, exactly as the mid-entry recovery does for a plain fetch failure (test 3).
     const staging = await root.getFileHandle('bucketer-zip-zjob-1.zip');
-    assert.equal((await staging.getFile()).size, 0, 'the failed entry\'s partial bytes must not survive the block');
+    assert.equal((await staging.getFile()).size, 0, "the failed entry's partial bytes must not survive the block");
 
     // A later run (storage freed) must resume cleanly from that intact, empty staging file.
     const result2 = await runZipJob(await loadJob('zjob-1'), { presign, fetchImpl, root });
@@ -580,7 +656,7 @@ describe('runZipJob', () => {
 
     const file = await staging.getFile();
     const entries = readZip(new Uint8Array(await file.arrayBuffer()));
-    assert.deepEqual(entries.map(e => e.name).sort(), ['x.txt', 'y.txt']);
+    assert.deepEqual(entries.map((e) => e.name).sort(), ['x.txt', 'y.txt']);
   });
 
   // D5: `active` is now a LIST (0..N entries), one per currently-downloading file,
@@ -588,10 +664,7 @@ describe('runZipJob', () => {
   // dedicated proof that it can hold more than one entry at once (real overlap).
   test('10. onProgress reports the active list while streaming and an empty list between/after', async () => {
     await saveJob(job());
-    await appendManifestPage('zjob-1', [
-      item('videos/a.txt', 'alpha'),
-      item('videos/b.txt', 'bravo-body'),
-    ], {});
+    await appendManifestPage('zjob-1', [item('videos/a.txt', 'alpha'), item('videos/b.txt', 'bravo-body')], {});
 
     const root = fakeOpfsRoot();
     // Multi-chunk bodies so at least one mid-stream onProgress call (0 < bytes < size)
@@ -603,30 +676,43 @@ describe('runZipJob', () => {
 
     const payloads = [];
     const result = await runZipJob(await loadJob('zjob-1'), {
-      presign, fetchImpl, root,
+      presign,
+      fetchImpl,
+      root,
       onProgress: (p) => payloads.push({ ...p, active: p.active.map((a) => ({ ...a })) }),
     });
     assert.equal(result.finished, true);
 
-    assert.ok(payloads.every(p => Array.isArray(p.active)), 'active is always an array');
+    assert.ok(
+      payloads.every((p) => Array.isArray(p.active)),
+      'active is always an array',
+    );
 
-    const activeEntries = payloads.flatMap(p => p.active);
+    const activeEntries = payloads.flatMap((p) => p.active);
     assert.ok(activeEntries.length > 0, 'saw an active file while streaming');
     // bytes starts at 0 the instant a fetch is taken (before its first chunk arrives —
     // runPrefetch reports the file as active from the moment it starts, not just once
     // bytes are flowing), so only an upper bound is guaranteed here; some mid-stream
     // reading (0 < bytes < size) for at least one entry is asserted separately below.
-    assert.ok(activeEntries.every(a => a.bytes >= 0 && a.bytes <= a.size),
-      'active.bytes never exceeds active.size');
-    assert.ok(activeEntries.some(a => a.bytes > 0 && a.bytes < a.size),
-      'at least one payload caught a file mid-stream (0 < bytes < size)');
-    assert.ok(activeEntries.some(a => a.key === 'videos/a.txt' && a.size === enc('alpha').length),
-      'a.txt was reported active with its real key and size');
-    assert.ok(activeEntries.some(a => a.key === 'videos/b.txt' && a.size === enc('bravo-body').length),
-      'b.txt was reported active with its real key and size');
+    assert.ok(
+      activeEntries.every((a) => a.bytes >= 0 && a.bytes <= a.size),
+      'active.bytes never exceeds active.size',
+    );
+    assert.ok(
+      activeEntries.some((a) => a.bytes > 0 && a.bytes < a.size),
+      'at least one payload caught a file mid-stream (0 < bytes < size)',
+    );
+    assert.ok(
+      activeEntries.some((a) => a.key === 'videos/a.txt' && a.size === enc('alpha').length),
+      'a.txt was reported active with its real key and size',
+    );
+    assert.ok(
+      activeEntries.some((a) => a.key === 'videos/b.txt' && a.size === enc('bravo-body').length),
+      'b.txt was reported active with its real key and size',
+    );
 
     // Cleared to an empty list right after each entry finishes (not just at the very end).
-    const emptyActiveCount = payloads.filter(p => p.active.length === 0).length;
+    const emptyActiveCount = payloads.filter((p) => p.active.length === 0).length;
     assert.ok(emptyActiveCount >= 2, 'active is cleared to [] after each of the two entries completes');
 
     assert.deepEqual(payloads[payloads.length - 1].active, [], 'active cleared at the end of the run');
@@ -644,12 +730,9 @@ describe('runZipJob', () => {
   // without a final unconditional emission after runPrefetch resolves, the run's
   // last-observed payload could still show that failed file as active, a phantom "still
   // downloading" indicator.
-  test('11. onProgress\'s final payload has an empty active list even when an item fails mid-stream', async () => {
+  test("11. onProgress's final payload has an empty active list even when an item fails mid-stream", async () => {
     await saveJob(job());
-    await appendManifestPage('zjob-1', [
-      item('videos/a.txt', 'alpha'),
-      item('videos/b.txt', 'bravo-body'),
-    ], {});
+    await appendManifestPage('zjob-1', [item('videos/a.txt', 'alpha'), item('videos/b.txt', 'bravo-body')], {});
 
     const root = fakeOpfsRoot();
     const fetchImpl = fetchFake({
@@ -661,7 +744,9 @@ describe('runZipJob', () => {
 
     const payloads = [];
     const result = await runZipJob(await loadJob('zjob-1'), {
-      presign, fetchImpl, root,
+      presign,
+      fetchImpl,
+      root,
       onProgress: (p) => payloads.push({ ...p, active: p.active.map((a) => ({ ...a })) }),
     });
 
@@ -672,13 +757,20 @@ describe('runZipJob', () => {
     assert.equal(statuses[ITEM_STATUS.DONE], 1, 'a.txt still completed normally');
     assert.equal(statuses[ITEM_STATUS.FAILED], 1, 'b.txt (the failing item) is FAILED');
     let failedItem;
-    await eachItemByStatus('zjob-1', ITEM_STATUS.FAILED, (it) => { failedItem = it; });
+    await eachItemByStatus('zjob-1', ITEM_STATUS.FAILED, (it) => {
+      failedItem = it;
+    });
     assert.equal(failedItem.key, 'videos/b.txt');
 
-    assert.ok(payloads.some(p => p.active.some(a => a.key === 'videos/b.txt')),
-      'b.txt was reported active for its one streamed chunk before it failed');
-    assert.deepEqual(payloads[payloads.length - 1].active, [],
-      'the run\'s final payload must not carry a phantom active file for the failed item');
+    assert.ok(
+      payloads.some((p) => p.active.some((a) => a.key === 'videos/b.txt')),
+      'b.txt was reported active for its one streamed chunk before it failed',
+    );
+    assert.deepEqual(
+      payloads[payloads.length - 1].active,
+      [],
+      "the run's final payload must not carry a phantom active file for the failed item",
+    );
   });
 
   // New for the concurrent engine (D1/D3/D5): a job whose items actually overlap in
@@ -688,12 +780,16 @@ describe('runZipJob', () => {
   // more than one entry at some point during the run, not just sequentially one at a time).
   test('12. a multi-item job downloads concurrently: byte-valid zip, correct CRCs, and the active list shows real overlap', async () => {
     await saveJob(job());
-    await appendManifestPage('zjob-1', [
-      item('videos/a.txt', 'alpha-one'),
-      item('videos/b.txt', 'bravo-two'),
-      item('videos/c.txt', 'charlie-three'),
-      item('videos/d.txt', 'delta-four'),
-    ], {});
+    await appendManifestPage(
+      'zjob-1',
+      [
+        item('videos/a.txt', 'alpha-one'),
+        item('videos/b.txt', 'bravo-two'),
+        item('videos/c.txt', 'charlie-three'),
+        item('videos/d.txt', 'delta-four'),
+      ],
+      {},
+    );
 
     const root = fakeOpfsRoot();
     const fetchImpl = fetchFake({
@@ -705,7 +801,9 @@ describe('runZipJob', () => {
 
     const progress = [];
     const result = await runZipJob(await loadJob('zjob-1'), {
-      presign, fetchImpl, root,
+      presign,
+      fetchImpl,
+      root,
       onProgress: (p) => progress.push({ ...p, active: p.active.map((a) => ({ ...a })) }),
     });
 
@@ -713,13 +811,15 @@ describe('runZipJob', () => {
     assert.equal(result.cancelled, false);
     assert.equal(result.blocked, null);
 
-    assert.ok(progress.some(p => p.active.length > 1),
-      'onProgress must show more than one file actively downloading at some point (real overlap) — the whole point of the prefetch pool over the old one-at-a-time loop');
+    assert.ok(
+      progress.some((p) => p.active.length > 1),
+      'onProgress must show more than one file actively downloading at some point (real overlap) — the whole point of the prefetch pool over the old one-at-a-time loop',
+    );
 
     const staging = await root.getFileHandle('bucketer-zip-zjob-1.zip');
     const entries = readZip(new Uint8Array(await (await staging.getFile()).arrayBuffer()));
-    assert.deepEqual(entries.map(e => e.name).sort(), ['a.txt', 'b.txt', 'c.txt', 'd.txt']);
-    const byName = Object.fromEntries(entries.map(e => [e.name, e]));
+    assert.deepEqual(entries.map((e) => e.name).sort(), ['a.txt', 'b.txt', 'c.txt', 'd.txt']);
+    const byName = Object.fromEntries(entries.map((e) => [e.name, e]));
     // readZip already independently cross-checks each entry's CRC (a table-free bitwise
     // CRC-32 against the central directory's recorded value) before returning — decoding
     // the correct plaintext back out proves both content and CRC are right.
@@ -736,11 +836,11 @@ describe('runZipJob', () => {
   // download-queue.test.js's NETWORK coverage no longer exercises it.
   test('13. a NETWORK probe blocks the whole job immediately, not item-by-item', async () => {
     await saveJob(job());
-    await appendManifestPage('zjob-1', [
-      item('videos/a.txt', 'alpha'),
-      item('videos/b.txt', 'bravo-body'),
-      item('videos/c.txt', 'charlie!!'),
-    ], {});
+    await appendManifestPage(
+      'zjob-1',
+      [item('videos/a.txt', 'alpha'), item('videos/b.txt', 'bravo-body'), item('videos/c.txt', 'charlie!!')],
+      {},
+    );
 
     const root = fakeOpfsRoot();
     const fetchImpl = fetchFake({
@@ -758,7 +858,11 @@ describe('runZipJob', () => {
     // and deterministic (probeCalls would otherwise legitimately include more than one
     // key, since several workers probe concurrently before any of them notices the block).
     const result = await runZipJob(await loadJob('zjob-1'), {
-      presign, fetchImpl, root, probe, concurrency: 1,
+      presign,
+      fetchImpl,
+      root,
+      probe,
+      concurrency: 1,
     });
 
     assert.notEqual(result.blocked, null);
@@ -768,7 +872,11 @@ describe('runZipJob', () => {
     const statuses = await statusesOf('zjob-1');
     assert.equal(statuses[ITEM_STATUS.FAILED], 0, 'a NETWORK block must not be recorded as per-item failures');
     assert.equal(statuses[ITEM_STATUS.PENDING], 3, 'no item is individually touched — the whole job stops at once');
-    assert.deepEqual(probeCalls, ['videos/a.txt'], 'the job must stop at the first NETWORK result and never probe the remaining items');
+    assert.deepEqual(
+      probeCalls,
+      ['videos/a.txt'],
+      'the job must stop at the first NETWORK result and never probe the remaining items',
+    );
   });
 });
 
@@ -777,7 +885,7 @@ describe('runZipJob', () => {
 describe('runZipJob — entry naming', () => {
   beforeEach(reset);
 
-  test('entry names strip the job\'s captured prefix', async () => {
+  test("entry names strip the job's captured prefix", async () => {
     await saveJob(job({ prefix: 'videos/' }));
     await appendManifestPage('zjob-1', [item('videos/sub/d.txt', 'delta')], {});
     const root = fakeOpfsRoot();
@@ -787,6 +895,9 @@ describe('runZipJob — entry naming', () => {
 
     const staging = await root.getFileHandle('bucketer-zip-zjob-1.zip');
     const entries = readZip(new Uint8Array(await (await staging.getFile()).arrayBuffer()));
-    assert.deepEqual(entries.map(e => e.name), [zipEntryPath('videos/sub/d.txt', 'videos/')]);
+    assert.deepEqual(
+      entries.map((e) => e.name),
+      [zipEntryPath('videos/sub/d.txt', 'videos/')],
+    );
   });
 });

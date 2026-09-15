@@ -4,9 +4,18 @@
 import { test, describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  S3Client, PutObjectCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command,
-  DeleteObjectCommand, DeleteObjectsCommand, CopyObjectCommand,
-  CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, ListPartsCommand,
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  HeadObjectCommand,
+  ListObjectsV2Command,
+  DeleteObjectCommand,
+  DeleteObjectsCommand,
+  CopyObjectCommand,
+  CreateMultipartUploadCommand,
+  UploadPartCommand,
+  CompleteMultipartUploadCommand,
+  ListPartsCommand,
   ListObjectVersionsCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -37,10 +46,15 @@ async function streamToString(stream) {
 
 describe('mock S3 — object round-trip', () => {
   test('PutObject then HeadObject preserves custom metadata + content-type', async () => {
-    await client.send(new PutObjectCommand({
-      Bucket: BUCKET, Key: 'docs/a.txt', Body: body('hello'),
-      ContentType: 'text/plain', Metadata: { 'file-mtime': '2026-01-01T00:00:00.000Z', 'bucketer-content-hash': 'sha256-ht64k:abc' },
-    }));
+    await client.send(
+      new PutObjectCommand({
+        Bucket: BUCKET,
+        Key: 'docs/a.txt',
+        Body: body('hello'),
+        ContentType: 'text/plain',
+        Metadata: { 'file-mtime': '2026-01-01T00:00:00.000Z', 'bucketer-content-hash': 'sha256-ht64k:abc' },
+      }),
+    );
     const head = await client.send(new HeadObjectCommand({ Bucket: BUCKET, Key: 'docs/a.txt' }));
     assert.equal(head.ContentType, 'text/plain');
     assert.equal(head.ContentLength, 5);
@@ -77,15 +91,21 @@ describe('mock S3 — listing', () => {
     }
     const resp = await client.send(new ListObjectsV2Command({ Bucket: BUCKET, Delimiter: '/' }));
     assert.deepEqual((resp.CommonPrefixes || []).map((p) => p.Prefix).sort(), ['docs/', 'photos/']);
-    assert.deepEqual((resp.Contents || []).map((o) => o.Key), ['top.txt']);
+    assert.deepEqual(
+      (resp.Contents || []).map((o) => o.Key),
+      ['top.txt'],
+    );
   });
 
   test('ListObjectsV2 paginates via ContinuationToken', async () => {
-    for (let i = 0; i < 5; i++) await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: `f${i}`, Body: body('x') }));
+    for (let i = 0; i < 5; i++)
+      await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: `f${i}`, Body: body('x') }));
     const p1 = await client.send(new ListObjectsV2Command({ Bucket: BUCKET, MaxKeys: 2 }));
     assert.equal(p1.IsTruncated, true);
     assert.equal((p1.Contents || []).length, 2);
-    const p2 = await client.send(new ListObjectsV2Command({ Bucket: BUCKET, MaxKeys: 2, ContinuationToken: p1.NextContinuationToken }));
+    const p2 = await client.send(
+      new ListObjectsV2Command({ Bucket: BUCKET, MaxKeys: 2, ContinuationToken: p1.NextContinuationToken }),
+    );
     assert.equal((p2.Contents || []).length, 2);
   });
 });
@@ -99,11 +119,17 @@ describe('mock S3 — delete', () => {
   });
 
   test('DeleteObjects batch deletes many', async () => {
-    for (const k of ['a', 'b', 'c']) await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: k, Body: body('x') }));
-    const resp = await client.send(new DeleteObjectsCommand({ Bucket: BUCKET, Delete: { Objects: [{ Key: 'a' }, { Key: 'b' }], Quiet: true } }));
+    for (const k of ['a', 'b', 'c'])
+      await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: k, Body: body('x') }));
+    const resp = await client.send(
+      new DeleteObjectsCommand({ Bucket: BUCKET, Delete: { Objects: [{ Key: 'a' }, { Key: 'b' }], Quiet: true } }),
+    );
     assert.ok(!resp.Errors || resp.Errors.length === 0);
     const list = await client.send(new ListObjectsV2Command({ Bucket: BUCKET }));
-    assert.deepEqual((list.Contents || []).map((o) => o.Key), ['c']);
+    assert.deepEqual(
+      (list.Contents || []).map((o) => o.Key),
+      ['c'],
+    );
   });
 
   test('STRICT: DeleteObjects rejects more than 1000 keys', async () => {
@@ -114,19 +140,39 @@ describe('mock S3 — delete', () => {
 
 describe('mock S3 — multipart', () => {
   test('Create → UploadPart×2 → ListParts → Complete assembles the object', async () => {
-    const { UploadId } = await client.send(new CreateMultipartUploadCommand({ Bucket: BUCKET, Key: 'big', ContentType: 'application/octet-stream', Metadata: { 'file-mtime': 'm' } }));
+    const { UploadId } = await client.send(
+      new CreateMultipartUploadCommand({
+        Bucket: BUCKET,
+        Key: 'big',
+        ContentType: 'application/octet-stream',
+        Metadata: { 'file-mtime': 'm' },
+      }),
+    );
     const part1 = new Uint8Array(5 * 1024 * 1024).fill(65); // 5 MiB of 'A' (non-last must be >= 5 MB)
     const part2 = body('TAIL');
-    const r1 = await client.send(new UploadPartCommand({ Bucket: BUCKET, Key: 'big', UploadId, PartNumber: 1, Body: part1 }));
-    const r2 = await client.send(new UploadPartCommand({ Bucket: BUCKET, Key: 'big', UploadId, PartNumber: 2, Body: part2 }));
+    const r1 = await client.send(
+      new UploadPartCommand({ Bucket: BUCKET, Key: 'big', UploadId, PartNumber: 1, Body: part1 }),
+    );
+    const r2 = await client.send(
+      new UploadPartCommand({ Bucket: BUCKET, Key: 'big', UploadId, PartNumber: 2, Body: part2 }),
+    );
 
     const parts = await client.send(new ListPartsCommand({ Bucket: BUCKET, Key: 'big', UploadId }));
     assert.equal((parts.Parts || []).length, 2);
 
-    await client.send(new CompleteMultipartUploadCommand({
-      Bucket: BUCKET, Key: 'big', UploadId,
-      MultipartUpload: { Parts: [{ PartNumber: 1, ETag: r1.ETag }, { PartNumber: 2, ETag: r2.ETag }] },
-    }));
+    await client.send(
+      new CompleteMultipartUploadCommand({
+        Bucket: BUCKET,
+        Key: 'big',
+        UploadId,
+        MultipartUpload: {
+          Parts: [
+            { PartNumber: 1, ETag: r1.ETag },
+            { PartNumber: 2, ETag: r2.ETag },
+          ],
+        },
+      }),
+    );
     const head = await client.send(new HeadObjectCommand({ Bucket: BUCKET, Key: 'big' }));
     assert.equal(head.ContentLength, 5 * 1024 * 1024 + 4);
     assert.equal(head.Metadata['file-mtime'], 'm', 'multipart metadata round-trips');
@@ -134,19 +180,49 @@ describe('mock S3 — multipart', () => {
 
   test('STRICT: Complete rejects a non-last part smaller than 5 MB', async () => {
     const { UploadId } = await client.send(new CreateMultipartUploadCommand({ Bucket: BUCKET, Key: 'small' }));
-    const r1 = await client.send(new UploadPartCommand({ Bucket: BUCKET, Key: 'small', UploadId, PartNumber: 1, Body: body('tiny') }));
-    const r2 = await client.send(new UploadPartCommand({ Bucket: BUCKET, Key: 'small', UploadId, PartNumber: 2, Body: body('tail') }));
-    await assert.rejects(client.send(new CompleteMultipartUploadCommand({
-      Bucket: BUCKET, Key: 'small', UploadId,
-      MultipartUpload: { Parts: [{ PartNumber: 1, ETag: r1.ETag }, { PartNumber: 2, ETag: r2.ETag }] },
-    })));
+    const r1 = await client.send(
+      new UploadPartCommand({ Bucket: BUCKET, Key: 'small', UploadId, PartNumber: 1, Body: body('tiny') }),
+    );
+    const r2 = await client.send(
+      new UploadPartCommand({ Bucket: BUCKET, Key: 'small', UploadId, PartNumber: 2, Body: body('tail') }),
+    );
+    await assert.rejects(
+      client.send(
+        new CompleteMultipartUploadCommand({
+          Bucket: BUCKET,
+          Key: 'small',
+          UploadId,
+          MultipartUpload: {
+            Parts: [
+              { PartNumber: 1, ETag: r1.ETag },
+              { PartNumber: 2, ETag: r2.ETag },
+            ],
+          },
+        }),
+      ),
+    );
   });
 });
 
 describe('mock S3 — copy', () => {
   test('CopyObject with MetadataDirective COPY preserves source metadata', async () => {
-    await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'src/a.txt', Body: body('data'), ContentType: 'text/plain', Metadata: { 'file-mtime': 'keepme' } }));
-    await client.send(new CopyObjectCommand({ Bucket: BUCKET, CopySource: `${BUCKET}/src/a.txt`, Key: 'dst/a.txt', MetadataDirective: 'COPY' }));
+    await client.send(
+      new PutObjectCommand({
+        Bucket: BUCKET,
+        Key: 'src/a.txt',
+        Body: body('data'),
+        ContentType: 'text/plain',
+        Metadata: { 'file-mtime': 'keepme' },
+      }),
+    );
+    await client.send(
+      new CopyObjectCommand({
+        Bucket: BUCKET,
+        CopySource: `${BUCKET}/src/a.txt`,
+        Key: 'dst/a.txt',
+        MetadataDirective: 'COPY',
+      }),
+    );
     const head = await client.send(new HeadObjectCommand({ Bucket: BUCKET, Key: 'dst/a.txt' }));
     assert.equal(head.ContentType, 'text/plain');
     assert.equal(head.Metadata['file-mtime'], 'keepme');
@@ -156,7 +232,11 @@ describe('mock S3 — copy', () => {
 
   test('STRICT: rejects an illegal self-copy with MetadataDirective COPY', async () => {
     await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'self', Body: body('x') }));
-    await assert.rejects(client.send(new CopyObjectCommand({ Bucket: BUCKET, CopySource: `${BUCKET}/self`, Key: 'self', MetadataDirective: 'COPY' })));
+    await assert.rejects(
+      client.send(
+        new CopyObjectCommand({ Bucket: BUCKET, CopySource: `${BUCKET}/self`, Key: 'self', MetadataDirective: 'COPY' }),
+      ),
+    );
   });
 });
 
@@ -164,16 +244,41 @@ describe('mock S3 — ListParts pagination (BUG-007 substrate)', () => {
   test('paginates parts at the max-parts page size with IsTruncated + NextPartNumberMarker', async () => {
     const { UploadId } = await client.send(new CreateMultipartUploadCommand({ Bucket: BUCKET, Key: 'paged' }));
     // Upload 5 parts (we'll page at 2). Real S3 caps at 1000; the SDK MaxParts drives our page size.
-    for (let n = 1; n <= 5; n++) await client.send(new UploadPartCommand({ Bucket: BUCKET, Key: 'paged', UploadId, PartNumber: n, Body: body(`p${n}`) }));
+    for (let n = 1; n <= 5; n++)
+      await client.send(
+        new UploadPartCommand({ Bucket: BUCKET, Key: 'paged', UploadId, PartNumber: n, Body: body(`p${n}`) }),
+      );
     const p1 = await client.send(new ListPartsCommand({ Bucket: BUCKET, Key: 'paged', UploadId, MaxParts: 2 }));
     assert.equal(p1.IsTruncated, true);
     assert.equal((p1.Parts || []).length, 2);
     assert.equal(p1.NextPartNumberMarker, '2');
-    const p2 = await client.send(new ListPartsCommand({ Bucket: BUCKET, Key: 'paged', UploadId, MaxParts: 2, PartNumberMarker: p1.NextPartNumberMarker }));
-    assert.deepEqual((p2.Parts || []).map((p) => p.PartNumber), [3, 4]);
-    const p3 = await client.send(new ListPartsCommand({ Bucket: BUCKET, Key: 'paged', UploadId, MaxParts: 2, PartNumberMarker: p2.NextPartNumberMarker }));
+    const p2 = await client.send(
+      new ListPartsCommand({
+        Bucket: BUCKET,
+        Key: 'paged',
+        UploadId,
+        MaxParts: 2,
+        PartNumberMarker: p1.NextPartNumberMarker,
+      }),
+    );
+    assert.deepEqual(
+      (p2.Parts || []).map((p) => p.PartNumber),
+      [3, 4],
+    );
+    const p3 = await client.send(
+      new ListPartsCommand({
+        Bucket: BUCKET,
+        Key: 'paged',
+        UploadId,
+        MaxParts: 2,
+        PartNumberMarker: p2.NextPartNumberMarker,
+      }),
+    );
     assert.equal(p3.IsTruncated, false);
-    assert.deepEqual((p3.Parts || []).map((p) => p.PartNumber), [5]);
+    assert.deepEqual(
+      (p3.Parts || []).map((p) => p.PartNumber),
+      [5],
+    );
   });
 });
 
@@ -182,15 +287,25 @@ describe('mock S3 — fault injection on multipart/copy ops', () => {
     await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'src', Body: body('data') }));
     const { UploadId } = await client.send(new CreateMultipartUploadCommand({ Bucket: BUCKET, Key: 'dst' }));
     mock.configure({ faults: [{ op: 'UploadPartCopy', status: 403, code: 'AccessDenied', message: 'no' }] });
-    await assert.rejects(client.send(new (await import('@aws-sdk/client-s3')).UploadPartCopyCommand({
-      Bucket: BUCKET, Key: 'dst', UploadId, PartNumber: 1, CopySource: `${BUCKET}/src`,
-    })));
+    await assert.rejects(
+      client.send(
+        new (await import('@aws-sdk/client-s3')).UploadPartCopyCommand({
+          Bucket: BUCKET,
+          Key: 'dst',
+          UploadId,
+          PartNumber: 1,
+          CopySource: `${BUCKET}/src`,
+        }),
+      ),
+    );
     mock.configure({ faults: [] });
   });
 
   test('one-shot SlowDown (times:1) is consumed after one hit — proves retry can recover', async () => {
     // Use raw fetch (not the SDK) so the SDK's built-in retry doesn't mask the one-shot mechanic.
-    mock.configure({ faults: [{ op: 'PutObject', method: 'PUT', status: 503, code: 'SlowDown', message: 'slow', times: 1 }] });
+    mock.configure({
+      faults: [{ op: 'PutObject', method: 'PUT', status: 503, code: 'SlowDown', message: 'slow', times: 1 }],
+    });
     const r1 = await fetch(`http://127.0.0.1:${port}/${BUCKET}/retry`, { method: 'PUT', body: 'x' });
     assert.equal(r1.status, 503, 'first attempt is throttled');
     const r2 = await fetch(`http://127.0.0.1:${port}/${BUCKET}/retry`, { method: 'PUT', body: 'x' });
@@ -204,17 +319,27 @@ describe('mock S3 — fault injection on multipart/copy ops', () => {
 describe('mock S3 — CORS expose honors config (BUG-028 substrate)', () => {
   test('a narrowed exposeHeaders (no x-amz-meta-*) omits metadata from Expose-Headers', async () => {
     mock.configure({ cors: { exposeHeaders: ['ETag', 'Content-Length'] } });
-    await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'm', Body: body('x'), Metadata: { 'file-mtime': 'z' } }));
+    await client.send(
+      new PutObjectCommand({ Bucket: BUCKET, Key: 'm', Body: body('x'), Metadata: { 'file-mtime': 'z' } }),
+    );
     // Simulate a browser cross-origin HEAD: send Origin so the mock emits CORS headers.
-    const resp = await fetch(`http://127.0.0.1:${port}/${BUCKET}/m`, { method: 'HEAD', headers: { Origin: 'http://app.test' } });
+    const resp = await fetch(`http://127.0.0.1:${port}/${BUCKET}/m`, {
+      method: 'HEAD',
+      headers: { Origin: 'http://app.test' },
+    });
     const expose = (resp.headers.get('access-control-expose-headers') || '').toLowerCase();
     assert.ok(!expose.includes('x-amz-meta-file-mtime'), `metadata must be hidden under narrowed CORS, got: ${expose}`);
     mock.configure({ cors: {} }); // reset to default (exposes x-amz-meta-*)
   });
 
   test('default exposeHeaders (x-amz-meta-*) includes the metadata header', async () => {
-    await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'm2', Body: body('x'), Metadata: { 'file-mtime': 'z' } }));
-    const resp = await fetch(`http://127.0.0.1:${port}/${BUCKET}/m2`, { method: 'HEAD', headers: { Origin: 'http://app.test' } });
+    await client.send(
+      new PutObjectCommand({ Bucket: BUCKET, Key: 'm2', Body: body('x'), Metadata: { 'file-mtime': 'z' } }),
+    );
+    const resp = await fetch(`http://127.0.0.1:${port}/${BUCKET}/m2`, {
+      method: 'HEAD',
+      headers: { Origin: 'http://app.test' },
+    });
     const expose = (resp.headers.get('access-control-expose-headers') || '').toLowerCase();
     assert.ok(expose.includes('x-amz-meta-file-mtime'), `default CORS must expose metadata, got: ${expose}`);
   });
@@ -356,7 +481,10 @@ describe('mock S3 — prefix scope (scopePrefix)', () => {
   });
 
   test('PutObject outside the scope is denied', async () => {
-    await assert.rejects(client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'clients/other/f.txt', Body: body('no') })), denied);
+    await assert.rejects(
+      client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'clients/other/f.txt', Body: body('no') })),
+      denied,
+    );
   });
 
   test('GetObject/HeadObject outside the scope are denied even when the key exists', async () => {
@@ -366,8 +494,10 @@ describe('mock S3 — prefix scope (scopePrefix)', () => {
     await assert.rejects(client.send(new GetObjectCommand({ Bucket: BUCKET, Key: 'clients/other/f.txt' })), denied);
     // HEAD error responses carry no XML body (real S3 too), so the SDK can't see the
     // code — the 403 status is the only signal, which is what isPermissionError uses.
-    await assert.rejects(client.send(new HeadObjectCommand({ Bucket: BUCKET, Key: 'clients/other/f.txt' })),
-      (err) => err.$metadata.httpStatusCode === 403);
+    await assert.rejects(
+      client.send(new HeadObjectCommand({ Bucket: BUCKET, Key: 'clients/other/f.txt' })),
+      (err) => err.$metadata.httpStatusCode === 403,
+    );
   });
 
   test('CopyObject is denied when either side is outside the scope', async () => {
@@ -375,16 +505,35 @@ describe('mock S3 — prefix scope (scopePrefix)', () => {
     await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'clients/other/src.txt', Body: body('s') }));
     await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: SCOPE + 'src.txt', Body: body('s') }));
     mock.configure({ scopePrefix: SCOPE });
-    await assert.rejects(client.send(new CopyObjectCommand({
-      Bucket: BUCKET, Key: SCOPE + 'dst.txt', CopySource: `${BUCKET}/clients/other/src.txt`,
-    })), denied, 'out-of-scope source must be denied');
-    await assert.rejects(client.send(new CopyObjectCommand({
-      Bucket: BUCKET, Key: 'clients/other/dst.txt', CopySource: `${BUCKET}/${SCOPE}src.txt`,
-    })), denied, 'out-of-scope destination must be denied');
+    await assert.rejects(
+      client.send(
+        new CopyObjectCommand({
+          Bucket: BUCKET,
+          Key: SCOPE + 'dst.txt',
+          CopySource: `${BUCKET}/clients/other/src.txt`,
+        }),
+      ),
+      denied,
+      'out-of-scope source must be denied',
+    );
+    await assert.rejects(
+      client.send(
+        new CopyObjectCommand({
+          Bucket: BUCKET,
+          Key: 'clients/other/dst.txt',
+          CopySource: `${BUCKET}/${SCOPE}src.txt`,
+        }),
+      ),
+      denied,
+      'out-of-scope destination must be denied',
+    );
   });
 
   test('multipart initiate outside the scope is denied — nothing to UploadPart against', async () => {
-    await assert.rejects(client.send(new CreateMultipartUploadCommand({ Bucket: BUCKET, Key: 'clients/other/big.bin' })), denied);
+    await assert.rejects(
+      client.send(new CreateMultipartUploadCommand({ Bucket: BUCKET, Key: 'clients/other/big.bin' })),
+      denied,
+    );
     const ok = await client.send(new CreateMultipartUploadCommand({ Bucket: BUCKET, Key: SCOPE + 'big.bin' }));
     assert.ok(ok.UploadId, 'in-scope initiate still works');
   });
@@ -394,12 +543,18 @@ describe('mock S3 — prefix scope (scopePrefix)', () => {
     await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: SCOPE + 'a.txt', Body: body('a') }));
     await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'clients/other/b.txt', Body: body('b') }));
     mock.configure({ scopePrefix: SCOPE });
-    const resp = await client.send(new DeleteObjectsCommand({
-      Bucket: BUCKET, Delete: { Objects: [{ Key: SCOPE + 'a.txt' }, { Key: 'clients/other/b.txt' }] },
-    }));
-    assert.ok((resp.Errors || []).some(e => e.Key === 'clients/other/b.txt' && e.Code === 'AccessDenied'));
+    const resp = await client.send(
+      new DeleteObjectsCommand({
+        Bucket: BUCKET,
+        Delete: { Objects: [{ Key: SCOPE + 'a.txt' }, { Key: 'clients/other/b.txt' }] },
+      }),
+    );
+    assert.ok((resp.Errors || []).some((e) => e.Key === 'clients/other/b.txt' && e.Code === 'AccessDenied'));
     mock.configure({ scopePrefix: null });
-    await assert.rejects(client.send(new HeadObjectCommand({ Bucket: BUCKET, Key: SCOPE + 'a.txt' })), 'a must be gone');
+    await assert.rejects(
+      client.send(new HeadObjectCommand({ Bucket: BUCKET, Key: SCOPE + 'a.txt' })),
+      'a must be gone',
+    );
     await client.send(new HeadObjectCommand({ Bucket: BUCKET, Key: 'clients/other/b.txt' })); // still there
   });
 
@@ -416,7 +571,7 @@ describe('mock S3 — prefix scope (scopePrefix)', () => {
   test('requestLog records list requests with their prefix', async () => {
     mock.requestLog.reset();
     await client.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: SCOPE, Delimiter: '/' }));
-    const lists = mock.requestLog.list().filter(r => r.isList);
+    const lists = mock.requestLog.list().filter((r) => r.isList);
     assert.equal(lists.length, 1);
     assert.equal(lists[0].listPrefix, SCOPE);
   });
@@ -429,10 +584,10 @@ describe('mock S3 — fault injection for transfers', () => {
     await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'k', Body: body('0123456789') }));
     mock.configure({ faults: [{ op: 'GetObject', killAtByte: 4 }] });
 
-    await assert.rejects(
-      async () => { const r = await fetch(url('k')); await r.arrayBuffer(); },
-      'a body truncated by a dropped connection must reject, not resolve short',
-    );
+    await assert.rejects(async () => {
+      const r = await fetch(url('k'));
+      await r.arrayBuffer();
+    }, 'a body truncated by a dropped connection must reject, not resolve short');
   });
 
   test('injects 503 SlowDown, which a retry policy must treat as retryable', async () => {

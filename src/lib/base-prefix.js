@@ -31,5 +31,5 @@ export function withinFloor(prefix, floor) {
 // guaranteed-descendant source (URL hash, history state, breadcrumb) routes
 // through here before becoming navigation state.
 export function clampToFloor(prefix, floor) {
-  return withinFloor(prefix, floor) ? (prefix || '') : floor;
+  return withinFloor(prefix, floor) ? prefix || '' : floor;
 }

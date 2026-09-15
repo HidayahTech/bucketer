@@ -42,9 +42,7 @@ export function PreviewMedia({ kind, url, text, truncated, alt, pixelated, onLoa
     return (
       <div class="preview-text-wrap">
         <pre class="preview-text">{text}</pre>
-        {truncated && (
-          <div class="preview-truncated">Preview limited to 100 KB — download for the full file.</div>
-        )}
+        {truncated && <div class="preview-truncated">Preview limited to 100 KB — download for the full file.</div>}
       </div>
     );
   }

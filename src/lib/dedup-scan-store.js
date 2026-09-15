@@ -28,7 +28,7 @@ export async function saveScanResult(record) {
       const tx = db.transaction(DEDUP_STORE, 'readwrite');
       tx.objectStore(DEDUP_STORE).put(record, scanKey(record.endpoint, record.bucket));
       tx.oncomplete = () => resolve(true);
-      tx.onerror    = () => resolve(false);
+      tx.onerror = () => resolve(false);
     });
   } catch {
     return false;
@@ -41,10 +41,10 @@ export async function loadScanResult(endpoint, bucket) {
   try {
     const db = await openDB();
     return await new Promise((resolve) => {
-      const tx  = db.transaction(DEDUP_STORE, 'readonly');
+      const tx = db.transaction(DEDUP_STORE, 'readonly');
       const req = tx.objectStore(DEDUP_STORE).get(scanKey(endpoint, bucket));
       req.onsuccess = () => resolve(req.result ?? null);
-      req.onerror   = () => resolve(null);
+      req.onerror = () => resolve(null);
     });
   } catch {
     return null;
@@ -60,7 +60,7 @@ export async function deleteScanResult(endpoint, bucket) {
       const tx = db.transaction(DEDUP_STORE, 'readwrite');
       tx.objectStore(DEDUP_STORE).delete(scanKey(endpoint, bucket));
       tx.oncomplete = () => resolve(true);
-      tx.onerror    = () => resolve(false);
+      tx.onerror = () => resolve(false);
     });
   } catch {
     return false;

@@ -50,13 +50,25 @@ const CREDENTIALS_VERSION = 1;
 const CONNECTIONS_VERSION = 2;
 
 function safeGetRaw(key) {
-  try { return localStorage.getItem(key); } catch { return null; }
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
 }
 function safeSetRaw(key, value) {
-  try { localStorage.setItem(key, value); } catch { /* private mode — in-memory state continues */ }
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* private mode — in-memory state continues */
+  }
 }
 function safeRemoveRaw(key) {
-  try { localStorage.removeItem(key); } catch { /* */ }
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    /* */
+  }
 }
 
 // Monotonic id generator. Deliberately NOT crypto.randomUUID(): that requires a
@@ -123,7 +135,7 @@ export function saveCredentialRecord(cred) {
   // eslint-disable-next-line no-unused-vars
   const { secretKey: _dropped, ...safeCred } = cred;
   const data = loadCredentialRecords();
-  const idx = data.credentials.findIndex(c => c.id === safeCred.id);
+  const idx = data.credentials.findIndex((c) => c.id === safeCred.id);
   if (idx >= 0) data.credentials[idx] = { ...data.credentials[idx], ...safeCred };
   else data.credentials.push({ ...safeCred });
   saveCredentialData(data);
@@ -137,9 +149,9 @@ export function saveCredentialRecord(cred) {
 // credential's ciphertext must survive a refused deletion.
 export function deleteCredentialRecord(id) {
   const { connections } = loadConnectionRecords();
-  if (connections.some(c => c.credentialId === id)) return false;
+  if (connections.some((c) => c.credentialId === id)) return false;
   const data = loadCredentialRecords();
-  data.credentials = data.credentials.filter(c => c.id !== id);
+  data.credentials = data.credentials.filter((c) => c.id !== id);
   saveCredentialData(data);
   deleteVaultEntry(id);
   return true;
@@ -150,11 +162,9 @@ export function saveConnectionRecord(conn) {
   const { secretKey: _dropped, ...incoming } = conn;
   // Filter out undefined values: they would override stored values via spread, but
   // callers pass partial objects where an absent key means "leave it alone".
-  const safeConn = Object.fromEntries(
-    Object.entries(incoming).filter(([, v]) => v !== undefined)
-  );
+  const safeConn = Object.fromEntries(Object.entries(incoming).filter(([, v]) => v !== undefined));
   const data = loadConnectionRecords();
-  const idx = data.connections.findIndex(c => c.id === safeConn.id);
+  const idx = data.connections.findIndex((c) => c.id === safeConn.id);
   const previousCredentialId = idx >= 0 ? data.connections[idx].credentialId : null;
   if (idx >= 0) data.connections[idx] = { ...data.connections[idx], ...safeConn };
   else data.connections.push({ ...safeConn });
@@ -176,10 +186,12 @@ export function saveConnectionRecord(conn) {
   // feature (e.g. omitting capabilities to leave it untouched). An absent key means
   // "leave it alone", not "it changed to undefined". Explicit undefined would orphan
   // the connection, so we must guard against that case.
-  if (previousCredentialId !== null
-      && 'credentialId' in safeConn
-      && safeConn.credentialId !== undefined
-      && previousCredentialId !== safeConn.credentialId) {
+  if (
+    previousCredentialId !== null &&
+    'credentialId' in safeConn &&
+    safeConn.credentialId !== undefined &&
+    previousCredentialId !== safeConn.credentialId
+  ) {
     deleteCredentialRecord(previousCredentialId);
   }
 }
@@ -192,8 +204,8 @@ export function saveConnectionRecord(conn) {
 // shared-credential case, so no extra guard is needed here.
 export function deleteConnectionRecord(id) {
   const data = loadConnectionRecords();
-  const conn = data.connections.find(c => c.id === id);
-  data.connections = data.connections.filter(c => c.id !== id);
+  const conn = data.connections.find((c) => c.id === id);
+  data.connections = data.connections.filter((c) => c.id !== id);
   saveConnectionData(data);
   if (conn) deleteCredentialRecord(conn.credentialId);
 }
@@ -204,7 +216,7 @@ export function deleteConnectionRecord(id) {
 // forgotten here — leaving a marker behind after a wipe would permanently disable
 // migration for that user.
 export function deleteAllConnectionData() {
-  CONNECTION_STORAGE_KEYS.forEach(k => safeRemoveRaw(k));
+  CONNECTION_STORAGE_KEYS.forEach((k) => safeRemoveRaw(k));
 }
 
 export const CONNECTION_STORAGE_KEYS = [LS_KEY_CREDENTIALS, LS_KEY_CONNECTIONS, LS_KEY_MIGRATED];
@@ -230,13 +242,13 @@ const LABEL_KEY_ID_MAX = 6;
 export function defaultCredentialLabel({ provider, keyId }) {
   const id = keyId || '';
   const shortId = id.length > LABEL_KEY_ID_MAX ? `${id.slice(0, LABEL_KEY_ID_MAX)}…` : id;
-  const label = provider ? (PROVIDER_LABELS[provider] || provider.toUpperCase()) : null;
+  const label = provider ? PROVIDER_LABELS[provider] || provider.toUpperCase() : null;
   return label ? `${label} — ${shortId}` : shortId;
 }
 
 export function defaultConnectionName({ provider, bucket }) {
-  const label = provider ? (PROVIDER_LABELS[provider] || provider.toUpperCase()) : null;
-  return label && bucket ? `${label} — ${bucket}` : (bucket || '');
+  const label = provider ? PROVIDER_LABELS[provider] || provider.toUpperCase() : null;
+  return label && bucket ? `${label} — ${bucket}` : bucket || '';
 }
 
 // Returns the existing credential matching these fields, or creates and persists
@@ -244,15 +256,15 @@ export function defaultConnectionName({ provider, bucket }) {
 export function findOrCreateCredential({ endpoint, keyId, provider, regionOverride, label }) {
   const fingerprint = credentialFingerprint({ endpoint, keyId, provider, regionOverride });
   const { credentials } = loadCredentialRecords();
-  const existing = credentials.find(c => credentialFingerprint(c) === fingerprint);
+  const existing = credentials.find((c) => credentialFingerprint(c) === fingerprint);
   if (existing) return existing;
 
   const cred = {
-    id:             newId('cred'),
-    label:          label || defaultCredentialLabel({ provider, keyId }),
-    endpoint:       (endpoint || '').trim().replace(/\/$/, ''),
-    keyId:          keyId || '',
-    provider:       provider || null,
+    id: newId('cred'),
+    label: label || defaultCredentialLabel({ provider, keyId }),
+    endpoint: (endpoint || '').trim().replace(/\/$/, ''),
+    keyId: keyId || '',
+    provider: provider || null,
     regionOverride: (regionOverride || '').trim(),
   };
   saveCredentialRecord(cred);
@@ -268,30 +280,28 @@ export function findOrCreateCredential({ endpoint, keyId, provider, regionOverri
 // treated as "not there" rather than surfaced as a half-built object.
 export function resolveConnection(id) {
   const { connections } = loadConnectionRecords();
-  const conn = connections.find(c => c.id === id);
+  const conn = connections.find((c) => c.id === id);
   if (!conn) return null;
   const { credentials } = loadCredentialRecords();
-  const cred = credentials.find(c => c.id === conn.credentialId);
+  const cred = credentials.find((c) => c.id === conn.credentialId);
   if (!cred) return null;
   return {
-    id:             conn.id,
-    name:           conn.name,
-    bucket:         conn.bucket,
-    basePrefix:     conn.basePrefix || '',
-    capabilities:   conn.capabilities || null,
-    credentialId:   cred.id,
-    endpoint:       cred.endpoint,
-    keyId:          cred.keyId,
-    provider:       cred.provider,
+    id: conn.id,
+    name: conn.name,
+    bucket: conn.bucket,
+    basePrefix: conn.basePrefix || '',
+    capabilities: conn.capabilities || null,
+    credentialId: cred.id,
+    endpoint: cred.endpoint,
+    keyId: cred.keyId,
+    provider: cred.provider,
     regionOverride: cred.regionOverride,
   };
 }
 
 export function listResolvedConnections() {
   const { connections } = loadConnectionRecords();
-  return connections
-    .map(c => resolveConnection(c.id))
-    .filter(Boolean);
+  return connections.map((c) => resolveConnection(c.id)).filter(Boolean);
 }
 
 const LS_KEY_PROFILES = 's3b_profiles';
@@ -365,17 +375,17 @@ export function migrateProfilesToConnections() {
       if (!profile || !profile.bucket) continue;
 
       const cred = findOrCreateCredential({
-        endpoint:       profile.endpoint,
-        keyId:          profile.keyId,
-        provider:       profile.provider,
+        endpoint: profile.endpoint,
+        keyId: profile.keyId,
+        provider: profile.provider,
         regionOverride: profile.regionOverride,
       });
 
       saveConnectionRecord({
-        id:           profile.id,
-        name:         profile.name || defaultConnectionName({ provider: profile.provider, bucket: profile.bucket }),
+        id: profile.id,
+        name: profile.name || defaultConnectionName({ provider: profile.provider, bucket: profile.bucket }),
         credentialId: cred.id,
-        bucket:       profile.bucket,
+        bucket: profile.bucket,
         capabilities: null,
       });
     } catch {
@@ -407,7 +417,7 @@ export function defaultCapabilities() {
 
 function isValidCapabilities(caps) {
   if (!caps || typeof caps !== 'object') return false;
-  return CAPABILITY_OPS.every(op => typeof caps[op] === 'string');
+  return CAPABILITY_OPS.every((op) => typeof caps[op] === 'string');
 }
 
 // Capabilities live on the connection record rather than in one global key, so
@@ -418,14 +428,14 @@ function isValidCapabilities(caps) {
 // holds their capabilities in memory for the session only.
 export function loadConnectionCapabilities(id) {
   const { connections } = loadConnectionRecords();
-  const conn = connections.find(c => c.id === id);
+  const conn = connections.find((c) => c.id === id);
   if (!conn || !isValidCapabilities(conn.capabilities)) return defaultCapabilities();
   return { ...defaultCapabilities(), ...conn.capabilities };
 }
 
 export function saveConnectionCapabilities(id, caps) {
   const data = loadConnectionRecords();
-  const idx = data.connections.findIndex(c => c.id === id);
+  const idx = data.connections.findIndex((c) => c.id === id);
   if (idx < 0) return; // ad-hoc connection — nothing to persist against
   data.connections[idx] = { ...data.connections[idx], capabilities: { ...caps } };
   saveConnectionData(data);
@@ -434,7 +444,7 @@ export function saveConnectionCapabilities(id, caps) {
 export function clearAllConnectionCapabilities() {
   const data = loadConnectionRecords();
   if (!data.connections.length) return;
-  data.connections = data.connections.map(c => ({ ...c, capabilities: null }));
+  data.connections = data.connections.map((c) => ({ ...c, capabilities: null }));
   saveConnectionData(data);
 }
 

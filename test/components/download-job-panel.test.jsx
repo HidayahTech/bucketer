@@ -26,7 +26,9 @@ const NOOP = () => {};
 
 // A classified job row, as api.listJobs returns them.
 const classified = (over = {}) => ({
-  id: 'old', prefix: 'videos/', bucket: 'bkt',
+  id: 'old',
+  prefix: 'videos/',
+  bucket: 'bkt',
   counters: { total: 412, bytesTotal: 900, sendable: 412, bytesSendable: 900 },
   counts: { pending: 100, failed: 72, issued: 240, done: 0 },
   jobClass: JOB_CLASS.UNFINISHED,
@@ -47,23 +49,47 @@ function fakeApi(over = {}) {
   };
 }
 
-const flush = () => new Promise(r => setTimeout(r, 0));
+const flush = () => new Promise((r) => setTimeout(r, 0));
 
 describe('DownloadJobPanel', () => {
   test('names the folder it is about to download', () => {
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: 'videos/' }} api={fakeApi()} onStart={NOOP} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: 'videos/' }}
+        api={fakeApi()}
+        onStart={NOOP}
+        onClose={NOOP}
+      />,
+    );
     assert.equal(m.text().includes('videos/'), true);
     m.cleanup();
   });
 
   test('HONESTY: says up front that it cannot show transfer progress', () => {
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={fakeApi()} onStart={NOOP} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: '' }}
+        api={fakeApi()}
+        onStart={NOOP}
+        onClose={NOOP}
+      />,
+    );
     assert.ok(/can(not|'t) (see|show)/i.test(m.text()));
     m.cleanup();
   });
 
   test('HONESTY: warns that files arrive flat, not as folders', () => {
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={fakeApi()} onStart={NOOP} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: '' }}
+        api={fakeApi()}
+        onStart={NOOP}
+        onClose={NOOP}
+      />,
+    );
     assert.ok(/folder/i.test(m.text()));
     assert.notEqual(m.query('[data-testid="mode-flatten"]'), null);
     assert.notEqual(m.query('[data-testid="mode-leaf"]'), null);
@@ -71,7 +97,15 @@ describe('DownloadJobPanel', () => {
   });
 
   test('lists the folder and reports what it found', async () => {
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={fakeApi()} onStart={NOOP} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: '' }}
+        api={fakeApi()}
+        onStart={NOOP}
+        onClose={NOOP}
+      />,
+    );
     fire(m.query('[data-testid="scan"]'), 'click');
     await flush();
 
@@ -82,7 +116,15 @@ describe('DownloadJobPanel', () => {
   });
 
   test('puts the real numbers on the confirm button', async () => {
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={fakeApi()} onStart={NOOP} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: '' }}
+        api={fakeApi()}
+        onStart={NOOP}
+        onClose={NOOP}
+      />,
+    );
     fire(m.query('[data-testid="scan"]'), 'click');
     await flush();
 
@@ -93,7 +135,15 @@ describe('DownloadJobPanel', () => {
   });
 
   test('mentions egress cost before a large transfer', async () => {
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={fakeApi()} onStart={NOOP} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: '' }}
+        api={fakeApi()}
+        onStart={NOOP}
+        onClose={NOOP}
+      />,
+    );
     fire(m.query('[data-testid="scan"]'), 'click');
     await flush();
     assert.ok(/egress|bill|cost/i.test(m.text()));
@@ -102,8 +152,15 @@ describe('DownloadJobPanel', () => {
 
   test('passes the chosen naming mode through', async () => {
     let started;
-    const api = fakeApi({ startJob: async ({ mode }) => { started = mode; return { id: 'j', mode }; } });
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />);
+    const api = fakeApi({
+      startJob: async ({ mode }) => {
+        started = mode;
+        return { id: 'j', mode };
+      },
+    });
+    const m = mount(
+      <DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />,
+    );
 
     fire(m.query('[data-testid="mode-flatten"]'), 'click');
     fire(m.query('[data-testid="scan"]'), 'click');
@@ -115,7 +172,17 @@ describe('DownloadJobPanel', () => {
 
   test('hands the job to onStart when confirmed', async () => {
     let handed = null;
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={fakeApi()} onStart={j => { handed = j; }} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: '' }}
+        api={fakeApi()}
+        onStart={(j) => {
+          handed = j;
+        }}
+        onClose={NOOP}
+      />,
+    );
     fire(m.query('[data-testid="scan"]'), 'click');
     await flush();
     fire(m.query('[data-testid="start"]'), 'click');
@@ -127,8 +194,14 @@ describe('DownloadJobPanel', () => {
 
   test('discards the job if the user backs out after listing', async () => {
     let discarded = null;
-    const api = fakeApi({ discard: async (id) => { discarded = id; } });
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />);
+    const api = fakeApi({
+      discard: async (id) => {
+        discarded = id;
+      },
+    });
+    const m = mount(
+      <DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />,
+    );
     fire(m.query('[data-testid="scan"]'), 'click');
     await flush();
     fire(m.query('[data-testid="panel-close"]'), 'click');
@@ -139,8 +212,14 @@ describe('DownloadJobPanel', () => {
   });
 
   test('reports an enumeration failure instead of pretending it worked', async () => {
-    const api = fakeApi({ enumerate: async () => { throw new Error('AccessDenied'); } });
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />);
+    const api = fakeApi({
+      enumerate: async () => {
+        throw new Error('AccessDenied');
+      },
+    });
+    const m = mount(
+      <DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />,
+    );
     fire(m.query('[data-testid="scan"]'), 'click');
     await flush();
 
@@ -152,8 +231,16 @@ describe('DownloadJobPanel', () => {
   test('offers the transfer-tool route as a sibling, not a fallback', () => {
     let asked = false;
     const m = mount(
-      <DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={fakeApi()} onStart={NOOP} onClose={NOOP}
-        onUseTransferTool={() => { asked = true; }} />,
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: '' }}
+        api={fakeApi()}
+        onStart={NOOP}
+        onClose={NOOP}
+        onUseTransferTool={() => {
+          asked = true;
+        }}
+      />,
     );
     fire(m.query('[data-testid="use-transfer-tool"]'), 'click');
     assert.equal(asked, true);
@@ -164,9 +251,18 @@ describe('DownloadJobPanel', () => {
   // because the Stage 1 command generator is prefix-scoped (spec decision 3).
   test('selection scope shows its label and hides the transfer-tool link', async () => {
     const m = mount(
-      <DownloadJobPanel bucket="bkt"
-        scope={{ kind: 'selection', roots: [{ type: 'file', key: 'a.txt', size: 1, etag: '"a"', lastModified: null, storageClass: null }], label: '1 selected item in bkt' }}
-        api={fakeApi()} onStart={NOOP} onClose={NOOP} onUseTransferTool={NOOP} />,
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{
+          kind: 'selection',
+          roots: [{ type: 'file', key: 'a.txt', size: 1, etag: '"a"', lastModified: null, storageClass: null }],
+          label: '1 selected item in bkt',
+        }}
+        api={fakeApi()}
+        onStart={NOOP}
+        onClose={NOOP}
+        onUseTransferTool={NOOP}
+      />,
     );
     await flush();
     assert.ok(m.text().includes('1 selected item in bkt'));
@@ -176,8 +272,14 @@ describe('DownloadJobPanel', () => {
 
   test('folder scope still offers the transfer-tool link', async () => {
     const m = mount(
-      <DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: 'p/' }}
-        api={fakeApi()} onStart={NOOP} onClose={NOOP} onUseTransferTool={NOOP} />,
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: 'p/' }}
+        api={fakeApi()}
+        onStart={NOOP}
+        onClose={NOOP}
+        onUseTransferTool={NOOP}
+      />,
     );
     await flush();
     assert.ok(m.query('[data-testid="use-transfer-tool"]'));
@@ -186,11 +288,21 @@ describe('DownloadJobPanel', () => {
 
   test('scan() passes the scope roots and label to startJob', async () => {
     let started = null;
-    const api = fakeApi({ startJob: async (args) => { started = args; return { id: 'j1' }; } });
+    const api = fakeApi({
+      startJob: async (args) => {
+        started = args;
+        return { id: 'j1' };
+      },
+    });
     const roots = [{ type: 'file', key: 'a.txt', size: 1, etag: '"a"', lastModified: null, storageClass: null }];
     const m = mount(
-      <DownloadJobPanel bucket="bkt" scope={{ kind: 'selection', roots, label: '1 selected item in bkt' }}
-        api={api} onStart={NOOP} onClose={NOOP} />,
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'selection', roots, label: '1 selected item in bkt' }}
+        api={api}
+        onStart={NOOP}
+        onClose={NOOP}
+      />,
     );
     await flush();
     fire(m.query('[data-testid="scan"]'), 'click');
@@ -205,7 +317,9 @@ describe('DownloadJobPanel', () => {
   // later session. The panel is the download entry point, so it is where they surface.
   test('surfaces an unfinished job from a previous session', async () => {
     const api = fakeApi({ listJobs: async () => [classified()] });
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />,
+    );
     await flush();
 
     const body = m.text();
@@ -218,7 +332,17 @@ describe('DownloadJobPanel', () => {
   test('resuming hands the existing job straight to onStart', async () => {
     let handed = null;
     const api = fakeApi({ listJobs: async () => [classified()] });
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={j => { handed = j; }} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: '' }}
+        api={api}
+        onStart={(j) => {
+          handed = j;
+        }}
+        onClose={NOOP}
+      />,
+    );
     await flush();
 
     fire(m.query('[data-testid="resume-old"]'), 'click');
@@ -230,9 +354,13 @@ describe('DownloadJobPanel', () => {
     let discarded = null;
     const api = fakeApi({
       listJobs: async () => [classified()],
-      discard: async (id) => { discarded = id; },
+      discard: async (id) => {
+        discarded = id;
+      },
     });
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />,
+    );
     await flush();
 
     fire(m.query('[data-testid="discard-old"]'), 'click');
@@ -244,12 +372,15 @@ describe('DownloadJobPanel', () => {
   // Postmortem F6 regression: a paused job with both failures and issued files is ONE
   // row (unfinished, since work remains), never two rows with two Discards.
   test('a job with failures and issued files renders exactly one row', async () => {
-    const api = fakeApi({ listJobs: async () => [classified({ counts: { pending: 0, failed: 2, issued: 6, done: 0 } })] });
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />);
+    const api = fakeApi({
+      listJobs: async () => [classified({ counts: { pending: 0, failed: 2, issued: 6, done: 0 } })],
+    });
+    const m = mount(
+      <DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />,
+    );
     await flush();
 
-    assert.equal(m.queryAll('[data-testid="discard-old"]').length, 1,
-      'one job, one row, one Discard');
+    assert.equal(m.queryAll('[data-testid="discard-old"]').length, 1, 'one job, one row, one Discard');
     assert.notEqual(m.query('[data-testid="resume-old"]'), null, 'work remains, so it resumes');
     assert.ok(m.text().includes('6 already sent'), 'the sent portion is disclosed on the same row');
     m.cleanup();
@@ -259,15 +390,31 @@ describe('DownloadJobPanel', () => {
   // mobile warning exists because backgrounding and page-memory limits are the real ceiling
   // on a phone and neither is something the app can detect or work around.
   test('names the mechanism this download will use', () => {
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={fakeApi()} onStart={NOOP}
-      onClose={NOOP} capabilities={DESKTOP} />);
+    const m = mount(
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: '' }}
+        api={fakeApi()}
+        onStart={NOOP}
+        onClose={NOOP}
+        capabilities={DESKTOP}
+      />,
+    );
     assert.notEqual(m.query('[data-testid="tier-notice"]'), null);
     m.cleanup();
   });
 
   test('warns on a phone, where the real limits are not detectable', () => {
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={fakeApi()} onStart={NOOP}
-      onClose={NOOP} capabilities={MOBILE} />);
+    const m = mount(
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: '' }}
+        api={fakeApi()}
+        onStart={NOOP}
+        onClose={NOOP}
+        capabilities={MOBILE}
+      />,
+    );
     const warn = m.query('[data-testid="mobile-warning"]');
     assert.notEqual(warn, null);
     assert.ok(/switch apps|background/i.test(warn.textContent));
@@ -275,8 +422,16 @@ describe('DownloadJobPanel', () => {
   });
 
   test('does not warn about phones on a desktop browser', () => {
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={fakeApi()} onStart={NOOP}
-      onClose={NOOP} capabilities={DESKTOP} />);
+    const m = mount(
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: '' }}
+        api={fakeApi()}
+        onStart={NOOP}
+        onClose={NOOP}
+        capabilities={DESKTOP}
+      />,
+    );
     assert.equal(m.query('[data-testid="mobile-warning"]'), null);
     m.cleanup();
   });
@@ -285,15 +440,31 @@ describe('DownloadJobPanel', () => {
   // progress bar the app cannot back up.
   test('HONESTY: does not promise folder delivery it cannot perform', () => {
     const capable = { ...DESKTOP, directoryPicker: true, writableFiles: true };
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={fakeApi()} onStart={NOOP}
-      onClose={NOOP} capabilities={capable} />);
+    const m = mount(
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: '' }}
+        api={fakeApi()}
+        onStart={NOOP}
+        onClose={NOOP}
+        capabilities={capable}
+      />,
+    );
     const body = m.text();
     assert.ok(/flat/i.test(body), 'must still say files arrive flat');
     m.cleanup();
   });
 
   test('works when no capabilities are supplied', () => {
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={fakeApi()} onStart={NOOP} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: '' }}
+        api={fakeApi()}
+        onStart={NOOP}
+        onClose={NOOP}
+      />,
+    );
     assert.notEqual(m.query('[data-testid="scan"]'), null);
     m.cleanup();
   });
@@ -302,8 +473,10 @@ describe('DownloadJobPanel', () => {
   // exit is closing the panel, which previously discarded the job out from under a crawl
   // that was still writing to it.
   test('offers a way to stop a long listing', async () => {
-    const api = fakeApi({ enumerate: () => new Promise(() => {}) });   // never settles
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />);
+    const api = fakeApi({ enumerate: () => new Promise(() => {}) }); // never settles
+    const m = mount(
+      <DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />,
+    );
     fire(m.query('[data-testid="scan"]'), 'click');
     await flush();
     assert.notEqual(m.query('[data-testid="cancel-scan"]'), null);
@@ -317,19 +490,26 @@ describe('DownloadJobPanel', () => {
       enumerate: async (_job, { shouldCancel }) => {
         // Stand in for a crawl that checks between pages.
         for (let i = 0; i < 100; i++) {
-          if (shouldCancel?.()) { cancelSeen = true; return { objects: 5, bytes: 5, cancelled: true, done: false }; }
-          await new Promise(r => setTimeout(r, 1));
+          if (shouldCancel?.()) {
+            cancelSeen = true;
+            return { objects: 5, bytes: 5, cancelled: true, done: false };
+          }
+          await new Promise((r) => setTimeout(r, 1));
         }
         return { objects: 5, bytes: 5, cancelled: false, done: true };
       },
-      discard: async (id) => { discarded = id; },
+      discard: async (id) => {
+        discarded = id;
+      },
     });
 
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />,
+    );
     fire(m.query('[data-testid="scan"]'), 'click');
     await flush();
     fire(m.query('[data-testid="cancel-scan"]'), 'click');
-    await new Promise(r => setTimeout(r, 60));
+    await new Promise((r) => setTimeout(r, 60));
 
     assert.equal(cancelSeen, true, 'the crawl must be told to stop');
     assert.equal(discarded, 'job-1', 'a half-enumerated job is not worth keeping');
@@ -343,22 +523,28 @@ describe('DownloadJobPanel', () => {
     const api = fakeApi({
       enumerate: async (_job, { shouldCancel }) => {
         for (let i = 0; i < 100; i++) {
-          if (shouldCancel?.()) { order.push('crawl-stopped'); return { objects: 1, bytes: 1, cancelled: true, done: false }; }
-          await new Promise(r => setTimeout(r, 1));
+          if (shouldCancel?.()) {
+            order.push('crawl-stopped');
+            return { objects: 1, bytes: 1, cancelled: true, done: false };
+          }
+          await new Promise((r) => setTimeout(r, 1));
         }
         return { objects: 1, bytes: 1, cancelled: false, done: true };
       },
-      discard: async () => { order.push('discard'); },
+      discard: async () => {
+        order.push('discard');
+      },
     });
 
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />,
+    );
     fire(m.query('[data-testid="scan"]'), 'click');
     await flush();
     fire(m.query('[data-testid="panel-close"]'), 'click');
-    await new Promise(r => setTimeout(r, 60));
+    await new Promise((r) => setTimeout(r, 60));
 
-    assert.deepEqual(order, ['crawl-stopped', 'discard'],
-      'the crawl must stop before its job is deleted, not after');
+    assert.deepEqual(order, ['crawl-stopped', 'discard'], 'the crawl must stop before its job is deleted, not after');
     m.cleanup();
   });
 
@@ -369,7 +555,9 @@ describe('DownloadJobPanel', () => {
         return { objects: 0, bytes: 0, done: true, cancelled: false };
       },
     });
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />,
+    );
     fire(m.query('[data-testid="scan"]'), 'click');
     await flush();
 
@@ -385,14 +573,28 @@ describe('DownloadJobPanel', () => {
 // the count (catalog defects 17/19: the count once shrank while the bytes did not).
 describe('DownloadJobPanel — archived objects', () => {
   const GB = 1024 ** 3;
-  const withArchived = (archived, archivedBytes = archived * GB) => fakeApi({
-    enumerate: async () => ({
-      objects: 412, bytes: 840 * GB, archived, archivedBytes, done: true, cancelled: false,
-    }),
-  });
+  const withArchived = (archived, archivedBytes = archived * GB) =>
+    fakeApi({
+      enumerate: async () => ({
+        objects: 412,
+        bytes: 840 * GB,
+        archived,
+        archivedBytes,
+        done: true,
+        cancelled: false,
+      }),
+    });
 
   test('warns when some objects are archived, naming the count and size', async () => {
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: 'v/' }} api={withArchived(12)} onStart={NOOP} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: 'v/' }}
+        api={withArchived(12)}
+        onStart={NOOP}
+        onClose={NOOP}
+      />,
+    );
     fire(m.query('[data-testid="scan"]'), 'click');
     await flush();
 
@@ -403,7 +605,15 @@ describe('DownloadJobPanel — archived objects', () => {
   });
 
   test('the offer counts and sizes only what can actually be sent', async () => {
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: 'v/' }} api={withArchived(12)} onStart={NOOP} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: 'v/' }}
+        api={withArchived(12)}
+        onStart={NOOP}
+        onClose={NOOP}
+      />,
+    );
     fire(m.query('[data-testid="scan"]'), 'click');
     await flush();
 
@@ -414,7 +624,15 @@ describe('DownloadJobPanel — archived objects', () => {
   });
 
   test('says nothing about archiving when nothing is archived', async () => {
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: 'v/' }} api={withArchived(0, 0)} onStart={NOOP} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: 'v/' }}
+        api={withArchived(0, 0)}
+        onStart={NOOP}
+        onClose={NOOP}
+      />,
+    );
     fire(m.query('[data-testid="scan"]'), 'click');
     await flush();
 
@@ -424,7 +642,15 @@ describe('DownloadJobPanel — archived objects', () => {
   });
 
   test('does not offer to start when every object is archived', async () => {
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: 'v/' }} api={withArchived(412, 840 * GB)} onStart={NOOP} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: 'v/' }}
+        api={withArchived(412, 840 * GB)}
+        onStart={NOOP}
+        onClose={NOOP}
+      />,
+    );
     fire(m.query('[data-testid="scan"]'), 'click');
     await flush();
 
@@ -438,28 +664,50 @@ describe('DownloadJobPanel — archived objects', () => {
 // capability-gated. (Postmortem F3 / catalog 18: a job invisible to every list had no
 // Discard, so its manifest was permanent — on Firefox and Safari even a clean one.)
 describe('DownloadJobPanel — sent and settled jobs', () => {
-  const sentJob = (over = {}) => classified({
-    id: 'job-9', prefix: 'videos/', jobClass: JOB_CLASS.SENT,
-    counts: { pending: 0, failed: 0, issued: 412, done: 0 }, ...over,
-  });
+  const sentJob = (over = {}) =>
+    classified({
+      id: 'job-9',
+      prefix: 'videos/',
+      jobClass: JOB_CLASS.SENT,
+      counts: { pending: 0, failed: 0, issued: 412, done: 0 },
+      ...over,
+    });
 
   test('a sent job renders with Discard even without a directory picker', async () => {
     const api = fakeApi({ listJobs: async () => [sentJob()] });
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: 'v/' }} api={api} capabilities={DESKTOP}
-      onStart={NOOP} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: 'v/' }}
+        api={api}
+        capabilities={DESKTOP}
+        onStart={NOOP}
+        onClose={NOOP}
+      />,
+    );
     await flush();
 
-    assert.notEqual(m.query('[data-testid="discard-job-9"]'), null,
-      'no browser may strand a manifest without a Discard');
-    assert.equal(m.query('[data-testid="verify-job-9"]'), null,
-      'the check action needs the picker; the row does not');
+    assert.notEqual(
+      m.query('[data-testid="discard-job-9"]'),
+      null,
+      'no browser may strand a manifest without a Discard',
+    );
+    assert.equal(m.query('[data-testid="verify-job-9"]'), null, 'the check action needs the picker; the row does not');
     m.cleanup();
   });
 
   test('a sent job offers the folder check when the picker exists', async () => {
     const api = fakeApi({ listJobs: async () => [sentJob()] });
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: 'v/' }} api={api} capabilities={CAN_PICK}
-      onStart={NOOP} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: 'v/' }}
+        api={api}
+        capabilities={CAN_PICK}
+        onStart={NOOP}
+        onClose={NOOP}
+      />,
+    );
     await flush();
 
     assert.notEqual(m.query('[data-testid="verify-job-9"]'), null);
@@ -468,11 +716,24 @@ describe('DownloadJobPanel — sent and settled jobs', () => {
   });
 
   test('a settled job shows its confirmation and can be discarded', async () => {
-    const api = fakeApi({ listJobs: async () => [sentJob({
-      jobClass: JOB_CLASS.SETTLED, counts: { pending: 0, failed: 0, issued: 0, done: 412 },
-    })] });
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: 'v/' }} api={api} capabilities={DESKTOP}
-      onStart={NOOP} onClose={NOOP} />);
+    const api = fakeApi({
+      listJobs: async () => [
+        sentJob({
+          jobClass: JOB_CLASS.SETTLED,
+          counts: { pending: 0, failed: 0, issued: 0, done: 412 },
+        }),
+      ],
+    });
+    const m = mount(
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: 'v/' }}
+        api={api}
+        capabilities={DESKTOP}
+        onStart={NOOP}
+        onClose={NOOP}
+      />,
+    );
     await flush();
 
     assert.ok(/confirmed/i.test(m.text()));
@@ -481,11 +742,23 @@ describe('DownloadJobPanel — sent and settled jobs', () => {
   });
 
   test('a previous check‘s summary is shown from the job record, surviving panel close', async () => {
-    const api = fakeApi({ listJobs: async () => [sentJob({
-      lastVerify: { confirmed: 400, missing: 10, mismatched: 2, ambiguous: 0, renamed: 0, at: 1 },
-    })] });
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: 'v/' }} api={api} capabilities={CAN_PICK}
-      onStart={NOOP} onClose={NOOP} />);
+    const api = fakeApi({
+      listJobs: async () => [
+        sentJob({
+          lastVerify: { confirmed: 400, missing: 10, mismatched: 2, ambiguous: 0, renamed: 0, at: 1 },
+        }),
+      ],
+    });
+    const m = mount(
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: 'v/' }}
+        api={api}
+        capabilities={CAN_PICK}
+        onStart={NOOP}
+        onClose={NOOP}
+      />,
+    );
     await flush();
 
     const summary = m.query('[data-testid="verified-job-9"]');
@@ -497,26 +770,45 @@ describe('DownloadJobPanel — sent and settled jobs', () => {
 });
 
 describe('DownloadJobPanel — the folder check', () => {
-  const sentJob = () => classified({
-    id: 'job-9', prefix: 'videos/', jobClass: JOB_CLASS.SENT,
-    counts: { pending: 0, failed: 0, issued: 412, done: 0 },
-  });
+  const sentJob = () =>
+    classified({
+      id: 'job-9',
+      prefix: 'videos/',
+      jobClass: JOB_CLASS.SENT,
+      counts: { pending: 0, failed: 0, issued: 412, done: 0 },
+    });
 
   test('checking re-lists the jobs so verdicts and class changes appear', async () => {
     let calls = 0;
     const api = fakeApi({
       listJobs: async () => {
         calls += 1;
-        return calls === 1 ? [sentJob()] : [{ ...sentJob(), lastVerify: { confirmed: 412, missing: 0, mismatched: 0, ambiguous: 0, renamed: 0, at: 1 } }];
+        return calls === 1
+          ? [sentJob()]
+          : [
+              {
+                ...sentJob(),
+                lastVerify: { confirmed: 412, missing: 0, mismatched: 0, ambiguous: 0, renamed: 0, at: 1 },
+              },
+            ];
       },
     });
     global.window.showDirectoryPicker = async () => ({ values: async function* () {} });
 
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: 'v/' }} api={api} capabilities={CAN_PICK}
-      onStart={NOOP} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: 'v/' }}
+        api={api}
+        capabilities={CAN_PICK}
+        onStart={NOOP}
+        onClose={NOOP}
+      />,
+    );
     await flush();
     fire(m.query('[data-testid="verify-job-9"]'), 'click');
-    await flush(); await flush();
+    await flush();
+    await flush();
 
     assert.match(m.text(), /412 confirmed/, 'the fresh verdict must be rendered');
     m.cleanup();
@@ -527,15 +819,26 @@ describe('DownloadJobPanel — the folder check', () => {
   test('a failing check shows its reason instead of silently doing nothing', async () => {
     const api = fakeApi({
       listJobs: async () => [sentJob()],
-      verify: async () => { throw new Error('That download was created for a different bucket. Reconnect to it to check it.'); },
+      verify: async () => {
+        throw new Error('That download was created for a different bucket. Reconnect to it to check it.');
+      },
     });
     global.window.showDirectoryPicker = async () => ({ values: async function* () {} });
 
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: 'v/' }} api={api} capabilities={CAN_PICK}
-      onStart={NOOP} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: 'v/' }}
+        api={api}
+        capabilities={CAN_PICK}
+        onStart={NOOP}
+        onClose={NOOP}
+      />,
+    );
     await flush();
     fire(m.query('[data-testid="verify-job-9"]'), 'click');
-    await flush(); await flush();
+    await flush();
+    await flush();
 
     const err = m.query('[data-testid="verify-error"]');
     assert.notEqual(err, null, 'the error must be rendered, not swallowed');
@@ -546,11 +849,23 @@ describe('DownloadJobPanel — the folder check', () => {
   // Cancelling the folder picker throws AbortError. That is a normal user action, not a
   // failure worth an error banner.
   test('a cancelled folder picker leaves no error behind', async () => {
-    global.window.showDirectoryPicker = async () => { const e = new Error('abort'); e.name = 'AbortError'; throw e; };
+    global.window.showDirectoryPicker = async () => {
+      const e = new Error('abort');
+      e.name = 'AbortError';
+      throw e;
+    };
     const api = fakeApi({ listJobs: async () => [sentJob()] });
 
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: 'v/' }} api={api} capabilities={CAN_PICK}
-      onStart={NOOP} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: 'v/' }}
+        api={api}
+        capabilities={CAN_PICK}
+        onStart={NOOP}
+        onClose={NOOP}
+      />,
+    );
     await flush();
     fire(m.query('[data-testid="verify-job-9"]'), 'click');
     await flush();
@@ -569,14 +884,23 @@ describe('DownloadJobPanel — the ZIP gate', () => {
   // via the microtask-scheduled path plain setState calls use. A 0ms flush() reliably
   // drains microtasks but does not span that real-time gap; the file's existing
   // long-poll pattern (see "cancelling a listing stops the crawl…" above) is reused here.
-  const flushEffects = () => new Promise(r => setTimeout(r, 60));
+  const flushEffects = () => new Promise((r) => setTimeout(r, 60));
 
   const readyWithGate = async (zipGateImpl, capabilities = ZIP_CAPABLE, apiOver = {}) => {
     const api = fakeApi({ zipGate: zipGateImpl, ...apiOver });
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: 'videos/' }}
-      api={api} onStart={NOOP} onClose={NOOP} capabilities={capabilities} />);
+    const m = mount(
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: 'videos/' }}
+        api={api}
+        onStart={NOOP}
+        onClose={NOOP}
+        capabilities={capabilities}
+      />,
+    );
     fire(m.query('[data-testid="scan"]'), 'click');
-    await flush(); await flushEffects();
+    await flush();
+    await flushEffects();
     return m;
   };
 
@@ -630,7 +954,10 @@ describe('DownloadJobPanel — the ZIP gate', () => {
   // files) is what a browser lacking the mechanism entirely looks like — the missing
   // button already says that, so the reason line would just be noise on every download.
   test("state 'unavailable' from a missing capability: no button, and no reason line either", async () => {
-    const m = await readyWithGate(async () => ({ state: 'unavailable', reason: 'This browser cannot stage a ZIP.' }), DESKTOP);
+    const m = await readyWithGate(
+      async () => ({ state: 'unavailable', reason: 'This browser cannot stage a ZIP.' }),
+      DESKTOP,
+    );
     assert.equal(m.query('[data-testid="start-zip"]'), null);
     assert.equal(m.query('[data-testid="zip-gate-reason"]'), null);
     m.cleanup();
@@ -647,12 +974,26 @@ describe('DownloadJobPanel — the ZIP gate', () => {
     let handed = null;
     const api = fakeApi({
       zipGate: async () => ({ state: 'offered', reason: null }),
-      startZipJob: async (job) => { requested = job; return { ...job, delivery: 'zip', zipName: 'videos-20260803-0000.zip' }; },
+      startZipJob: async (job) => {
+        requested = job;
+        return { ...job, delivery: 'zip', zipName: 'videos-20260803-0000.zip' };
+      },
     });
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: 'videos/' }}
-      api={api} onStart={j => { handed = j; }} onClose={NOOP} capabilities={ZIP_CAPABLE} />);
+    const m = mount(
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: 'videos/' }}
+        api={api}
+        onStart={(j) => {
+          handed = j;
+        }}
+        onClose={NOOP}
+        capabilities={ZIP_CAPABLE}
+      />,
+    );
     fire(m.query('[data-testid="scan"]'), 'click');
-    await flush(); await flushEffects();
+    await flush();
+    await flushEffects();
 
     fire(m.query('[data-testid="start-zip"]'), 'click');
     await flush();
@@ -668,17 +1009,33 @@ describe('DownloadJobPanel — the ZIP gate', () => {
   test('Allow more storage calls api.requestPersist and re-renders enabled once the gate fits', async () => {
     let persistCalled = false;
     const api = fakeApi({
-      zipGate: async () => ({ state: 'needs-storage', reason: 'Needs about 5.0 GB of temporary browser storage; 2.0 GB available.' }),
-      requestPersist: async () => { persistCalled = true; return { state: 'offered', reason: null }; },
+      zipGate: async () => ({
+        state: 'needs-storage',
+        reason: 'Needs about 5.0 GB of temporary browser storage; 2.0 GB available.',
+      }),
+      requestPersist: async () => {
+        persistCalled = true;
+        return { state: 'offered', reason: null };
+      },
     });
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: 'videos/' }}
-      api={api} onStart={NOOP} onClose={NOOP} capabilities={ZIP_CAPABLE} />);
+    const m = mount(
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: 'videos/' }}
+        api={api}
+        onStart={NOOP}
+        onClose={NOOP}
+        capabilities={ZIP_CAPABLE}
+      />,
+    );
     fire(m.query('[data-testid="scan"]'), 'click');
-    await flush(); await flushEffects();
+    await flush();
+    await flushEffects();
     assert.equal(m.query('[data-testid="start-zip"]').disabled, true);
 
     fire(m.query('[data-testid="allow-storage"]'), 'click');
-    await flush(); await flush();
+    await flush();
+    await flush();
 
     assert.equal(persistCalled, true);
     const btn = m.query('[data-testid="start-zip"]');
@@ -692,15 +1049,21 @@ describe('DownloadJobPanel — the ZIP gate', () => {
 // unexported zip job (all items DONE, no exportedAt — the recoverable state a failed or
 // cancelled export leaves behind) offers to save it again.
 describe('DownloadJobPanel — ZIP job rows', () => {
-  const zipSettledJob = (over = {}) => classified({
-    id: 'zip-1', prefix: 'videos/', jobClass: JOB_CLASS.SETTLED, delivery: 'zip',
-    counts: { pending: 0, failed: 0, issued: 0, done: 412 },
-    ...over,
-  });
+  const zipSettledJob = (over = {}) =>
+    classified({
+      id: 'zip-1',
+      prefix: 'videos/',
+      jobClass: JOB_CLASS.SETTLED,
+      delivery: 'zip',
+      counts: { pending: 0, failed: 0, issued: 0, done: 412 },
+      ...over,
+    });
 
   test('a settled zip job label carries the — ZIP suffix', async () => {
     const api = fakeApi({ listJobs: async () => [zipSettledJob({ exportedAt: 12345 })] });
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />,
+    );
     await flush();
     assert.ok(m.text().includes('videos/ — ZIP'));
     m.cleanup();
@@ -709,10 +1072,14 @@ describe('DownloadJobPanel — ZIP job rows', () => {
   test('a finished-unexported zip job offers Save the ZIP again, which calls api.exportZipAgain', async () => {
     let exported = null;
     const api = fakeApi({
-      listJobs: async () => [zipSettledJob()],   // no exportedAt: finished, never exported
-      exportZipAgain: async (id) => { exported = id; },
+      listJobs: async () => [zipSettledJob()], // no exportedAt: finished, never exported
+      exportZipAgain: async (id) => {
+        exported = id;
+      },
     });
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />,
+    );
     await flush();
 
     const btn = m.query('[data-testid="save-zip-again"]');
@@ -726,7 +1093,9 @@ describe('DownloadJobPanel — ZIP job rows', () => {
 
   test('an already-exported zip job does not offer Save the ZIP again', async () => {
     const api = fakeApi({ listJobs: async () => [zipSettledJob({ exportedAt: Date.now() })] });
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />,
+    );
     await flush();
     assert.equal(m.query('[data-testid="save-zip-again"]'), null);
     m.cleanup();
@@ -734,7 +1103,9 @@ describe('DownloadJobPanel — ZIP job rows', () => {
 
   test('a non-zip settled job carries no — ZIP suffix and no Save-again control', async () => {
     const api = fakeApi({ listJobs: async () => [zipSettledJob({ delivery: undefined, exportedAt: undefined })] });
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />,
+    );
     await flush();
     assert.equal(m.text().includes('— ZIP'), false);
     assert.equal(m.query('[data-testid="save-zip-again"]'), null);
@@ -747,16 +1118,22 @@ describe('DownloadJobPanel — ZIP job rows', () => {
 // rather than failing it file-by-file. This is the row-level half of that flow — the
 // engine/orchestration half is covered by download-queue.test.js and zip-job-run.test.js.
 describe('DownloadJobPanel — ZIP paused-for-storage row', () => {
-  const pausedZipJob = (over = {}) => classified({
-    id: 'zip-quota', prefix: 'videos/', delivery: 'zip', pausedForStorage: true,
-    counters: { total: 10, bytesTotal: 900, sendable: 10, bytesSendable: 900 },
-    counts: { pending: 8, failed: 0, issued: 0, done: 2 },
-    ...over,
-  });
+  const pausedZipJob = (over = {}) =>
+    classified({
+      id: 'zip-quota',
+      prefix: 'videos/',
+      delivery: 'zip',
+      pausedForStorage: true,
+      counters: { total: 10, bytesTotal: 900, sendable: 10, bytesSendable: 900 },
+      counts: { pending: 8, failed: 0, issued: 0, done: 2 },
+      ...over,
+    });
 
   test('renders the storage explanation and an Allow-storage control', async () => {
     const api = fakeApi({ listJobs: async () => [pausedZipJob()] });
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />,
+    );
     await flush();
 
     assert.ok(/storage/i.test(m.text()), 'the row must explain the job stopped for storage, not just say "unfinished"');
@@ -768,9 +1145,14 @@ describe('DownloadJobPanel — ZIP paused-for-storage row', () => {
     let persistArgs = null;
     const api = fakeApi({
       listJobs: async () => [pausedZipJob()],
-      requestPersist: async (args) => { persistArgs = args; return { state: 'offered', reason: null }; },
+      requestPersist: async (args) => {
+        persistArgs = args;
+        return { state: 'offered', reason: null };
+      },
     });
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />,
+    );
     await flush();
 
     fire(m.query('[data-testid="allow-storage-zip-quota"]'), 'click');
@@ -784,8 +1166,14 @@ describe('DownloadJobPanel — ZIP paused-for-storage row', () => {
   // (stopped on per-file failures, not a quota block) must not show storage UI it has no
   // basis for.
   test('a paused zip job without pausedForStorage shows neither the explanation nor the control', async () => {
-    const api = fakeApi({ listJobs: async () => [pausedZipJob({ pausedForStorage: false, counts: { pending: 0, failed: 8, issued: 0, done: 2 } })] });
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />);
+    const api = fakeApi({
+      listJobs: async () => [
+        pausedZipJob({ pausedForStorage: false, counts: { pending: 0, failed: 8, issued: 0, done: 2 } }),
+      ],
+    });
+    const m = mount(
+      <DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={NOOP} onClose={NOOP} />,
+    );
     await flush();
 
     assert.equal(m.query('[data-testid="allow-storage-zip-quota"]'), null);
@@ -797,7 +1185,17 @@ describe('DownloadJobPanel — ZIP paused-for-storage row', () => {
   test('Resume still hands the job to onStart from a storage-paused row', async () => {
     let handed = null;
     const api = fakeApi({ listJobs: async () => [pausedZipJob()] });
-    const m = mount(<DownloadJobPanel bucket="bkt" scope={{ kind: 'folder', prefix: '' }} api={api} onStart={j => { handed = j; }} onClose={NOOP} />);
+    const m = mount(
+      <DownloadJobPanel
+        bucket="bkt"
+        scope={{ kind: 'folder', prefix: '' }}
+        api={api}
+        onStart={(j) => {
+          handed = j;
+        }}
+        onClose={NOOP}
+      />,
+    );
     await flush();
 
     fire(m.query('[data-testid="resume-zip-quota"]'), 'click');

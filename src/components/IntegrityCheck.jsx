@@ -43,8 +43,8 @@ function ResultBanner({ result }) {
             {result.algorithm}: <code>{shortHash(result.hash)}</code>
           </div>
           <div style={{ fontSize: '.75rem', opacity: 0.8, marginTop: '.25rem' }}>
-            Note: this proves the host is serving the canonical artifact. It does not prove
-            the running JavaScript was not modified — a malicious host could rewrite both.
+            Note: this proves the host is serving the canonical artifact. It does not prove the running JavaScript was
+            not modified — a malicious host could rewrite both.
           </div>
         </div>
       </div>
@@ -58,8 +58,12 @@ function ResultBanner({ result }) {
           <div class="banner-title">Mismatch</div>
           The bytes this page is serving do NOT match the build GitLab CI published for v{v}.
           <div style={{ fontSize: '.75rem', marginTop: '.4rem', fontFamily: 'monospace' }}>
-            <div>served&nbsp;&nbsp;{result.algorithm}: <code>{shortHash(result.actual)}</code></div>
-            <div>expected {result.algorithm}: <code>{shortHash(result.expected)}</code></div>
+            <div>
+              served&nbsp;&nbsp;{result.algorithm}: <code>{shortHash(result.actual)}</code>
+            </div>
+            <div>
+              expected {result.algorithm}: <code>{shortHash(result.expected)}</code>
+            </div>
           </div>
         </div>
       </div>
@@ -80,8 +84,8 @@ function ResultBanner({ result }) {
     return (
       <div class="banner banner-warn" role="status" style={{ marginTop: '.5rem' }}>
         <div class="banner-body">
-          The manifest for v{v} uses hash algorithms this app cannot compute
-          ({result.algorithms.join(', ')}). Update the app to verify.
+          The manifest for v{v} uses hash algorithms this app cannot compute ({result.algorithms.join(', ')}). Update
+          the app to verify.
         </div>
       </div>
     );
@@ -90,15 +94,13 @@ function ResultBanner({ result }) {
   // network-error and any unrecognized status
   return (
     <div class="banner banner-warn" role="status" style={{ marginTop: '.5rem' }}>
-      <div class="banner-body">
-        Could not verify against GitLab.{result.message ? ` ${result.message}` : ''}
-      </div>
+      <div class="banner-body">Could not verify against GitLab.{result.message ? ` ${result.message}` : ''}</div>
     </div>
   );
 }
 
 export function IntegrityCheck({ verify = defaultVerify }) {
-  const [phase, setPhase] = useState('idle');   // 'idle' | 'running' | 'result'
+  const [phase, setPhase] = useState('idle'); // 'idle' | 'running' | 'result'
   const [result, setResult] = useState(null);
 
   async function handleVerify() {
@@ -117,12 +119,7 @@ export function IntegrityCheck({ verify = defaultVerify }) {
 
   return (
     <div class="integrity-check">
-      <button
-        type="button"
-        class="btn btn-ghost btn-sm"
-        onClick={handleVerify}
-        disabled={phase === 'running'}
-      >
+      <button type="button" class="btn btn-ghost btn-sm" onClick={handleVerify} disabled={phase === 'running'}>
         {phase === 'running' ? 'Verifying…' : 'Verify build integrity'}
       </button>
       {phase === 'result' && result && <ResultBanner result={result} />}

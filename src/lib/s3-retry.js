@@ -6,14 +6,19 @@
 // delete-queue.js keeps its own private copy of this logic (batched DeleteObjects); this
 // module is the per-request equivalent used by move-queue.js and move-multipart.js.
 
-const MAX_RETRIES   = 4;
+const MAX_RETRIES = 4;
 const RETRY_BASE_MS = 500;
 
 export function isThrottlingError(err) {
-  const code   = err.Code || err.code || err.name || '';
+  const code = err.Code || err.code || err.name || '';
   const status = err.$metadata?.httpStatusCode;
-  return code === 'SlowDown' || code === 'ServiceUnavailable' ||
-         code === 'ThrottlingException' || status === 503 || status === 429;
+  return (
+    code === 'SlowDown' ||
+    code === 'ServiceUnavailable' ||
+    code === 'ThrottlingException' ||
+    status === 503 ||
+    status === 429
+  );
 }
 
 // Browser fetch failures surface as a TypeError with a browser-specific message
@@ -51,11 +56,11 @@ export async function withUploadRetry(run, { maxRetries = MAX_RETRIES, baseMs = 
       return await run();
     } catch (err) {
       if (attempt < maxRetries && isRetryableUploadError(err) && !signal?.aborted) {
-        const base  = baseMs * 2 ** attempt;
+        const base = baseMs * 2 ** attempt;
         const delay = Math.round(base * (0.75 + Math.random() * 0.5));
-        await new Promise(r => setTimeout(r, delay));
+        await new Promise((r) => setTimeout(r, delay));
         attempt++;
-        onRetry?.(attempt, err);   // diagnostics: count transient retries for the upload log
+        onRetry?.(attempt, err); // diagnostics: count transient retries for the upload log
       } else {
         throw err;
       }
@@ -68,16 +73,20 @@ export async function withUploadRetry(run, { maxRetries = MAX_RETRIES, baseMs = 
 // attempt gets a fresh command instance, matching how the AWS SDK expects commands to be
 // single-use. Callers copying large objects pass `retryOn: isRetryableUploadError` so a
 // transient network drop mid-part is retried rather than aborting the whole copy.
-export async function sendWithRetry(client, makeCommand, { maxRetries = MAX_RETRIES, baseMs = RETRY_BASE_MS, retryOn = isThrottlingError } = {}) {
+export async function sendWithRetry(
+  client,
+  makeCommand,
+  { maxRetries = MAX_RETRIES, baseMs = RETRY_BASE_MS, retryOn = isThrottlingError } = {},
+) {
   let attempt = 0;
   for (;;) {
     try {
       return await client.send(makeCommand());
     } catch (err) {
       if (attempt < maxRetries && retryOn(err)) {
-        const base  = baseMs * 2 ** attempt;
+        const base = baseMs * 2 ** attempt;
         const delay = Math.round(base * (0.75 + Math.random() * 0.5));
-        await new Promise(r => setTimeout(r, delay));
+        await new Promise((r) => setTimeout(r, delay));
         attempt++;
       } else {
         throw err;

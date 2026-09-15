@@ -15,7 +15,4 @@ import { applyThemeToRoot } from './lib/theme.js';
 applyThemeToRoot(loadThemePref(), document.documentElement);
 
 const downloadUrl = readShareLink();
-render(
-  downloadUrl ? <DownloadPage presignedUrl={downloadUrl} /> : <App />,
-  document.getElementById('app')
-);
+render(downloadUrl ? <DownloadPage presignedUrl={downloadUrl} /> : <App />, document.getElementById('app'));

@@ -50,8 +50,15 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import {
-  startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage,
-  e2eTest, e2eDeviceName,
+  startMock,
+  startAppServer,
+  connectApp,
+  BUCKET,
+  launchBrowser,
+  newE2EContext,
+  newE2EPage,
+  e2eTest,
+  e2eDeviceName,
 } from '../harness.mjs';
 import { readZip, refCrc } from '../../helpers/zip-reader.js';
 
@@ -67,9 +74,9 @@ function mkBinary(length, seed) {
 
 // Arm 1: a folder of 4 files, one nested under sub/.
 const ZSEL = {
-  'zsel/a.txt':     Buffer.from('alpha file for the zip happy path\n'),
-  'zsel/b.txt':     Buffer.from('bravo file, a different length than alpha\n'),
-  'zsel/c.bin':     mkBinary(337, 7),
+  'zsel/a.txt': Buffer.from('alpha file for the zip happy path\n'),
+  'zsel/b.txt': Buffer.from('bravo file, a different length than alpha\n'),
+  'zsel/c.bin': mkBinary(337, 7),
   'zsel/sub/d.txt': Buffer.from('delta lives one folder down\n'),
 };
 
@@ -85,8 +92,14 @@ const ZINT = {
 // body is a distinct length/pattern (mkBinary keyed by index) so a bug that wrote the
 // right COUNT of entries but mixed up which bytes went with which name would still fail.
 const ZMANY = Object.fromEntries([
-  ...Array.from({ length: 10 }, (_, i) => [`zmany/f${String(i + 1).padStart(2, '0')}.txt`, mkBinary(40 + i * 11, i + 3)]),
-  ...Array.from({ length: 2 }, (_, i) => [`zmany/sub/n${String(i + 1).padStart(2, '0')}.txt`, mkBinary(60 + i * 17, i + 31)]),
+  ...Array.from({ length: 10 }, (_, i) => [
+    `zmany/f${String(i + 1).padStart(2, '0')}.txt`,
+    mkBinary(40 + i * 11, i + 3),
+  ]),
+  ...Array.from({ length: 2 }, (_, i) => [
+    `zmany/sub/n${String(i + 1).padStart(2, '0')}.txt`,
+    mkBinary(60 + i * 17, i + 31),
+  ]),
 ]);
 
 // Arm 4: WebKit absence — one file is enough to reach the ready phase.
@@ -96,7 +109,12 @@ before(async () => {
   ctx = await startMock();
   app = await startAppServer();
   browser = await launchBrowser();
-  for (const [key, body] of [...Object.entries(ZSEL), ...Object.entries(ZINT), ...Object.entries(ZMANY), ...Object.entries(ZWK)]) {
+  for (const [key, body] of [
+    ...Object.entries(ZSEL),
+    ...Object.entries(ZINT),
+    ...Object.entries(ZMANY),
+    ...Object.entries(ZWK),
+  ]) {
     await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: key, Body: body }));
   }
 });
@@ -126,7 +144,9 @@ function collectZipDownloads(p) {
         }
       })();
     },
-    settle(ms = 3000) { return new Promise((r) => setTimeout(r, ms)); },
+    settle(ms = 3000) {
+      return new Promise((r) => setTimeout(r, ms));
+    },
   };
 }
 
@@ -161,174 +181,226 @@ function assertZipMatches(entries, expected) {
 }
 
 describe('browser e2e — zip download', () => {
-  e2eTest('one zip download contains exactly the selected files, byte-for-byte, folder structure intact', async () => {
-    // ── Engine-identity observable: prove the IN-PLACE engine ran, not just that a valid
-    // zip came out. On Chromium/Firefox the zip path now runs through the in-place engine
-    // (a Web Worker doing positioned OPFS writes, per the 2026-08-04 offset-composition
-    // design); the serial engine it replaced instantiates no Worker at all. So "at least one
-    // `new Worker` was constructed before the download completed" is a valid presence proof
-    // for "in-place ran" — a silent regression back to serial, or a worker that fails to
-    // spin up and the code silently falling back, would both zero out this counter while the
-    // byte-level assertions below could still pass (a correct zip can, in principle, come out
-    // of either engine). This is the PRESENCE half; assertZipMatches below remains the
-    // CORRECTNESS half — neither subsumes the other.
-    //
-    // Installed on the CONTEXT (not evaluate()) and BEFORE page.goto(): addInitScript runs
-    // the wrapper before any of the navigated document's own scripts, so the app bundle's
-    // `import { makeAssemblerWorker }` / `new Worker(blobURL)` (assembler-worker-url.js) sees
-    // the wrapped constructor, not the original. Registering it here — after `page` already
-    // exists (created in beforeEach) but before this test's own `page.goto` — still lands
-    // ahead of that navigation: addInitScript scripts apply to a context's pages "whenever a
-    // page is created ... or is navigated" (verified locally against this Playwright version
-    // before relying on it here). WebKit is excluded (skipOn below): it has no zip button at
-    // all (arm 4), so there is nothing to instrument there.
-    await context.addInitScript(() => {
-      window.__zipWorkerCount = 0;
-      const OrigWorker = window.Worker;
-      if (OrigWorker) {
-        window.Worker = class extends OrigWorker {
-          constructor(...args) { super(...args); window.__zipWorkerCount++; }
-        };
+  e2eTest(
+    'one zip download contains exactly the selected files, byte-for-byte, folder structure intact',
+    async () => {
+      // ── Engine-identity observable: prove the IN-PLACE engine ran, not just that a valid
+      // zip came out. On Chromium/Firefox the zip path now runs through the in-place engine
+      // (a Web Worker doing positioned OPFS writes, per the 2026-08-04 offset-composition
+      // design); the serial engine it replaced instantiates no Worker at all. So "at least one
+      // `new Worker` was constructed before the download completed" is a valid presence proof
+      // for "in-place ran" — a silent regression back to serial, or a worker that fails to
+      // spin up and the code silently falling back, would both zero out this counter while the
+      // byte-level assertions below could still pass (a correct zip can, in principle, come out
+      // of either engine). This is the PRESENCE half; assertZipMatches below remains the
+      // CORRECTNESS half — neither subsumes the other.
+      //
+      // Installed on the CONTEXT (not evaluate()) and BEFORE page.goto(): addInitScript runs
+      // the wrapper before any of the navigated document's own scripts, so the app bundle's
+      // `import { makeAssemblerWorker }` / `new Worker(blobURL)` (assembler-worker-url.js) sees
+      // the wrapped constructor, not the original. Registering it here — after `page` already
+      // exists (created in beforeEach) but before this test's own `page.goto` — still lands
+      // ahead of that navigation: addInitScript scripts apply to a context's pages "whenever a
+      // page is created ... or is navigated" (verified locally against this Playwright version
+      // before relying on it here). WebKit is excluded (skipOn below): it has no zip button at
+      // all (arm 4), so there is nothing to instrument there.
+      await context.addInitScript(() => {
+        window.__zipWorkerCount = 0;
+        const OrigWorker = window.Worker;
+        if (OrigWorker) {
+          window.Worker = class extends OrigWorker {
+            constructor(...args) {
+              super(...args);
+              window.__zipWorkerCount++;
+            }
+          };
+        }
+      });
+
+      await page.goto(app.url, { waitUntil: 'domcontentloaded' });
+      await connectApp(page, ctx.httpsBrowserEndpoint);
+      await page.locator('[data-testid="folder-row:zsel"]').click();
+      await page.locator('[data-testid="file-row:a.txt"]').waitFor({ timeout: 10000 });
+      await openPanel(page);
+      await page.locator('[data-testid="scan"]').click();
+      await page.locator('[data-testid="start-zip"]').waitFor({ timeout: 15000 });
+      await page.locator('[data-testid="start-zip"]').click();
+
+      await downloads.waitForCount(1, 30000);
+      // The "one dialog" claim is presence AND absence, both measured: got exactly one, and
+      // nothing more shows up in a settle window after it.
+      await downloads.settle(3000);
+      assert.equal(downloads.list().length, 1, 'exactly one zip download must fire, never a second');
+
+      const filePath = await downloads.list()[0].path();
+      assert.ok(filePath, 'the zip download must be saved to a local path Playwright can read');
+      const bytes = new Uint8Array(readFileSync(filePath));
+      const entries = readZip(bytes); // throws on any structural defect (bad EOCD/CD/local headers)
+
+      const expected = Object.fromEntries(Object.entries(ZSEL).map(([k, v]) => [k.slice('zsel/'.length), v]));
+      assertZipMatches(entries, expected);
+
+      // Fail loudly if the counter never landed (wrong insertion point) rather than skipping
+      // the check — the whole point is that this fails if in-place didn't run.
+      const workerCount = await page.evaluate(() => window.__zipWorkerCount);
+      assert.ok(
+        Number.isInteger(workerCount),
+        'window.__zipWorkerCount must be defined — the init script did not land before app JS ran',
+      );
+      assert.ok(
+        workerCount >= 1,
+        `expected the in-place engine to construct at least one assembler Worker, saw ${workerCount}`,
+      );
+    },
+    { skipOn: { webkit: 'start-zip does not render on WebKit — see the WebKit-absence arm below' } },
+  );
+
+  e2eTest(
+    'a per-file failure pauses the zip; resuming finishes it as one complete download',
+    async (t) => {
+      if (e2eDeviceName()) {
+        t.skip('download-manager/OPFS staging behavior is not device-emulated; this arm runs on desktop lanes');
+        return;
       }
-    });
 
-    await page.goto(app.url, { waitUntil: 'domcontentloaded' });
-    await connectApp(page, ctx.httpsBrowserEndpoint);
-    await page.locator('[data-testid="folder-row:zsel"]').click();
-    await page.locator('[data-testid="file-row:a.txt"]').waitFor({ timeout: 10000 });
-    await openPanel(page);
-    await page.locator('[data-testid="scan"]').click();
-    await page.locator('[data-testid="start-zip"]').waitFor({ timeout: 15000 });
-    await page.locator('[data-testid="start-zip"]').click();
+      // The probe (a 1-byte Range GET) must survive so the failure stays scoped to f2.bin
+      // instead of blocking the whole job — see the file-header comment.
+      ctx.mock.configure({
+        faults: [{ op: 'GetObject', keyPrefix: 'zint/f2.bin', killAtByte: 1500, skipRange: true }],
+      });
 
-    await downloads.waitForCount(1, 30000);
-    // The "one dialog" claim is presence AND absence, both measured: got exactly one, and
-    // nothing more shows up in a settle window after it.
-    await downloads.settle(3000);
-    assert.equal(downloads.list().length, 1, 'exactly one zip download must fire, never a second');
+      // Same engine-identity observable as the happy-path arm above (see its comment for the
+      // full rationale): the in-place engine's assembler Worker must be created not just on
+      // the first run, but again on the resumed run — resume re-enters the same zip-job code
+      // path (file-granularity, per the header comment), so a regression that broke in-place
+      // specifically on resume (e.g. a fallback that only triggers on retry) would still be
+      // caught. Installed on the context before this test's page.goto, ahead of the app bundle.
+      await context.addInitScript(() => {
+        window.__zipWorkerCount = 0;
+        const OrigWorker = window.Worker;
+        if (OrigWorker) {
+          window.Worker = class extends OrigWorker {
+            constructor(...args) {
+              super(...args);
+              window.__zipWorkerCount++;
+            }
+          };
+        }
+      });
 
-    const filePath = await downloads.list()[0].path();
-    assert.ok(filePath, 'the zip download must be saved to a local path Playwright can read');
-    const bytes = new Uint8Array(readFileSync(filePath));
-    const entries = readZip(bytes); // throws on any structural defect (bad EOCD/CD/local headers)
+      await page.goto(app.url, { waitUntil: 'domcontentloaded' });
+      await connectApp(page, ctx.httpsBrowserEndpoint);
+      await page.locator('[data-testid="folder-row:zint"]').click();
+      await page.locator('[data-testid="file-row:f1.txt"]').waitFor({ timeout: 10000 });
+      await openPanel(page);
+      await page.locator('[data-testid="scan"]').click();
+      await page.locator('[data-testid="start-zip"]').waitFor({ timeout: 15000 });
+      await page.locator('[data-testid="start-zip"]').click();
 
-    const expected = Object.fromEntries(Object.entries(ZSEL).map(([k, v]) => [k.slice('zsel/'.length), v]));
-    assertZipMatches(entries, expected);
+      // f1.txt and f3.txt succeed, f2.bin fails on the dropped connection: MasterQueue's
+      // honest not-finished label (progress.md Task 4).
+      await page
+        .getByText(/Paused — 2 of 3 zipped, 1 failed/)
+        .first()
+        .waitFor({ timeout: 30000 });
+      assert.equal(downloads.list().length, 0, 'an unfinished zip (a failure still pending) must never export');
 
-    // Fail loudly if the counter never landed (wrong insertion point) rather than skipping
-    // the check — the whole point is that this fails if in-place didn't run.
-    const workerCount = await page.evaluate(() => window.__zipWorkerCount);
-    assert.ok(Number.isInteger(workerCount), 'window.__zipWorkerCount must be defined — the init script did not land before app JS ran');
-    assert.ok(workerCount >= 1, `expected the in-place engine to construct at least one assembler Worker, saw ${workerCount}`);
-  }, { skipOn: { webkit: 'start-zip does not render on WebKit — see the WebKit-absence arm below' } });
+      ctx.mock.configure({ faults: [] });
+      await openPanel(page);
+      await page.locator('[data-testid^="resume-"]').waitFor({ timeout: 10000 });
+      await page.locator('[data-testid^="resume-"]').first().click();
 
-  e2eTest('a per-file failure pauses the zip; resuming finishes it as one complete download', async (t) => {
-    if (e2eDeviceName()) {
-      t.skip('download-manager/OPFS staging behavior is not device-emulated; this arm runs on desktop lanes');
-      return;
-    }
+      await page
+        .getByText(/ZIP handed to your browser/)
+        .first()
+        .waitFor({ timeout: 30000 });
+      await downloads.waitForCount(1, 15000);
+      await downloads.settle(3000);
+      assert.equal(downloads.list().length, 1, 'the resumed job must export exactly one zip, not one per run');
 
-    // The probe (a 1-byte Range GET) must survive so the failure stays scoped to f2.bin
-    // instead of blocking the whole job — see the file-header comment.
-    ctx.mock.configure({ faults: [{ op: 'GetObject', keyPrefix: 'zint/f2.bin', killAtByte: 1500, skipRange: true }] });
+      const filePath = await downloads.list()[0].path();
+      const bytes = new Uint8Array(readFileSync(filePath));
+      const entries = readZip(bytes);
 
-    // Same engine-identity observable as the happy-path arm above (see its comment for the
-    // full rationale): the in-place engine's assembler Worker must be created not just on
-    // the first run, but again on the resumed run — resume re-enters the same zip-job code
-    // path (file-granularity, per the header comment), so a regression that broke in-place
-    // specifically on resume (e.g. a fallback that only triggers on retry) would still be
-    // caught. Installed on the context before this test's page.goto, ahead of the app bundle.
-    await context.addInitScript(() => {
-      window.__zipWorkerCount = 0;
-      const OrigWorker = window.Worker;
-      if (OrigWorker) {
-        window.Worker = class extends OrigWorker {
-          constructor(...args) { super(...args); window.__zipWorkerCount++; }
-        };
-      }
-    });
+      const expected = Object.fromEntries(Object.entries(ZINT).map(([k, v]) => [k.slice('zint/'.length), v]));
+      assertZipMatches(entries, expected);
 
-    await page.goto(app.url, { waitUntil: 'domcontentloaded' });
-    await connectApp(page, ctx.httpsBrowserEndpoint);
-    await page.locator('[data-testid="folder-row:zint"]').click();
-    await page.locator('[data-testid="file-row:f1.txt"]').waitFor({ timeout: 10000 });
-    await openPanel(page);
-    await page.locator('[data-testid="scan"]').click();
-    await page.locator('[data-testid="start-zip"]').waitFor({ timeout: 15000 });
-    await page.locator('[data-testid="start-zip"]').click();
+      // Fail loudly if the counter never landed, same as the happy-path arm.
+      const workerCount = await page.evaluate(() => window.__zipWorkerCount);
+      assert.ok(
+        Number.isInteger(workerCount),
+        'window.__zipWorkerCount must be defined — the init script did not land before app JS ran',
+      );
+      assert.ok(
+        workerCount >= 1,
+        `expected the in-place engine to construct at least one assembler Worker across the first run + resume, saw ${workerCount}`,
+      );
+    },
+    { skipOn: { webkit: 'start-zip does not render on WebKit — see the WebKit-absence arm below' } },
+  );
 
-    // f1.txt and f3.txt succeed, f2.bin fails on the dropped connection: MasterQueue's
-    // honest not-finished label (progress.md Task 4).
-    await page.getByText(/Paused — 2 of 3 zipped, 1 failed/).first().waitFor({ timeout: 30000 });
-    assert.equal(downloads.list().length, 0, 'an unfinished zip (a failure still pending) must never export');
+  e2eTest(
+    'a many-file zip (concurrent prefetch) still contains exactly the expected files, byte-for-byte',
+    async () => {
+      await page.goto(app.url, { waitUntil: 'domcontentloaded' });
+      await connectApp(page, ctx.httpsBrowserEndpoint);
+      await page.locator('[data-testid="folder-row:zmany"]').click();
+      await page.locator('[data-testid="file-row:f01.txt"]').waitFor({ timeout: 10000 });
+      await openPanel(page);
+      await page.locator('[data-testid="scan"]').click();
+      await page.locator('[data-testid="start-zip"]').waitFor({ timeout: 15000 });
+      await page.locator('[data-testid="start-zip"]').click();
 
-    ctx.mock.configure({ faults: [] });
-    await openPanel(page);
-    await page.locator('[data-testid^="resume-"]').waitFor({ timeout: 10000 });
-    await page.locator('[data-testid^="resume-"]').first().click();
+      await downloads.waitForCount(1, 30000);
+      // Same presence-AND-absence shape as the happy-path arm: concurrency must collapse
+      // back to exactly one export, not one per completed prefetch worker.
+      await downloads.settle(3000);
+      assert.equal(downloads.list().length, 1, 'exactly one zip download must fire, never one per prefetched file');
 
-    await page.getByText(/ZIP handed to your browser/).first().waitFor({ timeout: 30000 });
-    await downloads.waitForCount(1, 15000);
-    await downloads.settle(3000);
-    assert.equal(downloads.list().length, 1, 'the resumed job must export exactly one zip, not one per run');
+      const filePath = await downloads.list()[0].path();
+      const bytes = new Uint8Array(readFileSync(filePath));
+      const entries = readZip(bytes); // throws on any structural defect (bad EOCD/CD/local headers)
 
-    const filePath = await downloads.list()[0].path();
-    const bytes = new Uint8Array(readFileSync(filePath));
-    const entries = readZip(bytes);
+      const expected = Object.fromEntries(Object.entries(ZMANY).map(([k, v]) => [k.slice('zmany/'.length), v]));
+      assertZipMatches(entries, expected);
+    },
+    {
+      skipOn: {
+        webkit: 'start-zip does not render on WebKit — see the WebKit-absence arm below',
+      },
+    },
+  );
 
-    const expected = Object.fromEntries(Object.entries(ZINT).map(([k, v]) => [k.slice('zint/'.length), v]));
-    assertZipMatches(entries, expected);
+  e2eTest(
+    'WebKit offers the handoff button but never the zip button',
+    async () => {
+      await page.goto(app.url, { waitUntil: 'domcontentloaded' });
+      await connectApp(page, ctx.httpsBrowserEndpoint);
+      await page.locator('[data-testid="folder-row:zwk"]').click();
+      await page.locator('[data-testid="file-row:only.txt"]').waitFor({ timeout: 10000 });
+      await openPanel(page);
+      await page.locator('[data-testid="scan"]').click();
+      await page.locator('[data-testid="start"]').waitFor({ timeout: 15000 });
 
-    // Fail loudly if the counter never landed, same as the happy-path arm.
-    const workerCount = await page.evaluate(() => window.__zipWorkerCount);
-    assert.ok(Number.isInteger(workerCount), 'window.__zipWorkerCount must be defined — the init script did not land before app JS ran');
-    assert.ok(workerCount >= 1, `expected the in-place engine to construct at least one assembler Worker across the first run + resume, saw ${workerCount}`);
-  }, { skipOn: { webkit: 'start-zip does not render on WebKit — see the WebKit-absence arm below' } });
-
-  e2eTest('a many-file zip (concurrent prefetch) still contains exactly the expected files, byte-for-byte', async () => {
-    await page.goto(app.url, { waitUntil: 'domcontentloaded' });
-    await connectApp(page, ctx.httpsBrowserEndpoint);
-    await page.locator('[data-testid="folder-row:zmany"]').click();
-    await page.locator('[data-testid="file-row:f01.txt"]').waitFor({ timeout: 10000 });
-    await openPanel(page);
-    await page.locator('[data-testid="scan"]').click();
-    await page.locator('[data-testid="start-zip"]').waitFor({ timeout: 15000 });
-    await page.locator('[data-testid="start-zip"]').click();
-
-    await downloads.waitForCount(1, 30000);
-    // Same presence-AND-absence shape as the happy-path arm: concurrency must collapse
-    // back to exactly one export, not one per completed prefetch worker.
-    await downloads.settle(3000);
-    assert.equal(downloads.list().length, 1, 'exactly one zip download must fire, never one per prefetched file');
-
-    const filePath = await downloads.list()[0].path();
-    const bytes = new Uint8Array(readFileSync(filePath));
-    const entries = readZip(bytes); // throws on any structural defect (bad EOCD/CD/local headers)
-
-    const expected = Object.fromEntries(Object.entries(ZMANY).map(([k, v]) => [k.slice('zmany/'.length), v]));
-    assertZipMatches(entries, expected);
-  }, { skipOn: {
-    webkit: 'start-zip does not render on WebKit — see the WebKit-absence arm below',
-  } });
-
-  e2eTest('WebKit offers the handoff button but never the zip button', async () => {
-    await page.goto(app.url, { waitUntil: 'domcontentloaded' });
-    await connectApp(page, ctx.httpsBrowserEndpoint);
-    await page.locator('[data-testid="folder-row:zwk"]').click();
-    await page.locator('[data-testid="file-row:only.txt"]').waitFor({ timeout: 10000 });
-    await openPanel(page);
-    await page.locator('[data-testid="scan"]').click();
-    await page.locator('[data-testid="start"]').waitFor({ timeout: 15000 });
-
-    // start-zip is gated by an async effect (zipGate() reads live storage quota); give it
-    // room to resolve before treating its absence as meaningful rather than "not yet".
-    await page.waitForTimeout(2500);
-    assert.equal(await page.locator('[data-testid="start-zip"]').count(), 0,
-      'start-zip must not render where OPFS/writableFiles/streamingFetch are unavailable (WebKit)');
-    assert.equal(await page.locator('[data-testid="start"]').count(), 1,
-      'the handoff start button must still be offered on every engine');
-  }, { skipOn: {
-    chromium: 'presence of start-zip is asserted in the happy-path/interruption arms above',
-    firefox:  'presence of start-zip is asserted in the happy-path/interruption arms above',
-  } });
+      // start-zip is gated by an async effect (zipGate() reads live storage quota); give it
+      // room to resolve before treating its absence as meaningful rather than "not yet".
+      await page.waitForTimeout(2500);
+      assert.equal(
+        await page.locator('[data-testid="start-zip"]').count(),
+        0,
+        'start-zip must not render where OPFS/writableFiles/streamingFetch are unavailable (WebKit)',
+      );
+      assert.equal(
+        await page.locator('[data-testid="start"]').count(),
+        1,
+        'the handoff start button must still be offered on every engine',
+      );
+    },
+    {
+      skipOn: {
+        chromium: 'presence of start-zip is asserted in the happy-path/interruption arms above',
+        firefox: 'presence of start-zip is asserted in the happy-path/interruption arms above',
+      },
+    },
+  );
 });

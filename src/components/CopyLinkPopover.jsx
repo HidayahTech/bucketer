@@ -18,17 +18,21 @@ export function CopyLinkPopover({ client, bucket, fileKey, fileKeys, onClose, on
   const [error, setError] = useState(null);
 
   const isBatch = Array.isArray(fileKeys);
-  const keys    = isBatch ? fileKeys : [fileKey];
+  const keys = isBatch ? fileKeys : [fileKey];
 
   async function copyLinks(expiresIn) {
     setCopying(true);
     setError(null);
     try {
-      const urls = await Promise.all(keys.map(key => getSignedUrl(
-        client,
-        new GetObjectCommand(presignGetParams({ Bucket: bucket, Key: key, ResponseContentDisposition: 'inline' })),
-        { expiresIn },
-      )));
+      const urls = await Promise.all(
+        keys.map((key) =>
+          getSignedUrl(
+            client,
+            new GetObjectCommand(presignGetParams({ Bucket: bucket, Key: key, ResponseContentDisposition: 'inline' })),
+            { expiresIn },
+          ),
+        ),
+      );
       await navigator.clipboard.writeText(urls.join('\n'));
       onCopied(urls.length);
       onClose();
@@ -61,9 +65,15 @@ export function CopyLinkPopover({ client, bucket, fileKey, fileKeys, onClose, on
   function handleCustomCopy() {
     const mult = { minutes: 60, hours: 3600, days: 86400 };
     const n = parseInt(customValue, 10);
-    if (!n || n < 1) { setError('Enter a positive number.'); return; }
+    if (!n || n < 1) {
+      setError('Enter a positive number.');
+      return;
+    }
     const seconds = n * mult[customUnit];
-    if (seconds > 604800) { setError('Maximum is 7 days.'); return; }
+    if (seconds > 604800) {
+      setError('Maximum is 7 days.');
+      return;
+    }
     copyLinks(seconds);
   }
 
@@ -74,23 +84,28 @@ export function CopyLinkPopover({ client, bucket, fileKey, fileKeys, onClose, on
   return (
     <div class={`copy-link-popover${direction === 'up' ? ' copy-link-popover--up' : ''}`}>
       <div class="copy-link-presets">
-        {COPY_LINK_PRESETS.map(p => (
+        {COPY_LINK_PRESETS.map((p) => (
           <button key={p.seconds} class="btn btn-ghost btn-sm" onClick={() => copyLinks(p.seconds)} disabled={copying}>
             {p.label}
           </button>
         ))}
-        <button class="btn btn-ghost btn-sm" onClick={() => setShowCustom(v => !v)} disabled={copying}>
+        <button class="btn btn-ghost btn-sm" onClick={() => setShowCustom((v) => !v)} disabled={copying}>
           Custom…
         </button>
       </div>
       {showCustom && (
         <div class="copy-link-custom">
           <input
-            type="number" min="1" class="copy-link-num"
+            type="number"
+            min="1"
+            class="copy-link-num"
             value={customValue}
-            onInput={e => { setCustomValue(e.target.value); setError(null); }}
+            onInput={(e) => {
+              setCustomValue(e.target.value);
+              setError(null);
+            }}
           />
-          <select class="copy-link-unit" value={customUnit} onChange={e => setCustomUnit(e.target.value)}>
+          <select class="copy-link-unit" value={customUnit} onChange={(e) => setCustomUnit(e.target.value)}>
             <option value="minutes">min</option>
             <option value="hours">hrs</option>
             <option value="days">days</option>
@@ -107,8 +122,13 @@ export function CopyLinkPopover({ client, bucket, fileKey, fileKeys, onClose, on
         <>
           <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '.6rem 0' }} />
           <div class="copy-link-presets">
-            {COPY_LINK_PRESETS.map(p => (
-              <button key={p.seconds} class="btn btn-ghost btn-sm" onClick={() => copyBucketerLink(p.seconds)} disabled={sharingViaBucketer || copying}>
+            {COPY_LINK_PRESETS.map((p) => (
+              <button
+                key={p.seconds}
+                class="btn btn-ghost btn-sm"
+                onClick={() => copyBucketerLink(p.seconds)}
+                disabled={sharingViaBucketer || copying}
+              >
                 {p.label}
               </button>
             ))}

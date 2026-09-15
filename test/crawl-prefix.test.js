@@ -18,7 +18,7 @@ function mockClient(pages) {
     async send(cmd) {
       assert.equal(cmd.constructor.name, 'ListObjectsV2Command');
       calls.push({ ...cmd.input });
-      const idx = pages.findIndex(p => (p.token ?? undefined) === cmd.input.ContinuationToken);
+      const idx = pages.findIndex((p) => (p.token ?? undefined) === cmd.input.ContinuationToken);
       const page = pages[idx === -1 ? 0 : idx];
       return {
         Contents: page.contents,
@@ -35,10 +35,13 @@ describe('crawlPrefix', () => {
   test('hands a single page to onBatch and totals it', async () => {
     const client = mockClient([{ token: undefined, contents: [obj('a', 5), obj('b', 7)] }]);
     const batches = [];
-    const result = await crawlPrefix(client, 'bkt', 'p/', { onBatch: b => batches.push(b) });
+    const result = await crawlPrefix(client, 'bkt', 'p/', { onBatch: (b) => batches.push(b) });
 
     assert.equal(batches.length, 1);
-    assert.deepEqual(batches[0].map(o => o.Key), ['a', 'b']);
+    assert.deepEqual(
+      batches[0].map((o) => o.Key),
+      ['a', 'b'],
+    );
     assert.equal(result.objects, 2);
     assert.equal(result.bytes, 12);
     assert.equal(result.cancelled, false);
@@ -51,7 +54,7 @@ describe('crawlPrefix', () => {
       { token: 't2', contents: [obj('c')] },
     ]);
     const seen = [];
-    const result = await crawlPrefix(client, 'bkt', '', { onBatch: b => seen.push(...b.map(o => o.Key)) });
+    const result = await crawlPrefix(client, 'bkt', '', { onBatch: (b) => seen.push(...b.map((o) => o.Key)) });
 
     assert.deepEqual(seen, ['a', 'b', 'c']);
     assert.equal(result.objects, 3);
@@ -82,7 +85,7 @@ describe('crawlPrefix', () => {
       { token: 't1', contents: [obj('b')] },
     ]);
     const seen = [];
-    await crawlPrefix(client, 'bkt', '', { onBatch: b => seen.push(...b.map(o => o.Key)), startToken: 't1' });
+    await crawlPrefix(client, 'bkt', '', { onBatch: (b) => seen.push(...b.map((o) => o.Key)), startToken: 't1' });
     assert.deepEqual(seen, ['b']);
   });
 
@@ -95,7 +98,10 @@ describe('crawlPrefix', () => {
     const seen = [];
     let pages = 0;
     const result = await crawlPrefix(client, 'bkt', '', {
-      onBatch: b => { pages += 1; seen.push(...b.map(o => o.Key)); },
+      onBatch: (b) => {
+        pages += 1;
+        seen.push(...b.map((o) => o.Key));
+      },
       shouldCancel: () => pages >= 1,
     });
 
@@ -113,7 +119,7 @@ describe('crawlPrefix', () => {
     await crawlPrefix(client, 'bkt', '', {
       onBatch: async (b) => {
         order.push(`start:${b[0].Key}`);
-        await new Promise(r => setTimeout(r, 5));
+        await new Promise((r) => setTimeout(r, 5));
         order.push(`end:${b[0].Key}`);
       },
     });
@@ -123,7 +129,11 @@ describe('crawlPrefix', () => {
   test('does not call onBatch for an empty listing', async () => {
     const client = mockClient([{ token: undefined, contents: [] }]);
     let called = 0;
-    const result = await crawlPrefix(client, 'bkt', '', { onBatch: () => { called += 1; } });
+    const result = await crawlPrefix(client, 'bkt', '', {
+      onBatch: () => {
+        called += 1;
+      },
+    });
     assert.equal(called, 0);
     assert.equal(result.objects, 0);
   });

@@ -30,25 +30,38 @@ import { createS3Client } from '../lib/s3-client.js';
 import { diagnosticsProps } from '../lib/connection-diagnostics.js';
 import { detectProvider, PROVIDER_LABELS } from '../lib/provider.js';
 import {
-  loadCredentials, saveCredentials, clearCredentials,
-  loadUpdateCheckEnabled, saveUpdateCheckEnabled,
-  loadPrefetchSizeLimit, savePrefetchSizeLimit,
-  loadLastProfileId, saveLastProfileId, repairStorageInvariants,
+  loadCredentials,
+  saveCredentials,
+  clearCredentials,
+  loadUpdateCheckEnabled,
+  saveUpdateCheckEnabled,
+  loadPrefetchSizeLimit,
+  savePrefetchSizeLimit,
+  loadLastProfileId,
+  saveLastProfileId,
+  repairStorageInvariants,
   migrateProfilesFromLegacy,
 } from '../lib/storage.js';
 import {
-  listResolvedConnections, resolveConnection, findOrCreateCredential,
-  saveConnectionRecord, deleteConnectionRecord, migrateProfilesToConnections,
-  defaultCapabilities, loadConnectionCapabilities, saveConnectionCapabilities,
-  defaultConnectionName, hasMigratedConnections, loadCredentialRecords, credentialFingerprint,
+  listResolvedConnections,
+  resolveConnection,
+  findOrCreateCredential,
+  saveConnectionRecord,
+  deleteConnectionRecord,
+  migrateProfilesToConnections,
+  defaultCapabilities,
+  loadConnectionCapabilities,
+  saveConnectionCapabilities,
+  defaultConnectionName,
+  hasMigratedConnections,
+  loadCredentialRecords,
+  credentialFingerprint,
 } from '../lib/connections.js';
 import { cacheSecret, getCachedSecret } from '../lib/secret-cache.js';
 import { readUrlParams, hasUrlParams, buildShareUrl } from '../lib/url-params.js';
 import { normalizeBasePrefix } from '../lib/base-prefix.js';
 import { isForegroundTask } from '../lib/task-routing.js';
-import {
-  vaultExists, isUnlocked, recallSecret, rememberSecret, createVault, VAULT_ENABLED,
-} from '../lib/vault.js';
+import { vaultExists, isUnlocked, recallSecret, rememberSecret, createVault, VAULT_ENABLED } from '../lib/vault.js';
 import { FileBanner } from './FileBanner.jsx';
 import { CredentialForm } from './CredentialForm.jsx';
 import { VaultUnlock, VAULT_USERNAME } from './VaultUnlock.jsx';
@@ -60,15 +73,30 @@ import { MasterQueue } from './MasterQueue.jsx';
 import { runDeleteOperation } from '../lib/delete-queue.js';
 import { runMoveOperation, runCopyOperation, runRenameOperation, resumeMoveOperation } from '../lib/move-queue.js';
 import { taskStore } from '../lib/task-store.js';
-import { createDeleteTask, createTransferTask, createDownloadTask, createResumableMoveTask, engineUpdateToPatch } from '../lib/queue-tasks.js';
+import {
+  createDeleteTask,
+  createTransferTask,
+  createDownloadTask,
+  createResumableMoveTask,
+  engineUpdateToPatch,
+} from '../lib/queue-tasks.js';
 import { loadAllMoveJobs, loadMoveJob, deleteMoveJob } from '../lib/move-jobs.js';
 import { abortMultipartSession } from '../lib/upload-cleanup.js';
 import { listIncompleteUploads, classifyIncompleteUploads } from '../lib/multipart-uploads.js';
 import { IncompleteUploadsModal } from './IncompleteUploadsModal.jsx';
 import { DownloadJobPanel } from './DownloadJobPanel.jsx';
 import {
-  saveJob, loadJob, loadAllJobs, deleteJob, updateJob, countItemsByStatus,
-  eachItemByStatus, resetFailedToPending, ITEM_STATUS, JOB_STATUS, loadZipDetail,
+  saveJob,
+  loadJob,
+  loadAllJobs,
+  deleteJob,
+  updateJob,
+  countItemsByStatus,
+  eachItemByStatus,
+  resetFailedToPending,
+  ITEM_STATUS,
+  JOB_STATUS,
+  loadZipDetail,
   jobMatchesOrigin,
 } from '../lib/download-records.js';
 import { enumerateJob } from '../lib/download-manifest.js';
@@ -111,17 +139,29 @@ if (_iconLink) _iconLink.href = logoUrl;
 // localStorage (not sessionStorage): "never shown twice" must survive a tab close.
 const VAULT_OFFER_DISMISSED_KEY = 's3b_vault_offer_dismissed';
 function isVaultOfferDismissed() {
-  try { return localStorage.getItem(VAULT_OFFER_DISMISSED_KEY) === '1'; } catch { return false; }
+  try {
+    return localStorage.getItem(VAULT_OFFER_DISMISSED_KEY) === '1';
+  } catch {
+    return false;
+  }
 }
 function dismissVaultOfferPermanently() {
-  try { localStorage.setItem(VAULT_OFFER_DISMISSED_KEY, '1'); } catch { /* private mode — offer may reappear next session, acceptable degradation */ }
+  try {
+    localStorage.setItem(VAULT_OFFER_DISMISSED_KEY, '1');
+  } catch {
+    /* private mode — offer may reappear next session, acceptable degradation */
+  }
 }
 
 // navigator.storage.persisted() can itself throw on a browser where storage.estimate
 // exists but the permission surface does not; treated as "not persisted" rather than
 // propagating, since zipGate() only needs a boolean.
 async function zipStoragePersisted() {
-  try { return !!(await navigator.storage?.persisted?.()); } catch { return false; }
+  try {
+    return !!(await navigator.storage?.persisted?.());
+  } catch {
+    return false;
+  }
 }
 
 // Session states: locked | disconnected | connecting | connected | failed
@@ -129,7 +169,9 @@ export function App() {
   // Computed once at mount from vault.js's own storage reads — unlike recalling a
   // secret, vaultExists()/isUnlocked() do not depend on connection migration having
   // run yet, so (unlike recallSecret) this is safe inside a useState initializer.
-  const [session, setSession] = useState(() => (VAULT_ENABLED && vaultExists() && !isUnlocked()) ? 'locked' : 'disconnected');
+  const [session, setSession] = useState(() =>
+    VAULT_ENABLED && vaultExists() && !isUnlocked() ? 'locked' : 'disconnected',
+  );
   // selectedConnectionId must be declared before credentials so the credentials
   // initializer can pre-fill the form from the saved connection on first load.
   const [selectedConnectionId, setSelectedConnectionId] = useState(() => loadLastProfileId());
@@ -166,10 +208,23 @@ export function App() {
   // `initial` only in its own useState initializer, so without a key change,
   // setCredentials() alone is invisible to an already-mounted form.
   const [formResetKey, setFormResetKey] = useState(0);
-  const [logKey, setLogKey] = useState(0);         // incremented to refresh upload log
+  const [logKey, setLogKey] = useState(0); // incremented to refresh upload log
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [incompleteOpen, setIncompleteOpen] = useState(false);
-  const { changelogOpen, setChangelogOpen, aboutOpen, setAboutOpen, storageOpen, setStorageOpen, duplicatesOpen, setDuplicatesOpen, handoffOpen, setHandoffOpen, downloadOpen, setDownloadOpen } = useModalStates();
+  const {
+    changelogOpen,
+    setChangelogOpen,
+    aboutOpen,
+    setAboutOpen,
+    storageOpen,
+    setStorageOpen,
+    duplicatesOpen,
+    setDuplicatesOpen,
+    handoffOpen,
+    setHandoffOpen,
+    downloadOpen,
+    setDownloadOpen,
+  } = useModalStates();
   // The scope the DownloadJobPanel was opened with (folder or a batch-bar selection),
   // and the prefix a "Use a transfer tool" handoff should target — see handleDownloadRequest.
   const [downloadScope, setDownloadScope] = useState(null);
@@ -206,33 +261,41 @@ export function App() {
   // Persisted against the selected connection. With no connection selected the
   // credentials are ad-hoc, and their capabilities are session-only — persisting
   // them to a global key is what let bucket A's state apply to bucket B.
-  const handleCapabilityChange = useCallback((op, state) => {
-    setCapabilities(prev => {
-      if (prev[op] === state) return prev;
-      const next = { ...prev, [op]: state };
-      if (selectedConnectionId) saveConnectionCapabilities(selectedConnectionId, next);
-      return next;
-    });
-  }, [selectedConnectionId]);
+  const handleCapabilityChange = useCallback(
+    (op, state) => {
+      setCapabilities((prev) => {
+        if (prev[op] === state) return prev;
+        const next = { ...prev, [op]: state };
+        if (selectedConnectionId) saveConnectionCapabilities(selectedConnectionId, next);
+        return next;
+      });
+    },
+    [selectedConnectionId],
+  );
 
   // Live mirror of the selected connection id. Long-lived task callbacks (a move/delete
   // still running after the user switches buckets) otherwise compare against the value
   // captured when the run started; reading this ref gives them the CURRENT foreground so a
   // background task's side effects route correctly.
   const selectedConnectionIdRef = useRef(selectedConnectionId);
-  useEffect(() => { selectedConnectionIdRef.current = selectedConnectionId; }, [selectedConnectionId]);
+  useEffect(() => {
+    selectedConnectionIdRef.current = selectedConnectionId;
+  }, [selectedConnectionId]);
 
   // Apply a capability result to the connection a TASK belongs to, not the live selection.
   // Foreground task → update the shown capabilities (handleCapabilityChange). Background
   // task → persist to its own connection only, never disturbing the foreground's display.
-  const applyTaskCapability = useCallback((taskConnectionId, op, state) => {
-    if (isForegroundTask({ connectionId: taskConnectionId }, selectedConnectionIdRef.current)) {
-      handleCapabilityChange(op, state);
-    } else if (taskConnectionId != null) {
-      const caps = loadConnectionCapabilities(taskConnectionId);
-      if (caps[op] !== state) saveConnectionCapabilities(taskConnectionId, { ...caps, [op]: state });
-    }
-  }, [handleCapabilityChange]);
+  const applyTaskCapability = useCallback(
+    (taskConnectionId, op, state) => {
+      if (isForegroundTask({ connectionId: taskConnectionId }, selectedConnectionIdRef.current)) {
+        handleCapabilityChange(op, state);
+      } else if (taskConnectionId != null) {
+        const caps = loadConnectionCapabilities(taskConnectionId);
+        if (caps[op] !== state) saveConnectionCapabilities(taskConnectionId, { ...caps, [op]: state });
+      }
+    },
+    [handleCapabilityChange],
+  );
 
   // Recently-used buckets for the header quick-switch strip (MRU, capped).
   const connectionTabs = useConnectionTabs(connections, selectedConnectionId);
@@ -242,7 +305,7 @@ export function App() {
     const fresh = defaultCapabilities();
     setCapabilities(fresh);
     if (selectedConnectionId) saveConnectionCapabilities(selectedConnectionId, fresh);
-    setBrowserKey(k => k + 1); // re-mount browser → triggers new listing probe
+    setBrowserKey((k) => k + 1); // re-mount browser → triggers new listing probe
   }
 
   async function handleConnect(creds, { reconnect = false } = {}) {
@@ -283,7 +346,7 @@ export function App() {
       const c = createS3Client(fullCreds);
       setClient(c);
       setSession('connected');
-      setBrowserKey(k => k + 1);
+      setBrowserKey((k) => k + 1);
       // Hold this secret in memory (keyed by the credential's fingerprint) for the tab's
       // life, so a quick-switch back to a bucket on this account doesn't re-prompt. Not
       // persisted — dies with the tab (secret-cache.js). sessionStorage still holds the
@@ -314,7 +377,7 @@ export function App() {
     const conn = resolveConnection(connId);
     if (!conn) return Promise.resolve(false);
     return recallSecret(conn.credentialId, window.crypto.subtle)
-      .then(secret => {
+      .then((secret) => {
         if (!secret) return false;
         handleConnect({ ...conn, ...extraFields, secretKey: secret });
         return true;
@@ -363,21 +426,21 @@ export function App() {
     // handleSaveProfile) — it goes stale for the sidebar's reconnect CredentialForm,
     // which is not wired to onFormChange, so it can lag behind the connection that
     // actually just succeeded; `credentials` is what handleConnect itself just set.
-    const existing = selectedConnectionId ? connections.find(c => c.id === selectedConnectionId) : null;
+    const existing = selectedConnectionId ? connections.find((c) => c.id === selectedConnectionId) : null;
     const cred = findOrCreateCredential({
-      endpoint:       credentials.endpoint,
-      keyId:          credentials.keyId,
-      provider:       credentials.provider,
+      endpoint: credentials.endpoint,
+      keyId: credentials.keyId,
+      provider: credentials.provider,
       regionOverride: credentials.regionOverride,
     });
     if (!existing) {
       const id = Date.now();
       saveConnectionRecord({
         id,
-        name:         defaultConnectionName({ provider: credentials.provider, bucket: credentials.bucket }),
+        name: defaultConnectionName({ provider: credentials.provider, bucket: credentials.bucket }),
         credentialId: cred.id,
-        bucket:       credentials.bucket,
-        basePrefix:   credentials.basePrefix || '',
+        bucket: credentials.bucket,
+        basePrefix: credentials.basePrefix || '',
         capabilities: null,
       });
       setConnections(listResolvedConnections());
@@ -390,7 +453,9 @@ export function App() {
     // practice, but guarded per house policy against any promise rejection here.
     try {
       await rememberSecret(cred.id, credentials.secretKey, window.crypto.subtle);
-    } catch { /* see above */ }
+    } catch {
+      /* see above */
+    }
 
     dismissVaultOfferPermanently();
     setShowVaultOffer(false);
@@ -434,8 +499,8 @@ export function App() {
     // CredentialForm reads `initial` only at mount, so a state update alone is
     // invisible; force a remount only when the URL actually supplied values, to
     // keep the ordinary disconnect path byte-for-byte as it was.
-    if (Object.keys(fromUrl).length > 0) setFormResetKey(k => k + 1);
-    setBrowserKey(k => k + 1);
+    if (Object.keys(fromUrl).length > 0) setFormResetKey((k) => k + 1);
+    setBrowserKey((k) => k + 1);
   }
 
   // A share link opened while Bucketer is already loaded is a SAME-DOCUMENT
@@ -458,9 +523,9 @@ export function App() {
       const fromUrl = readUrlParams();
       if (Object.keys(fromUrl).length === 0) return;
       setUrlHadKeyId(!!fromUrl.keyId);
-      setCredentials(prev => ({ ...prev, ...fromUrl }));
-      setLiveFormData(prev => ({ ...prev, ...fromUrl }));
-      setFormResetKey(k => k + 1);
+      setCredentials((prev) => ({ ...prev, ...fromUrl }));
+      setLiveFormData((prev) => ({ ...prev, ...fromUrl }));
+      setFormResetKey((k) => k + 1);
     };
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
@@ -477,7 +542,10 @@ export function App() {
     // OPFS availability itself is not guaranteed, and this must not delay or block
     // startup either way.
     if (navigator.storage?.getDirectory) {
-      navigator.storage.getDirectory().then(root => sweepOrphanTemps(root)).catch(() => {});
+      navigator.storage
+        .getDirectory()
+        .then((root) => sweepOrphanTemps(root))
+        .catch(() => {});
     }
     repairStorageInvariants();
     // Restores the pre-branch migration chain: a user who last opened Bucketer
@@ -500,13 +568,11 @@ export function App() {
 
     const stored = loadCredentials();
     const fromUrl = readUrlParams();
-    const conn = lastId ? updated.find(c => c.id === lastId) : null;
+    const conn = lastId ? updated.find((c) => c.id === lastId) : null;
     // Prefer flat credentials (written by saveCredentials on every connect) over
     // connection data, so connecting with modified credentials — without saving —
     // is restored correctly on reload.
-    const base = stored.endpoint
-      ? stored
-      : (conn ? { ...conn, secretKey: stored.secretKey || '' } : stored);
+    const base = stored.endpoint ? stored : conn ? { ...conn, secretKey: stored.secretKey || '' } : stored;
     const merged = { ...base, ...fromUrl };
     // First load after migration: the `credentials` initializer above ran BEFORE
     // migrateProfilesToConnections(), so resolveConnection() found nothing and the
@@ -523,7 +589,7 @@ export function App() {
       // selectedConnectionId is unchanged (it was already `lastId` before migration
       // ran), so CredentialForm's key does not change and it will not remount to
       // pick up the credentials update above — force it explicitly.
-      setFormResetKey(k => k + 1);
+      setFormResetKey((k) => k + 1);
     }
     if (merged.endpoint && merged.bucket && merged.keyId && merged.secretKey) {
       handleConnect(merged);
@@ -534,7 +600,7 @@ export function App() {
       // disconnect; a same-tab reload after an earlier unlock still has the vault's
       // session key, though, so recall from it instead. Falls back to the ordinary
       // pre-fill below when this credential has no remembered secret.
-      tryAutoConnectViaVault(lastId, fromUrl).then(connected => {
+      tryAutoConnectViaVault(lastId, fromUrl).then((connected) => {
         if (!connected && !stored.endpoint) prefillFromMigratedConnection();
       });
     } else if (conn && !stored.endpoint) {
@@ -544,7 +610,9 @@ export function App() {
 
   useEffect(() => {
     if (!sidebarOpen) return;
-    const handler = (e) => { if (e.key === 'Escape') setSidebarOpen(false); };
+    const handler = (e) => {
+      if (e.key === 'Escape') setSidebarOpen(false);
+    };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, [sidebarOpen]);
@@ -575,37 +643,54 @@ export function App() {
   async function handleDeleteConfirm() {
     const req = pendingDelete;
     setPendingDelete(null);
-    const task = createDeleteTask({ ...req, bucket: credentials.bucket, connectionId: selectedConnectionId, provider: credentials.provider, endpoint: credentials.endpoint });
+    const task = createDeleteTask({
+      ...req,
+      bucket: credentials.bucket,
+      connectionId: selectedConnectionId,
+      provider: credentials.provider,
+      endpoint: credentials.endpoint,
+    });
     const id = taskStore.add(task);
     try {
-      await runDeleteOperation(client, task.bucket, task, (update) => {
-        // A background task (the user switched buckets mid-run) must not touch the
-        // foreground Browser's listing; the next visit to its bucket re-lists anyway.
-        const fg = isForegroundTask(task, selectedConnectionIdRef.current);
-        if (fg && update.deletedKeys?.length) {
-          browserActionsRef.current?.removeItems(update.deletedKeys, []);
-        }
-        if (update.phase === 'done') {
-          if (fg && update.deletedPrefixes?.length) {
-            browserActionsRef.current?.removeItems([], update.deletedPrefixes);
+      await runDeleteOperation(
+        client,
+        task.bucket,
+        task,
+        (update) => {
+          // A background task (the user switched buckets mid-run) must not touch the
+          // foreground Browser's listing; the next visit to its bucket re-lists anyway.
+          const fg = isForegroundTask(task, selectedConnectionIdRef.current);
+          if (fg && update.deletedKeys?.length) {
+            browserActionsRef.current?.removeItems(update.deletedKeys, []);
           }
-          if (fg) browserActionsRef.current?.invalidateCache(task.capturedPrefix);
-          // A run cancelled before any request proves nothing about permissions.
-          if (update.deleted > 0 || !update.cancelled) {
-            applyTaskCapability(task.connectionId, 'delete', 'permitted');
+          if (update.phase === 'done') {
+            if (fg && update.deletedPrefixes?.length) {
+              browserActionsRef.current?.removeItems([], update.deletedPrefixes);
+            }
+            if (fg) browserActionsRef.current?.invalidateCache(task.capturedPrefix);
+            // A run cancelled before any request proves nothing about permissions.
+            if (update.deleted > 0 || !update.cancelled) {
+              applyTaskCapability(task.connectionId, 'delete', 'permitted');
+            }
+            if (update.errors.length === 0 && !update.cancelled) {
+              const n = req.files.length + req.prefixes.length;
+              showToast(`Deleted ${n} item${n === 1 ? '' : 's'}`);
+            }
           }
-          if (update.errors.length === 0 && !update.cancelled) {
-            const n = req.files.length + req.prefixes.length;
-            showToast(`Deleted ${n} item${n === 1 ? '' : 's'}`);
-          }
-        }
-        taskStore.update(id, engineUpdateToPatch(update, 'deleted'), !!update.phase);
-      }, () => taskStore.isCancelRequested(id));
+          taskStore.update(id, engineUpdateToPatch(update, 'deleted'), !!update.phase);
+        },
+        () => taskStore.isCancelRequested(id),
+      );
     } catch (err) {
-      taskStore.update(id, {
-        status: 'done', subPhase: null,
-        errors: [{ key: '(unexpected)', message: err.message || String(err) }],
-      }, true);
+      taskStore.update(
+        id,
+        {
+          status: 'done',
+          subPhase: null,
+          errors: [{ key: '(unexpected)', message: err.message || String(err) }],
+        },
+        true,
+      );
     }
   }
 
@@ -634,133 +719,163 @@ export function App() {
         // Match the full origin, not just the bucket name: a different provider/endpoint can
         // reuse the same bucket name, and resuming would run copy/delete against the wrong
         // origin with the current credentials (credential confusion).
-        if (j.bucket !== credentials.bucket || j.provider !== credentials.provider || j.endpoint !== credentials.endpoint) continue;
+        if (
+          j.bucket !== credentials.bucket ||
+          j.provider !== credentials.provider ||
+          j.endpoint !== credentials.endpoint
+        )
+          continue;
         if (loadedMovesRef.current.has(j.id)) continue;
-        if (onScreen.some(t => t.id === j.id)) continue; // a move already running this session
+        if (onScreen.some((t) => t.id === j.id)) continue; // a move already running this session
         loadedMovesRef.current.add(j.id);
         taskStore.add(createResumableMoveTask(j));
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [session, credentials?.bucket]);
 
   // Record/enumeration wiring handed to DownloadJobPanel, which stays free of IndexedDB
   // and the SDK. Rebuilt only when the connection changes.
-  const downloadApi = useMemo(() => ({
-    // Every persisted job of this bucket, classified. ONE list, one classifier — the two
-    // independent filters this replaces could show a job twice or, worse, not at all
-    // (postmortem F3/F6): a job invisible to every list has no Discard, so its manifest
-    // was permanent. classifyJob is total, so every job lands in exactly one section.
-    listJobs: async () => {
-      const jobs = await loadAllJobs();
-      const origin = { bucket: credentials.bucket, provider: credentials.provider, endpoint: credentials.endpoint };
-      const mine = jobs.filter(j => jobMatchesOrigin(j, origin) && !activeDownloadJobs.current.has(j.id));
-      return Promise.all(mine.map(async j => {
-        // Jobs enumerated before the sendable counters existed self-heal on first sight:
-        // SKIPPED rows are bounded by the archived count, so this walk is small.
-        let counters = j.counters ?? {};
-        if (counters.sendable == null) {
-          let skipped = 0, skippedBytes = 0;
-          await eachItemByStatus(j.id, ITEM_STATUS.SKIPPED, (it) => { skipped += 1; skippedBytes += it.size || 0; });
-          counters = {
-            ...counters,
-            sendable:      (counters.total ?? 0) - skipped,
-            bytesSendable: (counters.bytesTotal ?? 0) - skippedBytes,
-          };
-          await updateJob(j.id, { counters });
-        }
-        const counts = {
-          pending: await countItemsByStatus(j.id, ITEM_STATUS.PENDING),
-          failed:  await countItemsByStatus(j.id, ITEM_STATUS.FAILED),
-          issued:  await countItemsByStatus(j.id, ITEM_STATUS.ISSUED),
-          done:    await countItemsByStatus(j.id, ITEM_STATUS.DONE),
+  const downloadApi = useMemo(
+    () => ({
+      // Every persisted job of this bucket, classified. ONE list, one classifier — the two
+      // independent filters this replaces could show a job twice or, worse, not at all
+      // (postmortem F3/F6): a job invisible to every list has no Discard, so its manifest
+      // was permanent. classifyJob is total, so every job lands in exactly one section.
+      listJobs: async () => {
+        const jobs = await loadAllJobs();
+        const origin = { bucket: credentials.bucket, provider: credentials.provider, endpoint: credentials.endpoint };
+        const mine = jobs.filter((j) => jobMatchesOrigin(j, origin) && !activeDownloadJobs.current.has(j.id));
+        return Promise.all(
+          mine.map(async (j) => {
+            // Jobs enumerated before the sendable counters existed self-heal on first sight:
+            // SKIPPED rows are bounded by the archived count, so this walk is small.
+            let counters = j.counters ?? {};
+            if (counters.sendable == null) {
+              let skipped = 0,
+                skippedBytes = 0;
+              await eachItemByStatus(j.id, ITEM_STATUS.SKIPPED, (it) => {
+                skipped += 1;
+                skippedBytes += it.size || 0;
+              });
+              counters = {
+                ...counters,
+                sendable: (counters.total ?? 0) - skipped,
+                bytesSendable: (counters.bytesTotal ?? 0) - skippedBytes,
+              };
+              await updateJob(j.id, { counters });
+            }
+            const counts = {
+              pending: await countItemsByStatus(j.id, ITEM_STATUS.PENDING),
+              failed: await countItemsByStatus(j.id, ITEM_STATUS.FAILED),
+              issued: await countItemsByStatus(j.id, ITEM_STATUS.ISSUED),
+              done: await countItemsByStatus(j.id, ITEM_STATUS.DONE),
+            };
+            return { ...j, counters, counts, jobClass: classifyJob(counts) };
+          }),
+        );
+      },
+      startJob: async ({ bucket, prefix, roots, mode, label }) => {
+        const job = {
+          id: crypto.randomUUID(),
+          bucket,
+          prefix,
+          roots,
+          mode,
+          label: label ?? null,
+          // Recorded because a manifest outlives the session that built it, and the archived
+          // check at enumeration is provider-specific. Jobs created before this field
+          // existed have none, which correctly flags nothing rather than guessing AWS.
+          provider: credentials.provider || detectProvider(credentials.endpoint),
+          // Recorded so the job is bound to its FULL origin, not just the bucket name:
+          // two accounts on one provider can reuse a bucket name, and matching on the name
+          // alone let one account's jobs surface under another's (jobMatchesOrigin).
+          endpoint: credentials.endpoint,
+          status: JOB_STATUS.ENUMERATING,
+          enumeration: {},
+          counters: { total: 0, bytesTotal: 0, sendable: 0, bytesSendable: 0 },
+          createdAt: Date.now(),
         };
-        return { ...j, counters, counts, jobClass: classifyJob(counts) };
-      }));
-    },
-    startJob: async ({ bucket, prefix, roots, mode, label }) => {
-      const job = {
-        id: crypto.randomUUID(),
-        bucket, prefix, roots, mode, label: label ?? null,
-        // Recorded because a manifest outlives the session that built it, and the archived
-        // check at enumeration is provider-specific. Jobs created before this field
-        // existed have none, which correctly flags nothing rather than guessing AWS.
-        provider: credentials.provider || detectProvider(credentials.endpoint),
-        // Recorded so the job is bound to its FULL origin, not just the bucket name:
-        // two accounts on one provider can reuse a bucket name, and matching on the name
-        // alone let one account's jobs surface under another's (jobMatchesOrigin).
-        endpoint: credentials.endpoint,
-        status: JOB_STATUS.ENUMERATING,
-        enumeration: {},
-        counters: { total: 0, bytesTotal: 0, sendable: 0, bytesSendable: 0 },
-        createdAt: Date.now(),
-      };
-      await saveJob(job);
-      return job;
-    },
-    // The directory handle is obtained in the component, because showDirectoryPicker
-    // needs a user gesture and cannot be called from here. The bucket is re-checked for
-    // the same reason handleDownloadStart re-checks it: a manifest outlives the session
-    // that built it, and a stale list surviving a reconnect would otherwise verify one
-    // bucket's job against another bucket's session.
-    verify: async (jobId, dirHandle) => {
-      const job = await loadJob(jobId);
-      if (!jobMatchesOrigin(job, { bucket: credentials.bucket, provider: credentials.provider, endpoint: credentials.endpoint })) {
-        throw new Error('That download was created for a different bucket. Reconnect to it to check it.');
-      }
-      return verifyJob(jobId, dirHandle);
-    },
-    enumerate: (job, opts) => enumerateJob(client, job, opts),
-    // A zip job's manifest isn't the only thing to clean up — its staged bytes sit in
-    // OPFS under the job's id and outlive the job record otherwise.
-    discard: async (id) => {
-      const j = await loadJob(id);
-      if (j?.delivery === 'zip') await discardZipStaging(id, { root: await navigator.storage.getDirectory() });
-      return deleteJob(id);
-    },
-    // The gate's async I/O — quota and the persist() flag — is kept here rather than in
-    // the panel, which must stay free of navigator.storage the same way it stays free of
-    // IndexedDB and the SDK. caps are the same browserCapabilities used everywhere else.
-    zipGate: async ({ sendableBytes }) => {
-      const quota = await readStorageQuota();
-      const persisted = await zipStoragePersisted();
-      return zipGate({ caps: browserCapabilities, sendableBytes, quota, persisted });
-    },
-    // The lazy-persist path (design spec): ask for persistent storage, then re-evaluate
-    // the same gate with fresh numbers. persist() can silently fail to grant anything, so
-    // persisted() is re-read rather than assumed — that is what lets a still-too-big job
-    // correctly land back on 'needs-storage' (offer the retry) instead of a wrong,
-    // permanent-looking 'unavailable'.
-    requestPersist: async ({ sendableBytes }) => {
-      try { await navigator.storage?.persist?.(); } catch { /* best effort; re-evaluate regardless */ }
-      const quota = await readStorageQuota();
-      const persisted = await zipStoragePersisted();
-      return zipGate({ caps: browserCapabilities, sendableBytes, quota, persisted });
-    },
-    // Patches the job record for zip delivery and hands back the patched job so the panel
-    // can feed it straight into its existing start-flow (onStart routes delivery:'zip' to
-    // handleZipStart).
-    startZipJob: async (job) => {
-      const patch = { delivery: 'zip', zipName: zipFileName(job.bucket, job.prefix ?? '') };
-      await updateJob(job.id, patch);
-      return { ...job, ...patch };
-    },
-    // Re-export from the intact OPFS staging for a zip job that finished (every item DONE)
-    // but never got its export written — exportZip threw, or the save dialog was
-    // cancelled. The same recoverable "DONE, no exportedAt" state handleZipStart itself
-    // leaves a job in when export fails.
-    exportZipAgain: async (id) => {
-      const j = await loadJob(id);
-      if (!j) return;
-      const root = await navigator.storage.getDirectory();
-      const zipName = j.zipName || zipFileName(j.bucket, j.prefix ?? '');
-      await exportZip(async () => {
-        const staging = await openZipStaging(id, { root });
-        return staging.getFile();
-      }, zipName);
-      await updateJob(id, { exportedAt: Date.now() });
-    },
-  }), [client, credentials.bucket, credentials.provider, credentials.endpoint, browserCapabilities]);
+        await saveJob(job);
+        return job;
+      },
+      // The directory handle is obtained in the component, because showDirectoryPicker
+      // needs a user gesture and cannot be called from here. The bucket is re-checked for
+      // the same reason handleDownloadStart re-checks it: a manifest outlives the session
+      // that built it, and a stale list surviving a reconnect would otherwise verify one
+      // bucket's job against another bucket's session.
+      verify: async (jobId, dirHandle) => {
+        const job = await loadJob(jobId);
+        if (
+          !jobMatchesOrigin(job, {
+            bucket: credentials.bucket,
+            provider: credentials.provider,
+            endpoint: credentials.endpoint,
+          })
+        ) {
+          throw new Error('That download was created for a different bucket. Reconnect to it to check it.');
+        }
+        return verifyJob(jobId, dirHandle);
+      },
+      enumerate: (job, opts) => enumerateJob(client, job, opts),
+      // A zip job's manifest isn't the only thing to clean up — its staged bytes sit in
+      // OPFS under the job's id and outlive the job record otherwise.
+      discard: async (id) => {
+        const j = await loadJob(id);
+        if (j?.delivery === 'zip') await discardZipStaging(id, { root: await navigator.storage.getDirectory() });
+        return deleteJob(id);
+      },
+      // The gate's async I/O — quota and the persist() flag — is kept here rather than in
+      // the panel, which must stay free of navigator.storage the same way it stays free of
+      // IndexedDB and the SDK. caps are the same browserCapabilities used everywhere else.
+      zipGate: async ({ sendableBytes }) => {
+        const quota = await readStorageQuota();
+        const persisted = await zipStoragePersisted();
+        return zipGate({ caps: browserCapabilities, sendableBytes, quota, persisted });
+      },
+      // The lazy-persist path (design spec): ask for persistent storage, then re-evaluate
+      // the same gate with fresh numbers. persist() can silently fail to grant anything, so
+      // persisted() is re-read rather than assumed — that is what lets a still-too-big job
+      // correctly land back on 'needs-storage' (offer the retry) instead of a wrong,
+      // permanent-looking 'unavailable'.
+      requestPersist: async ({ sendableBytes }) => {
+        try {
+          await navigator.storage?.persist?.();
+        } catch {
+          /* best effort; re-evaluate regardless */
+        }
+        const quota = await readStorageQuota();
+        const persisted = await zipStoragePersisted();
+        return zipGate({ caps: browserCapabilities, sendableBytes, quota, persisted });
+      },
+      // Patches the job record for zip delivery and hands back the patched job so the panel
+      // can feed it straight into its existing start-flow (onStart routes delivery:'zip' to
+      // handleZipStart).
+      startZipJob: async (job) => {
+        const patch = { delivery: 'zip', zipName: zipFileName(job.bucket, job.prefix ?? '') };
+        await updateJob(job.id, patch);
+        return { ...job, ...patch };
+      },
+      // Re-export from the intact OPFS staging for a zip job that finished (every item DONE)
+      // but never got its export written — exportZip threw, or the save dialog was
+      // cancelled. The same recoverable "DONE, no exportedAt" state handleZipStart itself
+      // leaves a job in when export fails.
+      exportZipAgain: async (id) => {
+        const j = await loadJob(id);
+        if (!j) return;
+        const root = await navigator.storage.getDirectory();
+        const zipName = j.zipName || zipFileName(j.bucket, j.prefix ?? '');
+        await exportZip(async () => {
+          const staging = await openZipStaging(id, { root });
+          return staging.getFile();
+        }, zipName);
+        await updateJob(id, { exportedAt: Date.now() });
+      },
+    }),
+    [client, credentials.bucket, credentials.provider, credentials.endpoint, browserCapabilities],
+  );
 
   // The panel has already listed the folder and taken the user's confirmation, so this
   // starts issuing straight away. Note it never touches capabilities: presigning is a
@@ -775,7 +890,13 @@ export function App() {
     // so the match is checked rather than assumed. Without this, a stale job would presign
     // its own recorded bucket using the *current* client, signing for a bucket the user is
     // not connected to.
-    if (!jobMatchesOrigin(fresh, { bucket: credentials.bucket, provider: credentials.provider, endpoint: credentials.endpoint })) {
+    if (
+      !jobMatchesOrigin(fresh, {
+        bucket: credentials.bucket,
+        provider: credentials.provider,
+        endpoint: credentials.endpoint,
+      })
+    ) {
       showToast('That download was created for a different bucket. Reconnect to it to continue.');
       return;
     }
@@ -790,26 +911,36 @@ export function App() {
     // (postmortem F5). Not counters.sendable either — a resume sends the remainder, and
     // "Sent 2 of 2" is what a completed 2-file resume looks like, not "Sent 2 of 3".
     const total = await countItemsByStatus(fresh.id, ITEM_STATUS.PENDING);
-    const task = createDownloadTask({ fileCount: total, bucket: fresh.bucket, capturedPrefix: fresh.prefix, connectionId: selectedConnectionId, provider: credentials.provider, endpoint: credentials.endpoint });
+    const task = createDownloadTask({
+      fileCount: total,
+      bucket: fresh.bucket,
+      capturedPrefix: fresh.prefix,
+      connectionId: selectedConnectionId,
+      provider: credentials.provider,
+      endpoint: credentials.endpoint,
+    });
     const id = taskStore.add(task);
     taskStore.update(id, { subPhase: null, total }, true);
     activeDownloadJobs.current.add(fresh.id);
     await updateJob(fresh.id, { status: JOB_STATUS.RUNNING });
 
-    const presign = (key, filename) => getSignedUrl(
-      client,
-      new GetObjectCommand(presignDownloadParams({ Bucket: fresh.bucket, Key: key, filename })),
-      { expiresIn: DOWNLOAD_PRESIGN_EXPIRES },
-    );
+    const presign = (key, filename) =>
+      getSignedUrl(client, new GetObjectCommand(presignDownloadParams({ Bucket: fresh.bucket, Key: key, filename })), {
+        expiresIn: DOWNLOAD_PRESIGN_EXPIRES,
+      });
 
     try {
-      const result = await runDownloadJob(fresh, {
-        presign,
-        issue: issueBrowserDownload,
-        probe: probeUrl,
-        shouldCancel: () => taskStore.isCancelRequested(id),
-        onProgress: ({ issued }) => taskStore.update(id, { current: issued }, false),
-      }, { delayMs: DOWNLOAD_ISSUE_DELAY_MS });
+      const result = await runDownloadJob(
+        fresh,
+        {
+          presign,
+          issue: issueBrowserDownload,
+          probe: probeUrl,
+          shouldCancel: () => taskStore.isCancelRequested(id),
+          onProgress: ({ issued }) => taskStore.update(id, { current: issued }, false),
+        },
+        { delayMs: DOWNLOAD_ISSUE_DELAY_MS },
+      );
 
       // A job-wide stop leads the error list rather than joining it: it explains why the
       // run ended, whereas the per-item entries are only the keys that individually failed.
@@ -817,12 +948,16 @@ export function App() {
         ? [{ key: '(job stopped)', message: blockedMessage(result.blocked) }, ...result.errors]
         : result.errors;
 
-      taskStore.update(id, {
-        status:   result.cancelled ? 'cancelled' : 'done',
-        subPhase: null,
-        current:  result.issued,
-        errors,
-      }, true);
+      taskStore.update(
+        id,
+        {
+          status: result.cancelled ? 'cancelled' : 'done',
+          subPhase: null,
+          current: result.issued,
+          errors,
+        },
+        true,
+      );
 
       // A manifest is kept whenever the run left something to act on — failures to retry,
       // a block to resume, or issued files whose arrival can still be verified. A run
@@ -837,10 +972,15 @@ export function App() {
         await deleteJob(fresh.id);
       }
     } catch (err) {
-      taskStore.update(id, {
-        status: 'done', subPhase: null,
-        errors: [{ key: '(unexpected)', message: err.message || String(err) }],
-      }, true);
+      taskStore.update(
+        id,
+        {
+          status: 'done',
+          subPhase: null,
+          errors: [{ key: '(unexpected)', message: err.message || String(err) }],
+        },
+        true,
+      );
     } finally {
       activeDownloadJobs.current.delete(fresh.id);
     }
@@ -855,7 +995,13 @@ export function App() {
     if (!fresh) return;
 
     // See handleDownloadStart: a manifest outlives the session that built it.
-    if (!jobMatchesOrigin(fresh, { bucket: credentials.bucket, provider: credentials.provider, endpoint: credentials.endpoint })) {
+    if (
+      !jobMatchesOrigin(fresh, {
+        bucket: credentials.bucket,
+        provider: credentials.provider,
+        endpoint: credentials.endpoint,
+      })
+    ) {
       showToast('That download was created for a different bucket. Reconnect to it to continue.');
       return;
     }
@@ -879,9 +1025,15 @@ export function App() {
     // bytesTotal for a job enumerated before the sendable counters existed.
     const bytesTotal = fresh.counters?.bytesSendable ?? fresh.counters?.bytesTotal ?? 0;
     const task = createDownloadTask({
-      fileCount: total, bucket: fresh.bucket, capturedPrefix: fresh.prefix, delivery: 'zip',
-      jobId: fresh.id, bytesTotal,
-      connectionId: selectedConnectionId, provider: credentials.provider, endpoint: credentials.endpoint,
+      fileCount: total,
+      bucket: fresh.bucket,
+      capturedPrefix: fresh.prefix,
+      delivery: 'zip',
+      jobId: fresh.id,
+      bytesTotal,
+      connectionId: selectedConnectionId,
+      provider: credentials.provider,
+      endpoint: credentials.endpoint,
     });
     const id = taskStore.add(task);
     taskStore.update(id, { subPhase: null, total }, true);
@@ -891,11 +1043,10 @@ export function App() {
     // pausing for a different reason, or finishing cleanly.
     await updateJob(fresh.id, { status: JOB_STATUS.RUNNING, pausedForStorage: false });
 
-    const presign = (key, filename) => getSignedUrl(
-      client,
-      new GetObjectCommand(presignDownloadParams({ Bucket: fresh.bucket, Key: key, filename })),
-      { expiresIn: DOWNLOAD_PRESIGN_EXPIRES },
-    );
+    const presign = (key, filename) =>
+      getSignedUrl(client, new GetObjectCommand(presignDownloadParams({ Bucket: fresh.bucket, Key: key, filename })), {
+        expiresIn: DOWNLOAD_PRESIGN_EXPIRES,
+      });
 
     try {
       const root = await navigator.storage.getDirectory();
@@ -922,14 +1073,18 @@ export function App() {
         ? [{ key: '(job stopped)', message: blockedMessage(result.blocked) }, ...result.errors]
         : result.errors;
 
-      taskStore.update(id, {
-        status:   result.cancelled ? 'cancelled' : 'done',
-        subPhase: null,
-        current:  doneCount,
-        finished: result.finished,
-        failed:   result.failed,
-        errors,
-      }, true);
+      taskStore.update(
+        id,
+        {
+          status: result.cancelled ? 'cancelled' : 'done',
+          subPhase: null,
+          current: doneCount,
+          finished: result.finished,
+          failed: result.failed,
+          errors,
+        },
+        true,
+      );
 
       if (result.finished) {
         // Mark the job DONE — staging holds a complete, valid zip — before attempting
@@ -960,10 +1115,15 @@ export function App() {
         await updateJob(fresh.id, { status: JOB_STATUS.PAUSED, pausedForStorage: result.blocked?.kind === 'STORAGE' });
       }
     } catch (err) {
-      taskStore.update(id, {
-        status: 'done', subPhase: null,
-        errors: [{ key: '(unexpected)', message: err.message || String(err) }],
-      }, true);
+      taskStore.update(
+        id,
+        {
+          status: 'done',
+          subPhase: null,
+          errors: [{ key: '(unexpected)', message: err.message || String(err) }],
+        },
+        true,
+      );
     } finally {
       activeDownloadJobs.current.delete(fresh.id);
     }
@@ -1010,19 +1170,46 @@ export function App() {
   // The MovePickerModal is the confirmation step, so a move/copy request starts
   // its task directly. A move (only) persists a resumable job keyed by the task id.
   async function handleMoveRequest({ files, prefixes, dest, capturedPrefix, mode = 'move', renameTo }) {
-    const task = createTransferTask({ files, prefixes, dest, capturedPrefix, bucket: credentials.bucket, mode, renameTo, connectionId: selectedConnectionId, provider: credentials.provider, endpoint: credentials.endpoint });
+    const task = createTransferTask({
+      files,
+      prefixes,
+      dest,
+      capturedPrefix,
+      bucket: credentials.bucket,
+      mode,
+      renameTo,
+      connectionId: selectedConnectionId,
+      provider: credentials.provider,
+      endpoint: credentials.endpoint,
+    });
     const id = taskStore.add(task);
     loadedMovesRef.current.add(id); // this job is already on screen — never re-surface it as paused
     const runOperation = mode === 'rename' ? runRenameOperation : mode === 'copy' ? runCopyOperation : runMoveOperation;
     const op = { ...task, jobId: id, provider: credentials.provider, endpoint: credentials.endpoint };
     try {
-      await runOperation(client, task.bucket, op, moveProgress(id, { capturedPrefix: task.capturedPrefix, dest: task.dest, mode, moveJobId: id, connectionId: task.connectionId }),
-        () => taskStore.isCancelRequested(id));
+      await runOperation(
+        client,
+        task.bucket,
+        op,
+        moveProgress(id, {
+          capturedPrefix: task.capturedPrefix,
+          dest: task.dest,
+          mode,
+          moveJobId: id,
+          connectionId: task.connectionId,
+        }),
+        () => taskStore.isCancelRequested(id),
+      );
     } catch (err) {
-      taskStore.update(id, {
-        status: 'done', subPhase: null,
-        errors: [{ key: '(unexpected)', message: err.message || String(err) }],
-      }, true);
+      taskStore.update(
+        id,
+        {
+          status: 'done',
+          subPhase: null,
+          errors: [{ key: '(unexpected)', message: err.message || String(err) }],
+        },
+        true,
+      );
     }
   }
 
@@ -1030,15 +1217,31 @@ export function App() {
   // to running. On clean completion the engine deletes the record and the row settles as done.
   async function handleResumeMove(task) {
     const record = await loadMoveJob(task.moveJobId);
-    if (!record) { taskStore.remove(task.id); return; }
+    if (!record) {
+      taskStore.remove(task.id);
+      return;
+    }
     taskStore.update(task.id, { status: 'running', subPhase: 'moving' }, true);
     try {
-      await resumeMoveOperation(client, record.bucket, record,
-        moveProgress(task.id, { capturedPrefix: record.capturedPrefix, dest: record.dest, mode: 'move', moveJobId: task.moveJobId, connectionId: selectedConnectionId }),
-        () => taskStore.isCancelRequested(task.id));
+      await resumeMoveOperation(
+        client,
+        record.bucket,
+        record,
+        moveProgress(task.id, {
+          capturedPrefix: record.capturedPrefix,
+          dest: record.dest,
+          mode: 'move',
+          moveJobId: task.moveJobId,
+          connectionId: selectedConnectionId,
+        }),
+        () => taskStore.isCancelRequested(task.id),
+      );
     } catch (err) {
-      taskStore.update(task.id, { status: 'done', subPhase: null,
-        errors: [{ key: '(unexpected)', message: err.message || String(err) }] }, true);
+      taskStore.update(
+        task.id,
+        { status: 'done', subPhase: null, errors: [{ key: '(unexpected)', message: err.message || String(err) }] },
+        true,
+      );
     }
   }
 
@@ -1054,8 +1257,11 @@ export function App() {
   }
   async function discardIncompleteUpload(upload) {
     await abortMultipartSession(client, {
-      bucket: credentials.bucket, key: upload.key, uploadId: upload.uploadId,
-      provider: credentials.provider, endpoint: credentials.endpoint,
+      bucket: credentials.bucket,
+      key: upload.key,
+      uploadId: upload.uploadId,
+      provider: credentials.provider,
+      endpoint: credentials.endpoint,
     });
   }
 
@@ -1064,11 +1270,17 @@ export function App() {
   async function handleDiscardMove(task) {
     const record = await loadMoveJob(task.moveJobId);
     if (record) {
-      const destBySource = new Map(record.items.map(it => [it.sourceKey, it.destKey]));
+      const destBySource = new Map(record.items.map((it) => [it.sourceKey, it.destKey]));
       for (const [sourceKey, info] of Object.entries(record.inflightUploads || {})) {
         const key = destBySource.get(sourceKey);
         if (key && info?.uploadId) {
-          await abortMultipartSession(client, { bucket: record.bucket, key, uploadId: info.uploadId, provider: record.provider, endpoint: record.endpoint }).catch(() => {});
+          await abortMultipartSession(client, {
+            bucket: record.bucket,
+            key,
+            uploadId: info.uploadId,
+            provider: record.provider,
+            endpoint: record.endpoint,
+          }).catch(() => {});
         }
       }
       await deleteMoveJob(task.moveJobId).catch(() => {});
@@ -1107,7 +1319,7 @@ export function App() {
     } else {
       handleSelectProfile(id);
       if (session === 'connected') setSession('disconnected');
-      setFormResetKey(k => k + 1);
+      setFormResetKey((k) => k + 1);
     }
   }
 
@@ -1118,17 +1330,15 @@ export function App() {
     // (set from the profile/credentials on load, before any edits). This prevents
     // a stale providerOverride from a previous session from leaking into the saved
     // profile, while preserving genuine explicit overrides (e.g. MinIO on a generic URL).
-    const providerSource = 'providerOverride' in liveFormData
-      ? liveFormData.providerOverride
-      : liveFormData.provider;
+    const providerSource = 'providerOverride' in liveFormData ? liveFormData.providerOverride : liveFormData.provider;
     const provider = providerSource || detectProvider(ep);
 
     const trimmedBucket = (liveFormData.bucket || '').trim();
     const basePrefix = normalizeBasePrefix(liveFormData.basePrefix);
 
     const cred = findOrCreateCredential({
-      endpoint:       ep,
-      keyId:          (liveFormData.keyId || '').trim(),
+      endpoint: ep,
+      keyId: (liveFormData.keyId || '').trim(),
       provider,
       regionOverride: (liveFormData.regionOverride || '').trim(),
     });
@@ -1138,16 +1348,17 @@ export function App() {
     // same bucket updates it rather than creating a duplicate row (there is no selected
     // connection in that flow). Falls through to a fresh id for a genuinely new bucket.
     const existing = selectedConnectionId
-      ? connections.find(c => c.id === selectedConnectionId)
-      : listResolvedConnections().find(c =>
-          c.credentialId === cred.id && c.bucket === trimmedBucket && (c.basePrefix || '') === basePrefix);
+      ? connections.find((c) => c.id === selectedConnectionId)
+      : listResolvedConnections().find(
+          (c) => c.credentialId === cred.id && c.bucket === trimmedBucket && (c.basePrefix || '') === basePrefix,
+        );
     const id = existing ? existing.id : Date.now();
 
     const conn = {
       id,
-      name:         name || defaultConnectionName({ provider, bucket: trimmedBucket }),
+      name: name || defaultConnectionName({ provider, bucket: trimmedBucket }),
       credentialId: cred.id,
-      bucket:       trimmedBucket,
+      bucket: trimmedBucket,
       basePrefix,
     };
     // Only set capabilities when creating. On update, omit the key so
@@ -1189,20 +1400,20 @@ export function App() {
     // not the write actually landed.
     const creds = {
       id,
-      name:           conn.name,
-      bucket:         conn.bucket,
-      basePrefix:     conn.basePrefix,
+      name: conn.name,
+      bucket: conn.bucket,
+      basePrefix: conn.basePrefix,
       // Mirrors the `if (!existing) conn.capabilities = null;` branch above: a
       // new connection's capabilities are null; an updated one keeps whatever
       // was already known (existing is the pre-write snapshot from React state —
       // the same source conn.capabilities deliberately avoided overwriting).
-      capabilities:   existing ? (existing.capabilities ?? null) : null,
-      credentialId:   cred.id,
-      endpoint:       cred.endpoint,
-      keyId:          cred.keyId,
-      provider:       cred.provider,
+      capabilities: existing ? (existing.capabilities ?? null) : null,
+      credentialId: cred.id,
+      endpoint: cred.endpoint,
+      keyId: cred.keyId,
+      provider: cred.provider,
       regionOverride: cred.regionOverride,
-      secretKey:      liveFormData.secretKey || '',
+      secretKey: liveFormData.secretKey || '',
     };
     setCredentials(creds);
     setLiveFormData(creds);
@@ -1215,23 +1426,23 @@ export function App() {
   // (account, bucket) pairing is persisted by the normal save flow, which de-dupes the
   // credential via findOrCreateCredential so the bucket lands under the same account.
   function handleAddBucket(credentialId) {
-    const cred = loadCredentialRecords().credentials.find(c => c.id === credentialId);
+    const cred = loadCredentialRecords().credentials.find((c) => c.id === credentialId);
     if (!cred) return;
     const prefill = {
-      endpoint:       cred.endpoint,
-      keyId:          cred.keyId,
-      provider:       cred.provider,
+      endpoint: cred.endpoint,
+      keyId: cred.keyId,
+      provider: cred.provider,
       regionOverride: cred.regionOverride,
-      bucket:         '',
-      basePrefix:     '',
-      secretKey:      '',
+      bucket: '',
+      basePrefix: '',
+      secretKey: '',
     };
     setSelectedConnectionId(null);
     saveLastProfileId(null);
     setCapabilities(defaultCapabilities());
     setCredentials(prefill);
     setLiveFormData(prefill);
-    setFormResetKey(k => k + 1); // remount CredentialForm so it re-reads the prefilled `initial`
+    setFormResetKey((k) => k + 1); // remount CredentialForm so it re-reads the prefilled `initial`
   }
 
   function handleDeleteProfile(id) {
@@ -1257,14 +1468,19 @@ export function App() {
           scope={downloadScope ?? { kind: 'folder', prefix: currentPrefix }}
           api={downloadApi}
           capabilities={browserCapabilities}
-          onStart={(job) => job.delivery === 'zip' ? handleZipStart(job) : handleDownloadStart(job)}
-          onClose={() => { setDownloadOpen(false); setDownloadScope(null); }}
+          onStart={(job) => (job.delivery === 'zip' ? handleZipStart(job) : handleDownloadStart(job))}
+          onClose={() => {
+            setDownloadOpen(false);
+            setDownloadScope(null);
+          }}
           onUseTransferTool={() => {
             // Only reachable from folder scope (the panel hides the link otherwise), so the
             // handoff targets the panel's folder — which may be a subfolder the user never
             // navigated into.
             setHandoffPrefix(downloadScope?.kind === 'folder' ? downloadScope.prefix : currentPrefix);
-            setDownloadOpen(false); setDownloadScope(null); setHandoffOpen(true);
+            setDownloadOpen(false);
+            setDownloadScope(null);
+            setHandoffOpen(true);
           }}
         />
       )}
@@ -1272,7 +1488,10 @@ export function App() {
         <TransferHandoff
           credentials={credentials}
           currentPrefix={handoffPrefix ?? currentPrefix}
-          onClose={() => { setHandoffOpen(false); setHandoffPrefix(null); }}
+          onClose={() => {
+            setHandoffOpen(false);
+            setHandoffPrefix(null);
+          }}
         />
       )}
       {duplicatesOpen && session === 'connected' && (
@@ -1307,7 +1526,7 @@ export function App() {
         {session === 'connected' && (
           <button
             class="hamburger"
-            onClick={() => setSidebarOpen(o => !o)}
+            onClick={() => setSidebarOpen((o) => !o)}
             aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
           >
             {sidebarOpen ? '✕' : '☰'}
@@ -1318,13 +1537,9 @@ export function App() {
           <ConnectionTabs tabs={connectionTabs} selectedId={selectedConnectionId} onSelect={switchToConnection} />
         )}
         <span class="spacer" />
-        {providerLabel && session === 'connected' && (
-          <span class="header-status">{providerLabel}</span>
-        )}
+        {providerLabel && session === 'connected' && <span class="header-status">{providerLabel}</span>}
         <StatusBadge session={session} />
-        {session === 'connected' && buildShareUrl(credentials) && (
-          <ShareLinkMenu credentials={credentials} />
-        )}
+        {session === 'connected' && buildShareUrl(credentials) && <ShareLinkMenu credentials={credentials} />}
         {session === 'connected' && capabilities.list !== 'denied' && (
           <button
             type="button"
@@ -1349,7 +1564,12 @@ export function App() {
           </button>
         )}
         {session === 'connected' && (
-          <button type="button" class="btn btn-ghost btn-sm" style={{ color: '#fff', borderColor: 'rgba(255,255,255,.4)' }} onClick={handleDisconnect}>
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            style={{ color: '#fff', borderColor: 'rgba(255,255,255,.4)' }}
+            onClick={handleDisconnect}
+          >
             Sign out
           </button>
         )}
@@ -1423,29 +1643,55 @@ export function App() {
             <div class="splash-info">
               <div class="splash-info-section">
                 <div class="splash-info-heading">About Bucketer</div>
-                <p>Every S3 GUI tool asks you to make a trade. Desktop clients require installation and don't travel with you. SaaS browser tools skip the install but route your credentials through servers you don't control. Self-hosted web UIs solve the credential trust problem by asking you to run and maintain a backend. Something always gives.</p>
-                <p><strong>Bucketer doesn't make you choose.</strong></p>
-                <p>It runs entirely in the browser — no installation, no backend, no server to maintain. The whole application ships as a single self-contained HTML file. Your secret key never leaves your browser except as a SigV4 signature on requests sent over TLS directly to your storage endpoint. Close the tab; the credentials are gone.</p>
-                <p>It handles multipart uploads of any size with cross-session resume, works first-class against B2, R2, Wasabi, AWS S3, MinIO, and any S3-compatible API, and shares state as deep-linkable URLs that never expose your bucket name in server logs.</p>
-                <p><button class="splash-about-link" onClick={() => setAboutOpen(true)}>Learn more →</button></p>
+                <p>
+                  Every S3 GUI tool asks you to make a trade. Desktop clients require installation and don't travel with
+                  you. SaaS browser tools skip the install but route your credentials through servers you don't control.
+                  Self-hosted web UIs solve the credential trust problem by asking you to run and maintain a backend.
+                  Something always gives.
+                </p>
+                <p>
+                  <strong>Bucketer doesn't make you choose.</strong>
+                </p>
+                <p>
+                  It runs entirely in the browser — no installation, no backend, no server to maintain. The whole
+                  application ships as a single self-contained HTML file. Your secret key never leaves your browser
+                  except as a SigV4 signature on requests sent over TLS directly to your storage endpoint. Close the
+                  tab; the credentials are gone.
+                </p>
+                <p>
+                  It handles multipart uploads of any size with cross-session resume, works first-class against B2, R2,
+                  Wasabi, AWS S3, MinIO, and any S3-compatible API, and shares state as deep-linkable URLs that never
+                  expose your bucket name in server logs.
+                </p>
+                <p>
+                  <button class="splash-about-link" onClick={() => setAboutOpen(true)}>
+                    Learn more →
+                  </button>
+                </p>
               </div>
 
               <div class="splash-info-section">
                 <div class="splash-info-heading">What is an S3-compatible bucket?</div>
                 <p>
-                  S3 is a widely-adopted standard for cloud storage, originally created by Amazon
-                  Web Services. Many providers use the same interface: Backblaze B2, Cloudflare R2,
-                  Wasabi, MinIO, and others.
+                  S3 is a widely-adopted standard for cloud storage, originally created by Amazon Web Services. Many
+                  providers use the same interface: Backblaze B2, Cloudflare R2, Wasabi, MinIO, and others.
                 </p>
                 <p>To connect you need three things from your storage provider:</p>
                 <ul class="splash-info-list">
-                  <li><strong>Endpoint</strong> — the provider's storage URL (e.g. <code>https://s3.us-east-1.amazonaws.com</code>)</li>
-                  <li><strong>Bucket name</strong> — the name of your storage container</li>
-                  <li><strong>Key ID and Secret Key</strong> — access credentials, similar to a username and password</li>
+                  <li>
+                    <strong>Endpoint</strong> — the provider's storage URL (e.g.{' '}
+                    <code>https://s3.us-east-1.amazonaws.com</code>)
+                  </li>
+                  <li>
+                    <strong>Bucket name</strong> — the name of your storage container
+                  </li>
+                  <li>
+                    <strong>Key ID and Secret Key</strong> — access credentials, similar to a username and password
+                  </li>
                 </ul>
                 <p>
-                  There is no account to create here. Access is controlled entirely by the
-                  credentials your storage provider gives you.
+                  There is no account to create here. Access is controlled entirely by the credentials your storage
+                  provider gives you.
                 </p>
               </div>
             </div>
@@ -1481,32 +1727,37 @@ export function App() {
             <SettingsPanel
               provider={credentials.provider}
               updateCheckEnabled={updateCheckEnabled}
-              onUpdateCheckChange={(val) => { saveUpdateCheckEnabled(val); setUpdateCheckEnabled(val); }}
+              onUpdateCheckChange={(val) => {
+                saveUpdateCheckEnabled(val);
+                setUpdateCheckEnabled(val);
+              }}
               prefetchSizeLimit={prefetchSizeLimit}
-              onPrefetchSizeLimitChange={(val) => { savePrefetchSizeLimit(val); setPrefetchSizeLimit(val); }}
+              onPrefetchSizeLimitChange={(val) => {
+                savePrefetchSizeLimit(val);
+                setPrefetchSizeLimit(val);
+              }}
             />
             <hr style={{ border: 'none', borderTop: '1px solid var(--border)' }} />
             <details class="s3-primer">
               <summary class="s3-primer-summary">About S3 buckets</summary>
               <div class="s3-primer-body">
                 <p>
-                  S3 buckets don't have real folders. What looks like a folder is just a
-                  shared prefix in the file name — a file stored as{' '}
-                  <code>photos/2024/trip.jpg</code> appears inside{' '}
-                  <code>photos / 2024</code>, but its full name is the entire path.
+                  S3 buckets don't have real folders. What looks like a folder is just a shared prefix in the file name
+                  — a file stored as <code>photos/2024/trip.jpg</code> appears inside <code>photos / 2024</code>, but
+                  its full name is the entire path.
                 </p>
                 <p>A few things that follow from this:</p>
                 <ul>
                   <li>Empty folders don't exist — they disappear when the last file inside them is deleted.</li>
                   <li>Files can only be in one place — there are no shortcuts or aliases.</li>
                   <li>
-                    Deleting a file is permanent unless your bucket has versioning enabled,
-                    in which case older versions can be recovered.
+                    Deleting a file is permanent unless your bucket has versioning enabled, in which case older versions
+                    can be recovered.
                   </li>
                 </ul>
                 <p>
-                  Access is controlled by your Key ID and Secret Key, not by user accounts.
-                  Anyone with those credentials has whatever permissions were granted to that key.
+                  Access is controlled by your Key ID and Secret Key, not by user accounts. Anyone with those
+                  credentials has whatever permissions were granted to that key.
                 </p>
               </div>
             </details>
@@ -1526,15 +1777,19 @@ export function App() {
               onLogEntry={() => {
                 if (logKeyDebounceRef.current) return;
                 logKeyDebounceRef.current = setTimeout(() => {
-                  setLogKey(k => k + 1);
+                  setLogKey((k) => k + 1);
                   logKeyDebounceRef.current = null;
                 }, 500);
               }}
-              onMount={({ addFiles }) => { addFilesRef.current = addFiles; }}
+              onMount={({ addFiles }) => {
+                addFilesRef.current = addFiles;
+              }}
             />
 
             <MasterQueue
-              readZipDetail={(jobId) => loadZipDetail(jobId).catch(() => ({ done: [], failed: [], doneCount: 0, failedCount: 0 }))}
+              readZipDetail={(jobId) =>
+                loadZipDetail(jobId).catch(() => ({ done: [], failed: [], doneCount: 0, failedCount: 0 }))
+              }
               onResumeMove={handleResumeMove}
               onDiscardMove={handleDiscardMove}
             />
@@ -1552,55 +1807,65 @@ export function App() {
               credentials={credentials}
               onCapabilityChange={handleCapabilityChange}
               capabilities={capabilities}
-              onInitialListFailed={(err) => { setSession('failed'); setConnectionError(err); }}
+              onInitialListFailed={(err) => {
+                setSession('failed');
+                setConnectionError(err);
+              }}
               onUploadTargetChange={setCurrentPrefix}
               onExternalDrop={(entries) => addFilesRef.current?.(entries)}
               onDeleteRequest={handleDeleteRequest}
               onMoveRequest={handleMoveRequest}
               onDownloadRequest={handleDownloadRequest}
-              onMount={(actions) => { browserActionsRef.current = actions; }}
+              onMount={(actions) => {
+                browserActionsRef.current = actions;
+              }}
               prefetchSizeLimit={prefetchSizeLimit}
             />
           </main>
         </div>
       )}
       {windowDragOver && session === 'connected' && capabilities.upload !== 'denied' && (
-        <div
-          class="window-drop-overlay"
-          onDragOver={(e) => e.preventDefault()}
-          onDrop={handleWindowDrop}
-        >
+        <div class="window-drop-overlay" onDragOver={(e) => e.preventDefault()} onDrop={handleWindowDrop}>
           <div class="window-drop-inner">Drop files anywhere to upload</div>
         </div>
       )}
       <footer class="app-footer">
-        <a href="https://gitlab.com/hidayahtech/bucketer" target="_blank" rel="noopener noreferrer">Bucketer</a>
-        {' '}&mdash;{' '}
-        <button class="footer-link-btn" onClick={() => setAboutOpen(true)}>About</button>
-        {' '}&mdash;{' '}
-        <button class="footer-link-btn" onClick={() => setStorageOpen(true)}>Storage &amp; Privacy</button>
-        {' '}&mdash;{' '}
-        Copyright &copy; 2026 <a href="https://hidayahtech.com" target="_blank" rel="noopener noreferrer">HidayahTech, LLC</a>
+        <a href="https://gitlab.com/hidayahtech/bucketer" target="_blank" rel="noopener noreferrer">
+          Bucketer
+        </a>{' '}
+        &mdash;{' '}
+        <button class="footer-link-btn" onClick={() => setAboutOpen(true)}>
+          About
+        </button>{' '}
+        &mdash;{' '}
+        <button class="footer-link-btn" onClick={() => setStorageOpen(true)}>
+          Storage &amp; Privacy
+        </button>{' '}
+        &mdash; Copyright &copy; 2026{' '}
+        <a href="https://hidayahtech.com" target="_blank" rel="noopener noreferrer">
+          HidayahTech, LLC
+        </a>
       </footer>
     </div>
   );
 }
 
 function StatusBadge({ session }) {
-  const cls = {
-    locked:       'status-disconnected', // no dedicated CSS state — reads the same as disconnected
-    disconnected: 'status-disconnected',
-    connecting:   'status-connecting',
-    connected:    'status-connected',
-    failed:       'status-failed',
-  }[session] || 'status-disconnected';
+  const cls =
+    {
+      locked: 'status-disconnected', // no dedicated CSS state — reads the same as disconnected
+      disconnected: 'status-disconnected',
+      connecting: 'status-connecting',
+      connected: 'status-connected',
+      failed: 'status-failed',
+    }[session] || 'status-disconnected';
 
   const label = {
-    locked:       'Locked',
+    locked: 'Locked',
     disconnected: 'Disconnected',
-    connecting:   'Connecting',
-    connected:    'Connected',
-    failed:       'Failed',
+    connecting: 'Connecting',
+    connected: 'Connected',
+    failed: 'Failed',
   }[session];
 
   return (
@@ -1633,8 +1898,13 @@ function VaultOfferBanner({ busy, error, onCreate, onDismiss }) {
     <div class="banner banner-info" role="status">
       <div class="banner-body">
         <div>Save this key so you don't have to retype it next time?</div>
-        <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '.4rem' }}>
-          <label htmlFor="vault-offer-username" class="hint">Account</label>
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flexWrap: 'wrap', marginTop: '.4rem' }}
+        >
+          <label htmlFor="vault-offer-username" class="hint">
+            Account
+          </label>
           <input
             id="vault-offer-username"
             name="vault-username"
@@ -1644,23 +1914,33 @@ function VaultOfferBanner({ busy, error, onCreate, onDismiss }) {
             autocomplete="username"
             style={{ width: '14rem' }}
           />
-          <label htmlFor="vault-offer-passphrase" class="hint">Passphrase</label>
+          <label htmlFor="vault-offer-passphrase" class="hint">
+            Passphrase
+          </label>
           <input
             id="vault-offer-passphrase"
             name="vault-new-passphrase"
             type="password"
             value={passphrase}
-            onInput={e => setPassphrase(e.target.value)}
+            onInput={(e) => setPassphrase(e.target.value)}
             autocomplete="new-password"
             required
           />
           <button type="submit" class="btn btn-primary btn-sm" disabled={busy}>
-            {busy ? <><span class="spinner" /> Saving…</> : 'Save key'}
+            {busy ? (
+              <>
+                <span class="spinner" /> Saving…
+              </>
+            ) : (
+              'Save key'
+            )}
           </button>
           {error && <span class="field-error">{error}</span>}
         </form>
       </div>
-      <button class="banner-close" onClick={onDismiss} aria-label="Dismiss">✕</button>
+      <button class="banner-close" onClick={onDismiss} aria-label="Dismiss">
+        ✕
+      </button>
     </div>
   );
 }

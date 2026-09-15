@@ -22,8 +22,6 @@ import { deleteResumeRecord } from './resume-records.js';
 //
 // params: { bucket, key, uploadId, provider, endpoint }
 export async function abortMultipartSession(client, { bucket, key, uploadId, provider, endpoint }) {
-  await client.send(
-    new AbortMultipartUploadCommand({ Bucket: bucket, Key: key, UploadId: uploadId }),
-  ).catch(() => {});
+  await client.send(new AbortMultipartUploadCommand({ Bucket: bucket, Key: key, UploadId: uploadId })).catch(() => {});
   await deleteResumeRecord({ provider, endpoint, bucket, destinationKey: key }).catch(() => {});
 }

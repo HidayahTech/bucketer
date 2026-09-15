@@ -16,7 +16,13 @@ import { PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { startMock, BUCKET, e2eTest } from '../harness.mjs';
 import { enumerateJob } from '../../../src/lib/download-manifest.js';
 import {
-  saveJob, loadJob, deleteJob, loadAllJobs, countItemsByStatus, ITEM_STATUS, JOB_STATUS,
+  saveJob,
+  loadJob,
+  deleteJob,
+  loadAllJobs,
+  countItemsByStatus,
+  ITEM_STATUS,
+  JOB_STATUS,
 } from '../../../src/lib/download-records.js';
 
 import { indexedDB, IDBKeyRange } from 'fake-indexeddb';
@@ -27,17 +33,32 @@ let ctx;
 
 before(async () => {
   ctx = await startMock();
-  await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'ar/cold.bin', Body: 'c'.repeat(100), StorageClass: 'GLACIER' }));
-  await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'ar/frozen.bin', Body: 'f'.repeat(50), StorageClass: 'DEEP_ARCHIVE' }));
-  await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'ar/instant.bin', Body: 'i'.repeat(20), StorageClass: 'GLACIER_IR' }));
+  await ctx.client.send(
+    new PutObjectCommand({ Bucket: BUCKET, Key: 'ar/cold.bin', Body: 'c'.repeat(100), StorageClass: 'GLACIER' }),
+  );
+  await ctx.client.send(
+    new PutObjectCommand({ Bucket: BUCKET, Key: 'ar/frozen.bin', Body: 'f'.repeat(50), StorageClass: 'DEEP_ARCHIVE' }),
+  );
+  await ctx.client.send(
+    new PutObjectCommand({ Bucket: BUCKET, Key: 'ar/instant.bin', Body: 'i'.repeat(20), StorageClass: 'GLACIER_IR' }),
+  );
   await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'ar/warm.bin', Body: 'w'.repeat(7) }));
 });
-after(async () => { await ctx?.mock.close(); });
-beforeEach(async () => { for (const j of await loadAllJobs()) await deleteJob(j.id); });
+after(async () => {
+  await ctx?.mock.close();
+});
+beforeEach(async () => {
+  for (const j of await loadAllJobs()) await deleteJob(j.id);
+});
 
 const job = (provider) => ({
-  id: 'job-ar', bucket: BUCKET, prefix: 'ar/', mode: 'leaf', provider,
-  status: JOB_STATUS.ENUMERATING, enumeration: {},
+  id: 'job-ar',
+  bucket: BUCKET,
+  prefix: 'ar/',
+  mode: 'leaf',
+  provider,
+  status: JOB_STATUS.ENUMERATING,
+  enumeration: {},
   counters: { total: 0, bytesTotal: 0, sendable: 0, bytesSendable: 0 },
 });
 

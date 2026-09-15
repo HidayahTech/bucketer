@@ -49,20 +49,33 @@ describe('captureFailure', () => {
     const dir = mkdtempSync(join(tmpdir(), 'e2e-cap-'));
     try {
       const shots = [];
-      const page = { async screenshot({ path }) { shots.push(path); writeFileSyncStub(path, ''); } };
+      const page = {
+        async screenshot({ path }) {
+          shots.push(path);
+          writeFileSyncStub(path, '');
+        },
+      };
       await captureFailure('mytest-chromium', page, ['[console] hi', '[pageerror] boom'], dir);
       assert.ok(existsSync(join(dir, 'mytest-chromium.log')), 'log written');
       assert.match(readFileSync(join(dir, 'mytest-chromium.log'), 'utf8'), /boom/);
       assert.ok(existsSync(join(dir, 'mytest-chromium.png')), 'screenshot written');
-    } finally { rmSync(dir, { recursive: true, force: true }); }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
   test('a screenshot failure (closed page) does not throw — log still written', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'e2e-cap-'));
     try {
-      const page = { async screenshot() { throw new Error('page closed'); } };
+      const page = {
+        async screenshot() {
+          throw new Error('page closed');
+        },
+      };
       await captureFailure('closed-firefox', page, ['x'], dir);
       assert.ok(existsSync(join(dir, 'closed-firefox.log')), 'log still written');
       assert.equal(existsSync(join(dir, 'closed-firefox.png')), false, 'no screenshot');
-    } finally { rmSync(dir, { recursive: true, force: true }); }
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

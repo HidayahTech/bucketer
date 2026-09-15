@@ -75,13 +75,7 @@ export function newSalt(getRandomValues) {
 // PBKDF2-SHA256 stretches the passphrase into AES-GCM key material. The key is
 // extractable by design — see the threat model above.
 export async function deriveVaultKey(passphrase, saltBytes, iterations, subtle) {
-  const baseKey = await subtle.importKey(
-    'raw',
-    new TextEncoder().encode(passphrase),
-    'PBKDF2',
-    false,
-    ['deriveKey'],
-  );
+  const baseKey = await subtle.importKey('raw', new TextEncoder().encode(passphrase), 'PBKDF2', false, ['deriveKey']);
   return subtle.deriveKey(
     { name: 'PBKDF2', salt: saltBytes, iterations, hash: 'SHA-256' },
     baseKey,
@@ -111,10 +105,18 @@ const LS_KEY_VAULT = 's3b_vault';
 export const VAULT_STORAGE_KEYS = [LS_KEY_VAULT];
 
 function safeGetRaw(key) {
-  try { return localStorage.getItem(key); } catch { return null; }
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
 }
 function safeRemoveRaw(key) {
-  try { localStorage.removeItem(key); } catch { /* */ }
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    /* */
+  }
 }
 
 // null on absent OR corrupt — never throws. Mirrors loadCredentialRecords'
@@ -141,7 +143,11 @@ export function vaultExists() {
 // absence of a thrown error — it reads the value back and compares.
 export function saveVaultRecord(record) {
   const json = JSON.stringify(record);
-  try { localStorage.setItem(LS_KEY_VAULT, json); } catch { /* checked below */ }
+  try {
+    localStorage.setItem(LS_KEY_VAULT, json);
+  } catch {
+    /* checked below */
+  }
   return safeGetRaw(LS_KEY_VAULT) === json;
 }
 
@@ -200,13 +206,25 @@ export function clearVaultEntries() {
 export const SS_KEY_VAULT_KEY = 's3b_vault_key';
 
 function safeGetSession(key) {
-  try { return sessionStorage.getItem(key); } catch { return null; }
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
 }
 function safeSetSession(key, value) {
-  try { sessionStorage.setItem(key, value); } catch { /* private mode — session ends unlocked-in-memory only */ }
+  try {
+    sessionStorage.setItem(key, value);
+  } catch {
+    /* private mode — session ends unlocked-in-memory only */
+  }
 }
 function safeRemoveSession(key) {
-  try { sessionStorage.removeItem(key); } catch { /* */ }
+  try {
+    sessionStorage.removeItem(key);
+  } catch {
+    /* */
+  }
 }
 
 async function storeSessionKey(key, subtle) {

@@ -22,8 +22,17 @@ import { describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import {
-  startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage,
-  collectDownloads, e2eTest, e2eEngineName, e2eDeviceName,
+  startMock,
+  startAppServer,
+  connectApp,
+  BUCKET,
+  launchBrowser,
+  newE2EContext,
+  newE2EPage,
+  collectDownloads,
+  e2eTest,
+  e2eEngineName,
+  e2eDeviceName,
 } from '../harness.mjs';
 
 let ctx, app, browser, context, page, downloads;
@@ -71,25 +80,40 @@ async function runFolderDownload(endpoint, folder, firstFile, fileCount) {
   await page.locator('[data-testid="scan"]').click();
   await page.locator('[data-testid="start"]').waitFor({ timeout: 30000 });
   await page.locator('[data-testid="start"]').click();
-  await page.getByText(new RegExp(`Sent ${fileCount} of ${fileCount}`)).first().waitFor({ timeout: 180000 });
+  await page
+    .getByText(new RegExp(`Sent ${fileCount} of ${fileCount}`))
+    .first()
+    .waitFor({ timeout: 180000 });
 }
 
 // Distinct object paths, not raw request count: once the download manager takes over a
 // navigation it may restart the fetch (measured: 72 GETs for 40 files on Chromium), so
 // per-file duplicates are normal. What must hold is that every file was requested at
 // least once.
-const navGetPaths = () => new Set(ctx.mock.requestLog.list().filter((r) => r.isNavGet).map((r) => r.path)).size;
+const navGetPaths = () =>
+  new Set(
+    ctx.mock.requestLog
+      .list()
+      .filter((r) => r.isNavGet)
+      .map((r) => r.path),
+  ).size;
 const isWebKit = () => e2eEngineName() === 'webkit';
 
 async function assertAllDownloaded(fileCount, timeoutMs) {
   if (isWebKit()) {
     await downloads.settle(4000);
-    assert.equal(navGetPaths(), fileCount,
-      'every file must be requested as an attachment at least once (WebKit lane: server-side observable)');
+    assert.equal(
+      navGetPaths(),
+      fileCount,
+      'every file must be requested as an attachment at least once (WebKit lane: server-side observable)',
+    );
   } else {
     await downloads.waitForCount(fileCount, timeoutMs);
-    assert.equal(navGetPaths(), fileCount,
-      'every download event must be matched by that file being requested from the mock');
+    assert.equal(
+      navGetPaths(),
+      fileCount,
+      'every download event must be matched by that file being requested from the mock',
+    );
   }
 }
 

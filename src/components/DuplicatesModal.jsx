@@ -27,8 +27,12 @@ import { saveScanResult, loadScanResult, deleteScanResult } from '../lib/dedup-s
 
 function badgeStyle(verified) {
   return {
-    display: 'inline-block', padding: '.05rem .45rem', borderRadius: '4px',
-    fontSize: '.7rem', fontWeight: 700, marginRight: '.5rem',
+    display: 'inline-block',
+    padding: '.05rem .45rem',
+    borderRadius: '4px',
+    fontSize: '.7rem',
+    fontWeight: 700,
+    marginRight: '.5rem',
     background: verified ? 'var(--accent)' : 'var(--border)',
     color: verified ? '#fff' : 'var(--text-muted)',
   };
@@ -63,17 +67,38 @@ function DupGroup({ group, canDownload, onSelectKeeper, onVerify, onDownload, on
                   />
                 </td>
                 <td class="dup-member-key" title={m.Key}>
-                  {m.Key}{isKeeper ? <span class="hint"> (keep)</span> : null}
+                  {m.Key}
+                  {isKeeper ? <span class="hint"> (keep)</span> : null}
                 </td>
                 <td class="log-num">{formatBytes(m.Size)}</td>
                 <td class="dup-member-actions" style={{ whiteSpace: 'nowrap' }}>
-                  <button type="button" class="btn btn-ghost btn-sm dup-download" disabled={!canDownload}
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-sm dup-download"
+                    disabled={!canDownload}
                     title={canDownload ? 'Download' : 'Download not permitted with current credentials'}
-                    onClick={() => onDownload(m.Key)}>↓</button>
-                  <button type="button" class="btn btn-ghost btn-sm dup-preview" disabled={!canDownload}
-                    title="Open a preview in a new tab" onClick={() => onPreview(m.Key)}>⊙</button>
-                  <button type="button" class="btn btn-ghost btn-sm dup-link" disabled={!canDownload}
-                    title="Copy a shareable link" onClick={() => onCopyLink(m.Key)}>⎘</button>
+                    onClick={() => onDownload(m.Key)}
+                  >
+                    ↓
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-sm dup-preview"
+                    disabled={!canDownload}
+                    title="Open a preview in a new tab"
+                    onClick={() => onPreview(m.Key)}
+                  >
+                    ⊙
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-sm dup-link"
+                    disabled={!canDownload}
+                    title="Copy a shareable link"
+                    onClick={() => onCopyLink(m.Key)}
+                  >
+                    ⎘
+                  </button>
                 </td>
               </tr>
             );
@@ -81,16 +106,27 @@ function DupGroup({ group, canDownload, onSelectKeeper, onVerify, onDownload, on
         </tbody>
       </table>
 
-      <div class="dup-group-actions" style={{ display: 'flex', gap: '.5rem', marginTop: '.45rem', alignItems: 'center' }}>
+      <div
+        class="dup-group-actions"
+        style={{ display: 'flex', gap: '.5rem', marginTop: '.45rem', alignItems: 'center' }}
+      >
         <button type="button" class="btn btn-sm dup-verify" disabled={verifying} onClick={() => onVerify(group.id)}>
           {verifying ? 'Verifying…' : verified ? 'Re-verify' : 'Verify (byte-for-byte)'}
         </button>
-        <button type="button" class="btn btn-sm btn-danger dup-delete" disabled
-          title="Deleting duplicates is enabled in a later iteration, after the detection workflow passes review — and then only for verified groups.">
+        <button
+          type="button"
+          class="btn btn-sm btn-danger dup-delete"
+          disabled
+          title="Deleting duplicates is enabled in a later iteration, after the detection workflow passes review — and then only for verified groups."
+        >
           Delete others
         </button>
-        <button type="button" class="btn btn-sm dup-move" disabled
-          title="Moving duplicates is enabled in a later iteration, after the detection workflow passes review.">
+        <button
+          type="button"
+          class="btn btn-sm dup-move"
+          disabled
+          title="Moving duplicates is enabled in a later iteration, after the detection workflow passes review."
+        >
           Move others
         </button>
         {verifying && <span class="spinner" />}
@@ -99,7 +135,15 @@ function DupGroup({ group, canDownload, onSelectKeeper, onVerify, onDownload, on
   );
 }
 
-export function DuplicatesReport({ groups, capabilities, onSelectKeeper, onVerify, onDownload, onPreview, onCopyLink }) {
+export function DuplicatesReport({
+  groups,
+  capabilities,
+  onSelectKeeper,
+  onVerify,
+  onDownload,
+  onPreview,
+  onCopyLink,
+}) {
   if (!groups || groups.length === 0) {
     return <p class="hint">No duplicate candidates found.</p>;
   }
@@ -111,12 +155,20 @@ export function DuplicatesReport({ groups, capabilities, onSelectKeeper, onVerif
   return (
     <div class="dup-report">
       <p class="section-heading" style={{ margin: '.25rem 0 0' }}>
-        {totalGroups} group{totalGroups !== 1 ? 's' : ''} · {redundant} redundant cop{redundant !== 1 ? 'ies' : 'y'} · {formatBytes(reclaimable)} reclaimable
+        {totalGroups} group{totalGroups !== 1 ? 's' : ''} · {redundant} redundant cop{redundant !== 1 ? 'ies' : 'y'} ·{' '}
+        {formatBytes(reclaimable)} reclaimable
       </p>
       {groups.map((g) => (
-        <DupGroup key={g.id} group={g} canDownload={canDownload}
-          onSelectKeeper={onSelectKeeper} onVerify={onVerify}
-          onDownload={onDownload} onPreview={onPreview} onCopyLink={onCopyLink} />
+        <DupGroup
+          key={g.id}
+          group={g}
+          canDownload={canDownload}
+          onSelectKeeper={onSelectKeeper}
+          onVerify={onVerify}
+          onDownload={onDownload}
+          onPreview={onPreview}
+          onCopyLink={onCopyLink}
+        />
       ))}
     </div>
   );
@@ -125,7 +177,9 @@ export function DuplicatesReport({ groups, capabilities, onSelectKeeper, onVerif
 // ── S3-backed read-only implementations (production path; tests inject overrides) ──
 
 async function presign(client, bucket, key, extra) {
-  return getSignedUrl(client, new GetObjectCommand(presignGetParams({ Bucket: bucket, Key: key, ...extra })), { expiresIn: PRESIGN_EXPIRES });
+  return getSignedUrl(client, new GetObjectCommand(presignGetParams({ Bucket: bucket, Key: key, ...extra })), {
+    expiresIn: PRESIGN_EXPIRES,
+  });
 }
 
 async function downloadObject(client, bucket, key) {
@@ -137,19 +191,30 @@ async function downloadObject(client, bucket, key) {
       { expiresIn: DOWNLOAD_PRESIGN_EXPIRES },
     );
     const a = document.createElement('a');
-    a.href = url; a.download = leafName(key);
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  } catch (err) { console.warn('[bucketer:dedup] download failed', key, err); }
+    a.href = url;
+    a.download = leafName(key);
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch (err) {
+    console.warn('[bucketer:dedup] download failed', key, err);
+  }
 }
 
 async function previewObject(client, bucket, key) {
-  try { window.open(await presign(client, bucket, key, { ResponseContentDisposition: 'inline' }), '_blank', 'noopener'); }
-  catch (err) { console.warn('[bucketer:dedup] preview failed', key, err); }
+  try {
+    window.open(await presign(client, bucket, key, { ResponseContentDisposition: 'inline' }), '_blank', 'noopener');
+  } catch (err) {
+    console.warn('[bucketer:dedup] preview failed', key, err);
+  }
 }
 
 async function copyLinkObject(client, bucket, key) {
-  try { await navigator.clipboard?.writeText(await presign(client, bucket, key)); }
-  catch (err) { console.warn('[bucketer:dedup] copy link failed', key, err); }
+  try {
+    await navigator.clipboard?.writeText(await presign(client, bucket, key));
+  } catch (err) {
+    console.warn('[bucketer:dedup] copy link failed', key, err);
+  }
 }
 
 // Read each object's body as an async iterable of chunks (reader-based for browser
@@ -157,8 +222,14 @@ async function copyLinkObject(client, bucket, key) {
 async function* streamChunks(readable) {
   const reader = readable.getReader();
   try {
-    for (;;) { const { value, done } = await reader.read(); if (done) break; if (value) yield value; }
-  } finally { reader.releaseLock(); }
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      if (value) yield value;
+    }
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 async function fetchBody(client, bucket, key) {
@@ -187,7 +258,21 @@ function progressLabel(p) {
 
 // onDeleteRequest is offered by App but not consumed yet: dedup Delete is disabled in
 // iteration 1 (see dedup-safety model). Re-add it to the destructure when wiring iteration 2.
-export function DuplicatesModal({ client, bucket, endpoint, currentPrefix, basePrefix, provider, capabilities, onClose, scan, verify, load, save, del }) {
+export function DuplicatesModal({
+  client,
+  bucket,
+  endpoint,
+  currentPrefix,
+  basePrefix,
+  provider,
+  capabilities,
+  onClose,
+  scan,
+  verify,
+  load,
+  save,
+  del,
+}) {
   const [scope, setScope] = useState('prefix');
   const [status, setStatus] = useState('idle');
   const [groups, setGroups] = useState([]);
@@ -199,11 +284,16 @@ export function DuplicatesModal({ client, bucket, endpoint, currentPrefix, baseP
   // Guards async state updates after the modal closes — the scan/verify/persist promises
   // can settle after unmount, and updating a torn-down tree throws in some environments.
   const mounted = useRef(true);
-  useEffect(() => () => { mounted.current = false; }, []);
+  useEffect(
+    () => () => {
+      mounted.current = false;
+    },
+    [],
+  );
 
-  const doLoad   = load || (() => loadScanResult(endpoint, bucket));
-  const doSave   = save || ((rec) => saveScanResult(rec));
-  const doDelete = del  || (() => deleteScanResult(endpoint, bucket));
+  const doLoad = load || (() => loadScanResult(endpoint, bucket));
+  const doSave = save || ((rec) => saveScanResult(rec));
+  const doDelete = del || (() => deleteScanResult(endpoint, bucket));
 
   // Restore the previous scan once, when the report opens — a large scan (tens of
   // thousands of objects) should never have to be repeated.
@@ -218,7 +308,9 @@ export function DuplicatesModal({ client, bucket, endpoint, currentPrefix, baseP
       setRestored(true);
       setStatus('done');
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []); // open-once restore
 
   // Persist results whenever they change so keeper choices and verifications survive a
@@ -226,25 +318,42 @@ export function DuplicatesModal({ client, bucket, endpoint, currentPrefix, baseP
   useEffect(() => {
     if (status !== 'done' || !scanMeta) return;
     const clean = groups.map((g) => ({ ...g, verifying: false }));
-    Promise.resolve(doSave({
-      endpoint, bucket, scope: scanMeta.scope, prefix: scanMeta.prefix,
-      scannedAt: scanMeta.scannedAt, objectCount: scanMeta.objectCount, groups: clean,
-    })).catch(() => {});
+    Promise.resolve(
+      doSave({
+        endpoint,
+        bucket,
+        scope: scanMeta.scope,
+        prefix: scanMeta.prefix,
+        scannedAt: scanMeta.scannedAt,
+        objectCount: scanMeta.objectCount,
+        groups: clean,
+      }),
+    ).catch(() => {});
   }, [groups, scanMeta, status]);
 
   async function clearSaved() {
     await Promise.resolve(doDelete()).catch(() => {});
     if (!mounted.current) return;
-    setGroups([]); setScanMeta(null); setRestored(false); setStatus('idle');
+    setGroups([]);
+    setScanMeta(null);
+    setRestored(false);
+    setStatus('idle');
   }
 
   const runScan = useCallback(async () => {
-    setStatus('scanning'); setError(null); setGroups([]); setProgress(null); setRestored(false);
+    setStatus('scanning');
+    setError(null);
+    setGroups([]);
+    setProgress(null);
+    setRestored(false);
     // The widest scan a prefix-scoped connection can make is its base prefix (#60) —
     // scanning '' would reproduce the exact AccessDenied this feature exists to fix.
-    const prefix = scope === 'bucket' ? (basePrefix || '') : (currentPrefix || '');
+    const prefix = scope === 'bucket' ? basePrefix || '' : currentPrefix || '';
     let totalObjects = 0;
-    const onProgress = (p) => { if (p && p.phase === 'listing') totalObjects = p.count; setProgress(p); };
+    const onProgress = (p) => {
+      if (p && p.phase === 'listing') totalObjects = p.count;
+      setProgress(p);
+    };
     try {
       const found = scan
         ? await scan({ scope, prefix })
@@ -253,7 +362,12 @@ export function DuplicatesModal({ client, bucket, endpoint, currentPrefix, baseP
             onProgress,
           });
       if (!mounted.current) return;
-      const result = found.map((g, i) => ({ ...g, id: g.id || `g${i}`, keeperKey: g.members[0].Key, verifying: false }));
+      const result = found.map((g, i) => ({
+        ...g,
+        id: g.id || `g${i}`,
+        keeperKey: g.members[0].Key,
+        verifying: false,
+      }));
       setGroups(result);
       setScanMeta({ scope, prefix, scannedAt: Date.now(), objectCount: totalObjects });
       setStatus('done');
@@ -266,7 +380,9 @@ export function DuplicatesModal({ client, bucket, endpoint, currentPrefix, baseP
 
   function selectKeeper(gid, key) {
     // Changing the keeper invalidates a prior verification (it confirmed a different keeper).
-    setGroups((prev) => prev.map((g) => g.id === gid ? { ...g, keeperKey: key, verified: false, confidence: 'candidate' } : g));
+    setGroups((prev) =>
+      prev.map((g) => (g.id === gid ? { ...g, keeperKey: key, verified: false, confidence: 'candidate' } : g)),
+    );
   }
 
   async function runVerify(gid) {
@@ -284,20 +400,24 @@ export function DuplicatesModal({ client, bucket, endpoint, currentPrefix, baseP
       if (!ok) return;
     }
 
-    setGroups((prev) => prev.map((x) => x.id === gid ? { ...x, verifying: true } : x));
+    setGroups((prev) => prev.map((x) => (x.id === gid ? { ...x, verifying: true } : x)));
     try {
       const results = verify
         ? await verify({ group: g, keeperKey: g.keeperKey, candidateKeys: others })
         : await verifyGroupBytes(client, bucket, g.keeperKey, others);
       if (!mounted.current) return;
       const allMatch = results.length > 0 && results.every(Boolean);
-      setGroups((prev) => prev.map((x) => x.id === gid
-        ? { ...x, verifying: false, verified: allMatch, confidence: allMatch ? 'verified' : 'candidate' }
-        : x));
+      setGroups((prev) =>
+        prev.map((x) =>
+          x.id === gid
+            ? { ...x, verifying: false, verified: allMatch, confidence: allMatch ? 'verified' : 'candidate' }
+            : x,
+        ),
+      );
     } catch (err) {
       if (!mounted.current) return;
       setError(err?.message || String(err));
-      setGroups((prev) => prev.map((x) => x.id === gid ? { ...x, verifying: false } : x));
+      setGroups((prev) => prev.map((x) => (x.id === gid ? { ...x, verifying: false } : x)));
     }
   }
 
@@ -306,15 +426,19 @@ export function DuplicatesModal({ client, bucket, endpoint, currentPrefix, baseP
       <div class="modal-title">Find duplicates</div>
       <p class="hint" style={{ marginTop: 0 }}>
         Read-only scan. Matches are <strong>candidates</strong> until confirmed byte-for-byte with
-        <strong> Verify</strong> — no hash alone is trusted to delete. Deleting and moving duplicates
-        arrive in a later iteration, once this detection workflow is reviewed.
+        <strong> Verify</strong> — no hash alone is trusted to delete. Deleting and moving duplicates arrive in a later
+        iteration, once this detection workflow is reviewed.
       </p>
 
       <div class="dup-controls" style={{ display: 'flex', gap: '.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
         <label class="hint">
           Scan:{' '}
-          <select class="dup-scope" value={scope} disabled={status === 'scanning'}
-            onChange={(e) => setScope(e.target.value)}>
+          <select
+            class="dup-scope"
+            value={scope}
+            disabled={status === 'scanning'}
+            onChange={(e) => setScope(e.target.value)}
+          >
             <option value="prefix">Current folder{currentPrefix ? ` (${currentPrefix})` : ' (root)'}</option>
             <option value="bucket">{basePrefix ? 'Entire scope' : 'Whole bucket'}</option>
           </select>
@@ -323,14 +447,25 @@ export function DuplicatesModal({ client, bucket, endpoint, currentPrefix, baseP
           {status === 'scanning' ? 'Scanning…' : scanMeta ? 'Re-scan' : 'Scan'}
         </button>
         {scanMeta && status !== 'scanning' && (
-          <button type="button" class="btn btn-ghost btn-sm dup-clear" onClick={clearSaved}
-            title="Discard the saved scan results">Clear saved</button>
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm dup-clear"
+            onClick={clearSaved}
+            title="Discard the saved scan results"
+          >
+            Clear saved
+          </button>
         )}
       </div>
 
       {scanMeta && status === 'done' && (
         <p class="hint dup-scanned-meta" style={{ margin: 0 }}>
-          Last scan: {scanMeta.scope === 'bucket' ? (basePrefix ? 'entire scope' : 'whole bucket') : `folder ${scanMeta.prefix || '(root)'}`}
+          Last scan:{' '}
+          {scanMeta.scope === 'bucket'
+            ? basePrefix
+              ? 'entire scope'
+              : 'whole bucket'
+            : `folder ${scanMeta.prefix || '(root)'}`}
           {scanMeta.objectCount ? ` · ${scanMeta.objectCount.toLocaleString()} objects` : ''}
           {scanMeta.scannedAt ? ` · ${new Date(scanMeta.scannedAt).toLocaleString()}` : ''}
           {restored ? ' · restored from cache' : ''}
@@ -356,7 +491,9 @@ export function DuplicatesModal({ client, bucket, endpoint, currentPrefix, baseP
       )}
 
       <div class="modal-actions">
-        <button type="button" class="btn btn-ghost btn-sm" onClick={onClose}>Close</button>
+        <button type="button" class="btn btn-ghost btn-sm" onClick={onClose}>
+          Close
+        </button>
       </div>
     </Modal>
   );

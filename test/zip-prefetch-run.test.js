@@ -24,7 +24,11 @@ function fakeOpfsRoot() {
     files,
     async getFileHandle(name, { create = false } = {}) {
       if (!files.has(name)) {
-        if (!create) { const e = new Error('missing'); e.name = 'NotFoundError'; throw e; }
+        if (!create) {
+          const e = new Error('missing');
+          e.name = 'NotFoundError';
+          throw e;
+        }
         files.set(name, new Uint8Array(0));
       }
       return {
@@ -34,18 +38,30 @@ function fakeOpfsRoot() {
           return {
             async write(u8) {
               const grown = new Uint8Array(Math.max(buf.length, pos + u8.length));
-              grown.set(buf); grown.set(u8, pos); buf = grown; pos += u8.length;
+              grown.set(buf);
+              grown.set(u8, pos);
+              buf = grown;
+              pos += u8.length;
             },
-            async truncate(n) { buf = buf.slice(0, n); pos = Math.min(pos, n); },
-            async seek(n) { pos = n; },
-            async close() { files.set(name, buf); },
+            async truncate(n) {
+              buf = buf.slice(0, n);
+              pos = Math.min(pos, n);
+            },
+            async seek(n) {
+              pos = n;
+            },
+            async close() {
+              files.set(name, buf);
+            },
           };
         },
         async getFile() {
           const b = files.get(name);
           return {
             size: b.length,
-            async arrayBuffer() { return b.buffer.slice(b.byteOffset, b.byteOffset + b.length); },
+            async arrayBuffer() {
+              return b.buffer.slice(b.byteOffset, b.byteOffset + b.length);
+            },
             slice(start, end) {
               const s = b.slice(start, end);
               return { arrayBuffer: async () => s.buffer.slice(s.byteOffset, s.byteOffset + s.length) };
@@ -54,7 +70,9 @@ function fakeOpfsRoot() {
         },
       };
     },
-    async removeEntry(name) { files.delete(name); },
+    async removeEntry(name) {
+      files.delete(name);
+    },
   };
 }
 
@@ -83,17 +101,34 @@ function abortError() {
 function raceWithAbort(promise, signal) {
   if (!signal) return promise;
   return new Promise((resolve, reject) => {
-    if (signal.aborted) { reject(abortError()); return; }
-    const onAbort = () => { cleanup(); reject(abortError()); };
+    if (signal.aborted) {
+      reject(abortError());
+      return;
+    }
+    const onAbort = () => {
+      cleanup();
+      reject(abortError());
+    };
     const cleanup = () => signal.removeEventListener('abort', onAbort);
     signal.addEventListener('abort', onAbort);
-    promise.then((v) => { cleanup(); resolve(v); }, (e) => { cleanup(); reject(e); });
+    promise.then(
+      (v) => {
+        cleanup();
+        resolve(v);
+      },
+      (e) => {
+        cleanup();
+        reject(e);
+      },
+    );
   });
 }
 
 function deferred() {
   let resolve;
-  const promise = new Promise((r) => { resolve = r; });
+  const promise = new Promise((r) => {
+    resolve = r;
+  });
   return { promise, resolve };
 }
 
@@ -168,18 +203,26 @@ describe('runPrefetch', () => {
     };
 
     const progress = [];
-    const onProgress = (p) => progress.push({ bytesDone: p.bytesDone, activeLen: p.active.length, activeKeys: p.active.map(a => a.key) });
+    const onProgress = (p) =>
+      progress.push({ bytesDone: p.bytesDone, activeLen: p.active.length, activeKeys: p.active.map((a) => a.key) });
 
     const resultPromise = runPrefetch(items, {
-      fetchImpl, presign, root: fakeOpfsRoot(), concurrency: 4,
-      onReady, onProgress,
+      fetchImpl,
+      presign,
+      root: fakeOpfsRoot(),
+      concurrency: 4,
+      onReady,
+      onProgress,
     });
 
     // Proof of real overlap: with 4 workers and 5 items, all 4 initial fetches must be
     // simultaneously in flight (none of their gates has been resolved yet) before we
     // resolve anything.
     await waitUntil(() => progress.some((p) => p.activeLen === 4));
-    assert.ok(progress.some((p) => p.activeLen > 1), 'onProgress must have observed more than one concurrent in-flight fetch');
+    assert.ok(
+      progress.some((p) => p.activeLen > 1),
+      'onProgress must have observed more than one concurrent in-flight fetch',
+    );
 
     // Resolve out of manifest order: k2, k4, k1, k3, k5. Each resolve is followed by a
     // wait for that key to land in `order` before triggering the next — this pins down
@@ -203,13 +246,15 @@ describe('runPrefetch', () => {
 
   // ── 2. Tier routing ─────────────────────────────────────────────────────────
   test('2. items route to memory/temp/solo by size; memory never touches temp; solo never buffers', async () => {
-    const TINY = 100;         // memory
+    const TINY = 100; // memory
     const MEDIUM = 5 * 1024 * 1024; // temp (> TINY_MAX=4MiB, <= MEDIUM_MAX=64MiB)
-    const HUGE = 70 * 1024 * 1024;  // solo (> MEDIUM_MAX)
+    const HUGE = 70 * 1024 * 1024; // solo (> MEDIUM_MAX)
 
     const tinyBytes = enc('tiny-body');
-    const mediumBytes = new Uint8Array(1024); mediumBytes.fill(7);
-    const hugeChunk = new Uint8Array(1024); hugeChunk.fill(9);
+    const mediumBytes = new Uint8Array(1024);
+    mediumBytes.fill(7);
+    const hugeChunk = new Uint8Array(1024);
+    hugeChunk.fill(9);
 
     const items = [
       { key: 'tiny.txt', size: TINY },
@@ -244,7 +289,13 @@ describe('runPrefetch', () => {
       // case, and so the solo live stream is actually consumed (proving it streams).
       const parts = [];
       for await (const c of entry.chunks) parts.push(c);
-      received.push({ key: entry.item.key, tier: entry.tier, crc: entry.crc, size: entry.size, bytes: parts.reduce((n, c) => n + c.length, 0) });
+      received.push({
+        key: entry.item.key,
+        tier: entry.tier,
+        crc: entry.crc,
+        size: entry.size,
+        bytes: parts.reduce((n, c) => n + c.length, 0),
+      });
     };
 
     const result = await runPrefetch(items, { fetchImpl, presign, root, concurrency: 3, onReady });
@@ -269,11 +320,19 @@ describe('runPrefetch', () => {
     // Medium item really did use an OPFS temp file (proves the temp tier, not memory,
     // handled it) — caught by the getFileHandle spy above, since the file itself is
     // gone by the time the run resolves.
-    assert.deepEqual(tempFilesCreated, ['bucketer-tmp-p0'], 'the temp tier must have created an OPFS temp file for medium.bin');
+    assert.deepEqual(
+      tempFilesCreated,
+      ['bucketer-tmp-p0'],
+      'the temp tier must have created an OPFS temp file for medium.bin',
+    );
     // Fix 3: a SUCCESSFUL temp buffer is removed once the writer has finished draining
     // it (right after withWriterLock resolves) — no leftover bucketer-tmp-* files after
     // a clean run.
-    assert.equal(root.files.has('bucketer-tmp-p0'), false, 'a successfully-written temp buffer must be cleaned up, not left behind');
+    assert.equal(
+      root.files.has('bucketer-tmp-p0'),
+      false,
+      'a successfully-written temp buffer must be cleaned up, not left behind',
+    );
   });
 
   // ── 3. Backpressure ──────────────────────────────────────────────────────────
@@ -288,7 +347,16 @@ describe('runPrefetch', () => {
       // Fast, ungated fetch: the fake body signals "fetch complete" (EOF) via onEof,
       // which is exactly when a buffer becomes ready-but-unwritten from the pool's
       // perspective. This is pure test-side instrumentation (no production hook needed).
-      return { ok: true, status: 200, body: fastBody([enc(key)], { onEof: () => { held++; maxHeld = Math.max(maxHeld, held); } }) };
+      return {
+        ok: true,
+        status: 200,
+        body: fastBody([enc(key)], {
+          onEof: () => {
+            held++;
+            maxHeld = Math.max(maxHeld, held);
+          },
+        }),
+      };
     };
 
     const order = [];
@@ -299,20 +367,29 @@ describe('runPrefetch', () => {
       held--;
     };
 
-    const result = await runPrefetch(items, { fetchImpl, presign, root: fakeOpfsRoot(), concurrency: CONCURRENCY, onReady });
+    const result = await runPrefetch(items, {
+      fetchImpl,
+      presign,
+      root: fakeOpfsRoot(),
+      concurrency: CONCURRENCY,
+      onReady,
+    });
 
     assert.deepEqual(result, { failed: [], denied: false, blocked: null, cancelled: false });
     assert.equal(order.length, 6);
     assert.ok(maxHeld > 1, `must show real overlap between fetch and write (maxHeld=${maxHeld})`);
-    assert.ok(maxHeld <= CONCURRENCY + 1, `held buffers must stay bounded near concurrency=${CONCURRENCY} (maxHeld=${maxHeld})`);
+    assert.ok(
+      maxHeld <= CONCURRENCY + 1,
+      `held buffers must stay bounded near concurrency=${CONCURRENCY} (maxHeld=${maxHeld})`,
+    );
   });
 
   // ── 4. Failure isolation ─────────────────────────────────────────────────────
   test('4. a mid-body fetch failure isolates that item; its temp buffer is discarded; other items still complete', async () => {
     const items = [
-      { key: 'a.txt', size: 100 },                    // memory, succeeds
-      { key: 'b.bin', size: 5 * 1024 * 1024 },         // temp, FAILS mid-body
-      { key: 'c.bin', size: 5 * 1024 * 1024 },         // temp, succeeds
+      { key: 'a.txt', size: 100 }, // memory, succeeds
+      { key: 'b.bin', size: 5 * 1024 * 1024 }, // temp, FAILS mid-body
+      { key: 'c.bin', size: 5 * 1024 * 1024 }, // temp, succeeds
     ];
 
     const fetchImpl = async (url) => {
@@ -327,7 +404,9 @@ describe('runPrefetch', () => {
     const root = fakeOpfsRoot();
     const order = [];
     const onReady = async (entry) => {
-      for await (const _c of entry.chunks) { /* drain */ }
+      for await (const _c of entry.chunks) {
+        /* drain */
+      }
       order.push(entry.item.key);
     };
 
@@ -356,12 +435,23 @@ describe('runPrefetch', () => {
   test('5. three DENIED probes (order-independent under concurrency) trip the job-wide denied flag', async () => {
     const items = Array.from({ length: 4 }, (_, i) => ({ key: `d${i}`, size: 4 }));
     const probe = async () => ({ kind: 'denied', message: 'access denied' });
-    const fetchImpl = async () => { throw new Error('must not be called — probe should have short-circuited'); };
+    const fetchImpl = async () => {
+      throw new Error('must not be called — probe should have short-circuited');
+    };
 
     let onReadyCalls = 0;
-    const onReady = async () => { onReadyCalls++; };
+    const onReady = async () => {
+      onReadyCalls++;
+    };
 
-    const result = await runPrefetch(items, { fetchImpl, presign, probe, root: fakeOpfsRoot(), concurrency: 4, onReady });
+    const result = await runPrefetch(items, {
+      fetchImpl,
+      presign,
+      probe,
+      root: fakeOpfsRoot(),
+      concurrency: 4,
+      onReady,
+    });
 
     assert.equal(result.denied, true, 'denied must trip after 3 consecutive DENIED probes');
     assert.equal(result.blocked, null, 'a DENIED streak is not a NETWORK block');
@@ -396,7 +486,12 @@ describe('runPrefetch', () => {
     const shouldCancel = () => completions >= 2;
 
     const result = await runPrefetch(items, {
-      fetchImpl, presign, root: fakeOpfsRoot(), concurrency: 3, onReady, shouldCancel,
+      fetchImpl,
+      presign,
+      root: fakeOpfsRoot(),
+      concurrency: 3,
+      onReady,
+      shouldCancel,
     });
 
     assert.equal(result.cancelled, true);
@@ -433,13 +528,21 @@ describe('runPrefetch', () => {
     const shouldCancel = () => completions >= 2;
 
     const result = await runPrefetch(items, {
-      fetchImpl, presign, root: fakeOpfsRoot(), concurrency: 3, onReady, shouldCancel,
+      fetchImpl,
+      presign,
+      root: fakeOpfsRoot(),
+      concurrency: 3,
+      onReady,
+      shouldCancel,
     });
 
     assert.equal(result.cancelled, true);
-    assert.equal(order.length, 2,
+    assert.equal(
+      order.length,
+      2,
       'no onReady call may happen once cancellation has been observed, even for an item ' +
-      'whose fetch had already finished and was already queued for the writer');
+        'whose fetch had already finished and was already queued for the writer',
+    );
   });
 
   // ── 8. (Fix 2 — Important) NETWORK blocks the whole job, not per-item ─────────────
@@ -451,13 +554,24 @@ describe('runPrefetch', () => {
       probeCalls.push(key);
       return { kind: 'network', status: null, message: 'offline' };
     };
-    const fetchImpl = async () => { throw new Error('must not be called — NETWORK should have short-circuited before any fetch'); };
+    const fetchImpl = async () => {
+      throw new Error('must not be called — NETWORK should have short-circuited before any fetch');
+    };
     let onReadyCalls = 0;
-    const onReady = async () => { onReadyCalls++; };
+    const onReady = async () => {
+      onReadyCalls++;
+    };
 
     // concurrency:1 — a single worker processes items strictly in order, so this proves
     // the job actually STOPS (n2/n3 are never even probed), not just that n1 is blocked.
-    const result = await runPrefetch(items, { fetchImpl, presign, probe, root: fakeOpfsRoot(), concurrency: 1, onReady });
+    const result = await runPrefetch(items, {
+      fetchImpl,
+      presign,
+      probe,
+      root: fakeOpfsRoot(),
+      concurrency: 1,
+      onReady,
+    });
 
     assert.notEqual(result.blocked, null);
     assert.equal(result.blocked.kind, 'network');
@@ -465,7 +579,11 @@ describe('runPrefetch', () => {
     assert.equal(result.cancelled, false);
     assert.equal(onReadyCalls, 0);
     assert.deepEqual(result.failed, [], 'a NETWORK block must not be recorded as per-item failures');
-    assert.deepEqual(probeCalls, ['n1'], 'the job must stop at the first NETWORK result and never probe the remaining items');
+    assert.deepEqual(
+      probeCalls,
+      ['n1'],
+      'the job must stop at the first NETWORK result and never probe the remaining items',
+    );
   });
 
   // ── 9. (Temp-file leak fix) an aborted mid-write temp-tier item orphans no OPFS file ──
@@ -475,8 +593,8 @@ describe('runPrefetch', () => {
   // aborted mid-tempStore.put() (cancel / NETWORK-block / a caller's quota-STORAGE pause
   // via shouldCancel) orphaned a bucketer-tmp-p<N> file on OPFS forever.
   test('9. an item aborted mid-write to its OPFS temp file leaves no orphaned bucketer-tmp-* file', async () => {
-    const fastItem = { key: 'fast.txt', size: 4 };               // memory tier, completes first
-    const midItem = { key: 'mid.bin', size: 5 * 1024 * 1024 };    // temp tier
+    const fastItem = { key: 'fast.txt', size: 4 }; // memory tier, completes first
+    const midItem = { key: 'mid.bin', size: 5 * 1024 * 1024 }; // temp tier
 
     // Deliberately never resolved — the only way this settles is via the AbortSignal
     // firing (raceWithAbort's own upfront `signal.aborted` check makes this safe
@@ -492,7 +610,8 @@ describe('runPrefetch', () => {
       // mid-write when abortAllInFlight() cuts it off, not merely "not yet started".
       let reads = 0;
       return {
-        ok: true, status: 200,
+        ok: true,
+        status: 200,
         body: {
           getReader() {
             return {
@@ -510,11 +629,18 @@ describe('runPrefetch', () => {
 
     const root = fakeOpfsRoot();
     let completions = 0;
-    const onReady = async () => { completions += 1; };
+    const onReady = async () => {
+      completions += 1;
+    };
     const shouldCancel = () => completions >= 1;
 
     const result = await runPrefetch([fastItem, midItem], {
-      fetchImpl, presign, root, concurrency: 2, onReady, shouldCancel,
+      fetchImpl,
+      presign,
+      root,
+      concurrency: 2,
+      onReady,
+      shouldCancel,
     });
 
     assert.equal(result.cancelled, true);

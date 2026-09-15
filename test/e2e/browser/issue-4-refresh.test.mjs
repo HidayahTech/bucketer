@@ -8,7 +8,16 @@
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest } from '../harness.mjs';
+import {
+  startMock,
+  startAppServer,
+  connectApp,
+  BUCKET,
+  launchBrowser,
+  newE2EContext,
+  newE2EPage,
+  e2eTest,
+} from '../harness.mjs';
 
 let ctx, app, browser;
 before(async () => {
@@ -16,14 +25,19 @@ before(async () => {
   app = await startAppServer();
   browser = await launchBrowser();
 });
-after(async () => { await browser?.close(); await app?.close(); await ctx?.mock.close(); });
+after(async () => {
+  await browser?.close();
+  await app?.close();
+  await ctx?.mock.close();
+});
 
 async function freshSession({ seed } = {}) {
   ctx.mock.reset();
   // Seed AFTER the reset (which would otherwise wipe it): a pre-existing row is how a spec
   // proves the initial listing has fully landed — and the app has finished mounting — before
   // it acts (issue #55). Same anchor technique as part 1 below.
-  if (seed) await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: seed, Body: new TextEncoder().encode('a') }));
+  if (seed)
+    await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: seed, Body: new TextEncoder().encode('a') }));
   const context = await newE2EContext(browser);
   const page = await newE2EPage(context);
   await page.goto(app.url, { waitUntil: 'domcontentloaded' });
@@ -32,12 +46,16 @@ async function freshSession({ seed } = {}) {
 }
 // Drop a file (with a folder-bearing relativePath) onto the Browser drop container.
 async function dropFile(page, name, content = 'x') {
-  await page.evaluate(({ name, content }) => {
-    const dt = new DataTransfer();
-    dt.items.add(new File([content], name, { type: 'text/plain' }));
-    document.querySelector('[data-testid="browser-drop"]')
-      .dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
-  }, { name, content });
+  await page.evaluate(
+    ({ name, content }) => {
+      const dt = new DataTransfer();
+      dt.items.add(new File([content], name, { type: 'text/plain' }));
+      document
+        .querySelector('[data-testid="browser-drop"]')
+        .dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+    },
+    { name, content },
+  );
 }
 
 describe('issue #4 part 2 — a sub-folder created by an upload appears without a manual refresh', () => {
@@ -59,7 +77,9 @@ describe('issue #4 part 2 — a sub-folder created by an upload appears without 
       // "newdir/", a descendant of the current view "").
       await page.locator('[data-testid="folder-row:newdir"]').waitFor({ timeout: 15000 });
       assert.equal(await page.locator('[data-testid="folder-row:newdir"]').count(), 1);
-    } finally { await context.close(); }
+    } finally {
+      await context.close();
+    }
   });
 });
 
@@ -71,7 +91,9 @@ describe('issue #4 part 1 — the Refresh button pulls changes made by another c
     // AFTER the out-of-band put below, making the "not visible yet" assertion race the
     // connect (seen on CI shared runners, issue #55).
     ctx.mock.reset();
-    await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'already-here.txt', Body: new TextEncoder().encode('m') }));
+    await ctx.client.send(
+      new PutObjectCommand({ Bucket: BUCKET, Key: 'already-here.txt', Body: new TextEncoder().encode('m') }),
+    );
     const context = await newE2EContext(browser);
     const page = await newE2EPage(context);
     await page.goto(app.url, { waitUntil: 'domcontentloaded' });
@@ -79,13 +101,17 @@ describe('issue #4 part 1 — the Refresh button pulls changes made by another c
     try {
       await page.locator('[data-testid="file-row:already-here.txt"]').waitFor({ timeout: 10000 });
       // Simulate "another device" writing directly to the bucket (no UI involved).
-      await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'from-other-device.txt', Body: new TextEncoder().encode('x') }));
+      await ctx.client.send(
+        new PutObjectCommand({ Bucket: BUCKET, Key: 'from-other-device.txt', Body: new TextEncoder().encode('x') }),
+      );
       // It isn't visible yet (no live sync)…
       assert.equal(await page.locator('[data-testid="file-row:from-other-device.txt"]').count(), 0);
       // …until the user clicks Refresh.
       await page.locator('[data-testid="refresh-listing"]').click();
       await page.locator('[data-testid="file-row:from-other-device.txt"]').waitFor({ timeout: 10000 });
       assert.equal(await page.locator('[data-testid="file-row:from-other-device.txt"]').count(), 1);
-    } finally { await context.close(); }
+    } finally {
+      await context.close();
+    }
   });
 });

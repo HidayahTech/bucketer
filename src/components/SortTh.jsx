@@ -9,9 +9,7 @@ export function SortTh({ col, sortCol, sortDir, onSort, align, colClass, childre
       title={`Sort by ${children}`}
     >
       {children}
-      <span class="sort-indicator">
-        {active ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}
-      </span>
+      <span class="sort-indicator">{active ? (sortDir === 'asc' ? '▲' : '▼') : '⇅'}</span>
     </th>
   );
 }

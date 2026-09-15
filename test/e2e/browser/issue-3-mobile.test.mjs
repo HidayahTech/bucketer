@@ -13,7 +13,17 @@ import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { devices } from 'playwright';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EPage, e2eTest, applyEngineQuirks, e2eEngineName } from '../harness.mjs';
+import {
+  startMock,
+  startAppServer,
+  connectApp,
+  BUCKET,
+  launchBrowser,
+  newE2EPage,
+  e2eTest,
+  applyEngineQuirks,
+  e2eEngineName,
+} from '../harness.mjs';
 
 let ctx, app, browser;
 before(async () => {
@@ -21,7 +31,11 @@ before(async () => {
   app = await startAppServer();
   browser = await launchBrowser();
 });
-after(async () => { await browser?.close(); await app?.close(); await ctx?.mock.close(); });
+after(async () => {
+  await browser?.close();
+  await app?.close();
+  await ctx?.mock.close();
+});
 
 describe('issue #3 — mobile (Android-emulated): upload does not teleport to root', () => {
   e2eTest('uploading into a nested folder on an emulated Android device keeps the user in that folder', async () => {
@@ -36,23 +50,37 @@ describe('issue #3 — mobile (Android-emulated): upload does not teleport to ro
       // Navigate into a nested folder.
       await page.locator('button[title="Create a new folder"]').click();
       const ni = page.locator('.modal-overlay input.form-input');
-      await ni.waitFor({ timeout: 5000 }); await ni.fill('mob'); await ni.press('Enter');
+      await ni.waitFor({ timeout: 5000 });
+      await ni.fill('mob');
+      await ni.press('Enter');
       await page.locator('[data-testid="folder-row:mob"]').click();
       await page.locator('.breadcrumb .current', { hasText: 'mob' }).waitFor({ timeout: 5000 });
       // Let the upload target propagate to the folder.
       const dest = page.locator('input[placeholder="(root of bucket)"]');
-      for (let i = 0; i < 50 && (await dest.inputValue().catch(() => '')) !== 'mob/'; i++) await page.waitForTimeout(100);
+      for (let i = 0; i < 50 && (await dest.inputValue().catch(() => '')) !== 'mob/'; i++)
+        await page.waitForTimeout(100);
 
       // Upload via the file input (the path mobile uses — "Choose files" / share-sheet).
-      await page.locator('[data-testid="file-input"]').setInputFiles({ name: 'phone.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('img') });
+      await page
+        .locator('[data-testid="file-input"]')
+        .setInputFiles({ name: 'phone.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('img') });
       await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: 20000 });
 
       // The object landed in the folder…
       const r = await ctx.client.send(new ListObjectsV2Command({ Bucket: BUCKET }));
-      assert.ok((r.Contents || []).some(o => o.Key === 'mob/phone.jpg'), 'upload targets the nested folder');
+      assert.ok(
+        (r.Contents || []).some((o) => o.Key === 'mob/phone.jpg'),
+        'upload targets the nested folder',
+      );
       // …and the user is STILL in the folder — not teleported to root (the desktop BUG-029 fix holds).
-      assert.equal(await page.locator('.breadcrumb .current', { hasText: 'mob' }).count(), 1, 'still in mob/ after upload');
+      assert.equal(
+        await page.locator('.breadcrumb .current', { hasText: 'mob' }).count(),
+        1,
+        'still in mob/ after upload',
+      );
       assert.match(await page.evaluate(() => location.hash), /mob/, 'URL hash still reflects the folder');
-    } finally { await context.close(); }
+    } finally {
+      await context.close();
+    }
   });
 });

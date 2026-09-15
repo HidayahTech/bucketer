@@ -13,8 +13,10 @@ function age(initiated) {
   if (!Number.isFinite(then)) return '';
   const secs = Math.max(0, Math.round((Date.now() - then) / 1000));
   if (secs < 60) return 'just now';
-  const mins = Math.round(secs / 60); if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.round(mins / 60); if (hrs < 24) return `${hrs}h ago`;
+  const mins = Math.round(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.round(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
   return `${Math.round(hrs / 24)}d ago`;
 }
 
@@ -25,10 +27,16 @@ export function IncompleteUploadsModal({ scan, discard, onClose }) {
   useEffect(() => {
     let cancelled = false;
     scan().then(
-      (uploads) => { if (!cancelled) setState({ loading: false, uploads, error: null }); },
-      (err) => { if (!cancelled) setState({ loading: false, uploads: [], error: err.message || String(err) }); },
+      (uploads) => {
+        if (!cancelled) setState({ loading: false, uploads, error: null });
+      },
+      (err) => {
+        if (!cancelled) setState({ loading: false, uploads: [], error: err.message || String(err) });
+      },
     );
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function handleDiscard(u) {
@@ -39,7 +47,11 @@ export function IncompleteUploadsModal({ scan, discard, onClose }) {
     } catch {
       // Leave the row so the user can retry; clear the busy flag below.
     } finally {
-      setBusy((b) => { const n = { ...b }; delete n[u.uploadId]; return n; });
+      setBusy((b) => {
+        const n = { ...b };
+        delete n[u.uploadId];
+        return n;
+      });
     }
   }
 
@@ -51,13 +63,21 @@ export function IncompleteUploadsModal({ scan, discard, onClose }) {
     <Modal onClose={onClose} class="incomplete-uploads-modal">
       <h2>Incomplete uploads</h2>
       <p class="muted">
-        Unfinished multipart uploads that are still using storage. Some may have been started by
-        other tools — discarding one that another tool is actively uploading will break that
-        transfer. Uploads Bucketer can resume appear in the operations queue instead.
+        Unfinished multipart uploads that are still using storage. Some may have been started by other tools —
+        discarding one that another tool is actively uploading will break that transfer. Uploads Bucketer can resume
+        appear in the operations queue instead.
       </p>
 
-      {state.loading && <p><span class="spinner" /> Scanning…</p>}
-      {state.error && <p class="error-text" data-testid="incomplete-error">Could not scan: {state.error}</p>}
+      {state.loading && (
+        <p>
+          <span class="spinner" /> Scanning…
+        </p>
+      )}
+      {state.error && (
+        <p class="error-text" data-testid="incomplete-error">
+          Could not scan: {state.error}
+        </p>
+      )}
       {!state.loading && !state.error && state.uploads.length === 0 && (
         <p data-testid="no-incomplete">No incomplete uploads found.</p>
       )}
@@ -74,8 +94,13 @@ export function IncompleteUploadsModal({ scan, discard, onClose }) {
               <li key={u.uploadId} data-testid={`incomplete-row:${u.uploadId}`} class="incomplete-row">
                 <span class="incomplete-key">{u.key}</span>
                 {u.initiated && <span class="incomplete-age muted"> · started {age(u.initiated)}</span>}
-                <button type="button" class="btn btn-ghost btn-sm" data-testid={`discard:${u.uploadId}`}
-                  disabled={!!busy[u.uploadId]} onClick={() => handleDiscard(u)}>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  data-testid={`discard:${u.uploadId}`}
+                  disabled={!!busy[u.uploadId]}
+                  onClick={() => handleDiscard(u)}
+                >
                   {busy[u.uploadId] ? 'Discarding…' : 'Discard'}
                 </button>
               </li>
@@ -85,7 +110,9 @@ export function IncompleteUploadsModal({ scan, discard, onClose }) {
       )}
 
       <div class="modal-actions">
-        <button type="button" class="btn btn-ghost" onClick={onClose}>Close</button>
+        <button type="button" class="btn btn-ghost" onClick={onClose}>
+          Close
+        </button>
       </div>
     </Modal>
   );

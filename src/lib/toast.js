@@ -10,10 +10,12 @@ export function createToastStore() {
   let toasts = [];
   let nextId = 1;
   const listeners = new Set();
-  const emit = () => { for (const l of listeners) l(toasts); };
+  const emit = () => {
+    for (const l of listeners) l(toasts);
+  };
 
   const dismiss = (id) => {
-    toasts = toasts.filter(t => t.id !== id);
+    toasts = toasts.filter((t) => t.id !== id);
     emit();
   };
 

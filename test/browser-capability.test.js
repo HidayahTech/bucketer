@@ -9,12 +9,18 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  detectCapabilities, availableTiers, selectTier, tierLabel, TIERS, inPlaceSupported,
+  detectCapabilities,
+  availableTiers,
+  selectTier,
+  tierLabel,
+  TIERS,
+  inPlaceSupported,
 } from '../src/lib/browser-capability.js';
 
 // Minimal window stand-ins. Each names the real engine it mirrors, measured 2026-07-31.
 const chromiumDesktop = {
-  showDirectoryPicker: () => {}, showSaveFilePicker: () => {},
+  showDirectoryPicker: () => {},
+  showSaveFilePicker: () => {},
   FileSystemFileHandle: { prototype: { createWritable: () => {} } },
   navigator: { storage: { getDirectory: () => {}, estimate: () => {} } },
   Response: { prototype: { body: null } },
@@ -65,7 +71,9 @@ describe('detectCapabilities', () => {
       Response: { prototype: {} },
     };
     Object.defineProperty(win.Response.prototype, 'body', {
-      get() { throw new TypeError('Illegal invocation'); },
+      get() {
+        throw new TypeError('Illegal invocation');
+      },
       configurable: true,
     });
     assert.doesNotThrow(() => detectCapabilities(win));
@@ -79,13 +87,15 @@ describe('availableTiers', () => {
   });
 
   test('a full engine offers all three, best first', () => {
-    assert.deepEqual(availableTiers(detectCapabilities(chromiumDesktop)),
-      [TIERS.MANAGED_FOLDER, TIERS.STAGED, TIERS.HANDOFF]);
+    assert.deepEqual(availableTiers(detectCapabilities(chromiumDesktop)), [
+      TIERS.MANAGED_FOLDER,
+      TIERS.STAGED,
+      TIERS.HANDOFF,
+    ]);
   });
 
   test('private storage without pickers offers two', () => {
-    assert.deepEqual(availableTiers(detectCapabilities(firefoxDesktop)),
-      [TIERS.STAGED, TIERS.HANDOFF]);
+    assert.deepEqual(availableTiers(detectCapabilities(firefoxDesktop)), [TIERS.STAGED, TIERS.HANDOFF]);
   });
 });
 
@@ -100,13 +110,11 @@ describe('selectTier', () => {
   });
 
   test('a chosen folder has no quota ceiling, so size never demotes it', () => {
-    assert.equal(selectTier(chromium, { largestFileBytes: 900 * GiB, quotaBytes: 10 * GiB }),
-      TIERS.MANAGED_FOLDER);
+    assert.equal(selectTier(chromium, { largestFileBytes: 900 * GiB, quotaBytes: 10 * GiB }), TIERS.MANAGED_FOLDER);
   });
 
   test('falls to staging when there is no picker', () => {
-    assert.equal(selectTier(firefox, { largestFileBytes: 2 * GiB, quotaBytes: 40 * GiB }),
-      TIERS.STAGED);
+    assert.equal(selectTier(firefox, { largestFileBytes: 2 * GiB, quotaBytes: 40 * GiB }), TIERS.STAGED);
   });
 
   // Staging holds one file at a time, so the ceiling is the largest single file, not the
@@ -114,12 +122,12 @@ describe('selectTier', () => {
   test('judges staging on the largest file, not the job total', () => {
     assert.equal(
       selectTier(firefox, { largestFileBytes: 1 * GiB, totalBytes: 500 * GiB, quotaBytes: 10 * GiB }),
-      TIERS.STAGED);
+      TIERS.STAGED,
+    );
   });
 
   test('hands off when the largest file will not fit in the quota', () => {
-    assert.equal(selectTier(firefox, { largestFileBytes: 40 * GiB, quotaBytes: 10 * GiB }),
-      TIERS.HANDOFF);
+    assert.equal(selectTier(firefox, { largestFileBytes: 40 * GiB, quotaBytes: 10 * GiB }), TIERS.HANDOFF);
   });
 
   test('stages optimistically when the quota is unknown', () => {
@@ -133,22 +141,20 @@ describe('selectTier', () => {
   });
 
   test('an explicit preference is honoured when that tier is available', () => {
-    assert.equal(selectTier(chromium, { largestFileBytes: 1, prefer: TIERS.HANDOFF }),
-      TIERS.HANDOFF);
+    assert.equal(selectTier(chromium, { largestFileBytes: 1, prefer: TIERS.HANDOFF }), TIERS.HANDOFF);
   });
 
   test('an explicit preference is ignored when that tier is not available', () => {
-    assert.equal(selectTier(bare, { largestFileBytes: 1, prefer: TIERS.MANAGED_FOLDER }),
-      TIERS.HANDOFF);
+    assert.equal(selectTier(bare, { largestFileBytes: 1, prefer: TIERS.MANAGED_FOLDER }), TIERS.HANDOFF);
   });
 });
 
 test('webWorker feature-detected; inPlaceSupported gates on opfs+streamingFetch+webWorker', () => {
   const win = {
-    navigator: { storage: { getDirectory(){} } },
+    navigator: { storage: { getDirectory() {} } },
     Response: { prototype: { body: 1 } },
-    FileSystemFileHandle: { prototype: { createWritable(){} } },
-    Worker: function(){},
+    FileSystemFileHandle: { prototype: { createWritable() {} } },
+    Worker: function () {},
   };
   const caps = detectCapabilities(win);
   assert.equal(caps.webWorker, true);

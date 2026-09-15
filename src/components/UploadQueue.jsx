@@ -19,20 +19,58 @@
 // File concurrency: N=3 default (D-3, configurable). Part concurrency: 4 per file (configurable).
 // Peak RAM at defaults: 3 files × 4 parts × 5 MiB = 60 MiB.
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
-import { PutObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand } from '@aws-sdk/client-s3';
+import {
+  PutObjectCommand,
+  CreateMultipartUploadCommand,
+  UploadPartCommand,
+  CompleteMultipartUploadCommand,
+  AbortMultipartUploadCommand,
+} from '@aws-sdk/client-s3';
 import { isPermissionError, parentPrefix } from '../lib/format.js';
 import {
-  saveResumeRecord, loadResumeRecord, deleteResumeRecord,
-  buildFileIdentity, fileIdentityMatches, computeFileHash,
-  markUploadActive, markUploadInactive, isUploadActiveElsewhere,
+  saveResumeRecord,
+  loadResumeRecord,
+  deleteResumeRecord,
+  buildFileIdentity,
+  fileIdentityMatches,
+  computeFileHash,
+  markUploadActive,
+  markUploadInactive,
+  isUploadActiveElsewhere,
   saveUploadLogEntry,
 } from '../lib/indexeddb.js';
-import { UploadQueue as Queue, calcPartSize, collectParts, preparePutBody, uploadPartsWithPool } from '../lib/upload-queue.js';
-import { loadPartConcurrency, loadPartSizeMB, loadUploadMemoryMB, loadFileConcurrency, loadUploadExpandThreshold, loadAdaptiveMode, loadMultiOriginUpload } from '../lib/storage.js';
-import { MULTIPART_THRESHOLD, DEFAULT_FILE_CONCURRENCY, PART_CONCURRENCY, ADAPTIVE_CONNECTION_BUDGET, PROBE_THRESHOLD_PARTS, DEFAULT_UPLOAD_MEMORY_MB } from '../lib/constants.js';
+import {
+  UploadQueue as Queue,
+  calcPartSize,
+  collectParts,
+  preparePutBody,
+  uploadPartsWithPool,
+} from '../lib/upload-queue.js';
+import {
+  loadPartConcurrency,
+  loadPartSizeMB,
+  loadUploadMemoryMB,
+  loadFileConcurrency,
+  loadUploadExpandThreshold,
+  loadAdaptiveMode,
+  loadMultiOriginUpload,
+} from '../lib/storage.js';
+import {
+  MULTIPART_THRESHOLD,
+  DEFAULT_FILE_CONCURRENCY,
+  PART_CONCURRENCY,
+  ADAPTIVE_CONNECTION_BUDGET,
+  PROBE_THRESHOLD_PARTS,
+  DEFAULT_UPLOAD_MEMORY_MB,
+} from '../lib/constants.js';
 import { buildUploadMetadata } from '../lib/upload-metadata.js';
 import { buildContentHashValue } from '../lib/content-hash.js';
-import { calcAdaptiveConcurrency, createProbeState, resolveProbe, capConcurrencyByMemory } from '../lib/concurrency-strategy.js';
+import {
+  calcAdaptiveConcurrency,
+  createProbeState,
+  resolveProbe,
+  capConcurrencyByMemory,
+} from '../lib/concurrency-strategy.js';
 import { isVhostShardable, uploadPartsSharded } from '../lib/upload-sharding.js';
 import { createS3Client } from '../lib/s3-client.js';
 import { requiresPathStyle } from '../lib/provider.js';
@@ -46,23 +84,38 @@ import { normalizeBasePrefix, withinFloor } from '../lib/base-prefix.js';
 
 // Status: queued | uploading | paused | resuming | done | error | aborted
 let _idCounter = 0;
-function newId() { return ++_idCounter; }
+function newId() {
+  return ++_idCounter;
+}
 
 function debugConcurrency(...args) {
   try {
     if (localStorage.getItem('s3b_debug_concurrency') === '1') {
       console.log('[bucketer:concurrency]', ...args);
     }
-  } catch { /* private browsing — skip */ }
+  } catch {
+    /* private browsing — skip */
+  }
 }
 
-export function UploadQueue({ client, bucket, provider, currentPrefix, credentials, onCapabilityChange, capabilities, onUploadsComplete, onLogEntry, onMount }) {
+export function UploadQueue({
+  client,
+  bucket,
+  provider,
+  currentPrefix,
+  credentials,
+  onCapabilityChange,
+  capabilities,
+  onUploadsComplete,
+  onLogEntry,
+  onMount,
+}) {
   const [items, setItems] = useState([]);
   const [collapsedBatches, setCollapsedBatches] = useState({});
   const queueRef = useRef(null);
   if (queueRef.current === null) {
     queueRef.current = new Queue(
-      loadAdaptiveMode() ? ADAPTIVE_CONNECTION_BUDGET : (loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY)
+      loadAdaptiveMode() ? ADAPTIVE_CONNECTION_BUDGET : (loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY),
     );
   }
   const activeUploadsRef = useRef({}); // id → { abort, uploadInstance }
@@ -74,7 +127,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   const { primed: cancelAllPrimed, handleClick: handleCancelAllClick } = useDoubleClickSafety(cancelAll);
 
   function toggleNotifSuppressed() {
-    setNotifSuppressed(prev => !prev);
+    setNotifSuppressed((prev) => !prev);
   }
 
   const canUpload = capabilities.upload !== 'denied';
@@ -88,7 +141,9 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
 
   const [destinationPrefix, setDestinationPrefix] = useState(currentPrefix || '');
   // Keep in sync with browser navigation, but let the user override by typing
-  useEffect(() => { setDestinationPrefix(currentPrefix || ''); }, [currentPrefix]);
+  useEffect(() => {
+    setDestinationPrefix(currentPrefix || '');
+  }, [currentPrefix]);
   // Live mirror of destinationPrefix. addFiles is exposed once via onMount ([] deps), so its closure
   // is captured at mount; reading destinationPrefix directly there would forever see the mount-time
   // value ('' = root) and send every drag-dropped upload to the root (GitLab #2 / BUG-031). The ref
@@ -102,8 +157,8 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   // floor visibly (inline error + disabled pickers) — no silent autocorrect.
   // The ref mirrors it for addFiles, whose closure is captured once at mount.
   const basePrefix = normalizeBasePrefix(credentials?.basePrefix);
-  const destWithSlash = destinationPrefix && !destinationPrefix.endsWith('/')
-    ? destinationPrefix + '/' : destinationPrefix;
+  const destWithSlash =
+    destinationPrefix && !destinationPrefix.endsWith('/') ? destinationPrefix + '/' : destinationPrefix;
   const destOutsideFloor = !!basePrefix && !withinFloor(destWithSlash || '', basePrefix);
   const destOutsideFloorRef = useRef(destOutsideFloor);
   destOutsideFloorRef.current = destOutsideFloor;
@@ -123,11 +178,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
 
   const batcherRef = useRef(null);
   if (batcherRef.current === null) {
-    batcherRef.current = createUpdateBatcher(
-      setItems,
-      fn => requestAnimationFrame(fn),
-      cancelAnimationFrame,
-    );
+    batcherRef.current = createUpdateBatcher(setItems, (fn) => requestAnimationFrame(fn), cancelAnimationFrame);
   }
 
   const updateItem = useCallback((id, patch, urgent = false) => {
@@ -136,9 +187,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
 
   // Returns the file concurrency to assign to the queue in the current mode.
   function effectiveFileConcurrency() {
-    return loadAdaptiveMode()
-      ? ADAPTIVE_CONNECTION_BUDGET
-      : (loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY);
+    return loadAdaptiveMode() ? ADAPTIVE_CONNECTION_BUDGET : (loadFileConcurrency() ?? DEFAULT_FILE_CONCURRENCY);
   }
 
   // Returns the part concurrency to use when starting or resuming a multipart upload.
@@ -154,7 +203,9 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   }
 
   // Expose addFiles to parent (e.g. for drop zones outside this component)
-  useEffect(() => { onMount?.({ addFiles }); }, []);
+  useEffect(() => {
+    onMount?.({ addFiles });
+  }, []);
 
   // fileEntries: Array<{ file: File, relativePath: string }>
   // relativePath preserves folder structure (e.g. "photos/2024/img.jpg").
@@ -180,15 +231,18 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       speed: 0,
       eta: null,
       error: null,
-      destinationKey: (() => { const dp = destinationPrefixRef.current; return (dp && !dp.endsWith('/') ? dp + '/' : dp) + relativePath; })(),
+      destinationKey: (() => {
+        const dp = destinationPrefixRef.current;
+        return (dp && !dp.endsWith('/') ? dp + '/' : dp) + relativePath;
+      })(),
       resumeRecord: null,
       largeFileWarningDismissed: false,
     }));
-    setItems(prev => [...newItems, ...prev]);
+    setItems((prev) => [...newItems, ...prev]);
 
     // Batches at or below the threshold start expanded; larger ones start collapsed.
     const threshold = loadUploadExpandThreshold() ?? 5;
-    setCollapsedBatches(prev => ({ ...prev, [batchId]: fileEntries.length > threshold }));
+    setCollapsedBatches((prev) => ({ ...prev, [batchId]: fileEntries.length > threshold }));
 
     // Request Notification API permission on first batch (Q4 in QUESTIONS.md)
     if (!notifAskedRef.current && 'Notification' in window) {
@@ -196,7 +250,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       Notification.requestPermission().catch(() => {});
     }
 
-    newItems.forEach(item => enqueueUpload(item));
+    newItems.forEach((item) => enqueueUpload(item));
   }
 
   // Check for a stale multipart session in IndexedDB before starting a new upload.
@@ -207,10 +261,14 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     let existingRecord = null;
     try {
       existingRecord = await loadResumeRecord({
-        provider, endpoint: credentials.endpoint,
-        bucket, destinationKey: item.destinationKey,
+        provider,
+        endpoint: credentials.endpoint,
+        bucket,
+        destinationKey: item.destinationKey,
       });
-    } catch { /* IndexedDB may be unavailable */ }
+    } catch {
+      /* IndexedDB may be unavailable */
+    }
 
     // Guard: batch may have been cancelled while loadResumeRecord was in flight
     if (cancelledBatchesRef.current.has(item.batchId)) return;
@@ -233,10 +291,16 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   async function runUpload(id, file, destinationKey) {
     // Concurrent tab conflict detection (§4.15)
     if (isUploadActiveElsewhere(destinationKey)) {
-      updateItem(id, {
-        status: 'error',
-        error: { message: `Another browser tab appears to be uploading to "${destinationKey}". Close the other tab or wait for it to finish before retrying.` },
-      }, true);
+      updateItem(
+        id,
+        {
+          status: 'error',
+          error: {
+            message: `Another browser tab appears to be uploading to "${destinationKey}". Close the other tab or wait for it to finish before retrying.`,
+          },
+        },
+        true,
+      );
       return;
     }
     markUploadActive(destinationKey);
@@ -286,20 +350,28 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         probeResult: uploadAnnotation?.probeResult ?? null,
       });
       saveUploadLogEntry({
-        fileName: file.name, destinationKey, fileSize: file.size,
-        status: 'done', startedAt: startTime, completedAt, durationSec,
+        fileName: file.name,
+        destinationKey,
+        fileSize: file.size,
+        status: 'done',
+        startedAt: startTime,
+        completedAt,
+        durationSec,
         avgSpeedBps: durationSec > 0 ? file.size / durationSec : null,
         errorMessage: null,
-        concurrencyMode:     loadAdaptiveMode() ? 'adaptive' : 'manual',
+        concurrencyMode: loadAdaptiveMode() ? 'adaptive' : 'manual',
         peakPartConcurrency: uploadAnnotation?.peakPartConcurrency ?? null,
-        sharded:             uploadAnnotation?.sharded ?? false,
-        probeResult:         uploadAnnotation?.probeResult ?? null,
-        partSize:            diag.partSize ?? null,
-        totalParts:          diag.totalParts ?? null,
-        retries:             diag.retries ?? 0,
-        provider, endpoint:  credentials.endpoint, bucket,
-      }).then(() => onLogEntry?.()).catch(() => {});
-
+        sharded: uploadAnnotation?.sharded ?? false,
+        probeResult: uploadAnnotation?.probeResult ?? null,
+        partSize: diag.partSize ?? null,
+        totalParts: diag.totalParts ?? null,
+        retries: diag.retries ?? 0,
+        provider,
+        endpoint: credentials.endpoint,
+        bucket,
+      })
+        .then(() => onLogEntry?.())
+        .catch(() => {});
     } catch (err) {
       if (err.name === 'AbortError' || err.message === 'Upload aborted') return;
       // For a multipart upload that failed on a transient (non-permission) error, the server
@@ -308,32 +380,56 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       // — instead of the destructive Restart that re-uploads the whole file (BUG-034).
       let failedResumeRecord = null;
       if (file.size >= MULTIPART_THRESHOLD && !isPermissionError(err)) {
-        failedResumeRecord = await loadResumeRecord({ provider, endpoint: credentials.endpoint, bucket, destinationKey }).catch(() => null);
+        failedResumeRecord = await loadResumeRecord({
+          provider,
+          endpoint: credentials.endpoint,
+          bucket,
+          destinationKey,
+        }).catch(() => null);
       }
       updateItem(id, { status: 'error', error: err, resumeRecord: failedResumeRecord }, true);
       const completedAt = Date.now();
       saveUploadLogEntry({
-        fileName: file.name, destinationKey, fileSize: file.size,
-        status: 'error', startedAt: startTime, completedAt,
+        fileName: file.name,
+        destinationKey,
+        fileSize: file.size,
+        status: 'error',
+        startedAt: startTime,
+        completedAt,
         durationSec: (completedAt - startTime) / 1000,
         avgSpeedBps: null,
         errorMessage: err?.message || String(err),
-        concurrencyMode:     loadAdaptiveMode() ? 'adaptive' : 'manual',
+        concurrencyMode: loadAdaptiveMode() ? 'adaptive' : 'manual',
         peakPartConcurrency: uploadAnnotation?.peakPartConcurrency ?? null,
-        sharded:             uploadAnnotation?.sharded ?? false,
-        probeResult:         null,
-        partSize:            diag.partSize ?? null,
-        totalParts:          diag.totalParts ?? null,
-        retries:             diag.retries ?? 0,
-        provider, endpoint:  credentials.endpoint, bucket,
-      }).then(() => onLogEntry?.()).catch(() => {});
+        sharded: uploadAnnotation?.sharded ?? false,
+        probeResult: null,
+        partSize: diag.partSize ?? null,
+        totalParts: diag.totalParts ?? null,
+        retries: diag.retries ?? 0,
+        provider,
+        endpoint: credentials.endpoint,
+        bucket,
+      })
+        .then(() => onLogEntry?.())
+        .catch(() => {});
       if (isPermissionError(err)) {
         onCapabilityChange('upload', 'denied');
         // Non-resumable failure on multipart: abort session and clear resume record (§4.10)
         if (file.size >= MULTIPART_THRESHOLD) {
-          const rec = await loadResumeRecord({ provider, endpoint: credentials.endpoint, bucket, destinationKey }).catch(() => null);
+          const rec = await loadResumeRecord({
+            provider,
+            endpoint: credentials.endpoint,
+            bucket,
+            destinationKey,
+          }).catch(() => null);
           if (rec) {
-            await abortMultipartSession(client, { bucket, key: destinationKey, uploadId: rec.uploadId, provider, endpoint: credentials.endpoint });
+            await abortMultipartSession(client, {
+              bucket,
+              key: destinationKey,
+              uploadId: rec.uploadId,
+              provider,
+              endpoint: credentials.endpoint,
+            });
           }
         }
       }
@@ -367,11 +463,13 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     const contentHash = await computeFileHash(file);
     await client.send(
       new PutObjectCommand({
-        Bucket: bucket, Key: destinationKey, Body: body,
+        Bucket: bucket,
+        Key: destinationKey,
+        Body: body,
         ContentType: file.type || 'application/octet-stream',
         Metadata: buildUploadMetadata(file, buildContentHashValue(contentHash)),
       }),
-      { abortSignal: controller.signal }
+      { abortSignal: controller.signal },
     );
     onProgress(file.size, file.size);
   }
@@ -390,11 +488,14 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     // second hash pass over the file.
     const contentHash = await computeFileHash(file);
 
-    const { UploadId: uploadId } = await client.send(new CreateMultipartUploadCommand({
-      Bucket: bucket, Key: destinationKey,
-      ContentType: file.type || 'application/octet-stream',
-      Metadata: buildUploadMetadata(file, buildContentHashValue(contentHash)),
-    }));
+    const { UploadId: uploadId } = await client.send(
+      new CreateMultipartUploadCommand({
+        Bucket: bucket,
+        Key: destinationKey,
+        ContentType: file.type || 'application/octet-stream',
+        Metadata: buildUploadMetadata(file, buildContentHashValue(contentHash)),
+      }),
+    );
 
     const abortController = new AbortController();
     activeUploadsRef.current[id] = { abort: () => abortController.abort(), uploadId };
@@ -406,10 +507,18 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       const fileIdentity = buildFileIdentity(file);
       if (contentHash) fileIdentity.contentHash = contentHash;
       await saveResumeRecord({
-        provider, endpoint: credentials.endpoint, bucket, destinationKey,
-        uploadId, partSize, fileIdentity, startedAt: Date.now(),
+        provider,
+        endpoint: credentials.endpoint,
+        bucket,
+        destinationKey,
+        uploadId,
+        partSize,
+        fileIdentity,
+        startedAt: Date.now(),
       });
-    } catch { /* IDB may be unavailable */ }
+    } catch {
+      /* IDB may be unavailable */
+    }
 
     const parts = Array.from({ length: totalParts });
     const allPartNumbers = Array.from({ length: totalParts }, (_, i) => i + 1);
@@ -423,14 +532,23 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       const end = Math.min(start + partSize, file.size);
       const chunk = await file.slice(start, end).arrayBuffer();
       const resp = await withUploadRetry(
-        () => partClient.send(
-          new UploadPartCommand({
-            Bucket: bucket, Key: destinationKey, UploadId: uploadId,
-            PartNumber: partNumber, Body: chunk,
-          }),
-          { abortSignal: abortController.signal },
-        ),
-        { signal: abortController.signal, onRetry: () => { diag.retries = (diag.retries ?? 0) + 1; } },
+        () =>
+          partClient.send(
+            new UploadPartCommand({
+              Bucket: bucket,
+              Key: destinationKey,
+              UploadId: uploadId,
+              PartNumber: partNumber,
+              Body: chunk,
+            }),
+            { abortSignal: abortController.signal },
+          ),
+        {
+          signal: abortController.signal,
+          onRetry: () => {
+            diag.retries = (diag.retries ?? 0) + 1;
+          },
+        },
       );
       parts[partNumber - 1] = { PartNumber: partNumber, ETag: resp.ETag };
       bytesUploaded += end - start;
@@ -447,7 +565,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
 
     let peakPartConcurrency;
     let sharded = false;
-    let probeResolved = null;   // read by the completion annotation below (BUG-035: keep at fn scope)
+    let probeResolved = null; // read by the completion annotation below (BUG-035: keep at fn scope)
 
     if (loadMultiOriginUpload() && isVhostShardable(bucket, provider)) {
       // Multi-origin sharding: the browser caps connections at ~6 per origin. Split this
@@ -458,20 +576,32 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       // and falls back to the default if it's rejected, so sharding can never cause a failure.
       // The memory budget is split across the two lanes. See src/lib/upload-sharding.js.
       const probeClient = createS3Client(credentials, { forcePathStyle: !requiresPathStyle(provider) });
-      const shardConcurrency = capConcurrencyByMemory(getEffectivePartConcurrency(), partSize, Math.floor(perFileBudget / 2));
-      const poolConcurrency  = capConcurrencyByMemory(getEffectivePartConcurrency(), partSize, perFileBudget);
+      const shardConcurrency = capConcurrencyByMemory(
+        getEffectivePartConcurrency(),
+        partSize,
+        Math.floor(perFileBudget / 2),
+      );
+      const poolConcurrency = capConcurrencyByMemory(getEffectivePartConcurrency(), partSize, perFileBudget);
       const result = await uploadPartsSharded(allPartNumbers, uploadPart, {
-        fallbackClient: client, probeClient, shardConcurrency, poolConcurrency,
+        fallbackClient: client,
+        probeClient,
+        shardConcurrency,
+        poolConcurrency,
       });
       sharded = result.sharded;
       peakPartConcurrency = sharded ? shardConcurrency * 2 : poolConcurrency;
-      debugConcurrency('shard-done', { file: file.name, totalParts, sharded, shardConcurrency, poolConcurrency, peak: peakPartConcurrency });
+      debugConcurrency('shard-done', {
+        file: file.name,
+        totalParts,
+        sharded,
+        shardConcurrency,
+        poolConcurrency,
+        peak: peakPartConcurrency,
+      });
     } else {
       const baseline = capConcurrencyByMemory(getEffectivePartConcurrency(), partSize, perFileBudget);
       const candidate = capConcurrencyByMemory(Math.min(16, baseline + 4), partSize, perFileBudget);
-      const shouldProbe = loadAdaptiveMode()
-        && totalParts >= PROBE_THRESHOLD_PARTS
-        && candidate !== baseline;
+      const shouldProbe = loadAdaptiveMode() && totalParts >= PROBE_THRESHOLD_PARTS && candidate !== baseline;
 
       peakPartConcurrency = baseline;
 
@@ -492,15 +622,16 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         const candidateMs = Date.now() - t2;
 
         const state = createProbeState(baseline, candidate);
-        state.baselineBytes  = 3 * partSize;
-        state.baselineMs     = baselineMs;
+        state.baselineBytes = 3 * partSize;
+        state.baselineMs = baselineMs;
         state.candidateBytes = 3 * partSize;
-        state.candidateMs    = candidateMs;
+        state.candidateMs = candidateMs;
         probeResolved = resolveProbe(state);
         peakPartConcurrency = probeResolved.winner;
 
         debugConcurrency('probe-result', {
-          baseline, candidate,
+          baseline,
+          candidate,
           baselineMbs: probeResolved.baselineMbs,
           candidateMbs: probeResolved.candidateMbs,
           winner: probeResolved.winner,
@@ -513,10 +644,23 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       }
     }
 
-    await withUploadRetry(() => client.send(new CompleteMultipartUploadCommand({
-      Bucket: bucket, Key: destinationKey, UploadId: uploadId,
-      MultipartUpload: { Parts: parts },
-    })), { signal: abortController.signal, onRetry: () => { diag.retries = (diag.retries ?? 0) + 1; } });
+    await withUploadRetry(
+      () =>
+        client.send(
+          new CompleteMultipartUploadCommand({
+            Bucket: bucket,
+            Key: destinationKey,
+            UploadId: uploadId,
+            MultipartUpload: { Parts: parts },
+          }),
+        ),
+      {
+        signal: abortController.signal,
+        onRetry: () => {
+          diag.retries = (diag.retries ?? 0) + 1;
+        },
+      },
+    );
 
     await deleteResumeRecord({ provider, endpoint: credentials.endpoint, bucket, destinationKey }).catch(() => {});
     delete activeUploadsRef.current[id];
@@ -536,7 +680,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   }
 
   async function handleResume(id) {
-    const item = items.find(it => it.id === id);
+    const item = items.find((it) => it.id === id);
     if (!item || !item.resumeRecord) return;
 
     updateItem(id, { status: 'resuming', error: null }, true);
@@ -546,10 +690,17 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     // Verify file identity (§4.15)
     const file = item.file;
     if (!fileIdentityMatches(fileIdentity, file)) {
-      updateItem(id, {
-        status: 'error',
-        error: { message: 'File does not match the resume record (name, size, or modification time differs). Please restart the upload.' },
-      }, true);
+      updateItem(
+        id,
+        {
+          status: 'error',
+          error: {
+            message:
+              'File does not match the resume record (name, size, or modification time differs). Please restart the upload.',
+          },
+        },
+        true,
+      );
       return;
     }
 
@@ -557,10 +708,17 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
     if (fileIdentity.contentHash) {
       const currentHash = await computeFileHash(file);
       if (currentHash && currentHash !== fileIdentity.contentHash) {
-        updateItem(id, {
-          status: 'error',
-          error: { message: 'File content hash does not match the resume record. The file may have changed since the upload was started. Please restart the upload.' },
-        }, true);
+        updateItem(
+          id,
+          {
+            status: 'error',
+            error: {
+              message:
+                'File content hash does not match the resume record. The file may have changed since the upload was started. Please restart the upload.',
+            },
+          },
+          true,
+        );
         return;
       }
     }
@@ -570,7 +728,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       // We do not trust the local resume record's part list — the session may have continued
       // in another browser or tab.
       const completedParts = await collectParts(client, { bucket, key: destinationKey, uploadId });
-      const completedNums = new Set(completedParts.map(p => p.PartNumber));
+      const completedNums = new Set(completedParts.map((p) => p.PartNumber));
 
       // Calculate total parts
       const totalParts = Math.ceil(item.file.size / partSize);
@@ -589,46 +747,68 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
       const budgetBytes = (loadUploadMemoryMB() ?? DEFAULT_UPLOAD_MEMORY_MB) * 1024 * 1024;
       const perFileBudget = Math.floor(budgetBytes / Math.max(1, activeCount));
       const concurrency = capConcurrencyByMemory(getEffectivePartConcurrency(), partSize, perFileBudget);
-      await uploadPartsWithPool(remainingParts, async (partNumber) => {
-        if (abortController.signal.aborted) throw new Error('Upload aborted');
-        const start = (partNumber - 1) * partSize;
-        const end = Math.min(start + partSize, item.file.size);
-        const chunk = await item.file.slice(start, end).arrayBuffer();
+      await uploadPartsWithPool(
+        remainingParts,
+        async (partNumber) => {
+          if (abortController.signal.aborted) throw new Error('Upload aborted');
+          const start = (partNumber - 1) * partSize;
+          const end = Math.min(start + partSize, item.file.size);
+          const chunk = await item.file.slice(start, end).arrayBuffer();
 
-        const partResp = await withUploadRetry(
-          () => client.send(new UploadPartCommand({
-            Bucket: bucket, Key: destinationKey, UploadId: uploadId,
-            PartNumber: partNumber, Body: chunk,
-          }), { abortSignal: abortController.signal }),
-          { signal: abortController.signal },
-        );
+          const partResp = await withUploadRetry(
+            () =>
+              client.send(
+                new UploadPartCommand({
+                  Bucket: bucket,
+                  Key: destinationKey,
+                  UploadId: uploadId,
+                  PartNumber: partNumber,
+                  Body: chunk,
+                }),
+                { abortSignal: abortController.signal },
+              ),
+            { signal: abortController.signal },
+          );
 
-        newParts.push({ PartNumber: partNumber, ETag: partResp.ETag });
-        const uploaded = Math.min(partNumber * partSize, item.file.size);
-        updateItem(id, { progress: (uploaded / item.file.size) * 100, bytesUploaded: uploaded });
-      }, concurrency);
+          newParts.push({ PartNumber: partNumber, ETag: partResp.ETag });
+          const uploaded = Math.min(partNumber * partSize, item.file.size);
+          updateItem(id, { progress: (uploaded / item.file.size) * 100, bytesUploaded: uploaded });
+        },
+        concurrency,
+      );
 
       // Complete
       newParts.sort((a, b) => a.PartNumber - b.PartNumber);
-      await withUploadRetry(() => client.send(new CompleteMultipartUploadCommand({
-        Bucket: bucket, Key: destinationKey, UploadId: uploadId,
-        MultipartUpload: { Parts: newParts },
-      })), { signal: abortController.signal });
+      await withUploadRetry(
+        () =>
+          client.send(
+            new CompleteMultipartUploadCommand({
+              Bucket: bucket,
+              Key: destinationKey,
+              UploadId: uploadId,
+              MultipartUpload: { Parts: newParts },
+            }),
+          ),
+        { signal: abortController.signal },
+      );
 
       await deleteResumeRecord({ provider, endpoint: credentials.endpoint, bucket, destinationKey }).catch(() => {});
       updateItem(id, { status: 'done', progress: 100, resumeRecord: null }, true);
       onCapabilityChange('upload', 'permitted');
-
     } catch (err) {
       // NoSuchUpload: the provider has expired or garbage-collected the multipart session.
       // Delete the stale record so the user is not offered resume again for this file.
       if (err?.Code === 'NoSuchUpload' || err?.name === 'NoSuchUpload') {
         await deleteResumeRecord({ provider, endpoint: credentials.endpoint, bucket, destinationKey }).catch(() => {});
-        updateItem(id, {
-          status: 'error',
-          resumeRecord: null,
-          error: { message: 'Upload session has expired and cannot be resumed. Please restart the upload.' },
-        }, true);
+        updateItem(
+          id,
+          {
+            status: 'error',
+            resumeRecord: null,
+            error: { message: 'Upload session has expired and cannot be resumed. Please restart the upload.' },
+          },
+          true,
+        );
       } else {
         updateItem(id, { status: 'error', error: err }, true);
       }
@@ -636,13 +816,16 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   }
 
   async function handleRestart(id) {
-    const item = items.find(it => it.id === id);
+    const item = items.find((it) => it.id === id);
     if (!item) return;
 
     if (item.resumeRecord) {
       await abortMultipartSession(client, {
-        bucket, key: item.destinationKey, uploadId: item.resumeRecord.uploadId,
-        provider, endpoint: credentials.endpoint,
+        bucket,
+        key: item.destinationKey,
+        uploadId: item.resumeRecord.uploadId,
+        provider,
+        endpoint: credentials.endpoint,
       });
     }
 
@@ -653,98 +836,117 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
 
   function handleCancelBatch(batchId) {
     cancelledBatchesRef.current.add(batchId);
-    const batchItemIds = new Set(items.filter(i => i.batchId === batchId).map(i => i.id));
+    const batchItemIds = new Set(items.filter((i) => i.batchId === batchId).map((i) => i.id));
     // Abort in-flight uploads for this batch
     Object.entries(activeUploadsRef.current).forEach(([id, active]) => {
       if (batchItemIds.has(Number(id))) active?.abort?.();
     });
     // Best-effort multipart cleanup — abort the S3 session and delete the
     // resume record so a re-drag of the same folder does not show files as paused
-    items.filter(i => i.batchId === batchId).forEach(item => {
-      const active = activeUploadsRef.current[item.id];
-      const uploadId = active?.uploadId ?? item.resumeRecord?.uploadId;
-      if (uploadId) {
-        abortMultipartSession(client, {
-          bucket, key: item.destinationKey, uploadId,
-          provider, endpoint: credentials.endpoint,
-        });
-      }
-    });
-    setItems(prev => prev.map(i =>
-      i.batchId === batchId && itemIsActive(i) ? { ...i, status: 'aborted' } : i
-    ));
+    items
+      .filter((i) => i.batchId === batchId)
+      .forEach((item) => {
+        const active = activeUploadsRef.current[item.id];
+        const uploadId = active?.uploadId ?? item.resumeRecord?.uploadId;
+        if (uploadId) {
+          abortMultipartSession(client, {
+            bucket,
+            key: item.destinationKey,
+            uploadId,
+            provider,
+            endpoint: credentials.endpoint,
+          });
+        }
+      });
+    setItems((prev) => prev.map((i) => (i.batchId === batchId && itemIsActive(i) ? { ...i, status: 'aborted' } : i)));
   }
 
   async function handleCancel(id) {
     const active = activeUploadsRef.current[id];
     if (active?.abort) active.abort();
 
-    const item = items.find(it => it.id === id);
+    const item = items.find((it) => it.id === id);
     const destinationKey = item?.destinationKey;
     // active.uploadId covers in-progress uploads; item.resumeRecord covers paused ones
     const uploadId = active?.uploadId ?? item?.resumeRecord?.uploadId;
 
     if (uploadId && destinationKey) {
       try {
-        await client.send(new AbortMultipartUploadCommand({
-          Bucket: bucket, Key: destinationKey, UploadId: uploadId,
-        }));
+        await client.send(
+          new AbortMultipartUploadCommand({
+            Bucket: bucket,
+            Key: destinationKey,
+            UploadId: uploadId,
+          }),
+        );
       } catch (err) {
-        updateItem(id, {
-          status: 'error',
-          error: { message: `Cancelled, but abort failed: ${err.message}. Incomplete parts may remain and accrue storage charges.` },
-        }, true);
+        updateItem(
+          id,
+          {
+            status: 'error',
+            error: {
+              message: `Cancelled, but abort failed: ${err.message}. Incomplete parts may remain and accrue storage charges.`,
+            },
+          },
+          true,
+        );
         return;
       }
       await deleteResumeRecord({ provider, endpoint: credentials.endpoint, bucket, destinationKey }).catch(() => {});
     }
 
-    setItems(prev => prev.filter(it => it.id !== id));
+    setItems((prev) => prev.filter((it) => it.id !== id));
   }
 
   function handleRemove(id) {
-    setItems(prev => prev.filter(it => it.id !== id));
+    setItems((prev) => prev.filter((it) => it.id !== id));
   }
 
   function dismissBatch(batchId) {
-    setItems(prev => prev.filter(i => i.batchId !== batchId));
-    setCollapsedBatches(prev => { const next = { ...prev }; delete next[batchId]; return next; });
+    setItems((prev) => prev.filter((i) => i.batchId !== batchId));
+    setCollapsedBatches((prev) => {
+      const next = { ...prev };
+      delete next[batchId];
+      return next;
+    });
     cancelledBatchesRef.current.delete(batchId);
   }
 
   function toggleBatchCollapse(batchId) {
-    setCollapsedBatches(prev => ({ ...prev, [batchId]: !prev[batchId] }));
+    setCollapsedBatches((prev) => ({ ...prev, [batchId]: !prev[batchId] }));
   }
 
   function collapseBatch(batchId) {
-    setCollapsedBatches(prev => ({ ...prev, [batchId]: true }));
+    setCollapsedBatches((prev) => ({ ...prev, [batchId]: true }));
   }
 
   function expandBatch(batchId) {
-    setCollapsedBatches(prev => ({ ...prev, [batchId]: false }));
+    setCollapsedBatches((prev) => ({ ...prev, [batchId]: false }));
   }
 
   function dismissAllSettled() {
-    const activeOrQueued = new Set(
-      items.filter(i => itemIsActive(i) || itemIsPaused(i)).map(i => i.batchId)
-    );
-    const toRemove = new Set([...new Set(items.map(i => i.batchId))].filter(id => !activeOrQueued.has(id)));
-    setItems(prev => prev.filter(i => !toRemove.has(i.batchId)));
-    setCollapsedBatches(prev => { const next = { ...prev }; toRemove.forEach(id => delete next[id]); return next; });
-    toRemove.forEach(id => cancelledBatchesRef.current.delete(id));
+    const activeOrQueued = new Set(items.filter((i) => itemIsActive(i) || itemIsPaused(i)).map((i) => i.batchId));
+    const toRemove = new Set([...new Set(items.map((i) => i.batchId))].filter((id) => !activeOrQueued.has(id)));
+    setItems((prev) => prev.filter((i) => !toRemove.has(i.batchId)));
+    setCollapsedBatches((prev) => {
+      const next = { ...prev };
+      toRemove.forEach((id) => delete next[id]);
+      return next;
+    });
+    toRemove.forEach((id) => cancelledBatchesRef.current.delete(id));
   }
 
   function retryAllFailed() {
-    items.filter(itemIsFailed).forEach(item => handleRestart(item.id));
+    items.filter(itemIsFailed).forEach((item) => handleRestart(item.id));
   }
 
   function cancelAll() {
-    const activeBatchIds = new Set(items.filter(itemIsActive).map(i => i.batchId));
-    activeBatchIds.forEach(batchId => handleCancelBatch(batchId));
+    const activeBatchIds = new Set(items.filter(itemIsActive).map((i) => i.batchId));
+    activeBatchIds.forEach((batchId) => handleCancelBatch(batchId));
   }
 
   function collapseAll() {
-    setCollapsedBatches(prev => {
+    setCollapsedBatches((prev) => {
       const next = { ...prev };
       for (const i of items) next[i.batchId] = true;
       return next;
@@ -752,7 +954,7 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   }
 
   function expandAll() {
-    setCollapsedBatches(prev => {
+    setCollapsedBatches((prev) => {
       const next = { ...prev };
       for (const i of items) next[i.batchId] = false;
       return next;
@@ -760,10 +962,13 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   }
 
   // beforeunload guard while any upload is active (§4.6)
-  const hasActive = items.some(it => it.status === 'uploading' || it.status === 'resuming');
+  const hasActive = items.some((it) => it.status === 'uploading' || it.status === 'resuming');
   useEffect(() => {
     if (!hasActive) return;
-    const handler = (e) => { e.preventDefault(); e.returnValue = ''; };
+    const handler = (e) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [hasActive]);
@@ -793,17 +998,22 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
   }
 
   // Global action bar availability flags
-  const settledBatchCount = batches.filter(([, bi]) =>
-    !bi.some(i => i.status === 'uploading' || i.status === 'resuming' || i.status === 'queued' || i.status === 'paused')
+  const settledBatchCount = batches.filter(
+    ([, bi]) =>
+      !bi.some(
+        (i) => i.status === 'uploading' || i.status === 'resuming' || i.status === 'queued' || i.status === 'paused',
+      ),
   ).length;
-  const hasAnyFailed  = items.some(i => i.status === 'error');
-  const hasAnyActive  = items.some(i => i.status === 'uploading' || i.status === 'resuming' || i.status === 'queued');
+  const hasAnyFailed = items.some((i) => i.status === 'error');
+  const hasAnyActive = items.some((i) => i.status === 'uploading' || i.status === 'resuming' || i.status === 'queued');
   const expandedCount = batches.filter(([id]) => !collapsedBatches[id]).length;
   const collapsedCount = batches.filter(([id]) => !!collapsedBatches[id]).length;
-  const showGlobalActions = batches.length > 0 && (
-    settledBatchCount >= 2 || hasAnyFailed || hasAnyActive ||
-    (batches.length >= 2 && (expandedCount >= 2 || collapsedCount >= 2))
-  );
+  const showGlobalActions =
+    batches.length > 0 &&
+    (settledBatchCount >= 2 ||
+      hasAnyFailed ||
+      hasAnyActive ||
+      (batches.length >= 2 && (expandedCount >= 2 || collapsedCount >= 2)));
 
   return (
     <div>
@@ -814,15 +1024,17 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
             <input
               type="text"
               value={destinationPrefix}
-              onInput={e => setDestinationPrefix(e.target.value)}
+              onInput={(e) => setDestinationPrefix(e.target.value)}
               placeholder="(root of bucket)"
             />
             <span class="hint">
-              Where uploaded files will be placed. Navigating the browser updates this automatically.
-              You can also type any path here — it doesn't need to exist yet.
+              Where uploaded files will be placed. Navigating the browser updates this automatically. You can also type
+              any path here — it doesn't need to exist yet.
             </span>
             {destOutsideFloor && (
-              <span class="field-error">Destination must stay under {basePrefix} — this connection's key only reaches that folder.</span>
+              <span class="field-error">
+                Destination must stay under {basePrefix} — this connection's key only reaches that folder.
+              </span>
             )}
           </div>
 
@@ -832,13 +1044,17 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
               class="btn btn-ghost btn-sm"
               disabled={destOutsideFloor}
               onClick={() => fileInputRef.current?.click()}
-            >Choose files</button>
+            >
+              Choose files
+            </button>
             <button
               type="button"
               class="btn btn-ghost btn-sm"
               disabled={destOutsideFloor}
               onClick={() => folderInputRef.current?.click()}
-            >Choose folder</button>
+            >
+              Choose folder
+            </button>
           </div>
 
           <input
@@ -848,20 +1064,25 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
             data-testid="file-input"
             style={{ display: 'none' }}
             onChange={(e) => {
-              addFiles(Array.from(e.target.files).map(f => ({ file: f, relativePath: f.name })));
+              addFiles(Array.from(e.target.files).map((f) => ({ file: f, relativePath: f.name })));
               e.target.value = '';
             }}
           />
           <input
-            ref={(el) => { folderInputRef.current = el; if (el) el.webkitdirectory = true; }}
+            ref={(el) => {
+              folderInputRef.current = el;
+              if (el) el.webkitdirectory = true;
+            }}
             type="file"
             multiple
             style={{ display: 'none' }}
             onChange={(e) => {
-              addFiles(Array.from(e.target.files).map(f => ({
-                file: f,
-                relativePath: f.webkitRelativePath || f.name,
-              })));
+              addFiles(
+                Array.from(e.target.files).map((f) => ({
+                  file: f,
+                  relativePath: f.webkitRelativePath || f.name,
+                })),
+              );
               e.target.value = '';
             }}
           />
@@ -878,10 +1099,14 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
         <div class="queue-global-actions">
           <span class="queue-global-actions-label">All queues:</span>
           {settledBatchCount >= 2 && (
-            <button type="button" class="btn btn-ghost btn-sm" onClick={dismissAllSettled}>Dismiss all done</button>
+            <button type="button" class="btn btn-ghost btn-sm" onClick={dismissAllSettled}>
+              Dismiss all done
+            </button>
           )}
           {hasAnyFailed && (
-            <button type="button" class="btn btn-ghost btn-sm" onClick={retryAllFailed}>Retry all failed</button>
+            <button type="button" class="btn btn-ghost btn-sm" onClick={retryAllFailed}>
+              Retry all failed
+            </button>
           )}
           {hasAnyActive && (
             <button
@@ -889,13 +1114,19 @@ export function UploadQueue({ client, bucket, provider, currentPrefix, credentia
               class="btn btn-ghost btn-sm"
               style={{ color: cancelAllPrimed ? 'var(--text-danger)' : undefined }}
               onClick={handleCancelAllClick}
-            >{cancelAllPrimed ? 'Sure?' : 'Cancel all'}</button>
+            >
+              {cancelAllPrimed ? 'Sure?' : 'Cancel all'}
+            </button>
           )}
           {batches.length >= 2 && expandedCount >= 2 && (
-            <button type="button" class="btn btn-ghost btn-sm" onClick={collapseAll}>Collapse all</button>
+            <button type="button" class="btn btn-ghost btn-sm" onClick={collapseAll}>
+              Collapse all
+            </button>
           )}
           {batches.length >= 2 && collapsedCount >= 2 && (
-            <button type="button" class="btn btn-ghost btn-sm" onClick={expandAll}>Expand all</button>
+            <button type="button" class="btn btn-ghost btn-sm" onClick={expandAll}>
+              Expand all
+            </button>
           )}
         </div>
       )}

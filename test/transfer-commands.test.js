@@ -38,29 +38,23 @@ describe('rcloneProvider', () => {
 describe('rcloneRemoteName', () => {
   // Prefixed so the generated command reads as remote:path rather than the confusing
   // "my-bucket:my-bucket" you get when the remote is named after the bucket itself.
-  test('prefixes the bucket name', () =>
-    assert.equal(rcloneRemoteName('my-bucket'), 'bucketer-my-bucket'));
+  test('prefixes the bucket name', () => assert.equal(rcloneRemoteName('my-bucket'), 'bucketer-my-bucket'));
 
   test('replaces characters invalid in a remote name', () =>
     assert.equal(rcloneRemoteName('my.bucket.name'), 'bucketer-my-bucket-name'));
 
-  test('falls back when the name reduces to nothing', () =>
-    assert.equal(rcloneRemoteName('...'), 'bucketer'));
+  test('falls back when the name reduces to nothing', () => assert.equal(rcloneRemoteName('...'), 'bucketer'));
 
-  test('falls back on empty input', () =>
-    assert.equal(rcloneRemoteName(''), 'bucketer'));
+  test('falls back on empty input', () => assert.equal(rcloneRemoteName(''), 'bucketer'));
 });
 
 describe('shellQuote', () => {
-  test('wraps a plain value in single quotes', () =>
-    assert.equal(shellQuote('plain'), "'plain'"));
+  test('wraps a plain value in single quotes', () => assert.equal(shellQuote('plain'), "'plain'"));
 
-  test('neutralises command substitution', () =>
-    assert.equal(shellQuote('$(whoami)'), "'$(whoami)'"));
+  test('neutralises command substitution', () => assert.equal(shellQuote('$(whoami)'), "'$(whoami)'"));
 
   // The POSIX idiom: close the quote, emit an escaped quote, reopen.
-  test('escapes an embedded single quote', () =>
-    assert.equal(shellQuote("it's"), "'it'\\''s'"));
+  test('escapes an embedded single quote', () => assert.equal(shellQuote("it's"), "'it'\\''s'"));
 
   test('a hostile prefix cannot break out of its quoting', () => {
     const hostile = "foo'; rm -rf ~; echo '";
@@ -153,7 +147,10 @@ describe('buildAwsCliCommand', () => {
   test('includes the endpoint and region', () => {
     const cmd = buildAwsCliCommand({
       endpoint: 'https://s3.us-west-004.backblazeb2.com',
-      bucket: 'b', prefix: 'v/', region: 'us-west-004', destDir: './out',
+      bucket: 'b',
+      prefix: 'v/',
+      region: 'us-west-004',
+      destDir: './out',
     });
     assert.match(cmd, /^aws s3 sync /);
     assert.equal(cmd.includes("'s3://b/v'"), true);

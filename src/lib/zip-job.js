@@ -65,7 +65,8 @@ export async function openZipStaging(jobId, { root }) {
     handle,
     async truncate(bytes) {
       const w = await handle.createWritable({ keepExistingData: true });
-      await w.truncate(bytes); await w.close();
+      await w.truncate(bytes);
+      await w.close();
     },
     async openAppend(at) {
       const w = await handle.createWritable({ keepExistingData: true });
@@ -77,7 +78,11 @@ export async function openZipStaging(jobId, { root }) {
 }
 
 export async function discardZipStaging(jobId, { root }) {
-  try { await root.removeEntry(stagingName(jobId)); } catch { /* best effort */ }
+  try {
+    await root.removeEntry(stagingName(jobId));
+  } catch {
+    /* best effort */
+  }
 }
 
 // LEGACY RECOVERY: nothing in the current engine ever writes ITEM_STATUS.ISSUED any
@@ -92,7 +97,9 @@ export async function discardZipStaging(jobId, { root }) {
 // very start of every run, before resumeAt is computed.
 async function promoteIssuedToDone(jobId) {
   const items = [];
-  await eachItemByStatus(jobId, ITEM_STATUS.ISSUED, (it) => { items.push(it); });
+  await eachItemByStatus(jobId, ITEM_STATUS.ISSUED, (it) => {
+    items.push(it);
+  });
   for (const it of items) {
     await updateItem(jobId, it.key, { status: ITEM_STATUS.DONE });
   }
@@ -109,7 +116,7 @@ const MAX_ERROR_SAMPLE = 50;
 // scope only and cannot be checked here — the worker self-reports at runtime instead, and
 // runZipJob falls back to the serial engine if it can't.
 export function selectZipEngine(caps, makeWorker) {
-  return (inPlaceSupported(caps) && makeWorker) ? 'inplace' : 'serial';
+  return inPlaceSupported(caps) && makeWorker ? 'inplace' : 'serial';
 }
 
 export async function runZipJob(job, opts) {
@@ -121,22 +128,32 @@ export async function runZipJob(job, opts) {
   return runSerialZipJob(job, opts);
 }
 
-async function runSerialZipJob(job, {
-  presign, probe, fetchImpl = fetch, root, concurrency, onProgress, shouldCancel = () => false,
-}) {
+async function runSerialZipJob(
+  job,
+  { presign, probe, fetchImpl = fetch, root, concurrency, onProgress, shouldCancel = () => false },
+) {
   const prefix = job.prefix ?? '';
   await promoteIssuedToDone(job.id);
 
   // 1. Reload completed entries; decide the resume point.
   const done = [];
-  await eachItemByStatus(job.id, ITEM_STATUS.DONE, (it) => { done.push(it); });
+  await eachItemByStatus(job.id, ITEM_STATUS.DONE, (it) => {
+    done.push(it);
+  });
   let resumeAt = done.reduce((m, it) => Math.max(m, it.zipEnd ?? 0), 0);
 
   const staging = await openZipStaging(job.id, { root });
   if (staging.size < resumeAt) {
     // Eviction or partial loss: the recorded entries are not on disk. Restart cleanly.
     for (const it of done) {
-      await updateItem(job.id, it.key, { status: ITEM_STATUS.PENDING, zipOffset: null, zipEnd: null, crc: null, time: null, date: null });
+      await updateItem(job.id, it.key, {
+        status: ITEM_STATUS.PENDING,
+        zipOffset: null,
+        zipEnd: null,
+        crc: null,
+        time: null,
+        date: null,
+      });
     }
     done.length = 0;
     resumeAt = 0;
@@ -154,11 +171,13 @@ async function runSerialZipJob(job, {
   // calls resetFailedToPending before every run, so PENDING is the complete resume set —
   // the same contract the old runDownloadJob-based engine relied on.
   const pendingItems = [];
-  await eachItemByStatus(job.id, ITEM_STATUS.PENDING, (it) => { pendingItems.push(it); });
+  await eachItemByStatus(job.id, ITEM_STATUS.PENDING, (it) => {
+    pendingItems.push(it);
+  });
 
   let quotaBlocked = null; // set by onReady below on a mid-entry QuotaExceededError
-  let liveActive = [];     // mirrors runPrefetch's own in-flight `active` list
-  let liveBytes = 0;       // mirrors runPrefetch's own `bytesDone` (this run's live total)
+  let liveActive = []; // mirrors runPrefetch's own in-flight `active` list
+  let liveBytes = 0; // mirrors runPrefetch's own `bytesDone` (this run's live total)
 
   const emitProgress = (activeOverride) => {
     onProgress?.({ done: completed, bytesDone: priorBytes + liveBytes, active: activeOverride ?? liveActive });
@@ -175,7 +194,8 @@ async function runSerialZipJob(job, {
     const entryStart = writer.offset;
     try {
       await writer.beginEntry(zipEntryPath(item.key, prefix), {
-        mtime: item.lastModified, declaredSize: item.size ?? 0,
+        mtime: item.lastModified,
+        declaredSize: item.size ?? 0,
       });
       for await (const chunk of entry.chunks) await writer.update(chunk);
       // The writer computes its own CRC in update() — entry.crc (runPrefetch's
@@ -200,7 +220,11 @@ async function runSerialZipJob(job, {
       // stream/writer below, and must not make runZipJob itself reject instead of
       // resolving with its documented { issued, failed, cancelled, ... } shape: the
       // old stream is being discarded either way, so a failed close on it is moot.
-      try { await out.close(); } catch { /* already errored; discard */ }
+      try {
+        await out.close();
+      } catch {
+        /* already errored; discard */
+      }
       await staging.truncate(entryStart);
       out = await staging.openAppend(entryStart);
       writer = createZipWriter({ write: (u8) => out.write(u8) }, { startOffset: entryStart });
@@ -227,9 +251,17 @@ async function runSerialZipJob(job, {
   };
 
   const prefetchResult = await runPrefetch(pendingItems, {
-    fetchImpl, presign, probe, root, concurrency,
+    fetchImpl,
+    presign,
+    probe,
+    root,
+    concurrency,
     onReady,
-    onProgress: (p) => { liveActive = p.active; liveBytes = p.bytesDone; emitProgress(p.active); },
+    onProgress: (p) => {
+      liveActive = p.active;
+      liveBytes = p.bytesDone;
+      emitProgress(p.active);
+    },
     shouldCancel: () => quotaBlocked !== null || shouldCancel(),
   });
 
@@ -237,9 +269,10 @@ async function runSerialZipJob(job, {
   // runPrefetch's own cancel bookkeeping (which onReady drove itself, purely to get
   // runPrefetch to stop) — so it is reported as a block, never as the cancelled path.
   const cancelled = quotaBlocked ? false : prefetchResult.cancelled;
-  const blocked = quotaBlocked
-    || prefetchResult.blocked
-    || (prefetchResult.denied
+  const blocked =
+    quotaBlocked ||
+    prefetchResult.blocked ||
+    (prefetchResult.denied
       ? { kind: PROBE_KIND.DENIED, status: null, message: 'Too many files in a row were denied.' }
       : null);
 
@@ -265,7 +298,15 @@ async function runSerialZipJob(job, {
   if (!cancelled && !blocked && pending === 0 && failed === 0) {
     const entries = [];
     await eachItemByStatus(job.id, ITEM_STATUS.DONE, (it) => {
-      entries.push({ path: zipEntryPath(it.key, prefix), zipOffset: it.zipOffset, zipEnd: it.zipEnd, size: it.size, crc: it.crc, time: it.time, date: it.date });
+      entries.push({
+        path: zipEntryPath(it.key, prefix),
+        zipOffset: it.zipOffset,
+        zipEnd: it.zipEnd,
+        size: it.size,
+        crc: it.crc,
+        time: it.time,
+        date: it.date,
+      });
     });
     await writer.finish(entries);
     finished = true;
@@ -273,6 +314,10 @@ async function runSerialZipJob(job, {
   // Guarded for the same reason as the mid-entry recovery close above: runZipJob must
   // always resolve with its documented shape, never reject because the final close on
   // an already-errored stream also rejects.
-  try { await out.close(); } catch { /* best effort; result is already computed */ }
+  try {
+    await out.close();
+  } catch {
+    /* best effort; result is already computed */
+  }
   return { issued: completed - priorCompleted, failed, cancelled, errors, blocked, finished };
 }

@@ -31,8 +31,7 @@ export function contentDispositionAttachment(filename) {
 
   // RFC 5987 ext-value. encodeURIComponent leaves ! ~ * ' ( ) alone; of those, attr-char
   // forbids * ' ( ), so they need finishing by hand.
-  const encoded = encodeURIComponent(clean)
-    .replace(/[*'()]/g, c => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+  const encoded = encodeURIComponent(clean).replace(/[*'()]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
 
   return `attachment; filename="${ascii}"; filename*=UTF-8''${encoded}`;
 }

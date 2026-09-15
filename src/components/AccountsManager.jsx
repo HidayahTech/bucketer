@@ -18,7 +18,7 @@ const KEY_TAIL = 4;
 // the key id — the tail disambiguates two accounts on the same provider without
 // echoing the whole key-adjacent string. Never shows the secret (there is none here).
 function accountLabel({ provider, keyId }) {
-  const label = provider ? (PROVIDER_LABELS[provider] || provider.toUpperCase()) : 'S3';
+  const label = provider ? PROVIDER_LABELS[provider] || provider.toUpperCase() : 'S3';
   const id = keyId || '';
   const tail = id.length > KEY_TAIL ? `…${id.slice(-KEY_TAIL)}` : id;
   return tail ? `${label} · key ${tail}` : label;
@@ -62,17 +62,19 @@ export function AccountsManager({ connections, selectedId, onSelect, onDelete, o
   const isExpanded = (g) => {
     if (g.credentialId in overrides) return overrides[g.credentialId];
     if (selectedId == null) return true;
-    return g.conns.some(c => c.id === selectedId);
+    return g.conns.some((c) => c.id === selectedId);
   };
-  const toggle = (g) =>
-    setOverrides(prev => ({ ...prev, [g.credentialId]: !isExpanded(g) }));
+  const toggle = (g) => setOverrides((prev) => ({ ...prev, [g.credentialId]: !isExpanded(g) }));
 
   const saveable = canSaveProfile(currentFormData);
   const saveTitle = saveable ? undefined : 'Fill in endpoint, bucket, and key ID with valid values to save a bucket';
-  const selectedConn = selectedId != null ? connections.find(c => c.id === selectedId) : null;
-  const initialSaveName = () => selectedConn ? selectedConn.name : defaultName(currentFormData);
+  const selectedConn = selectedId != null ? connections.find((c) => c.id === selectedId) : null;
+  const initialSaveName = () => (selectedConn ? selectedConn.name : defaultName(currentFormData));
 
-  function openSave() { setSaveName(initialSaveName()); setSaving(true); }
+  function openSave() {
+    setSaveName(initialSaveName());
+    setSaving(true);
+  }
   function handleConfirmSave(e) {
     e.preventDefault();
     const name = saveName.trim();
@@ -81,43 +83,82 @@ export function AccountsManager({ connections, selectedId, onSelect, onDelete, o
     setSaving(false);
     setSaveName('');
   }
-  function cancelSave() { setSaving(false); setSaveName(''); }
+  function cancelSave() {
+    setSaving(false);
+    setSaveName('');
+  }
 
   return (
     <div class="accounts-manager">
-      {groups.map(g => {
+      {groups.map((g) => {
         const expanded = isExpanded(g);
         return (
           <div class="account-group" key={g.credentialId}>
             <div class="account-header" onClick={() => toggle(g)}>
-              <span class="account-disclosure" aria-hidden="true">{expanded ? '▾' : '▸'}</span>
+              <span class="account-disclosure" aria-hidden="true">
+                {expanded ? '▾' : '▸'}
+              </span>
               <span class="account-name">{accountLabel(g.conns[0])}</span>
-              <button class="account-add-bucket btn-ghost" type="button"
+              <button
+                class="account-add-bucket btn-ghost"
+                type="button"
                 title="Add a bucket to this account — you only enter the bucket name"
-                onClick={e => { e.stopPropagation(); onAddBucket(g.credentialId); }}>+ bucket</button>
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddBucket(g.credentialId);
+                }}
+              >
+                + bucket
+              </button>
             </div>
             {expanded && (
               <ul class="bucket-list">
-                {g.conns.map(c => (
-                  <li key={c.id}
+                {g.conns.map((c) => (
+                  <li
+                    key={c.id}
                     class={'bucket-row' + (c.id === selectedId ? ' bucket-row-selected' : '')}
-                    onClick={() => { setConfirmDeleteId(null); onSelect(c.id); }}>
+                    onClick={() => {
+                      setConfirmDeleteId(null);
+                      onSelect(c.id);
+                    }}
+                  >
                     <span class="bucket-name">{c.bucket}</span>
                     {confirmDeleteId === c.id ? (
-                      <span class="bucket-delete-confirm" onClick={e => e.stopPropagation()}>
+                      <span class="bucket-delete-confirm" onClick={(e) => e.stopPropagation()}>
                         Delete?
-                        <button class="btn btn-sm bucket-delete-confirm-yes" type="button"
-                          onClick={e => { e.stopPropagation(); onDelete(c.id); setConfirmDeleteId(null); }}>
+                        <button
+                          class="btn btn-sm bucket-delete-confirm-yes"
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDelete(c.id);
+                            setConfirmDeleteId(null);
+                          }}
+                        >
                           Confirm
                         </button>
-                        <button class="btn btn-ghost btn-sm" type="button"
-                          onClick={e => { e.stopPropagation(); setConfirmDeleteId(null); }}>
+                        <button
+                          class="btn btn-ghost btn-sm"
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConfirmDeleteId(null);
+                          }}
+                        >
                           Cancel
                         </button>
                       </span>
                     ) : (
-                      <button class="bucket-row-delete btn-ghost" title="Forget this bucket"
-                        onClick={e => { e.stopPropagation(); setConfirmDeleteId(c.id); }}>✕</button>
+                      <button
+                        class="bucket-row-delete btn-ghost"
+                        title="Forget this bucket"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setConfirmDeleteId(c.id);
+                        }}
+                      >
+                        ✕
+                      </button>
                     )}
                   </li>
                 ))}
@@ -129,14 +170,28 @@ export function AccountsManager({ connections, selectedId, onSelect, onDelete, o
 
       {saving ? (
         <form class="bucket-save-form" onSubmit={handleConfirmSave}>
-          <input class="input" type="text" placeholder="Name" value={saveName}
-            onInput={e => setSaveName(e.target.value)} autoFocus />
-          <button class="btn btn-primary btn-sm" type="submit" disabled={!saveName.trim()}>Save</button>
-          <button class="btn btn-ghost btn-sm" type="button" onClick={cancelSave}>Cancel</button>
+          <input
+            class="input"
+            type="text"
+            placeholder="Name"
+            value={saveName}
+            onInput={(e) => setSaveName(e.target.value)}
+            autoFocus
+          />
+          <button class="btn btn-primary btn-sm" type="submit" disabled={!saveName.trim()}>
+            Save
+          </button>
+          <button class="btn btn-ghost btn-sm" type="button" onClick={cancelSave}>
+            Cancel
+          </button>
         </form>
       ) : (
-        <button class="btn btn-ghost btn-sm bucket-save-trigger"
-          disabled={!saveable} title={saveTitle} onClick={openSave}>
+        <button
+          class="btn btn-ghost btn-sm bucket-save-trigger"
+          disabled={!saveable}
+          title={saveTitle}
+          onClick={openSave}
+        >
           {selectedConn ? 'Update this bucket…' : 'Save current as a bucket…'}
         </button>
       )}

@@ -8,7 +8,13 @@ import assert from 'node:assert/strict';
 import { selectZipEngine } from '../src/lib/zip-job.js';
 
 test('selectZipEngine returns in-place only when caps support it AND a worker factory is given', () => {
-  assert.equal(selectZipEngine({ opfs:1, streamingFetch:1, webWorker:1 }, () => ({})), 'inplace');
-  assert.equal(selectZipEngine({ opfs:1, streamingFetch:1, webWorker:0 }, () => ({})), 'serial');
-  assert.equal(selectZipEngine({ opfs:1, streamingFetch:1, webWorker:1 }, null), 'serial');
+  assert.equal(
+    selectZipEngine({ opfs: 1, streamingFetch: 1, webWorker: 1 }, () => ({})),
+    'inplace',
+  );
+  assert.equal(
+    selectZipEngine({ opfs: 1, streamingFetch: 1, webWorker: 0 }, () => ({})),
+    'serial',
+  );
+  assert.equal(selectZipEngine({ opfs: 1, streamingFetch: 1, webWorker: 1 }, null), 'serial');
 });

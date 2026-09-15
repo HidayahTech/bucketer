@@ -13,10 +13,12 @@ export function createUpdateBatcher(setItems, scheduleFlush, cancelFlush) {
     if (pending.size === 0) return;
     const patches = new Map(pending);
     pending.clear();
-    setItems(prev => prev.map(it => {
-      const p = patches.get(it.id);
-      return p ? { ...it, ...p } : it;
-    }));
+    setItems((prev) =>
+      prev.map((it) => {
+        const p = patches.get(it.id);
+        return p ? { ...it, ...p } : it;
+      }),
+    );
   }
 
   function update(id, patch, urgent = false) {

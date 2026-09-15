@@ -21,14 +21,17 @@ import { purgeAllVersions, collectHiddenVersions } from '../lib/purge-versions.j
 
 function formatDate(d) {
   if (!d) return '';
-  try { return new Date(d).toLocaleDateString(); } catch { return ''; }
+  try {
+    return new Date(d).toLocaleDateString();
+  } catch {
+    return '';
+  }
 }
 
 function shortVersionId(id) {
   if (!id) return '—';
   return id.length > 18 ? id.slice(0, 18) + '…' : id;
 }
-
 
 export function HiddenVersions({ client, bucket, prefix, provider, diagnostics }) {
   const [rows, setRows] = useState(null);
@@ -59,18 +62,20 @@ export function HiddenVersions({ client, bucket, prefix, provider, diagnostics }
     setLoading(true);
     setError(null);
     try {
-      const resp = await client.send(new ListObjectVersionsCommand({
-        Bucket: bucket,
-        Prefix: prefix || undefined,
-        KeyMarker: keyMarker || undefined,
-        VersionIdMarker: versionIdMarker || undefined,
-      }));
+      const resp = await client.send(
+        new ListObjectVersionsCommand({
+          Bucket: bucket,
+          Prefix: prefix || undefined,
+          KeyMarker: keyMarker || undefined,
+          VersionIdMarker: versionIdMarker || undefined,
+        }),
+      );
       const hidden = collectHiddenVersions(resp);
       hidden.sort((a, b) => {
         const kc = a.key.localeCompare(b.key);
         return kc !== 0 ? kc : new Date(b.date) - new Date(a.date);
       });
-      setRows(prev => replace ? hidden : [...(prev || []), ...hidden]);
+      setRows((prev) => (replace ? hidden : [...(prev || []), ...hidden]));
       setIsTruncated(!!resp.IsTruncated);
       setNextKeyMarker(resp.NextKeyMarker || null);
       setNextVersionIdMarker(resp.NextVersionIdMarker || null);
@@ -81,7 +86,9 @@ export function HiddenVersions({ client, bucket, prefix, provider, diagnostics }
     }
   }
 
-  function load() { fetchPage(null, null, true); }
+  function load() {
+    fetchPage(null, null, true);
+  }
 
   async function handleDeleteConfirm() {
     const row = pendingDelete;
@@ -89,7 +96,7 @@ export function HiddenVersions({ client, bucket, prefix, provider, diagnostics }
     setDeleteError(null);
     try {
       await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: row.key, VersionId: row.versionId }));
-      setRows(prev => prev.filter(r => !(r.key === row.key && r.versionId === row.versionId)));
+      setRows((prev) => prev.filter((r) => !(r.key === row.key && r.versionId === row.versionId)));
       setPendingDelete(null);
     } catch (err) {
       setDeleteError(err);
@@ -103,17 +110,22 @@ export function HiddenVersions({ client, bucket, prefix, provider, diagnostics }
     setDeleteError(null);
     try {
       const allErrors = await purgeAllVersions(client, {
-        bucket, prefix: prefix || '',
+        bucket,
+        prefix: prefix || '',
         initialRows: rows || [],
-        nextKeyMarker, nextVersionIdMarker, isTruncated,
+        nextKeyMarker,
+        nextVersionIdMarker,
+        isTruncated,
       });
 
       if (allErrors.length > 0) {
         const first = allErrors[0];
-        setDeleteError(new Error(
-          `${allErrors.length} version${allErrors.length !== 1 ? 's' : ''} failed to delete. ` +
-          `First error — ${first.Key}: ${first.Message}`
-        ));
+        setDeleteError(
+          new Error(
+            `${allErrors.length} version${allErrors.length !== 1 ? 's' : ''} failed to delete. ` +
+              `First error — ${first.Key}: ${first.Message}`,
+          ),
+        );
       } else {
         setRows([]);
         setIsTruncated(false);
@@ -128,7 +140,10 @@ export function HiddenVersions({ client, bucket, prefix, provider, diagnostics }
     }
   }
 
-  function handleCancel() { setPendingDelete(null); setDeleteError(null); }
+  function handleCancel() {
+    setPendingDelete(null);
+    setDeleteError(null);
+  }
 
   const rel = (key) => key.slice((prefix || '').length) || key;
   const isAll = pendingDelete === 'all';
@@ -138,79 +153,107 @@ export function HiddenVersions({ client, bucket, prefix, provider, diagnostics }
     <div class="hidden-versions">
       {pendingDelete && (
         <Modal onClose={handleCancel}>
-            <div class="modal-title">
-              {isAll ? 'Purge all hidden versions?' : pendingDelete.type === 'delete-marker' && pendingDelete.isLatest ? 'Undelete this file?' : 'Permanently delete this version?'}
-            </div>
-            <div class="modal-body">
-              {isAll ? (
-                <>
+          <div class="modal-title">
+            {isAll
+              ? 'Purge all hidden versions?'
+              : pendingDelete.type === 'delete-marker' && pendingDelete.isLatest
+                ? 'Undelete this file?'
+                : 'Permanently delete this version?'}
+          </div>
+          <div class="modal-body">
+            {isAll ? (
+              <>
+                <p class="modal-caveat">
+                  This will permanently delete {isTruncated ? `${n}+ ` : `all ${n} `}hidden version{n !== 1 ? 's' : ''}
+                  {isTruncated ? ', including any not yet loaded,' : ''}.
+                </p>
+                <p class="modal-caveat">
+                  Any delete markers in this set will also be removed, which will undelete those files — their previous
+                  versions will reappear in the listing.
+                </p>
+                {provider === 'wasabi' && (
                   <p class="modal-caveat">
-                    This will permanently delete {isTruncated ? `${n}+ ` : `all ${n} `}hidden
-                    version{n !== 1 ? 's' : ''}{isTruncated ? ', including any not yet loaded,' : ''}.
+                    Wasabi has a 90-day minimum retention period. Versions deleted before 90 days are still billed for
+                    the remainder of that window.
                   </p>
-                  <p class="modal-caveat">
-                    Any delete markers in this set will also be removed, which will undelete those files — their previous versions will reappear in the listing.
-                  </p>
-                  {provider === 'wasabi' && (
-                    <p class="modal-caveat">
-                      Wasabi has a 90-day minimum retention period. Versions deleted before 90 days are still billed for the remainder of that window.
-                    </p>
-                  )}
-                </>
+                )}
+              </>
+            ) : (
+              <>
+                <p class="modal-filename" title={pendingDelete.key}>
+                  {rel(pendingDelete.key)}
+                </p>
+                <p class="modal-caveat">
+                  {pendingDelete.type === 'delete-marker' && pendingDelete.isLatest
+                    ? 'This delete marker is what makes the file appear deleted. Removing it will undelete the file — the previous version will become visible in the listing again.'
+                    : pendingDelete.type === 'delete-marker'
+                      ? "This is a superseded delete marker. Removing it will not change the file's current visibility."
+                      : 'This permanently removes this version and cannot be undone.'}
+                </p>
+              </>
+            )}
+            {deleteError && <div class="modal-error">{deleteError.message || String(deleteError)}</div>}
+          </div>
+          <div class="modal-actions">
+            <button class="btn btn-ghost btn-sm" onClick={handleCancel} disabled={deleting}>
+              Cancel
+            </button>
+            <button
+              class="btn btn-danger btn-sm"
+              onClick={isAll ? handlePurgeAllConfirm : handleDeleteConfirm}
+              disabled={deleting}
+            >
+              {deleting ? (
+                <span class="spinner" />
+              ) : isAll ? (
+                'Purge all'
+              ) : pendingDelete.type === 'delete-marker' && pendingDelete.isLatest ? (
+                'Undelete'
               ) : (
-                <>
-                  <p class="modal-filename" title={pendingDelete.key}>{rel(pendingDelete.key)}</p>
-                  <p class="modal-caveat">
-                    {pendingDelete.type === 'delete-marker' && pendingDelete.isLatest
-                      ? 'This delete marker is what makes the file appear deleted. Removing it will undelete the file — the previous version will become visible in the listing again.'
-                      : pendingDelete.type === 'delete-marker'
-                        ? 'This is a superseded delete marker. Removing it will not change the file\'s current visibility.'
-                        : 'This permanently removes this version and cannot be undone.'}
-                  </p>
-                </>
+                'Delete'
               )}
-              {deleteError && <div class="modal-error">{deleteError.message || String(deleteError)}</div>}
-            </div>
-            <div class="modal-actions">
-              <button class="btn btn-ghost btn-sm" onClick={handleCancel} disabled={deleting}>Cancel</button>
-              <button
-                class="btn btn-danger btn-sm"
-                onClick={isAll ? handlePurgeAllConfirm : handleDeleteConfirm}
-                disabled={deleting}
-              >
-                {deleting ? <span class="spinner" /> : isAll ? 'Purge all' : pendingDelete.type === 'delete-marker' && pendingDelete.isLatest ? 'Undelete' : 'Delete'}
-              </button>
-            </div>
+            </button>
+          </div>
         </Modal>
       )}
 
       {rows === null && !loading && !error ? (
         <div class="hidden-versions-bar">
-          <button class="btn btn-ghost btn-sm" onClick={load}>Show hidden versions…</button>
+          <button class="btn btn-ghost btn-sm" onClick={load}>
+            Show hidden versions…
+          </button>
         </div>
       ) : (
         <>
           <div class="hidden-versions-header">
-            <span class="section-heading" style={{ margin: 0 }}>Hidden versions &amp; deleted files</span>
+            <span class="section-heading" style={{ margin: 0 }}>
+              Hidden versions &amp; deleted files
+            </span>
             <div style={{ display: 'flex', gap: '.5rem' }}>
               {rows && rows.length > 0 && (
                 <button
                   class="btn btn-ghost btn-sm"
                   style={{ color: 'var(--text-danger)', borderColor: 'var(--text-danger)' }}
-                  onClick={() => { setDeleteError(null); setPendingDelete('all'); }}
+                  onClick={() => {
+                    setDeleteError(null);
+                    setPendingDelete('all');
+                  }}
                   disabled={loading || deleting}
                 >
                   Purge all{isTruncated ? '…' : ` (${n})`}
                 </button>
               )}
-              <button class="btn btn-ghost btn-sm" onClick={load} disabled={loading || deleting}>Refresh</button>
+              <button class="btn btn-ghost btn-sm" onClick={load} disabled={loading || deleting}>
+                Refresh
+              </button>
             </div>
           </div>
 
           <p class="hidden-versions-note">
             Items here are not visible in the normal listing.
             <strong> Old versions</strong> are previous copies of files that were overwritten.
-            <strong> Delete markers</strong> are what make files appear deleted — the content still exists in storage, and removing a delete marker will undelete the file.
+            <strong> Delete markers</strong> are what make files appear deleted — the content still exists in storage,
+            and removing a delete marker will undelete the file.
           </p>
 
           {error && (
@@ -222,7 +265,12 @@ export function HiddenVersions({ client, bucket, prefix, provider, diagnostics }
             />
           )}
 
-          {loading && <div class="empty-state"><span class="spinner" style={{ marginRight: '.5rem' }} />Loading…</div>}
+          {loading && (
+            <div class="empty-state">
+              <span class="spinner" style={{ marginRight: '.5rem' }} />
+              Loading…
+            </div>
+          )}
 
           {!loading && rows !== null && rows.length === 0 && (
             <div class="empty-state">No hidden versions found in this prefix.</div>
@@ -244,27 +292,48 @@ export function HiddenVersions({ client, bucket, prefix, provider, diagnostics }
                 {rows.map((r, i) => (
                   <tr key={`${r.key}-${r.versionId}-${i}`} class="file-row">
                     <td class="col-name">
-                      <span class="file-name" title={r.key}>{rel(r.key)}</span>
+                      <span class="file-name" title={r.key}>
+                        {rel(r.key)}
+                      </span>
                     </td>
                     <td>
-                      {r.type === 'delete-marker'
-                        ? <span class="version-badge version-badge-dm" title={r.isLatest ? 'This marker is hiding the file — removing it will undelete the file' : 'An older delete marker, no longer the current version'}>
-                            {r.isLatest ? 'Delete marker — file hidden' : 'Delete marker (superseded)'}
-                          </span>
-                        : <span class="version-badge version-badge-old">Old version</span>
-                      }
+                      {r.type === 'delete-marker' ? (
+                        <span
+                          class="version-badge version-badge-dm"
+                          title={
+                            r.isLatest
+                              ? 'This marker is hiding the file — removing it will undelete the file'
+                              : 'An older delete marker, no longer the current version'
+                          }
+                        >
+                          {r.isLatest ? 'Delete marker — file hidden' : 'Delete marker (superseded)'}
+                        </span>
+                      ) : (
+                        <span class="version-badge version-badge-old">Old version</span>
+                      )}
                     </td>
-                    <td class="col-version-id" title={r.versionId}>{shortVersionId(r.versionId)}</td>
+                    <td class="col-version-id" title={r.versionId}>
+                      {shortVersionId(r.versionId)}
+                    </td>
                     <td class="col-size">{r.size != null ? formatBytes(r.size) : '—'}</td>
                     <td class="col-modified">{formatDate(r.date)}</td>
                     <td class="col-actions">
                       <button
                         class="btn btn-ghost btn-sm"
                         style={{ color: 'var(--text-danger)', borderColor: 'transparent' }}
-                        onClick={() => { setDeleteError(null); setPendingDelete(r); }}
+                        onClick={() => {
+                          setDeleteError(null);
+                          setPendingDelete(r);
+                        }}
                         disabled={deleting}
-                        title={r.type === 'delete-marker' && r.isLatest ? 'Undelete file (remove this delete marker)' : 'Permanently delete this version'}
-                      >✕</button>
+                        title={
+                          r.type === 'delete-marker' && r.isLatest
+                            ? 'Undelete file (remove this delete marker)'
+                            : 'Permanently delete this version'
+                        }
+                      >
+                        ✕
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -274,7 +343,11 @@ export function HiddenVersions({ client, bucket, prefix, provider, diagnostics }
 
           {isTruncated && !loading && (
             <div class="load-more-bar">
-              <button class="btn btn-ghost" onClick={() => fetchPage(nextKeyMarker, nextVersionIdMarker, false)} disabled={deleting}>
+              <button
+                class="btn btn-ghost"
+                onClick={() => fetchPage(nextKeyMarker, nextVersionIdMarker, false)}
+                disabled={deleting}
+              >
                 Load more
               </button>
             </div>

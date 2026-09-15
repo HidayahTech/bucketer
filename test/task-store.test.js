@@ -7,9 +7,18 @@ function makeScheduler() {
   const state = { queued: null };
   return {
     state,
-    schedule: (fn) => { state.queued = fn; return 1; },
-    cancel: () => { state.queued = null; },
-    frame: () => { const fn = state.queued; state.queued = null; if (fn) fn(); },
+    schedule: (fn) => {
+      state.queued = fn;
+      return 1;
+    },
+    cancel: () => {
+      state.queued = null;
+    },
+    frame: () => {
+      const fn = state.queued;
+      state.queued = null;
+      if (fn) fn();
+    },
   };
 }
 
@@ -32,7 +41,7 @@ describe('taskStore — add / get / subscribe', () => {
   test('subscribe fires immediately with current tasks and on every add/remove', () => {
     const { store } = makeStore();
     const calls = [];
-    store.subscribe(tasks => calls.push(tasks.length));
+    store.subscribe((tasks) => calls.push(tasks.length));
     assert.deepEqual(calls, [0], 'immediate call with empty list');
     const id = store.add({ kind: 'delete' });
     assert.deepEqual(calls, [0, 1]);
@@ -43,7 +52,7 @@ describe('taskStore — add / get / subscribe', () => {
   test('unsubscribe stops notifications', () => {
     const { store } = makeStore();
     const calls = [];
-    const unsub = store.subscribe(tasks => calls.push(tasks.length));
+    const unsub = store.subscribe((tasks) => calls.push(tasks.length));
     unsub();
     store.add({ kind: 'delete' });
     assert.deepEqual(calls, [0], 'no call after unsubscribe');
@@ -64,8 +73,8 @@ describe('taskStore — batched updates', () => {
   test('urgent updates flush immediately, preserving pending fields', () => {
     const { store, sched } = makeStore();
     const id = store.add({ kind: 'delete', current: 0, status: 'running' });
-    store.update(id, { current: 5 });                    // pending
-    store.update(id, { status: 'done' }, true);          // urgent
+    store.update(id, { current: 5 }); // pending
+    store.update(id, { status: 'done' }, true); // urgent
     assert.equal(store.get()[0].status, 'done');
     assert.equal(store.get()[0].current, 5, 'pending progress not lost by urgent flush');
     sched.frame(); // no-op, nothing pending
@@ -84,7 +93,7 @@ describe('taskStore — batched updates', () => {
     const { store } = makeStore();
     const id = store.add({ kind: 'delete' });
     const calls = [];
-    store.subscribe(tasks => calls.push(tasks.length));
+    store.subscribe((tasks) => calls.push(tasks.length));
     store.update(id, { current: 1 });
     store.remove(id);
     assert.deepEqual(calls, [1, 0], 'one notification for the remove, none for the flushed patch');

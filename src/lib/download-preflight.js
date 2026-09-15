@@ -25,11 +25,11 @@
 // every probe. Same reasoning as the chunk transport in the design doc.
 
 export const PROBE_KIND = {
-  OK:        'ok',
-  DENIED:    'denied',
-  MISSING:   'missing',
+  OK: 'ok',
+  DENIED: 'denied',
+  MISSING: 'missing',
   TRANSIENT: 'transient',
-  NETWORK:   'network',
+  NETWORK: 'network',
 };
 
 // A 416 means the object exists and simply has no byte 0 — it is empty. That is a readable
@@ -70,13 +70,17 @@ export async function probeUrl(url, { fetchImpl = fetch } = {}) {
 export function blockedMessage(probe) {
   switch (probe?.kind) {
     case PROBE_KIND.DENIED:
-      return `The bucket refused the download (HTTP ${probe.status ?? '4xx'}). The credentials may `
-           + 'have expired, the access key may not have read permission for these objects, or this '
-           + "computer's clock may be too far off for the signature to be accepted.";
+      return (
+        `The bucket refused the download (HTTP ${probe.status ?? '4xx'}). The credentials may ` +
+        'have expired, the access key may not have read permission for these objects, or this ' +
+        "computer's clock may be too far off for the signature to be accepted."
+      );
     case PROBE_KIND.NETWORK:
-      return 'The download could not reach the bucket. This is usually a missing CORS rule on the '
-           + 'bucket, but it is also what a dropped network connection looks like — the browser '
-           + `does not say which. (${probe.message || 'request failed'})`;
+      return (
+        'The download could not reach the bucket. This is usually a missing CORS rule on the ' +
+        'bucket, but it is also what a dropped network connection looks like — the browser ' +
+        `does not say which. (${probe.message || 'request failed'})`
+      );
     // STORAGE is not a probe kind (it never comes from probeUrl) — it is zip-job.js's
     // job-wide block for a mid-entry QuotaExceededError, carried through download-queue.js's
     // .jobBlock signal. Named here anyway because this is the one place that turns any

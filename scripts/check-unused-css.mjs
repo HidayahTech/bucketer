@@ -14,9 +14,19 @@
 import { PurgeCSS } from 'purgecss';
 
 const DYNAMIC_PREFIXES = [
-  /^toast-/, /^logo-phase-/, /^status-badge/, /^upload-item-status/, /^col-sort/,
-  /^allow-storage-/, /^discard-/, /^keeper-/, /^resume-/, /^sep-/,
-  /^storage-reason-/, /^verified-/, /^verify-/,
+  /^toast-/,
+  /^logo-phase-/,
+  /^status-badge/,
+  /^upload-item-status/,
+  /^col-sort/,
+  /^allow-storage-/,
+  /^discard-/,
+  /^keeper-/,
+  /^resume-/,
+  /^sep-/,
+  /^storage-reason-/,
+  /^verified-/,
+  /^verify-/,
 ];
 
 const [result] = await new PurgeCSS().purge({

@@ -10,7 +10,7 @@ const VERSION = '1.21.1';
 
 // Ensure document.querySelector('meta[name="app-version"]') returns our test version.
 beforeEach(() => {
-  document.head.querySelectorAll('meta[name="app-version"]').forEach(el => el.remove());
+  document.head.querySelectorAll('meta[name="app-version"]').forEach((el) => el.remove());
   const meta = document.createElement('meta');
   meta.setAttribute('name', 'app-version');
   meta.setAttribute('content', VERSION);
@@ -40,8 +40,10 @@ describe('IntegrityCheck — idle state', () => {
 
   test('button label references build integrity, not generic verification', () => {
     const { query, cleanup } = mount(h(IntegrityCheck, { verify: fakeVerify({ status: 'match' }) }));
-    assert.ok(/integrity/i.test(query('button').textContent),
-      'button label must say "Verify build integrity" so the action is self-explanatory wherever the component is mounted');
+    assert.ok(
+      /integrity/i.test(query('button').textContent),
+      'button label must say "Verify build integrity" so the action is self-explanatory wherever the component is mounted',
+    );
     cleanup();
   });
 });
@@ -53,16 +55,22 @@ describe('IntegrityCheck — match result framing', () => {
     fire(query('button'), 'click');
     await flush();
     const body = text().toLowerCase();
-    assert.ok(body.includes('does not prove') || body.includes('cannot prove'),
-      'match banner must explicitly state that this does not prove the running JS was not modified — the framing was the whole point of the feature');
+    assert.ok(
+      body.includes('does not prove') || body.includes('cannot prove'),
+      'match banner must explicitly state that this does not prove the running JS was not modified — the framing was the whole point of the feature',
+    );
     cleanup();
   });
 });
 
 describe('IntegrityCheck — result rendering', () => {
   test('match → renders banner-success with truncated hash', async () => {
-    const result = { status: 'match', version: VERSION, algorithm: 'sha256',
-                     hash: 'cc9a608c6d048f2d4a2ad686ca1b5b9cfcf63080216e49405d67d2df9bfb4e9c' };
+    const result = {
+      status: 'match',
+      version: VERSION,
+      algorithm: 'sha256',
+      hash: 'cc9a608c6d048f2d4a2ad686ca1b5b9cfcf63080216e49405d67d2df9bfb4e9c',
+    };
     const { query, text, cleanup } = mount(h(IntegrityCheck, { verify: fakeVerify(result) }));
     fire(query('button'), 'click');
     await flush();
@@ -72,9 +80,13 @@ describe('IntegrityCheck — result rendering', () => {
   });
 
   test('mismatch → renders banner-danger with both hashes', async () => {
-    const result = { status: 'mismatch', version: VERSION, algorithm: 'sha256',
-                     actual: 'aaaa608c6d048f2d4a2ad686ca1b5b9cfcf63080216e49405d67d2df9bfb4e9c',
-                     expected: 'bbbb608c6d048f2d4a2ad686ca1b5b9cfcf63080216e49405d67d2df9bfb4e9c' };
+    const result = {
+      status: 'mismatch',
+      version: VERSION,
+      algorithm: 'sha256',
+      actual: 'aaaa608c6d048f2d4a2ad686ca1b5b9cfcf63080216e49405d67d2df9bfb4e9c',
+      expected: 'bbbb608c6d048f2d4a2ad686ca1b5b9cfcf63080216e49405d67d2df9bfb4e9c',
+    };
     const { query, text, cleanup } = mount(h(IntegrityCheck, { verify: fakeVerify(result) }));
     fire(query('button'), 'click');
     await flush();
@@ -102,8 +114,7 @@ describe('IntegrityCheck — result rendering', () => {
     await flush();
     assert.ok(query('.banner-warn'));
     const body = text();
-    assert.ok(body.includes('blake3') && body.includes('sha3_256'),
-      'must list the algorithms the manifest expected');
+    assert.ok(body.includes('blake3') && body.includes('sha3_256'), 'must list the algorithms the manifest expected');
     cleanup();
   });
 
@@ -121,7 +132,10 @@ describe('IntegrityCheck — result rendering', () => {
 describe('IntegrityCheck — running state', () => {
   test('button is disabled while verify is in flight', async () => {
     let resolveVerify;
-    const verify = () => new Promise(r => { resolveVerify = r; });
+    const verify = () =>
+      new Promise((r) => {
+        resolveVerify = r;
+      });
     const { query, cleanup } = mount(h(IntegrityCheck, { verify }));
     fire(query('button'), 'click');
     await Promise.resolve();
@@ -142,8 +156,11 @@ describe('IntegrityCheck — version-from-meta', () => {
     const { query, cleanup } = mount(h(IntegrityCheck, { verify }));
     fire(query('button'), 'click');
     await flush();
-    assert.equal(captured?.version, VERSION,
-      'IntegrityCheck must read the running version from the app-version meta tag');
+    assert.equal(
+      captured?.version,
+      VERSION,
+      'IntegrityCheck must read the running version from the app-version meta tag',
+    );
     cleanup();
   });
 });

@@ -17,34 +17,54 @@ export function Breadcrumb({ prefix, floor = '', onNavigate, onMoveOver, onMoveL
     if (!onMoveOver && !onMoveDrop) return { class: cls };
     return {
       class: cls,
-      onDragOver:  onMoveOver  ? (e) => onMoveOver(target, e)  : undefined,
+      onDragOver: onMoveOver ? (e) => onMoveOver(target, e) : undefined,
       onDragLeave: onMoveLeave ? (e) => onMoveLeave(target, e) : undefined,
-      onDrop:      onMoveDrop  ? (e) => { e.preventDefault(); onMoveDrop(target, e); } : undefined,
+      onDrop: onMoveDrop
+        ? (e) => {
+            e.preventDefault();
+            onMoveDrop(target, e);
+          }
+        : undefined,
     };
   }
 
   // Defensive: a prefix outside the floor should be impossible (every caller clamps),
   // but must not crash — fall back to unscoped rendering.
-  const effectiveFloor = (floor && (prefix || '').startsWith(floor)) ? floor : '';
+  const effectiveFloor = floor && (prefix || '').startsWith(floor) ? floor : '';
   const floorParts = effectiveFloor.split('/').filter(Boolean);
   const rootLabel = floorParts.length ? floorParts[floorParts.length - 1] : 'root';
   const rootTitle = effectiveFloor ? `Your access starts here — ${effectiveFloor}` : undefined;
 
-  if (!prefix || prefix === effectiveFloor) return (
-    <div class="breadcrumb"><span class="current" title={rootTitle}>{effectiveFloor ? rootLabel : '/ (root)'}</span></div>
-  );
+  if (!prefix || prefix === effectiveFloor)
+    return (
+      <div class="breadcrumb">
+        <span class="current" title={rootTitle}>
+          {effectiveFloor ? rootLabel : '/ (root)'}
+        </span>
+      </div>
+    );
   const parts = prefix.split('/').filter(Boolean).slice(floorParts.length);
   return (
     <div class="breadcrumb">
-      <span {...crumbProps(effectiveFloor)} title={rootTitle} onClick={() => onNavigate(effectiveFloor)}>{rootLabel}</span>
+      <span {...crumbProps(effectiveFloor)} title={rootTitle} onClick={() => onNavigate(effectiveFloor)}>
+        {rootLabel}
+      </span>
       {parts.map((part, i) => {
         const target = effectiveFloor + parts.slice(0, i + 1).join('/') + '/';
         const isLast = i === parts.length - 1;
         return [
-          <span key={`sep-${i}`} class="sep">/</span>,
-          isLast
-            ? <span key={part} class="current">{part}</span>
-            : <span key={part} {...crumbProps(target)} onClick={() => onNavigate(target)}>{part}</span>,
+          <span key={`sep-${i}`} class="sep">
+            /
+          </span>,
+          isLast ? (
+            <span key={part} class="current">
+              {part}
+            </span>
+          ) : (
+            <span key={part} {...crumbProps(target)} onClick={() => onNavigate(target)}>
+              {part}
+            </span>
+          ),
         ];
       })}
     </div>

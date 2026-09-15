@@ -5,9 +5,13 @@ import assert from 'node:assert/strict';
 // The tab-conflict functions read/write localStorage at call time, not import time.
 const store = {};
 global.localStorage = {
-  getItem:  key      => Object.prototype.hasOwnProperty.call(store, key) ? store[key] : null,
-  setItem:  (key, v) => { store[key] = String(v); },
-  removeItem: key    => { delete store[key]; },
+  getItem: (key) => (Object.prototype.hasOwnProperty.call(store, key) ? store[key] : null),
+  setItem: (key, v) => {
+    store[key] = String(v);
+  },
+  removeItem: (key) => {
+    delete store[key];
+  },
 };
 
 import {
@@ -27,7 +31,9 @@ describe('buildFileIdentity', () => {
   test('returns name, size, and lastModified from a File-like object', () => {
     const file = { name: 'photo.jpg', size: 204800, lastModified: 1700000000000 };
     assert.deepEqual(buildFileIdentity(file), {
-      name: 'photo.jpg', size: 204800, lastModified: 1700000000000,
+      name: 'photo.jpg',
+      size: 204800,
+      lastModified: 1700000000000,
     });
   });
 
@@ -50,15 +56,24 @@ describe('fileIdentityMatches', () => {
   });
 
   test('returns false when name differs', () => {
-    assert.equal(fileIdentityMatches(identity, { name: 'video2.mp4', size: 1073741824, lastModified: 1700000000000 }), false);
+    assert.equal(
+      fileIdentityMatches(identity, { name: 'video2.mp4', size: 1073741824, lastModified: 1700000000000 }),
+      false,
+    );
   });
 
   test('returns false when size differs', () => {
-    assert.equal(fileIdentityMatches(identity, { name: 'video.mp4', size: 1073741825, lastModified: 1700000000000 }), false);
+    assert.equal(
+      fileIdentityMatches(identity, { name: 'video.mp4', size: 1073741825, lastModified: 1700000000000 }),
+      false,
+    );
   });
 
   test('returns false when lastModified differs', () => {
-    assert.equal(fileIdentityMatches(identity, { name: 'video.mp4', size: 1073741824, lastModified: 1700000000001 }), false);
+    assert.equal(
+      fileIdentityMatches(identity, { name: 'video.mp4', size: 1073741824, lastModified: 1700000000001 }),
+      false,
+    );
   });
 });
 
@@ -145,6 +160,6 @@ describe('markUploadActive / markUploadInactive / isUploadActiveElsewhere', () =
     markUploadInactive('uploads/a.txt');
     const active = JSON.parse(store[ACTIVE_KEY] || '{}');
     assert.ok(!Object.prototype.hasOwnProperty.call(active, 'uploads/a.txt'));
-    assert.ok( Object.prototype.hasOwnProperty.call(active, 'uploads/b.txt'));
+    assert.ok(Object.prototype.hasOwnProperty.call(active, 'uploads/b.txt'));
   });
 });

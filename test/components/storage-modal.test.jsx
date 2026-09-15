@@ -43,7 +43,7 @@ describe('StorageModal — structure', () => {
 
   test('renders a Close button', () => {
     const { cleanup } = mount(h(StorageModal, defaultProps()));
-    const btn = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Close');
+    const btn = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Close');
     assert.ok(btn, 'Close button must be present');
     cleanup();
   });
@@ -52,7 +52,16 @@ describe('StorageModal — structure', () => {
 describe('StorageModal — close mechanisms', () => {
   test('clicking the backdrop overlay calls onClose', () => {
     let closed = false;
-    const { query, cleanup } = mount(h(StorageModal, defaultProps({ onClose: () => { closed = true; } })));
+    const { query, cleanup } = mount(
+      h(
+        StorageModal,
+        defaultProps({
+          onClose: () => {
+            closed = true;
+          },
+        }),
+      ),
+    );
     fire(query('.modal-overlay'), 'click');
     assert.ok(closed, 'backdrop click must call onClose');
     cleanup();
@@ -60,7 +69,16 @@ describe('StorageModal — close mechanisms', () => {
 
   test('clicking inside the dialog does NOT call onClose', () => {
     let closed = false;
-    const { query, cleanup } = mount(h(StorageModal, defaultProps({ onClose: () => { closed = true; } })));
+    const { query, cleanup } = mount(
+      h(
+        StorageModal,
+        defaultProps({
+          onClose: () => {
+            closed = true;
+          },
+        }),
+      ),
+    );
     fire(query('.modal-dialog') || query('.storage-dialog'), 'click');
     assert.ok(!closed, 'clicking inside the dialog must not call onClose (stopPropagation)');
     cleanup();
@@ -68,7 +86,16 @@ describe('StorageModal — close mechanisms', () => {
 
   test('pressing Escape calls onClose', () => {
     let closed = false;
-    const { cleanup } = mount(h(StorageModal, defaultProps({ onClose: () => { closed = true; } })));
+    const { cleanup } = mount(
+      h(
+        StorageModal,
+        defaultProps({
+          onClose: () => {
+            closed = true;
+          },
+        }),
+      ),
+    );
     fire(document, 'keydown', { key: 'Escape' });
     assert.ok(closed, 'Escape key must call onClose');
     cleanup();
@@ -76,8 +103,17 @@ describe('StorageModal — close mechanisms', () => {
 
   test('Close button calls onClose', () => {
     let closed = false;
-    const { cleanup } = mount(h(StorageModal, defaultProps({ onClose: () => { closed = true; } })));
-    const btn = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Close');
+    const { cleanup } = mount(
+      h(
+        StorageModal,
+        defaultProps({
+          onClose: () => {
+            closed = true;
+          },
+        }),
+      ),
+    );
+    const btn = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Close');
     assert.ok(btn, 'Close button must be present');
     fire(btn, 'click');
     assert.ok(closed, 'Close button must call onClose');
@@ -86,7 +122,16 @@ describe('StorageModal — close mechanisms', () => {
 
   test('unmounting removes the Escape key listener', () => {
     let closedAfterUnmount = false;
-    const { cleanup } = mount(h(StorageModal, defaultProps({ onClose: () => { closedAfterUnmount = true; } })));
+    const { cleanup } = mount(
+      h(
+        StorageModal,
+        defaultProps({
+          onClose: () => {
+            closedAfterUnmount = true;
+          },
+        }),
+      ),
+    );
     cleanup();
     fire(document, 'keydown', { key: 'Escape' });
     assert.ok(!closedAfterUnmount, 'Escape must not fire after modal is unmounted');
@@ -113,7 +158,7 @@ describe('StorageModal — wipe section', () => {
   test('shows "Clear all app data" button', () => {
     const { cleanup } = mount(h(StorageModal, defaultProps()));
     // The wipe button appears after data loads; check it exists
-    const btn = [...document.querySelectorAll('button')].find(b => /clear all/i.test(b.textContent));
+    const btn = [...document.querySelectorAll('button')].find((b) => /clear all/i.test(b.textContent));
     // If data hasn't loaded yet, btn may be undefined — that is acceptable
     // What's important is we do not throw
     assert.doesNotThrow(() => cleanup());
@@ -128,7 +173,7 @@ describe('connection model in the storage inspector', () => {
     // resolves, so the inspector sections do not exist on synchronous mount.
     // Poll a bounded number of ticks rather than guessing a fixed delay.
     for (let i = 0; i < 20 && text().includes('Loading'); i++) {
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
     }
 
     const rendered = text();
@@ -149,23 +194,23 @@ describe('connection model in the storage inspector', () => {
     // primitives App.jsx's handleSaveProfile uses, so the row rendered in the
     // Saved Profiles table is backed by a real connection record.
     const cred = findOrCreateCredential({
-      endpoint:       'https://s3.us-east-1.amazonaws.com',
-      keyId:          'AKIDEXAMPLE1234',
-      provider:       'aws',
+      endpoint: 'https://s3.us-east-1.amazonaws.com',
+      keyId: 'AKIDEXAMPLE1234',
+      provider: 'aws',
       regionOverride: '',
     });
     saveConnectionRecord({
-      id:           'conn-test-delete-1',
-      name:         'Test connection',
+      id: 'conn-test-delete-1',
+      name: 'Test connection',
       credentialId: cred.id,
-      bucket:       'test-bucket',
+      bucket: 'test-bucket',
       capabilities: null,
     });
 
     const { text, queryAll, cleanup } = mount(h(StorageModal, defaultProps()));
     try {
       for (let i = 0; i < 20 && text().includes('Loading'); i++) {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
       }
 
       const delBtn = queryAll('.sv-del-btn')[0];
@@ -173,9 +218,9 @@ describe('connection model in the storage inspector', () => {
       fire(delBtn, 'click');
 
       assert.equal(
-        loadConnectionRecords().connections.some(c => c.id === 'conn-test-delete-1'),
+        loadConnectionRecords().connections.some((c) => c.id === 'conn-test-delete-1'),
         false,
-        'clicking the row delete button must remove the connection from s3b_connections'
+        'clicking the row delete button must remove the connection from s3b_connections',
       );
     } finally {
       cleanup();

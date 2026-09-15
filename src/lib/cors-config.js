@@ -22,16 +22,29 @@ export function shellQuote(s) {
 }
 
 export function corsJson(origin, provider) {
-  const exposeMeta = provider === PROVIDERS.B2
-    ? [`x-amz-meta-${CONTENT_HASH_KEY}`, `x-amz-meta-${FILE_MTIME_KEY}`]
-    : ['x-amz-meta-*'];
-  return JSON.stringify({
-    CORSRules: [{
-      AllowedOrigins: [origin],
-      AllowedMethods: ['GET', 'PUT', 'HEAD', 'POST', 'DELETE'],
-      AllowedHeaders: ['Authorization', 'Content-Type', 'Content-MD5', 'x-amz-*', 'amz-sdk-invocation-id', 'amz-sdk-request', 'ETag'],
-      ExposeHeaders: ['ETag', 'Content-Length', 'Content-Type', ...exposeMeta],
-      MaxAgeSeconds: 3600,
-    }],
-  }, null, 2);
+  const exposeMeta =
+    provider === PROVIDERS.B2 ? [`x-amz-meta-${CONTENT_HASH_KEY}`, `x-amz-meta-${FILE_MTIME_KEY}`] : ['x-amz-meta-*'];
+  return JSON.stringify(
+    {
+      CORSRules: [
+        {
+          AllowedOrigins: [origin],
+          AllowedMethods: ['GET', 'PUT', 'HEAD', 'POST', 'DELETE'],
+          AllowedHeaders: [
+            'Authorization',
+            'Content-Type',
+            'Content-MD5',
+            'x-amz-*',
+            'amz-sdk-invocation-id',
+            'amz-sdk-request',
+            'ETag',
+          ],
+          ExposeHeaders: ['ETag', 'Content-Length', 'Content-Type', ...exposeMeta],
+          MaxAgeSeconds: 3600,
+        },
+      ],
+    },
+    null,
+    2,
+  );
 }

@@ -20,8 +20,7 @@ import {
 } from '../src/lib/download-naming.js';
 
 describe('sanitizeSegment', () => {
-  test('leaves an ordinary name alone', () =>
-    assert.equal(sanitizeSegment('report.pdf'), 'report.pdf'));
+  test('leaves an ordinary name alone', () => assert.equal(sanitizeSegment('report.pdf'), 'report.pdf'));
 
   test('SECURITY: dot segments cannot traverse', () => {
     assert.equal(sanitizeSegment('..'), '__');
@@ -37,8 +36,7 @@ describe('sanitizeSegment', () => {
   test('replaces characters no Windows filesystem accepts', () =>
     assert.equal(sanitizeSegment('a:b*c?d"e<f>g|h'), 'a_b_c_d_e_f_g_h'));
 
-  test('strips control characters', () =>
-    assert.equal(sanitizeSegment('a\u0000b\u001Fc'), 'abc'));
+  test('strips control characters', () => assert.equal(sanitizeSegment('a\u0000b\u001Fc'), 'abc'));
 
   test('escapes Windows reserved device names', () => {
     assert.equal(sanitizeSegment('CON'), 'CON_');
@@ -48,8 +46,7 @@ describe('sanitizeSegment', () => {
   });
 
   // Windows reserves these even with an extension: CON.txt is still CON.
-  test('escapes a reserved name that carries an extension', () =>
-    assert.equal(sanitizeSegment('con.txt'), 'con_.txt'));
+  test('escapes a reserved name that carries an extension', () => assert.equal(sanitizeSegment('con.txt'), 'con_.txt'));
 
   test('does not escape a name that merely starts with a reserved word', () =>
     assert.equal(sanitizeSegment('console.log'), 'console.log'));
@@ -60,12 +57,11 @@ describe('sanitizeSegment', () => {
     assert.equal(sanitizeSegment('name. . '), 'name');
   });
 
-  test('falls back when nothing survives', () =>
-    assert.equal(sanitizeSegment(''), '_'));
+  test('falls back when nothing survives', () => assert.equal(sanitizeSegment(''), '_'));
 
   test('normalises to NFC so macOS and Linux agree', () => {
-    const nfd = 'café.txt';   // e + combining acute
-    const nfc = 'café.txt';    // precomposed é
+    const nfd = 'café.txt'; // e + combining acute
+    const nfc = 'café.txt'; // precomposed é
     assert.equal(sanitizeSegment(nfd), nfc);
   });
 
@@ -77,11 +73,9 @@ describe('sanitizeSegment', () => {
 });
 
 describe('segmentsForKey', () => {
-  test('splits a nested key', () =>
-    assert.deepEqual(segmentsForKey('videos/2024/a.mp4'), ['videos', '2024', 'a.mp4']));
+  test('splits a nested key', () => assert.deepEqual(segmentsForKey('videos/2024/a.mp4'), ['videos', '2024', 'a.mp4']));
 
-  test('drops leading and empty segments', () =>
-    assert.deepEqual(segmentsForKey('/a//b/'), ['a', 'b']));
+  test('drops leading and empty segments', () => assert.deepEqual(segmentsForKey('/a//b/'), ['a', 'b']));
 
   test('SECURITY: a traversal key stays inside the destination', () =>
     assert.deepEqual(segmentsForKey('../../etc/passwd'), ['__', '__', 'etc', 'passwd']));
@@ -89,17 +83,13 @@ describe('segmentsForKey', () => {
   test('SECURITY: an absolute-looking key is relative', () =>
     assert.deepEqual(segmentsForKey('/etc/passwd'), ['etc', 'passwd']));
 
-  test('empty key yields no segments', () =>
-    assert.deepEqual(segmentsForKey(''), []));
+  test('empty key yields no segments', () => assert.deepEqual(segmentsForKey(''), []));
 });
 
 describe('isDirectoryMarker', () => {
-  test('a key ending in a slash is a folder marker', () =>
-    assert.equal(isDirectoryMarker('foo/'), true));
-  test('an ordinary key is not', () =>
-    assert.equal(isDirectoryMarker('foo/bar.txt'), false));
-  test('an empty key is not', () =>
-    assert.equal(isDirectoryMarker(''), false));
+  test('a key ending in a slash is a folder marker', () => assert.equal(isDirectoryMarker('foo/'), true));
+  test('an ordinary key is not', () => assert.equal(isDirectoryMarker('foo/bar.txt'), false));
+  test('an empty key is not', () => assert.equal(isDirectoryMarker(''), false));
 });
 
 describe('flatNameForKey', () => {

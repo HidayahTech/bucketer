@@ -50,16 +50,20 @@ describe('abortMultipartSession', () => {
 
     // Pre-condition: save a resume record
     await saveResumeRecord({
-      provider: params.provider, endpoint: params.endpoint,
-      bucket: params.bucket, destinationKey: params.key,
+      provider: params.provider,
+      endpoint: params.endpoint,
+      bucket: params.bucket,
+      destinationKey: params.key,
       uploadId: params.uploadId,
       partSize: 5 * 1024 * 1024,
       fileIdentity: { name: 'file.bin', size: 1000, lastModified: 0 },
       startedAt: Date.now(),
     });
     const before = await loadResumeRecord({
-      provider: params.provider, endpoint: params.endpoint,
-      bucket: params.bucket, destinationKey: params.key,
+      provider: params.provider,
+      endpoint: params.endpoint,
+      bucket: params.bucket,
+      destinationKey: params.key,
     });
     assert.ok(before !== null, 'resume record should exist before cleanup');
 
@@ -69,8 +73,10 @@ describe('abortMultipartSession', () => {
 
     // Post-condition: resume record should be gone
     const after = await loadResumeRecord({
-      provider: params.provider, endpoint: params.endpoint,
-      bucket: params.bucket, destinationKey: params.key,
+      provider: params.provider,
+      endpoint: params.endpoint,
+      bucket: params.bucket,
+      destinationKey: params.key,
     });
     assert.equal(after, null, 'resume record should be deleted after cleanup');
   });
@@ -89,8 +95,10 @@ describe('abortMultipartSession', () => {
       uploadId: 'failing-upload',
     };
     await saveResumeRecord({
-      provider: params.provider, endpoint: params.endpoint,
-      bucket: params.bucket, destinationKey: params.key,
+      provider: params.provider,
+      endpoint: params.endpoint,
+      bucket: params.bucket,
+      destinationKey: params.key,
       uploadId: params.uploadId,
       partSize: 5 * 1024 * 1024,
       fileIdentity: { name: 'crash.bin', size: 500, lastModified: 0 },
@@ -101,8 +109,10 @@ describe('abortMultipartSession', () => {
     await abortMultipartSession(client, params); // must not throw
 
     const after = await loadResumeRecord({
-      provider: params.provider, endpoint: params.endpoint,
-      bucket: params.bucket, destinationKey: params.key,
+      provider: params.provider,
+      endpoint: params.endpoint,
+      bucket: params.bucket,
+      destinationKey: params.key,
     });
     assert.equal(after, null, 'resume record must be deleted even when abort fails');
   });

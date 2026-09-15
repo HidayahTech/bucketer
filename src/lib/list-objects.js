@@ -13,16 +13,17 @@ import { withUploadRetry } from './s3-retry.js';
 
 export function listObjectsPage(client, { bucket, prefix, token, maxKeys, signal } = {}) {
   return withUploadRetry(
-    () => client.send(
-      new ListObjectsV2Command({
-        Bucket: bucket,
-        Prefix: prefix || undefined,
-        Delimiter: '/',
-        MaxKeys: maxKeys,
-        ContinuationToken: token || undefined,
-      }),
-      { abortSignal: signal },
-    ),
+    () =>
+      client.send(
+        new ListObjectsV2Command({
+          Bucket: bucket,
+          Prefix: prefix || undefined,
+          Delimiter: '/',
+          MaxKeys: maxKeys,
+          ContinuationToken: token || undefined,
+        }),
+        { abortSignal: signal },
+      ),
     { signal },
   );
 }

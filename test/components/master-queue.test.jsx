@@ -16,7 +16,7 @@ import { createTaskStore } from '../../src/lib/task-store.js';
 import { createDeleteTask, createTransferTask, createResumableMoveTask } from '../../src/lib/queue-tasks.js';
 
 // Urgent updates flush synchronously, so tests never need a frame to fire.
-const makeStore = () => createTaskStore(fn => setTimeout(fn, 0), clearTimeout);
+const makeStore = () => createTaskStore((fn) => setTimeout(fn, 0), clearTimeout);
 
 function addDelete(store, patch = {}) {
   const id = store.add(createDeleteTask({ files: ['a.txt', 'b.txt'], prefixes: [], capturedPrefix: '', bucket: 'b' }));
@@ -44,7 +44,16 @@ describe('MasterQueue — running states', () => {
 
   test('move checking shows "Checking destination…"', () => {
     const store = makeStore();
-    store.add(createTransferTask({ files: [{ key: 'a', size: 1 }], prefixes: [], dest: 'd/', capturedPrefix: '', bucket: 'b', mode: 'move' }));
+    store.add(
+      createTransferTask({
+        files: [{ key: 'a', size: 1 }],
+        prefixes: [],
+        dest: 'd/',
+        capturedPrefix: '',
+        bucket: 'b',
+        mode: 'move',
+      }),
+    );
     const { text, cleanup } = mount(h(MasterQueue, { store }));
     assert.ok(text().includes('Checking destination'));
     cleanup();
@@ -61,7 +70,16 @@ describe('MasterQueue — running states', () => {
 
   test('copying uses the Copying verb', () => {
     const store = makeStore();
-    const id = store.add(createTransferTask({ files: [{ key: 'a', size: 1 }], prefixes: [], dest: 'd/', capturedPrefix: '', bucket: 'b', mode: 'copy' }));
+    const id = store.add(
+      createTransferTask({
+        files: [{ key: 'a', size: 1 }],
+        prefixes: [],
+        dest: 'd/',
+        capturedPrefix: '',
+        bucket: 'b',
+        mode: 'copy',
+      }),
+    );
     store.update(id, { subPhase: 'moving', current: 0, total: 1 }, true);
     const { text, cleanup } = mount(h(MasterQueue, { store }));
     assert.ok(text().includes('Copying 1 file'));
@@ -137,7 +155,7 @@ describe('MasterQueue — interactions', () => {
     const store = makeStore();
     addDelete(store, { status: 'done' });
     const { cleanup } = mount(h(MasterQueue, { store }));
-    const dismiss = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Dismiss');
+    const dismiss = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Dismiss');
     fire(dismiss, 'click');
     assert.equal(store.get().length, 0);
     cleanup();
@@ -147,9 +165,9 @@ describe('MasterQueue — interactions', () => {
     const store = makeStore();
     const id = addDelete(store, { status: 'done', collapsed: true, errors: [{ key: 'a', message: 'x' }] });
     const { query, cleanup } = mount(h(MasterQueue, { store }));
-    const toggle = [...document.querySelectorAll('button')].find(b => b.textContent.includes('Show details'));
+    const toggle = [...document.querySelectorAll('button')].find((b) => b.textContent.includes('Show details'));
     fire(toggle, 'click');
-    assert.equal(store.get().find(t => t.id === id).collapsed, false);
+    assert.equal(store.get().find((t) => t.id === id).collapsed, false);
     assert.ok(query('.queue-op-errors'), 'error list now expanded');
     cleanup();
   });
@@ -161,7 +179,7 @@ describe('MasterQueue — interactions', () => {
     const running = addDelete(store);
     const { text, cleanup } = mount(h(MasterQueue, { store }));
     assert.ok(text().includes('Dismiss all finished'));
-    const btn = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Dismiss all finished');
+    const btn = [...document.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Dismiss all finished');
     fire(btn, 'click');
     assert.equal(store.get().length, 1);
     assert.equal(store.get()[0].id, running);
@@ -180,7 +198,16 @@ describe('MasterQueue — interactions', () => {
 describe('MasterQueue — rename', () => {
   test('a running rename task shows "Renaming <old> → <new>"', () => {
     const store = makeStore();
-    const id = store.add(createTransferTask({ files: [], prefixes: ['photos/2024/'], renameTo: 'memories', capturedPrefix: 'photos/', bucket: 'b', mode: 'rename' }));
+    const id = store.add(
+      createTransferTask({
+        files: [],
+        prefixes: ['photos/2024/'],
+        renameTo: 'memories',
+        capturedPrefix: 'photos/',
+        bucket: 'b',
+        mode: 'rename',
+      }),
+    );
     store.update(id, { subPhase: 'moving', total: 3, current: 1 }, true);
     const { text, cleanup } = mount(h(MasterQueue, { store }));
     assert.ok(text().includes('Renaming 2024 → memories'), text());
@@ -188,7 +215,16 @@ describe('MasterQueue — rename', () => {
   });
   test('a done rename task shows "Renamed <old> → <new>"', () => {
     const store = makeStore();
-    const id = store.add(createTransferTask({ files: [], prefixes: ['photos/2024/'], renameTo: 'memories', capturedPrefix: 'photos/', bucket: 'b', mode: 'rename' }));
+    const id = store.add(
+      createTransferTask({
+        files: [],
+        prefixes: ['photos/2024/'],
+        renameTo: 'memories',
+        capturedPrefix: 'photos/',
+        bucket: 'b',
+        mode: 'rename',
+      }),
+    );
     store.update(id, { status: 'done', subPhase: null }, true);
     const { text, cleanup } = mount(h(MasterQueue, { store }));
     assert.ok(text().includes('Renamed 2024 → memories'), text());
@@ -199,7 +235,16 @@ describe('MasterQueue — rename', () => {
 describe('MasterQueue — move byte progress', () => {
   test('a running move reporting bytes renders the progress bar and byte line', () => {
     const store = makeStore();
-    const id = store.add(createTransferTask({ files: [{ key: 'a', size: 1000 }], prefixes: [], dest: 'd/', capturedPrefix: '', bucket: 'b', mode: 'move' }));
+    const id = store.add(
+      createTransferTask({
+        files: [{ key: 'a', size: 1000 }],
+        prefixes: [],
+        dest: 'd/',
+        capturedPrefix: '',
+        bucket: 'b',
+        mode: 'move',
+      }),
+    );
     store.update(id, { subPhase: 'moving', current: 0, total: 1, bytesDone: 300, bytesTotal: 1000 }, true);
     const { query, text, cleanup } = mount(h(MasterQueue, { store }));
     assert.ok(query('.queue-op-progress'), 'byte-progress block renders for a move');
@@ -218,7 +263,13 @@ describe('MasterQueue — move byte progress', () => {
 });
 
 describe('MasterQueue — resumable move', () => {
-  const rec = { id: 'mv-1', bucket: 'b', dest: 'arch/', capturedPrefix: '', items: [{ sourceKey: 'a', destKey: 'arch/a', size: 100 }] };
+  const rec = {
+    id: 'mv-1',
+    bucket: 'b',
+    dest: 'arch/',
+    capturedPrefix: '',
+    items: [{ sourceKey: 'a', destKey: 'arch/a', size: 100 }],
+  };
 
   test('a paused move shows Resume and Discard (not Cancel/Dismiss)', () => {
     const store = makeStore();
@@ -235,7 +286,15 @@ describe('MasterQueue — resumable move', () => {
     const store = makeStore();
     const id = store.add(createResumableMoveTask(rec));
     let resumed = null;
-    const { query, cleanup } = mount(h(MasterQueue, { store, onResumeMove: (t) => { resumed = t; }, onDiscardMove: () => {} }));
+    const { query, cleanup } = mount(
+      h(MasterQueue, {
+        store,
+        onResumeMove: (t) => {
+          resumed = t;
+        },
+        onDiscardMove: () => {},
+      }),
+    );
     fire(query('[data-testid="move-resume"]'), 'click');
     assert.equal(resumed.id, id);
     cleanup();
@@ -245,7 +304,15 @@ describe('MasterQueue — resumable move', () => {
     const store = makeStore();
     const id = store.add(createResumableMoveTask(rec));
     let discarded = null;
-    const { query, cleanup } = mount(h(MasterQueue, { store, onResumeMove: () => {}, onDiscardMove: (t) => { discarded = t; } }));
+    const { query, cleanup } = mount(
+      h(MasterQueue, {
+        store,
+        onResumeMove: () => {},
+        onDiscardMove: (t) => {
+          discarded = t;
+        },
+      }),
+    );
     fire(query('[data-testid="move-discard"]'), 'click');
     assert.equal(discarded.id, id);
     cleanup();
@@ -255,14 +322,28 @@ describe('MasterQueue — resumable move', () => {
 describe('MasterQueue — interrupted move surfaces inline', () => {
   test('a paused move WITH errors shows Resume, Discard, the error count, and an expandable list', () => {
     const store = makeStore();
-    const base = createResumableMoveTask({ id: 'mv-1', bucket: 'b', dest: 'arch/', capturedPrefix: '', items: [{ sourceKey: 'a', destKey: 'arch/a', size: 1 }] });
-    store.add({ ...base, moveJobId: 'mv-1', collapsed: true, errors: [{ key: 'b.bin', message: 'storage cap exceeded' }] });
+    const base = createResumableMoveTask({
+      id: 'mv-1',
+      bucket: 'b',
+      dest: 'arch/',
+      capturedPrefix: '',
+      items: [{ sourceKey: 'a', destKey: 'arch/a', size: 1 }],
+    });
+    store.add({
+      ...base,
+      moveJobId: 'mv-1',
+      collapsed: true,
+      errors: [{ key: 'b.bin', message: 'storage cap exceeded' }],
+    });
     const { text, query, cleanup } = mount(h(MasterQueue, { store, onResumeMove: () => {}, onDiscardMove: () => {} }));
     assert.ok(query('[data-testid="move-resume"]'), 'Resume');
     assert.ok(query('[data-testid="move-discard"]'), 'Discard');
     assert.equal(query('[data-testid="task-cancel"]'), null, 'no Cancel');
     assert.ok(/1 error/.test(text()), text());
-    assert.ok([...document.querySelectorAll('button')].some(b => b.textContent.includes('Show details')), 'errors are expandable');
+    assert.ok(
+      [...document.querySelectorAll('button')].some((b) => b.textContent.includes('Show details')),
+      'errors are expandable',
+    );
     cleanup();
   });
 });
@@ -270,7 +351,17 @@ describe('MasterQueue — interrupted move surfaces inline', () => {
 describe('MasterQueue — origin chip', () => {
   test('a task row shows the bucket it belongs to as an origin chip', () => {
     const store = makeStore();
-    store.add(createDeleteTask({ files: ['a.txt'], prefixes: [], capturedPrefix: '', bucket: 'photos', connectionId: 'c1', provider: 'b2', endpoint: 'https://e' }));
+    store.add(
+      createDeleteTask({
+        files: ['a.txt'],
+        prefixes: [],
+        capturedPrefix: '',
+        bucket: 'photos',
+        connectionId: 'c1',
+        provider: 'b2',
+        endpoint: 'https://e',
+      }),
+    );
     const { query, cleanup } = mount(h(MasterQueue, { store }));
     const chip = query('.queue-op-origin');
     assert.ok(chip, 'an origin chip should render for a task with a bucket');

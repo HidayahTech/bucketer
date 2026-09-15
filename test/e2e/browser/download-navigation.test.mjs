@@ -10,7 +10,16 @@
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest } from '../harness.mjs';
+import {
+  startMock,
+  startAppServer,
+  connectApp,
+  BUCKET,
+  launchBrowser,
+  newE2EContext,
+  newE2EPage,
+  e2eTest,
+} from '../harness.mjs';
 
 let ctx, app, browser, context, page;
 
@@ -59,23 +68,27 @@ describe('browser e2e — a failing download cannot navigate the app away', () =
   // and the browser renders it — into the hidden frame, never the top frame. `skipRange`
   // makes the fault hit only the download GET.
   e2eTest('an error response renders into the hidden frame, not the top frame', async () => {
-    ctx.mock.configure({ faults: [{ op: 'GetObject', method: 'GET', status: 404, code: 'NoSuchKey', message: 'gone', skipRange: true }] });
+    ctx.mock.configure({
+      faults: [{ op: 'GetObject', method: 'GET', status: 404, code: 'NoSuchKey', message: 'gone', skipRange: true }],
+    });
     ctx.mock.requestLog.reset();
     const before = page.url();
 
     await startFolderDownload();
     await page.locator('#bucketer-download-frames iframe').first().waitFor({ state: 'attached', timeout: 15000 });
     // Let the run finish issuing all three before asserting on its traffic.
-    await page.getByText(/Sent 3 of 3/).first().waitFor({ timeout: 15000 });
+    await page
+      .getByText(/Sent 3 of 3/)
+      .first()
+      .waitFor({ timeout: 15000 });
 
     assert.equal(page.url(), before, 'the application must still be the document in the top frame');
-    assert.ok(await page.locator('#app').count() > 0, 'the app root must still be mounted');
+    assert.ok((await page.locator('#app').count()) > 0, 'the app root must still be mounted');
     // BUG-053 replaced the single reused frame with a bounded pool: consecutive issues
     // must not share a frame (a src reassignment cancels a pending navigation), and the
     // pool cap is what prevents an element-per-file DOM leak.
     const frameCount = await page.locator('#bucketer-download-frames iframe').count();
-    assert.ok(frameCount >= 1 && frameCount <= 8,
-      `frame pool must hold between 1 and 8 frames, saw ${frameCount}`);
+    assert.ok(frameCount >= 1 && frameCount <= 8, `frame pool must hold between 1 and 8 frames, saw ${frameCount}`);
 
     // Presence assertions: absence claims above are only trustworthy if the run genuinely
     // reached the mock (the postmortem's lesson: an inert feature satisfies every absence
@@ -84,11 +97,20 @@ describe('browser e2e — a failing download cannot navigate the app away', () =
     // first file's error and issues b.txt (missteps item 47 recorded that this was written
     // down as the bar and never asserted).
     // The last nav GET may still be in flight when the "Sent" text lands; poll briefly.
-    const navPaths = () => new Set(ctx.mock.requestLog.list().filter((r) => r.isNavGet).map((r) => r.path));
+    const navPaths = () =>
+      new Set(
+        ctx.mock.requestLog
+          .list()
+          .filter((r) => r.isNavGet)
+          .map((r) => r.path),
+      );
     const deadline = Date.now() + 5000;
     while (navPaths().size < 3 && Date.now() < deadline) await new Promise((r) => setTimeout(r, 100));
-    assert.equal(navPaths().size, 3,
-      `every file must be requested as a download despite the first erroring — saw ${[...navPaths()].join(', ')}`);
+    assert.equal(
+      navPaths().size,
+      3,
+      `every file must be requested as a download despite the first erroring — saw ${[...navPaths()].join(', ')}`,
+    );
   });
 
   // The probe is a raw fetch carrying Range, which is CORS-safelisted. Asserting on the DENIED
@@ -103,14 +125,22 @@ describe('browser e2e — a failing download cannot navigate the app away', () =
     // The previous run issued every item (its errors happened after issuing), so its
     // manifest is gone and this scans a fresh job.
     // No reload: reconnecting would have to disambiguate three submit buttons in the connected UI.
-    ctx.mock.configure({ faults: [{ op: 'GetObject', method: 'GET', status: 403, code: 'AccessDenied', message: 'denied' }] });
+    ctx.mock.configure({
+      faults: [{ op: 'GetObject', method: 'GET', status: 403, code: 'AccessDenied', message: 'denied' }],
+    });
     ctx.mock.requestLog.reset();
 
     await startFolderDownload();
 
-    await page.getByText(/refused the download/i).first().waitFor({ timeout: 15000 });
+    await page
+      .getByText(/refused the download/i)
+      .first()
+      .waitFor({ timeout: 15000 });
     assert.equal(page.url().startsWith(app.url), true, 'a blocked job must not navigate either');
-    assert.equal(ctx.mock.requestLog.list().filter((r) => r.isNavGet).length, 0,
-      'nothing may be handed to the download manager under a wholesale deny');
+    assert.equal(
+      ctx.mock.requestLog.list().filter((r) => r.isNavGet).length,
+      0,
+      'nothing may be handed to the download manager under a wholesale deny',
+    );
   });
 });

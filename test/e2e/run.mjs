@@ -14,9 +14,12 @@ import { dirname, join } from 'node:path';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const layer = process.argv[2] || 'all';
 
-const dirs = layer === 'node'    ? ['test/e2e/mock-s3', 'test/e2e/node']
-           : layer === 'browser' ? ['test/e2e/browser']
-           : ['test/e2e/mock-s3', 'test/e2e/node', 'test/e2e/browser'];
+const dirs =
+  layer === 'node'
+    ? ['test/e2e/mock-s3', 'test/e2e/node']
+    : layer === 'browser'
+      ? ['test/e2e/browser']
+      : ['test/e2e/mock-s3', 'test/e2e/node', 'test/e2e/browser'];
 
 // This Node version's `--test` imports directory args rather than searching them, so collect
 // the *.test.mjs files explicitly and pass them as paths.
@@ -48,10 +51,15 @@ try {
   // but deterministic — the right trade for browser e2e.
   // In CI (E2E_JUNIT=1) emit a JUnit report for the MR test-summary widget, while keeping the
   // human-readable spec output on stdout. node:test supports multiple reporters (Node >=20).
-  const reporters = process.env.E2E_JUNIT === '1'
-    ? ['--test-reporter=spec', '--test-reporter-destination=stdout',
-       '--test-reporter=junit', '--test-reporter-destination=junit-e2e.xml']
-    : [];
+  const reporters =
+    process.env.E2E_JUNIT === '1'
+      ? [
+          '--test-reporter=spec',
+          '--test-reporter-destination=stdout',
+          '--test-reporter=junit',
+          '--test-reporter-destination=junit-e2e.xml',
+        ]
+      : [];
   run(['--test', '--test-concurrency=1', ...reporters, ...files]);
 } catch (err) {
   process.exit(err.status ?? 1);

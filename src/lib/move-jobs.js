@@ -12,14 +12,14 @@ import { openDB, MOVE_JOB_STORE } from './indexeddb-core.js';
 function txDone(tx) {
   return new Promise((resolve, reject) => {
     tx.oncomplete = () => resolve();
-    tx.onerror    = () => reject(tx.error);
-    tx.onabort    = () => reject(tx.error || new Error('transaction aborted'));
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error('transaction aborted'));
   });
 }
 function reqResult(req) {
   return new Promise((resolve, reject) => {
     req.onsuccess = () => resolve(req.result);
-    req.onerror   = () => reject(req.error);
+    req.onerror = () => reject(req.error);
   });
 }
 
@@ -41,7 +41,9 @@ export async function loadAllMoveJobs() {
     const db = await openDB();
     const tx = db.transaction(MOVE_JOB_STORE, 'readonly');
     return (await reqResult(tx.objectStore(MOVE_JOB_STORE).getAll())) ?? [];
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 
 // Read-merge-write one row so a partial update never clobbers fields written elsewhere.

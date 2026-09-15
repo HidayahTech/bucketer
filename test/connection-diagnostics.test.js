@@ -13,7 +13,9 @@ const BASE = {
 };
 
 const fetchOk = async () => ({ type: 'opaque' });
-const fetchFail = async () => { throw new TypeError('NetworkError'); };
+const fetchFail = async () => {
+  throw new TypeError('NetworkError');
+};
 
 describe('runDiagnostics verdicts', () => {
   test('offline: navigator reports no connection', async () => {
@@ -27,15 +29,21 @@ describe('runDiagnostics verdicts', () => {
 
   test('mixed-content: https page with http endpoint', async () => {
     const { verdict, checks } = await runDiagnostics({
-      ...BASE, endpoint: 'http://minio.example.com:9000', fetchFn: fetchOk,
+      ...BASE,
+      endpoint: 'http://minio.example.com:9000',
+      fetchFn: fetchOk,
     });
     assert.equal(verdict, 'mixed-content');
-    assert.equal(checks.find(c => c.id === 'mixed-content').status, 'fail');
+    assert.equal(checks.find((c) => c.id === 'mixed-content').status, 'fail');
   });
 
   test('http endpoint from an http page is NOT mixed content', async () => {
     const { verdict } = await runDiagnostics({
-      ...BASE, endpoint: 'http://minio.example.com:9000', pageProtocol: 'http:', forcePathStyle: true, fetchFn: fetchOk,
+      ...BASE,
+      endpoint: 'http://minio.example.com:9000',
+      pageProtocol: 'http:',
+      forcePathStyle: true,
+      fetchFn: fetchOk,
     });
     assert.equal(verdict, 'cors-blocked');
   });
@@ -48,8 +56,8 @@ describe('runDiagnostics verdicts', () => {
   test('endpoint-unreachable: probe of endpoint origin rejects', async () => {
     const { verdict, checks } = await runDiagnostics({ ...BASE, fetchFn: fetchFail });
     assert.equal(verdict, 'endpoint-unreachable');
-    assert.equal(checks.find(c => c.id === 'endpoint-reachable').status, 'fail');
-    assert.equal(checks.find(c => c.id === 'bucket-host-reachable').status, 'skip');
+    assert.equal(checks.find((c) => c.id === 'endpoint-reachable').status, 'fail');
+    assert.equal(checks.find((c) => c.id === 'bucket-host-reachable').status, 'skip');
   });
 
   test('bucket-host-unreachable: endpoint ok, bucket vhost rejects', async () => {
@@ -63,9 +71,12 @@ describe('runDiagnostics verdicts', () => {
 
   test('bucket vhost probe targets bucket.<endpoint-host>', async () => {
     const urls = [];
-    const fetchFn = async (url) => { urls.push(String(url)); return { type: 'opaque' }; };
+    const fetchFn = async (url) => {
+      urls.push(String(url));
+      return { type: 'opaque' };
+    };
     await runDiagnostics({ ...BASE, fetchFn });
-    assert.ok(urls.some(u => u.startsWith('https://my-bucket.s3.us-west-004.backblazeb2.com')));
+    assert.ok(urls.some((u) => u.startsWith('https://my-bucket.s3.us-west-004.backblazeb2.com')));
   });
 
   test('cors-blocked: everything reachable', async () => {
@@ -76,24 +87,36 @@ describe('runDiagnostics verdicts', () => {
 
   test('path-style skips the bucket-host probe', async () => {
     const urls = [];
-    const fetchFn = async (url) => { urls.push(String(url)); return { type: 'opaque' }; };
+    const fetchFn = async (url) => {
+      urls.push(String(url));
+      return { type: 'opaque' };
+    };
     const { verdict, checks } = await runDiagnostics({ ...BASE, forcePathStyle: true, fetchFn });
     assert.equal(verdict, 'cors-blocked');
-    assert.equal(checks.find(c => c.id === 'bucket-host-reachable').status, 'skip');
+    assert.equal(checks.find((c) => c.id === 'bucket-host-reachable').status, 'skip');
     assert.equal(urls.length, 1, 'only the endpoint origin is probed');
   });
 
   test('probe timeout counts as unreachable', async () => {
     // Never resolves; rejects only on abort — exercises the AbortController path.
-    const hangingFetch = (url, opts) => new Promise((_, reject) => {
-      opts.signal.addEventListener('abort', () => reject(new Error('aborted')));
-    });
+    const hangingFetch = (url, opts) =>
+      new Promise((_, reject) => {
+        opts.signal.addEventListener('abort', () => reject(new Error('aborted')));
+      });
     const { verdict } = await runDiagnostics({ ...BASE, fetchFn: hangingFetch, timeoutMs: 10 });
     assert.equal(verdict, 'endpoint-unreachable');
   });
 
   test('every verdict has a user-facing message', async () => {
-    for (const v of ['offline', 'mixed-content', 'bad-endpoint-url', 'endpoint-unreachable', 'bucket-host-unreachable', 'cors-blocked', 'cors-blocked-transient']) {
+    for (const v of [
+      'offline',
+      'mixed-content',
+      'bad-endpoint-url',
+      'endpoint-unreachable',
+      'bucket-host-unreachable',
+      'cors-blocked',
+      'cors-blocked-transient',
+    ]) {
       assert.equal(typeof VERDICT_MESSAGES[v], 'string');
       assert.ok(VERDICT_MESSAGES[v].length > 20, `message for ${v} should be a real sentence`);
     }
@@ -104,8 +127,10 @@ describe('runDiagnostics verdicts', () => {
   // #52.1: wildcard-DNS providers (AWS, R2) answer probes for nonexistent buckets,
   // so a bucket-name typo lands on cors-blocked — the message must hint at that.
   test('cors-blocked message hints at bucket-name typos (#52)', () => {
-    assert.ok(VERDICT_MESSAGES['cors-blocked'].toLowerCase().includes('bucket name'),
-      'cors-blocked must suggest double-checking the bucket name');
+    assert.ok(
+      VERDICT_MESSAGES['cors-blocked'].toLowerCase().includes('bucket name'),
+      'cors-blocked must suggest double-checking the bucket name',
+    );
   });
 
   // #52.2: on an already-working connection a mid-transfer network reset also
@@ -118,10 +143,11 @@ describe('runDiagnostics verdicts', () => {
 
   test('transient message suggests retry, not CORS misconfiguration (#52)', () => {
     const msg = VERDICT_MESSAGES['cors-blocked-transient'];
-    assert.ok(msg.toLowerCase().includes('transient') || msg.toLowerCase().includes('retry'),
-      'transient verdict should frame the failure as retryable');
-    assert.ok(!msg.includes('almost certainly'),
-      'transient verdict must not confidently blame CORS configuration');
+    assert.ok(
+      msg.toLowerCase().includes('transient') || msg.toLowerCase().includes('retry'),
+      'transient verdict should frame the failure as retryable',
+    );
+    assert.ok(!msg.includes('almost certainly'), 'transient verdict must not confidently blame CORS configuration');
   });
 
   test('connected does not change failure verdicts (#52)', async () => {

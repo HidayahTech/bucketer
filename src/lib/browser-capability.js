@@ -42,7 +42,7 @@ const LABELS = {
 // site data shares the same allowance.
 export const QUOTA_SAFETY = 0.9;
 
-const isFn = v => typeof v === 'function';
+const isFn = (v) => typeof v === 'function';
 
 export function detectCapabilities(win = globalThis) {
   const nav = win?.navigator ?? {};
@@ -50,17 +50,17 @@ export function detectCapabilities(win = globalThis) {
 
   // `in`, never property access: reading a getter off a prototype invokes it with the
   // prototype as the receiver and throws "Illegal invocation" in a real browser.
-  const streamingFetch = !!win?.Response?.prototype && ('body' in win.Response.prototype);
+  const streamingFetch = !!win?.Response?.prototype && 'body' in win.Response.prototype;
 
   return {
     directoryPicker: isFn(win?.showDirectoryPicker),
-    savePicker:      isFn(win?.showSaveFilePicker),
-    writableFiles:   isFn(fileHandleProto?.createWritable),
-    opfs:            isFn(nav?.storage?.getDirectory),
+    savePicker: isFn(win?.showSaveFilePicker),
+    writableFiles: isFn(fileHandleProto?.createWritable),
+    opfs: isFn(nav?.storage?.getDirectory),
     storageEstimate: isFn(nav?.storage?.estimate),
     streamingFetch,
-    webWorker:       typeof win?.Worker === 'function',
-    likelyMobile:    detectMobileHint(win),
+    webWorker: typeof win?.Worker === 'function',
+    likelyMobile: detectMobileHint(win),
   };
 }
 
@@ -79,7 +79,11 @@ export function inPlaceSupported(caps) {
 function detectMobileHint(win) {
   const uaMobile = win?.navigator?.userAgentData?.mobile;
   if (typeof uaMobile === 'boolean') return uaMobile;
-  try { return !!win?.matchMedia?.('(pointer: coarse)')?.matches; } catch { return false; }
+  try {
+    return !!win?.matchMedia?.('(pointer: coarse)')?.matches;
+  } catch {
+    return false;
+  }
 }
 
 // Best first. HANDOFF is always present — it needs nothing from the browser beyond a link.

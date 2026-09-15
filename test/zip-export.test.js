@@ -15,21 +15,29 @@ function fakeDoc() {
   const removed = [];
   const created = [];
   return {
-    created, appended, removed,
+    created,
+    appended,
+    removed,
     createElement(tag) {
       const el = {
         tag,
         href: null,
         download: null,
         clicked: 0,
-        click() { this.clicked += 1; },
+        click() {
+          this.clicked += 1;
+        },
       };
       created.push(el);
       return el;
     },
     body: {
-      appendChild(el) { appended.push(el); },
-      removeChild(el) { removed.push(el); },
+      appendChild(el) {
+        appended.push(el);
+      },
+      removeChild(el) {
+        removed.push(el);
+      },
     },
   };
 }
@@ -39,13 +47,16 @@ function fakeUrl() {
   const created = [];
   const revoked = [];
   return {
-    created, revoked,
+    created,
+    revoked,
     createObjectURL(file) {
       const url = `blob:fake-${n++}`;
       created.push({ url, file });
       return url;
     },
-    revokeObjectURL(url) { revoked.push(url); },
+    revokeObjectURL(url) {
+      revoked.push(url);
+    },
   };
 }
 
@@ -78,7 +89,11 @@ describe('exportZip', () => {
     const originalSetTimeout = global.setTimeout;
     let capturedCallback = null;
     let capturedDelay = null;
-    global.setTimeout = (cb, ms) => { capturedCallback = cb; capturedDelay = ms; return 0; };
+    global.setTimeout = (cb, ms) => {
+      capturedCallback = cb;
+      capturedDelay = ms;
+      return 0;
+    };
 
     try {
       await exportZip(async () => ({ name: 'staged.bin' }), 'bucket-20260803-1200.zip', doc, urlImpl);

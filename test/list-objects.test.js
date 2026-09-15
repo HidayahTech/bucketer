@@ -24,7 +24,13 @@ describe('listObjectsPage', () => {
     const response = { Contents: [{ Key: 'a' }], IsTruncated: false };
     const controller = new AbortController();
     const client = mockClient({ response });
-    const resp = await listObjectsPage(client, { bucket: 'b', prefix: 'p/', token: 'Tok', maxKeys: 500, signal: controller.signal });
+    const resp = await listObjectsPage(client, {
+      bucket: 'b',
+      prefix: 'p/',
+      token: 'Tok',
+      maxKeys: 500,
+      signal: controller.signal,
+    });
     assert.equal(resp, response);
     const { input, opts } = client.commands[0];
     assert.equal(input.Bucket, 'b');

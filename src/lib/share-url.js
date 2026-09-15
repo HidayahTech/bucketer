@@ -14,7 +14,7 @@ function toBase64url(str) {
 }
 
 function fromBase64url(encoded) {
-  const padded = encoded + '=='.slice((encoded.length % 4) || 4);
+  const padded = encoded + '=='.slice(encoded.length % 4 || 4);
   return atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
 }
 

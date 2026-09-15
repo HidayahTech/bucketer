@@ -10,7 +10,17 @@ import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { devices } from 'playwright';
 import { PutObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EPage, e2eTest, applyEngineQuirks, e2eEngineName } from '../harness.mjs';
+import {
+  startMock,
+  startAppServer,
+  connectApp,
+  BUCKET,
+  launchBrowser,
+  newE2EPage,
+  e2eTest,
+  applyEngineQuirks,
+  e2eEngineName,
+} from '../harness.mjs';
 
 let ctx, app, browser;
 before(async () => {
@@ -18,7 +28,11 @@ before(async () => {
   app = await startAppServer();
   browser = await launchBrowser();
 });
-after(async () => { await browser?.close(); await app?.close(); await ctx?.mock.close(); });
+after(async () => {
+  await browser?.close();
+  await app?.close();
+  await ctx?.mock.close();
+});
 
 async function newMobilePage() {
   const context = await browser.newContext(applyEngineQuirks(e2eEngineName(), devices['Pixel 5']));
@@ -34,8 +48,10 @@ async function assertButtonsInViewport(page, rowLocator, label) {
   for (const btn of buttons) {
     const box = await btn.boundingBox();
     assert.ok(box, `${label}: action button must be visible (have a bounding box)`);
-    assert.ok(box.x >= 0 && box.x + box.width <= vw + 1,
-      `${label}: button at x=${box.x} w=${box.width} must fit inside viewport width ${vw}`);
+    assert.ok(
+      box.x >= 0 && box.x + box.width <= vw + 1,
+      `${label}: button at x=${box.x} w=${box.width} must fit inside viewport width ${vw}`,
+    );
   }
 }
 
@@ -63,9 +79,15 @@ describe('issue #49 — mobile (Pixel-5-emulated): per-row actions are reachable
       assert.ok(overflow <= 0, `page must not overflow horizontally (scrollWidth exceeds viewport by ${overflow}px)`);
 
       await assertButtonsInViewport(page, page.locator('[data-testid="file-row:reflow.txt"]'), 'file row');
-      await assertButtonsInViewport(page, page.locator(`[data-testid="file-row:${LONG_NAME}"]`), 'long-name file row (BUG-042)');
+      await assertButtonsInViewport(
+        page,
+        page.locator(`[data-testid="file-row:${LONG_NAME}"]`),
+        'long-name file row (BUG-042)',
+      );
       await assertButtonsInViewport(page, page.locator('[data-testid="folder-row:docs"]'), 'folder row');
-    } finally { await context.close(); }
+    } finally {
+      await context.close();
+    }
   });
 
   e2eTest('per-row delete works end-to-end on mobile (no force-click)', async () => {
@@ -89,12 +111,14 @@ describe('issue #49 — mobile (Pixel-5-emulated): per-row actions are reachable
       let keys;
       do {
         const r = await ctx.client.send(new ListObjectsV2Command({ Bucket: BUCKET }));
-        keys = (r.Contents || []).map(o => o.Key);
+        keys = (r.Contents || []).map((o) => o.Key);
         if (keys.length === 0) break;
-        await new Promise(r2 => setTimeout(r2, 150));
+        await new Promise((r2) => setTimeout(r2, 150));
       } while (Date.now() < deadline);
       assert.deepEqual(keys, [], 'the object is deleted from the bucket');
-    } finally { await context.close(); }
+    } finally {
+      await context.close();
+    }
   });
 
   e2eTest('copy-link popover opens fully inside the mobile viewport', async () => {
@@ -113,8 +137,12 @@ describe('issue #49 — mobile (Pixel-5-emulated): per-row actions are reachable
       const vw = await page.evaluate(() => window.innerWidth);
       const box = await popover.boundingBox();
       assert.ok(box, 'popover must be visible');
-      assert.ok(box.x >= 0 && box.x + box.width <= vw + 1,
-        `popover (x=${box.x}, w=${box.width}) must fit inside viewport width ${vw}`);
-    } finally { await context.close(); }
+      assert.ok(
+        box.x >= 0 && box.x + box.width <= vw + 1,
+        `popover (x=${box.x}, w=${box.width}) must fit inside viewport width ${vw}`,
+      );
+    } finally {
+      await context.close();
+    }
   });
 });

@@ -53,19 +53,19 @@ export function resolveProbe(state) {
   if (state.baselineMs < PROBE_MIN_MS || state.candidateMs < PROBE_MIN_MS) {
     return {
       ...state,
-      winner:       state.baseline,
-      baselineMbs:  null,
+      winner: state.baseline,
+      baselineMbs: null,
       candidateMbs: null,
       inconclusive: true,
     };
   }
-  const baselineMbs  = state.baselineBytes / state.baselineMs;
+  const baselineMbs = state.baselineBytes / state.baselineMs;
   const candidateMbs = state.candidateBytes / state.candidateMs;
   const winner = candidateMbs > baselineMbs * 1.1 ? state.candidate : state.baseline;
   return {
     ...state,
     winner,
-    baselineMbs:  Math.round(baselineMbs  * 1000) / 1000,
+    baselineMbs: Math.round(baselineMbs * 1000) / 1000,
     candidateMbs: Math.round(candidateMbs * 1000) / 1000,
     inconclusive: false,
   };

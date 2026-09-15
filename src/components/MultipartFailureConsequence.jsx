@@ -17,23 +17,24 @@ export function MultipartFailureConsequence({ provider }) {
   if (provider === 'r2') {
     return (
       <div style={{ marginTop: '.3rem' }}>
-        <strong>R2:</strong> Incomplete multipart uploads are automatically aborted after 7 days — no manual cleanup needed.
+        <strong>R2:</strong> Incomplete multipart uploads are automatically aborted after 7 days — no manual cleanup
+        needed.
       </div>
     );
   }
   if (provider === 'b2') {
     return (
       <div style={{ marginTop: '.3rem' }}>
-        <strong>B2:</strong> Incomplete parts may remain and accrue storage charges until aborted.
-        Check your bucket's incomplete multipart uploads and abort them via the B2 console or CLI.
-        Consider setting a lifecycle rule to auto-abort incomplete uploads.
+        <strong>B2:</strong> Incomplete parts may remain and accrue storage charges until aborted. Check your bucket's
+        incomplete multipart uploads and abort them via the B2 console or CLI. Consider setting a lifecycle rule to
+        auto-abort incomplete uploads.
       </div>
     );
   }
   return (
     <div style={{ marginTop: '.3rem' }}>
-      Incomplete multipart parts may remain on the provider and accrue storage charges.
-      Check your provider's console for incomplete multipart uploads.
+      Incomplete multipart parts may remain on the provider and accrue storage charges. Check your provider's console
+      for incomplete multipart uploads.
     </div>
   );
 }

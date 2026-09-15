@@ -37,14 +37,16 @@ function truncateToBytes(str, budget) {
 }
 
 export function sanitizeSegment(segment) {
-  let s = String(segment ?? '').normalize('NFC').replace(CONTROL, '');
+  let s = String(segment ?? '')
+    .normalize('NFC')
+    .replace(CONTROL, '');
 
   // A segment of nothing but dots is the traversal case. Mapping each dot to an
   // underscore keeps the name recognisable while making traversal impossible.
   if (/^\.+$/.test(s)) return '_'.repeat(s.length);
 
   s = s.replace(ILLEGAL, '_');
-  s = s.replace(/[. ]+$/, '');   // Windows silently drops trailing dots and spaces
+  s = s.replace(/[. ]+$/, ''); // Windows silently drops trailing dots and spaces
 
   if (!s) return '_';
 

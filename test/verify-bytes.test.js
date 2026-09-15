@@ -58,16 +58,17 @@ describe('verifyAgainstReference', () => {
     const reference = src('the quick brown fox');
     const candidates = [
       src('the quick', ' brown fox'), // identical, different boundaries
-      src('the quick brown FOX'),     // differs near the end
-      src('the quick brown fox'),     // identical
+      src('the quick brown FOX'), // differs near the end
+      src('the quick brown fox'), // identical
     ];
     assert.deepEqual(await verifyAgainstReference(reference, candidates), [true, false, true]);
   });
 
   test('a candidate that is a prefix of the keeper → false', async () => {
-    assert.deepEqual(
-      await verifyAgainstReference(src('abcdef'), [src('abc'), src('abcdef'), src('abcdefg')]),
-      [false, true, false],
-    );
+    assert.deepEqual(await verifyAgainstReference(src('abcdef'), [src('abc'), src('abcdef'), src('abcdefg')]), [
+      false,
+      true,
+      false,
+    ]);
   });
 });

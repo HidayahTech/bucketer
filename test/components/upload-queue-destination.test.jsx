@@ -12,12 +12,19 @@ import { UploadQueue } from '../../src/components/UploadQueue.jsx';
 const caps = { list: 'permitted', download: 'permitted', upload: 'permitted', delete: 'permitted' };
 
 function mountQueue({ basePrefix = '', currentPrefix = '' } = {}) {
-  return mount(h(UploadQueue, {
-    client: { send: () => Promise.resolve({}) }, bucket: 'b', provider: 'generic',
-    currentPrefix, credentials: { bucket: 'b', endpoint: 'https://e', basePrefix },
-    capabilities: caps, onCapabilityChange: () => {}, onUploadsComplete: () => {},
-    onLogEntry: () => {},
-  }));
+  return mount(
+    h(UploadQueue, {
+      client: { send: () => Promise.resolve({}) },
+      bucket: 'b',
+      provider: 'generic',
+      currentPrefix,
+      credentials: { bucket: 'b', endpoint: 'https://e', basePrefix },
+      capabilities: caps,
+      onCapabilityChange: () => {},
+      onUploadsComplete: () => {},
+      onLogEntry: () => {},
+    }),
+  );
 }
 
 function destInput(query) {
@@ -25,7 +32,7 @@ function destInput(query) {
 }
 
 function chooseButtons(queryAll) {
-  return Array.from(queryAll('button')).filter(b => /Choose (files|folder)/.test(b.textContent));
+  return Array.from(queryAll('button')).filter((b) => /Choose (files|folder)/.test(b.textContent));
 }
 
 describe('UploadQueue — destination floor (#60)', () => {
@@ -35,7 +42,9 @@ describe('UploadQueue — destination floor (#60)', () => {
       setInput(destInput(query), 'team/bob/');
       assert.ok(query('.field-error'), 'an inline error must render for an out-of-floor destination');
       for (const b of chooseButtons(queryAll)) assert.equal(b.disabled, true, `${b.textContent} must be disabled`);
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 
   test('an in-floor destination is accepted', () => {
@@ -44,7 +53,9 @@ describe('UploadQueue — destination floor (#60)', () => {
       setInput(destInput(query), 'team/alice/2026/');
       assert.ok(!query('.field-error'), 'no error for a destination under the floor');
       for (const b of chooseButtons(queryAll)) assert.equal(b.disabled, false);
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 
   test('clearing the destination while scoped is out-of-floor (root is above the floor)', () => {
@@ -52,7 +63,9 @@ describe('UploadQueue — destination floor (#60)', () => {
     try {
       setInput(destInput(query), '');
       assert.ok(query('.field-error'), 'the bucket root is outside the floor while scoped');
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 
   test('unscoped connections keep free-text destinations (regression anchor)', () => {
@@ -61,6 +74,8 @@ describe('UploadQueue — destination floor (#60)', () => {
       setInput(destInput(query), 'anywhere/at/all/');
       assert.ok(!query('.field-error'), 'no floor, no error');
       for (const b of chooseButtons(queryAll)) assert.equal(b.disabled, false);
-    } finally { cleanup(); }
+    } finally {
+      cleanup();
+    }
   });
 });

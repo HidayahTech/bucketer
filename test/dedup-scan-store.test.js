@@ -19,11 +19,21 @@ function record(bucket, extra = {}) {
     prefix: '',
     scannedAt: 1700000000000,
     objectCount: 30000,
-    groups: [{
-      id: 'g0', size: 10, matchedBy: 'md5', confidence: 'verified', verified: true,
-      reclaimableBytes: 10, keeperKey: 'a',
-      members: [{ Key: 'a', Size: 10, LastModified: new Date(0) }, { Key: 'b', Size: 10, LastModified: new Date(1) }],
-    }],
+    groups: [
+      {
+        id: 'g0',
+        size: 10,
+        matchedBy: 'md5',
+        confidence: 'verified',
+        verified: true,
+        reclaimableBytes: 10,
+        keeperKey: 'a',
+        members: [
+          { Key: 'a', Size: 10, LastModified: new Date(0) },
+          { Key: 'b', Size: 10, LastModified: new Date(1) },
+        ],
+      },
+    ],
     ...extra,
   };
 }

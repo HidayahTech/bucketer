@@ -16,13 +16,10 @@
 
 import { JSDOM } from 'jsdom';
 
-const dom = new JSDOM(
-  '<!DOCTYPE html><html><body><div id="app"></div></body></html>',
-  {
-    url: 'http://localhost:3000',
-    pretendToBeVisual: true, // enables requestAnimationFrame (used by Preact's scheduler)
-  },
-);
+const dom = new JSDOM('<!DOCTYPE html><html><body><div id="app"></div></body></html>', {
+  url: 'http://localhost:3000',
+  pretendToBeVisual: true, // enables requestAnimationFrame (used by Preact's scheduler)
+});
 
 const { window } = dom;
 
@@ -33,50 +30,54 @@ function def(name, value) {
 }
 
 // Core DOM globals
-def('window',   window);
+def('window', window);
 def('document', window.document);
 def('navigator', window.navigator);
 def('location', window.location);
-def('history',  window.history);
+def('history', window.history);
 
 // Event constructors (Preact and components dispatch/listen for these)
-def('Event',        window.Event);
-def('MouseEvent',   window.MouseEvent);
-def('KeyboardEvent',window.KeyboardEvent);
-def('CustomEvent',  window.CustomEvent);
-def('InputEvent',   window.InputEvent);
+def('Event', window.Event);
+def('MouseEvent', window.MouseEvent);
+def('KeyboardEvent', window.KeyboardEvent);
+def('CustomEvent', window.CustomEvent);
+def('InputEvent', window.InputEvent);
 
 // Preact's async scheduler uses MutationObserver when available
 def('MutationObserver', window.MutationObserver);
 
 // Animation frame (components use this for progress interpolation)
 def('requestAnimationFrame', window.requestAnimationFrame ?? ((cb) => setTimeout(cb, 16)));
-def('cancelAnimationFrame',  window.cancelAnimationFrame  ?? clearTimeout);
+def('cancelAnimationFrame', window.cancelAnimationFrame ?? clearTimeout);
 
 // Timing and rendering. jsdom's window.performance.now() recurses into itself once it is
 // installed as the global `performance` (a jsdom quirk): under an async re-render that calls
 // it, the stack overflows ("Maximum call stack size exceeded"). The source only needs
 // performance.now(), so install a simple non-recursive implementation. This also removes the
 // long-standing jsdom rAF stack-overflow hazard in component tests.
-def('performance',      { now: () => Date.now(), timeOrigin: Date.now() });
+def('performance', { now: () => Date.now(), timeOrigin: Date.now() });
 def('getComputedStyle', window.getComputedStyle);
 
 // DOM node constructors (instanceof checks in Preact internals)
 def('HTMLElement', window.HTMLElement);
-def('Element',     window.Element);
-def('Node',        window.Node);
-def('NodeList',    window.NodeList);
-def('Text',        window.Text);
+def('Element', window.Element);
+def('Node', window.Node);
+def('NodeList', window.NodeList);
+def('Text', window.Text);
 
 // Storage (components read from localStorage on mount)
-def('localStorage',   window.localStorage);
+def('localStorage', window.localStorage);
 def('sessionStorage', window.sessionStorage);
 
 // Web Crypto (used by computeFileHash in file-identity.js)
 def('crypto', window.crypto);
 
 // Notification API (used by UploadQueue — stub if jsdom does not provide it)
-def('Notification', window.Notification ?? class Notification {
-  static permission = 'default';
-  constructor() {}
-});
+def(
+  'Notification',
+  window.Notification ??
+    class Notification {
+      static permission = 'default';
+      constructor() {}
+    },
+);

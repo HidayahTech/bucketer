@@ -41,7 +41,7 @@ describe('MultipartFailureConsequence — B2', () => {
     const { text, cleanup } = mount(h(MultipartFailureConsequence, { provider: 'b2' }));
     assert.ok(
       text().toLowerCase().includes('console') || text().toLowerCase().includes('cli'),
-      'B2 message must tell the user to use the B2 console or CLI to clean up'
+      'B2 message must tell the user to use the B2 console or CLI to clean up',
     );
     cleanup();
   });
@@ -54,9 +54,9 @@ describe('MultipartFailureConsequence — B2', () => {
 });
 
 describe('MultipartFailureConsequence — generic (non-B2, non-R2)', () => {
-  test('tells user to check the provider\'s console', () => {
+  test("tells user to check the provider's console", () => {
     const { text, cleanup } = mount(h(MultipartFailureConsequence, { provider: 'wasabi' }));
-    assert.ok(text().toLowerCase().includes("provider"), 'generic message must mention checking the provider');
+    assert.ok(text().toLowerCase().includes('provider'), 'generic message must mention checking the provider');
     cleanup();
   });
 
@@ -72,6 +72,7 @@ describe('MultipartFailureConsequence — generic (non-B2, non-R2)', () => {
     // Both should produce the generic message (not B2 or R2 specific)
     assert.ok(!t1().includes('7 days') && !t1().toLowerCase().includes('b2:'));
     assert.ok(!t2().includes('7 days') && !t2().toLowerCase().includes('b2:'));
-    c1(); c2();
+    c1();
+    c2();
   });
 });

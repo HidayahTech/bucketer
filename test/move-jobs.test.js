@@ -7,18 +7,32 @@ global.IDBKeyRange = IDBKeyRange;
 import { test, describe, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  saveMoveJob, loadMoveJob, loadAllMoveJobs, updateMoveJob, deleteMoveJob, clearAllMoveJobs,
+  saveMoveJob,
+  loadMoveJob,
+  loadAllMoveJobs,
+  updateMoveJob,
+  deleteMoveJob,
+  clearAllMoveJobs,
 } from '../src/lib/move-jobs.js';
 
 const job = (over = {}) => ({
-  id: 'mv-1', provider: 'b2', endpoint: 'https://e', bucket: 'bkt', mode: 'move',
-  dest: 'arch/', capturedPrefix: '', createdAt: 0,
+  id: 'mv-1',
+  provider: 'b2',
+  endpoint: 'https://e',
+  bucket: 'bkt',
+  mode: 'move',
+  dest: 'arch/',
+  capturedPrefix: '',
+  createdAt: 0,
   items: [{ sourceKey: 'a.bin', destKey: 'arch/a.bin', size: 100 }],
-  inflight: null, ...over,
+  inflight: null,
+  ...over,
 });
 
 describe('move-jobs', () => {
-  beforeEach(async () => { await clearAllMoveJobs(); });
+  beforeEach(async () => {
+    await clearAllMoveJobs();
+  });
 
   test('saves a job and loads it back by id', async () => {
     await saveMoveJob(job());
@@ -35,7 +49,7 @@ describe('move-jobs', () => {
     await saveMoveJob(job({ id: 'mv-1' }));
     await saveMoveJob(job({ id: 'mv-2' }));
     const all = await loadAllMoveJobs();
-    assert.deepEqual(all.map(j => j.id).sort(), ['mv-1', 'mv-2']);
+    assert.deepEqual(all.map((j) => j.id).sort(), ['mv-1', 'mv-2']);
   });
 
   test('updateMoveJob merges a patch into one row, leaving other fields intact', async () => {

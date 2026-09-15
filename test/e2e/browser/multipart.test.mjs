@@ -4,7 +4,16 @@
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest } from '../harness.mjs';
+import {
+  startMock,
+  startAppServer,
+  connectApp,
+  BUCKET,
+  launchBrowser,
+  newE2EContext,
+  newE2EPage,
+  e2eTest,
+} from '../harness.mjs';
 
 let ctx, app, browser;
 before(async () => {
@@ -12,7 +21,11 @@ before(async () => {
   app = await startAppServer();
   browser = await launchBrowser();
 });
-after(async () => { await browser?.close(); await app?.close(); await ctx?.mock.close(); });
+after(async () => {
+  await browser?.close();
+  await app?.close();
+  await ctx?.mock.close();
+});
 
 describe('BUG-009 — multipart permission failure aborts the session', () => {
   e2eTest('a 403 on UploadPart aborts the multipart upload (no orphaned session, nothing stored)', async () => {
@@ -24,11 +37,15 @@ describe('BUG-009 — multipart permission failure aborts the session', () => {
       await connectApp(page, ctx.browserEndpoint);
 
       // CreateMultipartUpload succeeds; UploadPart is denied → the app must Abort + clear the record.
-      ctx.mock.configure({ faults: [{ op: 'UploadPart', method: 'PUT', status: 403, code: 'AccessDenied', message: 'no write' }] });
+      ctx.mock.configure({
+        faults: [{ op: 'UploadPart', method: 'PUT', status: 403, code: 'AccessDenied', message: 'no write' }],
+      });
 
       // A 6 MiB file forces the multipart path (>= 5 MiB threshold).
       const big = Buffer.alloc(6 * 1024 * 1024, 7);
-      await page.locator('[data-testid="file-input"]').setInputFiles({ name: 'big.bin', mimeType: 'application/octet-stream', buffer: big });
+      await page
+        .locator('[data-testid="file-input"]')
+        .setInputFiles({ name: 'big.bin', mimeType: 'application/octet-stream', buffer: big });
 
       // Wait for the failure to surface (the item enters the error state with a Retry button).
       await page.locator('button:has-text("Retry")').first().waitFor({ timeout: 20000 });
@@ -44,6 +61,8 @@ describe('BUG-009 — multipart permission failure aborts the session', () => {
       assert.equal((r.Contents || []).length, 0, 'a denied multipart upload stores no object');
 
       ctx.mock.configure({ faults: [] });
-    } finally { await context.close(); }
+    } finally {
+      await context.close();
+    }
   });
 });

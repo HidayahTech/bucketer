@@ -25,10 +25,10 @@ import { useState, useRef } from 'preact/hooks';
 export function applyClickSafety(primed, onConfirm, setPrimed, clearFn, scheduleFn) {
   if (!primed) {
     setPrimed(true);
-    clearFn();                              // cancel any previous pending reset
-    scheduleFn(() => setPrimed(false));     // schedule auto-reset after timeout
+    clearFn(); // cancel any previous pending reset
+    scheduleFn(() => setPrimed(false)); // schedule auto-reset after timeout
   } else {
-    clearFn();                              // cancel the pending reset
+    clearFn(); // cancel the pending reset
     setPrimed(false);
     onConfirm();
   }
@@ -47,7 +47,9 @@ export function useDoubleClickSafety(onConfirm, timeoutMs = 3000) {
       onConfirm,
       setPrimed,
       () => clearTimeout(timerRef.current),
-      (cb) => { timerRef.current = setTimeout(cb, timeoutMs); },
+      (cb) => {
+        timerRef.current = setTimeout(cb, timeoutMs);
+      },
     );
   }
 

@@ -15,7 +15,12 @@ const CREDS = { bucket: 'b', keyId: 'AKID', secretKey: 'secret' };
 
 describe('createS3Client — region resolution', () => {
   test('uses regionOverride when provided (highest priority)', async () => {
-    const c = createS3Client({ ...CREDS, endpoint: 'https://s3.us-west-004.backblazeb2.com', provider: 'b2', regionOverride: 'my-custom-region' });
+    const c = createS3Client({
+      ...CREDS,
+      endpoint: 'https://s3.us-west-004.backblazeb2.com',
+      provider: 'b2',
+      regionOverride: 'my-custom-region',
+    });
     assert.equal(await c.config.region(), 'my-custom-region');
   });
 
@@ -35,7 +40,12 @@ describe('createS3Client — region resolution', () => {
   });
 
   test('regionOverride wins over an endpoint that contains a region', async () => {
-    const c = createS3Client({ ...CREDS, endpoint: 'https://s3.eu-central-1.amazonaws.com', provider: 'aws', regionOverride: 'ap-southeast-1' });
+    const c = createS3Client({
+      ...CREDS,
+      endpoint: 'https://s3.eu-central-1.amazonaws.com',
+      provider: 'aws',
+      regionOverride: 'ap-southeast-1',
+    });
     assert.equal(await c.config.region(), 'ap-southeast-1');
   });
 
@@ -81,12 +91,18 @@ describe('createS3Client — forcePathStyle', () => {
 
 describe('createS3Client — forcePathStyle override', () => {
   test('explicit forcePathStyle:false overrides the provider path-style default (B2)', () => {
-    const c = createS3Client({ ...CREDS, endpoint: 'https://s3.us-west-004.backblazeb2.com', provider: 'b2' }, { forcePathStyle: false });
+    const c = createS3Client(
+      { ...CREDS, endpoint: 'https://s3.us-west-004.backblazeb2.com', provider: 'b2' },
+      { forcePathStyle: false },
+    );
     assert.equal(c.config.forcePathStyle, false);
   });
 
   test('explicit forcePathStyle:true overrides a virtual-hosted provider default (R2)', () => {
-    const c = createS3Client({ ...CREDS, endpoint: 'https://abc123.r2.cloudflarestorage.com', provider: 'r2' }, { forcePathStyle: true });
+    const c = createS3Client(
+      { ...CREDS, endpoint: 'https://abc123.r2.cloudflarestorage.com', provider: 'r2' },
+      { forcePathStyle: true },
+    );
     assert.equal(c.config.forcePathStyle, true);
   });
 

@@ -14,7 +14,8 @@ describe('presignGetParams (#13)', () => {
 
   test('preserves Bucket, Key, and disposition / content-type fields', () => {
     const p = presignGetParams({
-      Bucket: 'b', Key: 'k',
+      Bucket: 'b',
+      Key: 'k',
       ResponseContentDisposition: 'inline',
       ResponseContentType: 'text/plain; charset=utf-8',
     });

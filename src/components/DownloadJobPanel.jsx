@@ -25,8 +25,7 @@ import { selectTier, tierLabel, TIERS } from '../lib/browser-capability.js';
 import { JOB_CLASS } from '../lib/download-lifecycle.js';
 import { prefixRoot } from '../lib/download-roots.js';
 
-export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTransferTool,
-                                   capabilities = null }) {
+export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTransferTool, capabilities = null }) {
   const isFolder = scope.kind === 'folder';
   const roots = isFolder ? [prefixRoot(scope.prefix || '')] : scope.roots;
   // The transfer-tool generator is prefix-scoped, so the link renders only when this
@@ -34,7 +33,7 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
   const showTransferTool = !!onUseTransferTool && isFolder;
 
   const [mode, setMode] = useState(NAMING_MODES.LEAF);
-  const [phase, setPhase] = useState('options');   // options | listing | ready | error
+  const [phase, setPhase] = useState('options'); // options | listing | ready | error
   const [counts, setCounts] = useState({ objects: 0, bytes: 0, archived: 0, archivedBytes: 0 });
   const [job, setJob] = useState(null);
   const [error, setError] = useState(null);
@@ -68,28 +67,48 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
 
   // A job from an earlier session is the reason the manifest is durable at all, so it has
   // to be reachable here — resumable, checkable, or at minimum discardable.
-  useEffect(() => { refreshJobs(); }, [api]);
+  useEffect(() => {
+    refreshJobs();
+  }, [api]);
 
   // The ZIP gate needs the live storage quota and the persist() flag — async I/O that,
   // per this file's contract, must stay behind api rather than touch navigator.storage
   // directly. Re-evaluated whenever the ready phase is entered with something sendable;
   // quota can drift between one job and the next within the same session.
   useEffect(() => {
-    if (phase !== 'ready' || sendable <= 0 || !api.zipGate) { setZipGateState(null); return; }
+    if (phase !== 'ready' || sendable <= 0 || !api.zipGate) {
+      setZipGateState(null);
+      return;
+    }
     let alive = true;
-    api.zipGate({ sendableBytes }).then(g => { if (alive) setZipGateState(g); })
-      .catch(() => { if (alive) setZipGateState(null); });
-    return () => { alive = false; };
+    api
+      .zipGate({ sendableBytes })
+      .then((g) => {
+        if (alive) setZipGateState(g);
+      })
+      .catch(() => {
+        if (alive) setZipGateState(null);
+      });
+    return () => {
+      alive = false;
+    };
   }, [api, phase, sendable, sendableBytes]);
 
   async function refreshJobs() {
-    try { setJobs((await api.listJobs?.()) || []); }
-    catch { /* a missing history is not worth an error banner */ }
+    try {
+      setJobs((await api.listJobs?.()) || []);
+    } catch {
+      /* a missing history is not worth an error banner */
+    }
   }
 
   async function discardJob(id) {
-    try { await api.discard(id); } catch { /* best effort */ }
-    setJobs(list => list.filter(j => j.id !== id));
+    try {
+      await api.discard(id);
+    } catch {
+      /* best effort */
+    }
+    setJobs((list) => list.filter((j) => j.id !== id));
   }
 
   // The picker must be opened from the click itself — it needs a user gesture, which is
@@ -121,17 +140,27 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
     scanCancelled.current = false;
     let created = null;
     try {
-      created = await api.startJob({ bucket, prefix: isFolder ? (scope.prefix || '') : '', roots, mode, label: isFolder ? null : scope.label });
+      created = await api.startJob({
+        bucket,
+        prefix: isFolder ? scope.prefix || '' : '',
+        roots,
+        mode,
+        label: isFolder ? null : scope.label,
+      });
       setJob(created);
       const result = await api.enumerate(created, {
-        onProgress: p => setCounts(c => ({ ...c, ...p })),
+        onProgress: (p) => setCounts((c) => ({ ...c, ...p })),
         shouldCancel: () => scanCancelled.current,
       });
 
       // A half-enumerated manifest is not worth keeping: it would resume as a job that
       // silently omits everything the crawl never reached.
       if (result.cancelled) {
-        try { await api.discard(created.id); } catch { /* best effort */ }
+        try {
+          await api.discard(created.id);
+        } catch {
+          /* best effort */
+        }
         setJob(null);
         setCounts({ objects: 0, bytes: 0, archived: 0, archivedBytes: 0 });
         setPhase('options');
@@ -139,14 +168,22 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
       }
 
       setCounts({
-        objects: result.objects, bytes: result.bytes,
-        archived: result.archived ?? 0, archivedBytes: result.archivedBytes ?? 0,
+        objects: result.objects,
+        bytes: result.bytes,
+        archived: result.archived ?? 0,
+        archivedBytes: result.archivedBytes ?? 0,
       });
       setPhase('ready');
     } catch (err) {
       // An enumeration failure leaves nothing usable behind, so drop the empty job rather
       // than leaving a phantom in the list.
-      if (created) { try { await api.discard(created.id); } catch { /* best effort */ } }
+      if (created) {
+        try {
+          await api.discard(created.id);
+        } catch {
+          /* best effort */
+        }
+      }
       setJob(null);
       setError(err?.message || String(err));
       setPhase('error');
@@ -163,7 +200,13 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
       return;
     }
     // Backing out after listing must not leave an orphaned job behind.
-    if (job && phase !== 'started') { try { await api.discard(job.id); } catch { /* best effort */ } }
+    if (job && phase !== 'started') {
+      try {
+        await api.discard(job.id);
+      } catch {
+        /* best effort */
+      }
+    }
     onClose();
   }
 
@@ -186,8 +229,11 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
   // The lazy-persist path: ask for persistent storage, then re-render from the
   // re-evaluated gate App hands back (enabling start-zip if it now fits).
   async function allowStorage() {
-    try { setZipGateState(await api.requestPersist({ sendableBytes })); }
-    catch { /* best effort; keep the previous gate state */ }
+    try {
+      setZipGateState(await api.requestPersist({ sendableBytes }));
+    } catch {
+      /* best effort; keep the previous gate state */
+    }
   }
 
   // Same lazy-persist path, but for a job already paused mid-run on a QuotaExceededError
@@ -196,19 +242,26 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
   // matters, and the user resumes afterward through the row's existing Resume control.
   async function allowStorageForJob(j) {
     const jobSendableBytes = j.counters?.bytesSendable ?? j.counters?.bytesTotal ?? 0;
-    try { await api.requestPersist({ sendableBytes: jobSendableBytes }); }
-    catch { /* best effort */ }
+    try {
+      await api.requestPersist({ sendableBytes: jobSendableBytes });
+    } catch {
+      /* best effort */
+    }
   }
 
   // A zip job that finished (every item DONE) but never got its export written — the
   // recoverable state a failed or cancelled export leaves behind (see App's
   // handleZipStart). Re-exports from the intact OPFS staging.
   async function saveZipAgain(id) {
-    try { await api.exportZipAgain(id); } catch { /* best effort */ }
+    try {
+      await api.exportZipAgain(id);
+    } catch {
+      /* best effort */
+    }
     await refreshJobs();
   }
 
-  const zipSuffix = (j) => j.delivery === 'zip' ? ' — ZIP' : '';
+  const zipSuffix = (j) => (j.delivery === 'zip' ? ' — ZIP' : '');
 
   function lastVerifySummary(v) {
     const parts = [`${v.confirmed.toLocaleString()} confirmed`];
@@ -219,9 +272,9 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
     return parts.join(', ');
   }
 
-  const unfinished = jobs.filter(j => j.jobClass === JOB_CLASS.UNFINISHED);
-  const sent = jobs.filter(j => j.jobClass === JOB_CLASS.SENT);
-  const settled = jobs.filter(j => j.jobClass === JOB_CLASS.SETTLED);
+  const unfinished = jobs.filter((j) => j.jobClass === JOB_CLASS.UNFINISHED);
+  const sent = jobs.filter((j) => j.jobClass === JOB_CLASS.SENT);
+  const settled = jobs.filter((j) => j.jobClass === JOB_CLASS.SETTLED);
 
   return (
     <Modal onClose={close} class="download-job-dialog">
@@ -234,42 +287,46 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
 
       <div class="download-job-body">
         <p class="download-job-scope">
-          {isFolder
-            ? <>Downloading <code>{scopeText}</code> and everything beneath it.</>
-            : <>Downloading <code>{scopeText}</code>.</>}
+          {isFolder ? (
+            <>
+              Downloading <code>{scopeText}</code> and everything beneath it.
+            </>
+          ) : (
+            <>
+              Downloading <code>{scopeText}</code>.
+            </>
+          )}
         </p>
 
         <p class="download-job-note" data-testid="tier-notice">
-          <strong>{tierLabel(tier)}.</strong> Your browser does the transferring. That makes it
-          reliable, but it also means Bucketer cannot see how far along each file is — it can
-          only tell you which files it has handed over. Files also arrive as a flat list in
-          your downloads folder, because browsers cannot create folders when downloading.
+          <strong>{tierLabel(tier)}.</strong> Your browser does the transferring. That makes it reliable, but it also
+          means Bucketer cannot see how far along each file is — it can only tell you which files it has handed over.
+          Files also arrive as a flat list in your downloads folder, because browsers cannot create folders when
+          downloading.
         </p>
 
         {capabilities?.likelyMobile && (
           <p class="download-job-warning" data-testid="mobile-warning">
-            This looks like a phone or tablet. Downloads there are unreliable beyond a few
-            hundred megabytes: the browser stops this tab when you switch apps, and the page
-            can be closed without warning if it runs short of memory. For anything large, use
-            a desktop browser or the command-line option.
+            This looks like a phone or tablet. Downloads there are unreliable beyond a few hundred megabytes: the
+            browser stops this tab when you switch apps, and the page can be closed without warning if it runs short of
+            memory. For anything large, use a desktop browser or the command-line option.
           </p>
         )}
 
         {phase === 'options' && unfinished.length > 0 && (
           <div class="download-job-unfinished">
             <p class="download-job-unfinished-title">Unfinished from an earlier session</p>
-            {unfinished.map(u => (
+            {unfinished.map((u) => (
               <div key={u.id} class="download-job-unfinished-row">
                 <span class="download-job-unfinished-scope">
-                  {u.label || u.prefix || bucket}{zipSuffix(u)} — {(u.counts.pending + u.counts.failed).toLocaleString()} of{' '}
+                  {u.label || u.prefix || bucket}
+                  {zipSuffix(u)} — {(u.counts.pending + u.counts.failed).toLocaleString()} of{' '}
                   {(u.counters?.sendable ?? u.counters?.total ?? 0).toLocaleString()} still to send
                   {u.counts.issued > 0 && ` (${u.counts.issued.toLocaleString()} already sent)`}
                   {/* A folder check may be what put files back in this pile; the user
                       must see the verdict that did it, not just a bigger to-send count. */}
                   {u.lastVerify && (
-                    <span data-testid={`verified-${u.id}`}>
-                      {' '}— last check: {lastVerifySummary(u.lastVerify)}
-                    </span>
+                    <span data-testid={`verified-${u.id}`}> — last check: {lastVerifySummary(u.lastVerify)}</span>
                   )}
                   {/* pausedForStorage: this run stopped on a mid-entry QuotaExceededError
                       (zip-job.js) rather than a per-file failure — the row explains why
@@ -277,22 +334,38 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
                       user can free up room before hitting Resume. */}
                   {u.delivery === 'zip' && u.pausedForStorage && (
                     <span data-testid={`storage-reason-${u.id}`}>
-                      {' '}— ran out of temporary browser storage while building the ZIP.
+                      {' '}
+                      — ran out of temporary browser storage while building the ZIP.
                     </span>
                   )}
                 </span>
                 {u.delivery === 'zip' && u.pausedForStorage && (
-                  <button type="button" class="btn btn-ghost btn-sm" data-testid={`allow-storage-${u.id}`}
-                    onClick={() => allowStorageForJob(u)}>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-sm"
+                    data-testid={`allow-storage-${u.id}`}
+                    onClick={() => allowStorageForJob(u)}
+                  >
                     Allow more storage…
                   </button>
                 )}
-                <button type="button" class="btn btn-sm" data-testid={`resume-${u.id}`}
-                  onClick={() => { onStart(u); onClose(); }}>
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  data-testid={`resume-${u.id}`}
+                  onClick={() => {
+                    onStart(u);
+                    onClose();
+                  }}
+                >
                   Resume
                 </button>
-                <button type="button" class="btn btn-ghost btn-sm" data-testid={`discard-${u.id}`}
-                  onClick={() => discardJob(u.id)}>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  data-testid={`discard-${u.id}`}
+                  onClick={() => discardJob(u.id)}
+                >
                   Discard
                 </button>
               </div>
@@ -308,24 +381,26 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
         {phase === 'options' && sent.length > 0 && (
           <div class="download-job-unfinished">
             <p class="download-job-unfinished-title">Sent, but not yet confirmed</p>
-            {sent.map(v => (
+            {sent.map((v) => (
               <div key={v.id} class="download-job-unfinished-row">
                 <span class="download-job-unfinished-scope">
-                  {v.label || v.prefix || bucket}{zipSuffix(v)} — {v.counts.issued.toLocaleString()} files sent
+                  {v.label || v.prefix || bucket}
+                  {zipSuffix(v)} — {v.counts.issued.toLocaleString()} files sent
                   {v.lastVerify && (
-                    <span data-testid={`verified-${v.id}`}>
-                      {' '}— last check: {lastVerifySummary(v.lastVerify)}
-                    </span>
+                    <span data-testid={`verified-${v.id}`}> — last check: {lastVerifySummary(v.lastVerify)}</span>
                   )}
                 </span>
                 {canVerify && (
-                  <button type="button" class="btn btn-sm" data-testid={`verify-${v.id}`}
-                    onClick={() => verify(v.id)}>
+                  <button type="button" class="btn btn-sm" data-testid={`verify-${v.id}`} onClick={() => verify(v.id)}>
                     Check my downloads folder
                   </button>
                 )}
-                <button type="button" class="btn btn-ghost btn-sm" data-testid={`discard-${v.id}`}
-                  onClick={() => discardJob(v.id)}>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  data-testid={`discard-${v.id}`}
+                  onClick={() => discardJob(v.id)}
+                >
                   Discard
                 </button>
               </div>
@@ -341,10 +416,11 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
         {phase === 'options' && settled.length > 0 && (
           <div class="download-job-unfinished">
             <p class="download-job-unfinished-title">Confirmed complete</p>
-            {settled.map(s => (
+            {settled.map((s) => (
               <div key={s.id} class="download-job-unfinished-row">
                 <span class="download-job-unfinished-scope">
-                  {s.label || s.prefix || bucket}{zipSuffix(s)} — all {s.counts.done.toLocaleString()} files confirmed
+                  {s.label || s.prefix || bucket}
+                  {zipSuffix(s)} — all {s.counts.done.toLocaleString()} files confirmed
                 </span>
                 {/* A zip job whose items are all DONE but which never got its export
                     written — exportZip threw, or the save dialog was cancelled — is
@@ -353,13 +429,21 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
                     no separate "unexported" job class (postmortem F3/F6: classes must stay
                     total over item counts, not grow a special case per delivery mode). */}
                 {s.delivery === 'zip' && !s.exportedAt && (
-                  <button type="button" class="btn btn-sm" data-testid="save-zip-again"
-                    onClick={() => saveZipAgain(s.id)}>
+                  <button
+                    type="button"
+                    class="btn btn-sm"
+                    data-testid="save-zip-again"
+                    onClick={() => saveZipAgain(s.id)}
+                  >
                     Save the ZIP again
                   </button>
                 )}
-                <button type="button" class="btn btn-ghost btn-sm" data-testid={`discard-${s.id}`}
-                  onClick={() => discardJob(s.id)}>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  data-testid={`discard-${s.id}`}
+                  onClick={() => discardJob(s.id)}
+                >
                   Discard
                 </button>
               </div>
@@ -400,8 +484,12 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
                 Check this folder
               </button>
               {showTransferTool && (
-                <button type="button" class="btn btn-ghost btn-sm" data-testid="use-transfer-tool"
-                  onClick={onUseTransferTool}>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  data-testid="use-transfer-tool"
+                  onClick={onUseTransferTool}
+                >
                   Use a transfer tool instead
                 </button>
               )}
@@ -411,21 +499,23 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
 
         {phase === 'listing' && (
           <>
-            <p class="download-job-status">
-              Listing files… found {counts.objects.toLocaleString()} so far.
-            </p>
+            <p class="download-job-status">Listing files… found {counts.objects.toLocaleString()} so far.</p>
             <div class="download-job-actions">
-              <button type="button" class="btn btn-ghost btn-sm" data-testid="cancel-scan"
-                onClick={() => { scanCancelled.current = true; }}>
+              <button
+                type="button"
+                class="btn btn-ghost btn-sm"
+                data-testid="cancel-scan"
+                onClick={() => {
+                  scanCancelled.current = true;
+                }}
+              >
                 Stop listing
               </button>
             </div>
           </>
         )}
 
-        {phase === 'error' && (
-          <p class="download-job-error">Could not list this folder: {error}</p>
-        )}
+        {phase === 'error' && <p class="download-job-error">Could not list this folder: {error}</p>}
 
         {phase === 'ready' && counts.objects === 0 && (
           <p class="download-job-status">There are no files here to download.</p>
@@ -442,14 +532,14 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
                 tier cannot report their absence — the user would simply never see them. */}
             {counts.archived > 0 && (
               <p class="download-job-warning" data-testid="archived-notice">
-                <strong>{counts.archived.toLocaleString()}</strong> of these
-                ({formatBytes(counts.archivedBytes)}) are archived (Glacier or Deep Archive)
-                and cannot be downloaded until you restore them in AWS. They will be left out.
+                <strong>{counts.archived.toLocaleString()}</strong> of these ({formatBytes(counts.archivedBytes)}) are
+                archived (Glacier or Deep Archive) and cannot be downloaded until you restore them in AWS. They will be
+                left out.
               </p>
             )}
             <p class="download-job-warning">
-              Most providers bill for egress — moving this much data out of your bucket may
-              cost money. Check your provider's pricing if you are not sure.
+              Most providers bill for egress — moving this much data out of your bucket may cost money. Check your
+              provider's pricing if you are not sure.
             </p>
             <div class="download-job-actions">
               {sendable > 0 && (
@@ -461,30 +551,39 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
                   entering this phase (see the effect above) — null until then, so no zip
                   button appears before the gate is known. 'unavailable' never renders one. */}
               {sendable > 0 && zipGateState && zipGateState.state !== 'unavailable' && (
-                <button type="button" class="btn btn-sm" data-testid="start-zip"
-                  disabled={zipGateState.state === 'needs-storage'} onClick={startZip}>
+                <button
+                  type="button"
+                  class="btn btn-sm"
+                  data-testid="start-zip"
+                  disabled={zipGateState.state === 'needs-storage'}
+                  onClick={startZip}
+                >
                   Download as one ZIP ({sendable.toLocaleString()} files, {formatBytes(sendableBytes)})
                 </button>
               )}
               {showTransferTool && (
-                <button type="button" class="btn btn-ghost btn-sm" data-testid="use-transfer-tool"
-                  onClick={onUseTransferTool}>
+                <button
+                  type="button"
+                  class="btn btn-ghost btn-sm"
+                  data-testid="use-transfer-tool"
+                  onClick={onUseTransferTool}
+                >
                   Use a transfer tool instead
                 </button>
               )}
             </div>
             {sendable > 0 && zipGateState?.state === 'offered' && (
               <p class="download-job-hint">
-                Arrives as a single file with its folder structure intact. Your browser asks
-                once, not N times.
+                Arrives as a single file with its folder structure intact. Your browser asks once, not N times.
               </p>
             )}
             {sendable > 0 && zipGateState?.state === 'needs-storage' && (
               <>
-                <p class="download-job-warning" data-testid="zip-gate-reason">{zipGateState.reason}</p>
+                <p class="download-job-warning" data-testid="zip-gate-reason">
+                  {zipGateState.reason}
+                </p>
                 <div class="download-job-actions">
-                  <button type="button" class="btn btn-ghost btn-sm" data-testid="allow-storage"
-                    onClick={allowStorage}>
+                  <button type="button" class="btn btn-ghost btn-sm" data-testid="allow-storage" onClick={allowStorage}>
                     Allow more storage…
                   </button>
                 </div>
@@ -496,7 +595,9 @@ export function DownloadJobPanel({ bucket, scope, api, onStart, onClose, onUseTr
                 'unavailable' with caps intact, is the size reason: not enough room even
                 once persisted. */}
             {sendable > 0 && zipGateState?.state === 'unavailable' && zipCapable && zipGateState.reason && (
-              <p class="download-job-note" data-testid="zip-gate-reason">{zipGateState.reason}</p>
+              <p class="download-job-note" data-testid="zip-gate-reason">
+                {zipGateState.reason}
+              </p>
             )}
           </>
         )}

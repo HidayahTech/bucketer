@@ -38,15 +38,18 @@ export async function enumerateJob(client, job, { onProgress, shouldCancel, maxK
 
   const toItem = (o) => {
     const isArchived = isArchivedStorageClass(o.StorageClass, job.provider);
-    if (isArchived) { archived += 1; archivedBytes += o.Size ?? 0; }
+    if (isArchived) {
+      archived += 1;
+      archivedBytes += o.Size ?? 0;
+    }
     return {
-      key:          o.Key,
-      size:         o.Size ?? 0,
-      etag:         o.ETag,
+      key: o.Key,
+      size: o.Size ?? 0,
+      etag: o.ETag,
       lastModified: o.LastModified ? new Date(o.LastModified).getTime() : null,
-      localName:    flatNameForKey(o.Key, mode),
+      localName: flatNameForKey(o.Key, mode),
       storageClass: o.StorageClass ?? null,
-      status:       isArchived ? ITEM_STATUS.SKIPPED : ITEM_STATUS.PENDING,
+      status: isArchived ? ITEM_STATUS.SKIPPED : ITEM_STATUS.PENDING,
       ...(isArchived ? { skipReason: 'archived' } : {}),
     };
   };
@@ -65,18 +68,23 @@ export async function enumerateJob(client, job, { onProgress, shouldCancel, maxK
       while (j < roots.length && roots[j].type === ROOT_TYPES.FILE) {
         const r = roots[j];
         if (!isDirectoryMarker(r.key)) {
-          items.push(toItem({
-            Key: r.key, Size: r.size, ETag: r.etag,
-            LastModified: r.lastModified != null ? new Date(r.lastModified) : null,
-            StorageClass: r.storageClass,
-          }));
+          items.push(
+            toItem({
+              Key: r.key,
+              Size: r.size,
+              ETag: r.etag,
+              LastModified: r.lastModified != null ? new Date(r.lastModified) : null,
+              StorageClass: r.storageClass,
+            }),
+          );
         }
         j += 1;
       }
       objects += items.length;
       for (const it of items) bytes += it.size;
       await appendManifestPage(job.id, items, {
-        rootIndex: j, continuationToken: null,
+        rootIndex: j,
+        continuationToken: null,
         ...(j >= roots.length ? { done: true } : {}),
       });
       onProgress?.({ objects, bytes });
@@ -95,19 +103,26 @@ export async function enumerateJob(client, job, { onProgress, shouldCancel, maxK
     const startToken = i === startIndex ? job.enumeration?.continuationToken : undefined;
     const rootIdx = i;
     const result = await crawlPrefix(client, job.bucket, roots[i].prefix, {
-      maxKeys, shouldCancel, startToken,
+      maxKeys,
+      shouldCancel,
+      startToken,
       onBatch: async (contents, { nextToken }) => {
-        const items = contents.filter(o => !isDirectoryMarker(o.Key)).map(toItem);
+        const items = contents.filter((o) => !isDirectoryMarker(o.Key)).map(toItem);
         objects += items.length;
         for (const it of items) bytes += it.size;
         // Committed even when `items` is empty: a page of nothing but folder markers
         // still has to advance the token, or a resume would replay it forever.
-        await appendManifestPage(job.id, items, nextToken
-          ? { rootIndex: rootIdx, continuationToken: nextToken }
-          : {
-              rootIndex: rootIdx + 1, continuationToken: null,
-              ...(rootIdx + 1 >= roots.length ? { done: true } : {}),
-            });
+        await appendManifestPage(
+          job.id,
+          items,
+          nextToken
+            ? { rootIndex: rootIdx, continuationToken: nextToken }
+            : {
+                rootIndex: rootIdx + 1,
+                continuationToken: null,
+                ...(rootIdx + 1 >= roots.length ? { done: true } : {}),
+              },
+        );
         onProgress?.({ objects, bytes });
       },
     });

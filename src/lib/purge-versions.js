@@ -21,11 +21,19 @@ import { ListObjectVersionsCommand, DeleteObjectsCommand } from '@aws-sdk/client
 // and are deliberately excluded here to avoid confusion with "normal" files.
 export function collectHiddenVersions(resp) {
   const hidden = [];
-  for (const v of (resp.Versions || [])) {
-    if (!v.IsLatest) hidden.push({ key: v.Key, versionId: v.VersionId, type: 'old-version', size: v.Size, date: v.LastModified });
+  for (const v of resp.Versions || []) {
+    if (!v.IsLatest)
+      hidden.push({ key: v.Key, versionId: v.VersionId, type: 'old-version', size: v.Size, date: v.LastModified });
   }
-  for (const dm of (resp.DeleteMarkers || [])) {
-    hidden.push({ key: dm.Key, versionId: dm.VersionId, type: 'delete-marker', isLatest: dm.IsLatest, size: null, date: dm.LastModified });
+  for (const dm of resp.DeleteMarkers || []) {
+    hidden.push({
+      key: dm.Key,
+      versionId: dm.VersionId,
+      type: 'delete-marker',
+      isLatest: dm.IsLatest,
+      size: null,
+      date: dm.LastModified,
+    });
   }
   return hidden;
 }
@@ -40,24 +48,29 @@ export function collectHiddenVersions(resp) {
 //   initialRows:          rows already fetched and shown in the UI (may be partial)
 //   nextKeyMarker/etc:    pagination markers from the last fetchPage call
 //   isTruncated:          whether there are more pages beyond initialRows
-export async function purgeAllVersions(client, { bucket, prefix, initialRows, nextKeyMarker, nextVersionIdMarker, isTruncated }) {
+export async function purgeAllVersions(
+  client,
+  { bucket, prefix, initialRows, nextKeyMarker, nextVersionIdMarker, isTruncated },
+) {
   // Collect all rows including any pages not yet loaded into the UI
   let all = [...(initialRows || [])];
-  let km    = nextKeyMarker;
-  let vim   = nextVersionIdMarker;
+  let km = nextKeyMarker;
+  let vim = nextVersionIdMarker;
   let trunc = isTruncated;
 
   while (trunc) {
-    const resp = await client.send(new ListObjectVersionsCommand({
-      Bucket: bucket,
-      Prefix: km ? undefined : (prefix || undefined), // prefix only on the first additional page
-      KeyMarker: km || undefined,
-      VersionIdMarker: vim || undefined,
-    }));
-    all   = all.concat(collectHiddenVersions(resp));
+    const resp = await client.send(
+      new ListObjectVersionsCommand({
+        Bucket: bucket,
+        Prefix: km ? undefined : prefix || undefined, // prefix only on the first additional page
+        KeyMarker: km || undefined,
+        VersionIdMarker: vim || undefined,
+      }),
+    );
+    all = all.concat(collectHiddenVersions(resp));
     trunc = !!resp.IsTruncated;
-    km    = resp.NextKeyMarker  || null;
-    vim   = resp.NextVersionIdMarker || null;
+    km = resp.NextKeyMarker || null;
+    vim = resp.NextVersionIdMarker || null;
   }
 
   // Batch-delete in chunks of 1000. Continue through every batch even if some fail —
@@ -67,10 +80,12 @@ export async function purgeAllVersions(client, { bucket, prefix, initialRows, ne
   for (let i = 0; i < all.length; i += 1000) {
     const batch = all.slice(i, i + 1000);
     try {
-      const resp = await client.send(new DeleteObjectsCommand({
-        Bucket: bucket,
-        Delete: { Objects: batch.map(r => ({ Key: r.key, VersionId: r.versionId })), Quiet: true },
-      }));
+      const resp = await client.send(
+        new DeleteObjectsCommand({
+          Bucket: bucket,
+          Delete: { Objects: batch.map((r) => ({ Key: r.key, VersionId: r.versionId })), Quiet: true },
+        }),
+      );
       if (resp.Errors) allErrors.push(...resp.Errors);
     } catch (batchErr) {
       allErrors.push({ Key: '(network)', Message: batchErr.message || String(batchErr) });

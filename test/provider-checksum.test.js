@@ -31,7 +31,10 @@ describe('providerChecksumAdapter', () => {
 describe('parseAwsChecksum — strict acceptance', () => {
   test('accepts a FULL_OBJECT CRC64NVME checksum', () => {
     const { warn, warnings } = capture();
-    const sig = parseAwsChecksum({ Checksum: { ChecksumCRC64NVME: 'uWdU3w7C/Yo=', ChecksumType: 'FULL_OBJECT' } }, { warn });
+    const sig = parseAwsChecksum(
+      { Checksum: { ChecksumCRC64NVME: 'uWdU3w7C/Yo=', ChecksumType: 'FULL_OBJECT' } },
+      { warn },
+    );
     assert.equal(sig, 'crc64nvme:uWdU3w7C/Yo=');
     assert.equal(warnings.length, 0);
   });
@@ -76,7 +79,9 @@ describe('parseAwsChecksum — fail loud on unexpected shapes', () => {
 
 describe('awsAdapter — integration', () => {
   test('returns the normalized signature from GetObjectAttributes', async () => {
-    const client = { send: () => Promise.resolve({ Checksum: { ChecksumCRC64NVME: 'AAA=', ChecksumType: 'FULL_OBJECT' } }) };
+    const client = {
+      send: () => Promise.resolve({ Checksum: { ChecksumCRC64NVME: 'AAA=', ChecksumType: 'FULL_OBJECT' } }),
+    };
     assert.equal(await awsAdapter(client, 'bk', 'k', {}), 'crc64nvme:AAA=');
   });
 

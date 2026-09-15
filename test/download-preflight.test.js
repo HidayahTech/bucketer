@@ -1,9 +1,7 @@
 // Copyright (C) 2026 HidayahTech, LLC
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  probeUrl, blockedMessage, PROBE_KIND,
-} from '../src/lib/download-preflight.js';
+import { probeUrl, blockedMessage, PROBE_KIND } from '../src/lib/download-preflight.js';
 
 const responding = (init) => {
   const fn = async (url, opts) => {
@@ -62,7 +60,9 @@ describe('probeUrl', () => {
   });
 
   test('classifies a thrown fetch as a network failure', async () => {
-    const fetchImpl = async () => { throw new TypeError('Failed to fetch'); };
+    const fetchImpl = async () => {
+      throw new TypeError('Failed to fetch');
+    };
     const r = await probeUrl('u', { fetchImpl });
 
     assert.equal(r.kind, PROBE_KIND.NETWORK);

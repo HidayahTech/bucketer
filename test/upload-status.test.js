@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { isActive, isFailed, isSettled, isPaused, isDone, isAborted } from '../src/lib/upload-status.js';
 
 const ALL_STATUSES = ['queued', 'uploading', 'resuming', 'paused', 'done', 'error', 'aborted'];
-const make = s => ({ status: s });
+const make = (s) => ({ status: s });
 
 describe('isActive', () => {
   test('true for uploading, resuming, queued', () => {
@@ -25,7 +25,7 @@ describe('isFailed', () => {
   });
 
   test('false for all non-error statuses', () => {
-    for (const s of ALL_STATUSES.filter(s => s !== 'error')) {
+    for (const s of ALL_STATUSES.filter((s) => s !== 'error')) {
       assert.ok(!isFailed(make(s)), `isFailed should be false for '${s}'`);
     }
   });
@@ -51,7 +51,7 @@ describe('isPaused', () => {
   });
 
   test('false for all other statuses', () => {
-    for (const s of ALL_STATUSES.filter(s => s !== 'paused')) {
+    for (const s of ALL_STATUSES.filter((s) => s !== 'paused')) {
       assert.ok(!isPaused(make(s)), `isPaused should be false for '${s}'`);
     }
   });
@@ -63,7 +63,7 @@ describe('isDone', () => {
   });
 
   test('false for all other statuses', () => {
-    for (const s of ALL_STATUSES.filter(s => s !== 'done')) {
+    for (const s of ALL_STATUSES.filter((s) => s !== 'done')) {
       assert.ok(!isDone(make(s)), `isDone should be false for '${s}'`);
     }
   });
@@ -75,7 +75,7 @@ describe('isAborted', () => {
   });
 
   test('false for all other statuses', () => {
-    for (const s of ALL_STATUSES.filter(s => s !== 'aborted')) {
+    for (const s of ALL_STATUSES.filter((s) => s !== 'aborted')) {
       assert.ok(!isAborted(make(s)), `isAborted should be false for '${s}'`);
     }
   });

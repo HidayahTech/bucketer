@@ -1,7 +1,16 @@
 // Copyright (C) 2026 HidayahTech, LLC
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyTier, TINY_MAX, MEDIUM_MAX, CONCURRENCY, createTempStore, TEMP_CHUNK, sweepOrphanTemps, SWEEP_MIN_AGE_MS } from '../src/lib/zip-prefetch.js';
+import {
+  classifyTier,
+  TINY_MAX,
+  MEDIUM_MAX,
+  CONCURRENCY,
+  createTempStore,
+  TEMP_CHUNK,
+  sweepOrphanTemps,
+  SWEEP_MIN_AGE_MS,
+} from '../src/lib/zip-prefetch.js';
 
 // Trimmed copy of the fake OPFS root from test/zip-job-run.test.js (write-fault
 // injection dropped — this file's tests don't need it). Same shape: getFileHandle /
@@ -21,7 +30,11 @@ function fakeOpfsRoot() {
     wholeFileReads,
     async getFileHandle(name, { create = false } = {}) {
       if (!files.has(name)) {
-        if (!create) { const e = new Error('missing'); e.name = 'NotFoundError'; throw e; }
+        if (!create) {
+          const e = new Error('missing');
+          e.name = 'NotFoundError';
+          throw e;
+        }
         files.set(name, new Uint8Array(0));
         if (!lastModified.has(name)) lastModified.set(name, Date.now());
       }
@@ -32,11 +45,22 @@ function fakeOpfsRoot() {
           return {
             async write(u8) {
               const grown = new Uint8Array(Math.max(buf.length, pos + u8.length));
-              grown.set(buf); grown.set(u8, pos); buf = grown; pos += u8.length;
+              grown.set(buf);
+              grown.set(u8, pos);
+              buf = grown;
+              pos += u8.length;
             },
-            async truncate(n) { buf = buf.slice(0, n); pos = Math.min(pos, n); },
-            async seek(n) { pos = n; },
-            async close() { files.set(name, buf); lastModified.set(name, Date.now()); },
+            async truncate(n) {
+              buf = buf.slice(0, n);
+              pos = Math.min(pos, n);
+            },
+            async seek(n) {
+              pos = n;
+            },
+            async close() {
+              files.set(name, buf);
+              lastModified.set(name, Date.now());
+            },
           };
         },
         async getFile() {
@@ -62,7 +86,11 @@ function fakeOpfsRoot() {
       };
     },
     async removeEntry(name) {
-      if (!files.has(name)) { const e = new Error('missing'); e.name = 'NotFoundError'; throw e; }
+      if (!files.has(name)) {
+        const e = new Error('missing');
+        e.name = 'NotFoundError';
+        throw e;
+      }
       files.delete(name);
       lastModified.delete(name);
     },
@@ -88,7 +116,9 @@ describe('classifyTier', () => {
     assert.equal(classifyTier(undefined), 'memory');
     assert.equal(classifyTier(null), 'memory');
   });
-  test('default concurrency is 4', () => { assert.equal(CONCURRENCY, 4); });
+  test('default concurrency is 4', () => {
+    assert.equal(CONCURRENCY, 4);
+  });
 });
 
 describe('createTempStore', () => {
@@ -137,13 +167,19 @@ describe('createTempStore', () => {
     assert.equal(total, size);
     const rebuilt = new Uint8Array(total);
     let pos = 0;
-    for (const c of chunks) { rebuilt.set(c, pos); pos += c.length; }
+    for (const c of chunks) {
+      rebuilt.set(c, pos);
+      pos += c.length;
+    }
     assert.deepEqual(rebuilt, original);
 
-    assert.equal(root.wholeFileReads.get('bucketer-tmp-big.bin') || 0, 0,
+    assert.equal(
+      root.wholeFileReads.get('bucketer-tmp-big.bin') || 0,
+      0,
       'stream() must read via chunked slice() calls only — a whole-file arrayBuffer() ' +
-      'read would defeat the point of the OPFS temp tier (keeping medium-file bytes off ' +
-      'the in-memory budget)');
+        'read would defeat the point of the OPFS temp tier (keeping medium-file bytes off ' +
+        'the in-memory budget)',
+    );
   });
 
   test('remove deletes the temp file', async () => {
@@ -208,10 +244,7 @@ describe('sweepOrphanTemps', () => {
 
     await sweepOrphanTemps(root, { now: () => FIXED_NOW });
 
-    assert.deepEqual(
-      [...root.files.keys()].sort(),
-      ['bucketer-tmp-p1', 'bucketer-zip-job1.zip', 'unrelated-file.txt'],
-    );
+    assert.deepEqual([...root.files.keys()].sort(), ['bucketer-tmp-p1', 'bucketer-zip-job1.zip', 'unrelated-file.txt']);
   });
 
   test('best-effort: a single removeEntry failure does not abort the rest of the sweep', async () => {

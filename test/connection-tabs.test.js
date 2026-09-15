@@ -28,16 +28,25 @@ describe('deriveTabs', () => {
   ];
 
   test('projects mru ids onto connections in mru order', () => {
-    assert.deepEqual(deriveTabs([3, 1], conns, 6).map(c => c.id), [3, 1]);
+    assert.deepEqual(
+      deriveTabs([3, 1], conns, 6).map((c) => c.id),
+      [3, 1],
+    );
   });
 
   test('drops mru ids that no longer resolve to a connection', () => {
-    assert.deepEqual(deriveTabs([9, 2, 8], conns, 6).map(c => c.id), [2]);
+    assert.deepEqual(
+      deriveTabs([9, 2, 8], conns, 6).map((c) => c.id),
+      [2],
+    );
   });
 
   test('caps the number of tabs', () => {
     assert.equal(deriveTabs([1, 2, 3], conns, 2).length, 2);
-    assert.deepEqual(deriveTabs([1, 2, 3], conns, 2).map(c => c.id), [1, 2]);
+    assert.deepEqual(
+      deriveTabs([1, 2, 3], conns, 2).map((c) => c.id),
+      [1, 2],
+    );
   });
 
   test('an empty mru yields no tabs', () => {

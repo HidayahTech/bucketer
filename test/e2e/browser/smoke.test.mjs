@@ -5,7 +5,17 @@
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, connectApp, BUCKET, launchBrowser, newE2EContext, newE2EPage, e2eTest, scaleTimeout } from '../harness.mjs';
+import {
+  startMock,
+  startAppServer,
+  connectApp,
+  BUCKET,
+  launchBrowser,
+  newE2EContext,
+  newE2EPage,
+  e2eTest,
+  scaleTimeout,
+} from '../harness.mjs';
 
 let ctx, app, browser, context, page;
 
@@ -31,7 +41,10 @@ async function waitForKeys(expected, timeout = scaleTimeout(10000)) {
   const want = JSON.stringify(expected);
   const deadline = Date.now() + timeout;
   let keys = await bucketKeys();
-  while (JSON.stringify(keys) !== want && Date.now() < deadline) { await new Promise((r) => setTimeout(r, 150)); keys = await bucketKeys(); }
+  while (JSON.stringify(keys) !== want && Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 150));
+    keys = await bucketKeys();
+  }
   assert.deepEqual(keys, expected);
 }
 
@@ -40,12 +53,14 @@ describe('browser e2e — connect, upload, list, delete', () => {
     await page.goto(app.url, { waitUntil: 'domcontentloaded' });
     await connectApp(page, ctx.browserEndpoint);
     // Reaching the connected UI means the ListObjectsV2 probe succeeded over CORS.
-    assert.ok(await page.locator('[data-testid="file-input"]').count() > 0, 'connected UI is shown');
+    assert.ok((await page.locator('[data-testid="file-input"]').count()) > 0, 'connected UI is shown');
   });
 
   e2eTest('uploading a file stores it in the bucket and shows it in the listing', async () => {
     await page.locator('[data-testid="file-input"]').setInputFiles({
-      name: 'e2e-upload.txt', mimeType: 'text/plain', buffer: Buffer.from('hello from e2e'),
+      name: 'e2e-upload.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from('hello from e2e'),
     });
     await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: 20000 });
 

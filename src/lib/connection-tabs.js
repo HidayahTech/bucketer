@@ -5,13 +5,13 @@
 // Move `id` to the front of the MRU list, removing any earlier occurrence so it never
 // duplicates. Returns a new array; the input is not mutated.
 export function touchMru(mru, id) {
-  return [id, ...mru.filter(x => x !== id)];
+  return [id, ...mru.filter((x) => x !== id)];
 }
 
 // Project the MRU id order onto the current connections: resolve each id to its
 // connection (dropping ids that no longer exist), preserving MRU order, capped at `cap`.
 export function deriveTabs(mru, connections, cap) {
-  const byId = new Map(connections.map(c => [c.id, c]));
+  const byId = new Map(connections.map((c) => [c.id, c]));
   const tabs = [];
   for (const id of mru) {
     const c = byId.get(id);

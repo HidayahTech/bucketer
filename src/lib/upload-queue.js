@@ -24,11 +24,15 @@ export async function collectParts(client, { bucket, key, uploadId }) {
   const parts = [];
   let marker;
   do {
-    const resp = await client.send(new ListPartsCommand({
-      Bucket: bucket, Key: key, UploadId: uploadId,
-      PartNumberMarker: marker,
-    }));
-    for (const p of (resp.Parts || [])) parts.push({ PartNumber: p.PartNumber, ETag: p.ETag });
+    const resp = await client.send(
+      new ListPartsCommand({
+        Bucket: bucket,
+        Key: key,
+        UploadId: uploadId,
+        PartNumberMarker: marker,
+      }),
+    );
+    for (const p of resp.Parts || []) parts.push({ PartNumber: p.PartNumber, ETag: p.ETag });
     marker = resp.IsTruncated ? resp.NextPartNumberMarker : undefined;
   } while (marker);
   return parts;
@@ -36,7 +40,7 @@ export async function collectParts(client, { bucket, key, uploadId }) {
 
 export function calcPartSize(fileSize, preferredBytes) {
   const floor = Math.max(5 * 1000 * 1000, Math.ceil(fileSize / 10000));
-  return (preferredBytes && preferredBytes > floor) ? preferredBytes : floor;
+  return preferredBytes && preferredBytes > floor ? preferredBytes : floor;
 }
 
 // Generic bounded-concurrency worker pool: up to `concurrency` workers pull items off a
@@ -88,10 +92,12 @@ export class UploadQueue {
     while (this._running < this.concurrency && this._pending.length > 0) {
       const { task, resolve, reject } = this._pending.shift();
       this._running++;
-      task().then(resolve, reject).finally(() => {
-        this._running--;
-        this._drain();
-      });
+      task()
+        .then(resolve, reject)
+        .finally(() => {
+          this._running--;
+          this._drain();
+        });
     }
   }
 }

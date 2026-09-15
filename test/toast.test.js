@@ -8,7 +8,9 @@ describe('toast store (#15)', () => {
   test('show() adds a toast and notifies subscribers', () => {
     const store = createToastStore();
     let seen = null;
-    store.subscribe(t => { seen = t; });
+    store.subscribe((t) => {
+      seen = t;
+    });
     const id = store.show('Saved', { duration: 0 });
     assert.equal(store.get().length, 1);
     assert.equal(store.get()[0].message, 'Saved');
@@ -29,7 +31,10 @@ describe('toast store (#15)', () => {
     const a = store.show('a', { duration: 0 });
     store.show('b', { duration: 0 });
     store.dismiss(a);
-    assert.deepEqual(store.get().map(t => t.message), ['b']);
+    assert.deepEqual(
+      store.get().map((t) => t.message),
+      ['b'],
+    );
   });
 
   test('defaults type to success', () => {
@@ -54,7 +59,9 @@ describe('toast store (#15)', () => {
   test('subscribe returns an unsubscribe that stops notifications', () => {
     const store = createToastStore();
     let calls = 0;
-    const unsub = store.subscribe(() => { calls++; });
+    const unsub = store.subscribe(() => {
+      calls++;
+    });
     unsub();
     store.show('x', { duration: 0 });
     assert.equal(calls, 1);

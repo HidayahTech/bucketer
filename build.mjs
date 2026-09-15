@@ -21,20 +21,20 @@ const UPDATE_CHECK_RANGE_BYTES = 512;
 
 // ── Mode definitions ──────────────────────────────────────────────────────────
 const MODES = {
-  prod: { dest: 'dist', minify: true,  sourcemap: false,    nodeEnv: 'production',  invariants: true  },
-  dev:  { dest: 'dist', minify: false, sourcemap: 'inline', nodeEnv: 'development', invariants: false },
+  prod: { dest: 'dist', minify: true, sourcemap: false, nodeEnv: 'production', invariants: true },
+  dev: { dest: 'dist', minify: false, sourcemap: 'inline', nodeEnv: 'development', invariants: false },
   perf: { dest: 'perf', minify: false, sourcemap: 'inline', nodeEnv: 'development', invariants: false },
 };
 
-const modeKey = process.argv.find(a => a.startsWith('--mode='))?.slice(7)
-  ?? (process.argv.includes('--dev') ? 'dev' : 'prod');
+const modeKey =
+  process.argv.find((a) => a.startsWith('--mode='))?.slice(7) ?? (process.argv.includes('--dev') ? 'dev' : 'prod');
 
 if (!MODES[modeKey]) {
   console.error(`Unknown build mode: ${modeKey}. Valid modes: ${Object.keys(MODES).join(', ')}`);
   process.exit(1);
 }
 
-const mode     = MODES[modeKey];
+const mode = MODES[modeKey];
 const appTitle = 'Bucketer — In-Browser S3-Compatible Bucket Manager';
 
 // Read package version up front — needed for changelog generation before esbuild.
@@ -89,8 +89,9 @@ function parseChangelog(src) {
     // markers. Runs AFTER continuation-line joining, because a marker pair can
     // span physical lines in the wrapped source (e.g. the v1.33.0 entry).
     const clean = (t) => t.replace(/`([^`]+)`/g, '$1').replace(/\*\*([^*]+)\*\*/g, '$1');
-    const changes = rawChanges.map(c =>
-      typeof c === 'string' ? clean(c) : { group: c.group, items: c.items.map(clean) });
+    const changes = rawChanges.map((c) =>
+      typeof c === 'string' ? clean(c) : { group: c.group, items: c.items.map(clean) },
+    );
     entries.push({ version, date, ...(title ? { title: title.trim() } : {}), changes });
   }
   return entries;
@@ -104,7 +105,7 @@ if (mode.invariants) {
     const found = changelog[0]?.version ?? '(none)';
     console.error(
       `\nBuild invariant FAILED: CHANGELOG.md top entry is v${found} but package.json is v${appVersion}.\n` +
-      `Add a ## [${appVersion}] — date — Title entry to the top of CHANGELOG.md before building.`
+        `Add a ## [${appVersion}] — date — Title entry to the top of CHANGELOG.md before building.`,
     );
     process.exit(1);
   }
@@ -201,9 +202,9 @@ if (mode.invariants) {
     if (endByte >= UPDATE_CHECK_RANGE_BYTES) {
       console.error(
         `\nBuild invariant FAILED: <meta name="${tag}"> ends at byte ${endByte}, ` +
-        `which exceeds the update-check range boundary of ${UPDATE_CHECK_RANGE_BYTES} bytes.\n` +
-        `Move the tag earlier in <head> or increase UPDATE_CHECK_RANGE_BYTES in build.mjs ` +
-        `and UpdateBanner.jsx (keeping them in sync).`
+          `which exceeds the update-check range boundary of ${UPDATE_CHECK_RANGE_BYTES} bytes.\n` +
+          `Move the tag earlier in <head> or increase UPDATE_CHECK_RANGE_BYTES in build.mjs ` +
+          `and UpdateBanner.jsx (keeping them in sync).`,
       );
       invariantFailed = true;
     } else {
@@ -219,9 +220,9 @@ if (mode.invariants) {
   if (actualBytes > SIZE_LIMIT_BYTES) {
     console.error(
       `\nBuild invariant FAILED: ${mode.dest}/index.html is ${(actualBytes / 1024).toFixed(1)} KB, ` +
-      `which exceeds the ${SIZE_LIMIT_BYTES / 1024} KB tripwire (T5-2).\n` +
-      `This usually means a large dependency or asset was added by accident — ` +
-      `investigate before raising the tripwire.`
+        `which exceeds the ${SIZE_LIMIT_BYTES / 1024} KB tripwire (T5-2).\n` +
+        `This usually means a large dependency or asset was added by accident — ` +
+        `investigate before raising the tripwire.`,
     );
     invariantFailed = true;
   }
@@ -242,7 +243,7 @@ if (mode.invariants) {
   if (out.includes('sourceMappingURL')) {
     console.error(
       `\nBuild invariant FAILED: ${mode.dest}/index.html contains a sourceMappingURL comment (T5-1).\n` +
-      `Source maps must not leak into the production bundle — they expose internal file paths.`
+        `Source maps must not leak into the production bundle — they expose internal file paths.`,
     );
     invariantFailed = true;
   } else {

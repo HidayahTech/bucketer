@@ -21,19 +21,38 @@ const CERT = join(DIR, 'cert.pem');
 const MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 function fresh(path) {
-  try { return Date.now() - statSync(path).mtimeMs < MAX_AGE_MS; } catch { return false; }
+  try {
+    return Date.now() - statSync(path).mtimeMs < MAX_AGE_MS;
+  } catch {
+    return false;
+  }
 }
 
 export function ensureTlsCert() {
   if (!(existsSync(KEY) && existsSync(CERT) && fresh(CERT))) {
     mkdirSync(DIR, { recursive: true });
     try {
-      execFileSync('openssl', [
-        'req', '-x509', '-newkey', 'rsa:2048', '-nodes',
-        '-keyout', KEY, '-out', CERT, '-days', '2',
-        '-subj', '/CN=localhost',
-        '-addext', 'subjectAltName=DNS:localhost,DNS:*.localhost,IP:127.0.0.1',
-      ], { stdio: 'pipe' });
+      execFileSync(
+        'openssl',
+        [
+          'req',
+          '-x509',
+          '-newkey',
+          'rsa:2048',
+          '-nodes',
+          '-keyout',
+          KEY,
+          '-out',
+          CERT,
+          '-days',
+          '2',
+          '-subj',
+          '/CN=localhost',
+          '-addext',
+          'subjectAltName=DNS:localhost,DNS:*.localhost,IP:127.0.0.1',
+        ],
+        { stdio: 'pipe' },
+      );
     } catch (err) {
       throw new Error(`Cannot generate the e2e TLS certificate (is openssl installed?): ${err.message}`);
     }

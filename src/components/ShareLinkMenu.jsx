@@ -26,22 +26,25 @@ export function ShareLinkMenu({ credentials }) {
     try {
       await navigator.clipboard.writeText(url);
       showToast(message);
-    } catch { /* clipboard API unavailable */ }
+    } catch {
+      /* clipboard API unavailable */
+    }
     setOpen(false);
   }
 
-  const copyConfigOnly = () =>
-    copy(buildShareUrl(credentials), 'Share link copied to clipboard');
+  const copyConfigOnly = () => copy(buildShareUrl(credentials), 'Share link copied to clipboard');
   const copyWithKeyId = () =>
-    copy(buildShareUrl(credentials, { includeKeyId: true }),
-         'Link with access key ID copied — recipient still needs the secret key');
+    copy(
+      buildShareUrl(credentials, { includeKeyId: true }),
+      'Link with access key ID copied — recipient still needs the secret key',
+    );
 
   return (
     <div class="copy-link-wrap" ref={open ? wrapRef : undefined}>
       <button
         class="btn btn-ghost btn-sm"
         style={{ color: '#fff', borderColor: 'rgba(255,255,255,.4)' }}
-        onClick={() => setOpen(v => !v)}
+        onClick={() => setOpen((v) => !v)}
         title="Copy a shareable link with the connection pre-filled"
       >
         Copy link

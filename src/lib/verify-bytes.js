@@ -30,7 +30,10 @@ class ChunkPuller {
   async next() {
     while (!this.done) {
       const r = await this.it.next();
-      if (r.done) { this.done = true; return EMPTY; }
+      if (r.done) {
+        this.done = true;
+        return EMPTY;
+      }
       if (r.value && r.value.length) return asU8(r.value);
     }
     return EMPTY;
@@ -56,31 +59,39 @@ export async function verifyAgainstReference(reference, candidates) {
     const refBuf = await ref.next();
     const refEof = refBuf.length === 0;
 
-    await Promise.all(states.map(async (s) => {
-      if (!s.matching) return;
+    await Promise.all(
+      states.map(async (s) => {
+        if (!s.matching) return;
 
-      if (refEof) {
-        // Reference is exhausted; an identical candidate must also be exhausted.
-        if (s.leftover.length === 0) s.leftover = await s.puller.next();
-        if (s.leftover.length !== 0) s.matching = false;
-        return;
-      }
-
-      // Consume exactly refBuf.length bytes from the candidate, comparing as we go.
-      let need = refBuf.length;
-      let offset = 0;
-      while (need > 0) {
-        if (s.leftover.length === 0) {
-          s.leftover = await s.puller.next();
-          if (s.leftover.length === 0) { s.matching = false; return; } // candidate shorter
+        if (refEof) {
+          // Reference is exhausted; an identical candidate must also be exhausted.
+          if (s.leftover.length === 0) s.leftover = await s.puller.next();
+          if (s.leftover.length !== 0) s.matching = false;
+          return;
         }
-        const take = Math.min(need, s.leftover.length);
-        if (!rangesEqual(s.leftover, 0, refBuf, offset, take)) { s.matching = false; return; }
-        s.leftover = s.leftover.subarray(take);
-        offset += take;
-        need -= take;
-      }
-    }));
+
+        // Consume exactly refBuf.length bytes from the candidate, comparing as we go.
+        let need = refBuf.length;
+        let offset = 0;
+        while (need > 0) {
+          if (s.leftover.length === 0) {
+            s.leftover = await s.puller.next();
+            if (s.leftover.length === 0) {
+              s.matching = false;
+              return;
+            } // candidate shorter
+          }
+          const take = Math.min(need, s.leftover.length);
+          if (!rangesEqual(s.leftover, 0, refBuf, offset, take)) {
+            s.matching = false;
+            return;
+          }
+          s.leftover = s.leftover.subarray(take);
+          offset += take;
+          need -= take;
+        }
+      }),
+    );
 
     if (refEof) break;
     if (states.every((s) => !s.matching)) break; // every candidate already diverged

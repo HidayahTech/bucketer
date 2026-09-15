@@ -4,28 +4,52 @@ import { formatBytes, formatSpeed, formatEta } from '../lib/format.js';
 import { useDoubleClickSafety } from '../hooks/useDoubleClickSafety.js';
 import { UploadItem } from './UploadItem.jsx';
 
-export function BatchSummary({ items, provider, collapsed, onToggleCollapse, onCollapse, onExpand, onDismiss, onCancelBatch, onResume, onRestart, onCancel, onRemove, onDismissLargeWarn, notifSuppressed, onToggleNotifs }) {
+export function BatchSummary({
+  items,
+  provider,
+  collapsed,
+  onToggleCollapse,
+  onCollapse,
+  onExpand,
+  onDismiss,
+  onCancelBatch,
+  onResume,
+  onRestart,
+  onCancel,
+  onRemove,
+  onDismissLargeWarn,
+  notifSuppressed,
+  onToggleNotifs,
+}) {
   // Single pass — replaces 8 separate filter/reduce calls over all items
-  let doneCount = 0, abortedCount = 0, queuedCount = 0, errorCount = 0;
-  let totalBytes = 0, confirmedBytes = 0;
-  const errorItems = [], pausedItems = [], inFlightItems = [];
+  let doneCount = 0,
+    abortedCount = 0,
+    queuedCount = 0,
+    errorCount = 0;
+  let totalBytes = 0,
+    confirmedBytes = 0;
+  const errorItems = [],
+    pausedItems = [],
+    inFlightItems = [];
   for (const i of items) {
     totalBytes += i.size;
     confirmedBytes += i.status === 'done' ? i.size : i.bytesUploaded;
-    if      (i.status === 'done')                                  doneCount++;
-    else if (i.status === 'aborted')                               abortedCount++;
-    else if (i.status === 'queued')                                queuedCount++;
-    else if (i.status === 'error')    { errorCount++; errorItems.push(i); }
-    else if (i.status === 'paused')                                pausedItems.push(i);
-    else if (i.status === 'uploading' || i.status === 'resuming')  inFlightItems.push(i);
+    if (i.status === 'done') doneCount++;
+    else if (i.status === 'aborted') abortedCount++;
+    else if (i.status === 'queued') queuedCount++;
+    else if (i.status === 'error') {
+      errorCount++;
+      errorItems.push(i);
+    } else if (i.status === 'paused') pausedItems.push(i);
+    else if (i.status === 'uploading' || i.status === 'resuming') inFlightItems.push(i);
   }
 
-  const totalFiles     = items.length;
+  const totalFiles = items.length;
   const completedCount = doneCount;
 
-  const isActive   = inFlightItems.length > 0;
-  const allDone    = completedCount === totalFiles && errorCount === 0 && abortedCount === 0;
-  const isSettled  = !isActive && queuedCount === 0 && pausedItems.length === 0;
+  const isActive = inFlightItems.length > 0;
+  const allDone = completedCount === totalFiles && errorCount === 0 && abortedCount === 0;
+  const isSettled = !isActive && queuedCount === 0 && pausedItems.length === 0;
 
   // Auto-collapse 3 s after batch completes cleanly
   const prevAllDoneRef = useRef(false);
@@ -49,8 +73,8 @@ export function BatchSummary({ items, provider, collapsed, onToggleCollapse, onC
           body = `${doneCount} file${doneCount !== 1 ? 's' : ''} uploaded`;
         } else {
           const parts = [];
-          if (doneCount > 0)    parts.push(`${doneCount} uploaded`);
-          if (errorCount > 0)   parts.push(`${errorCount} failed`);
+          if (doneCount > 0) parts.push(`${doneCount} uploaded`);
+          if (errorCount > 0) parts.push(`${errorCount} failed`);
           if (abortedCount > 0) parts.push(`${abortedCount} cancelled`);
           body = parts.join(' · ');
         }
@@ -68,20 +92,19 @@ export function BatchSummary({ items, provider, collapsed, onToggleCollapse, onC
   }, [errorCount]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Float error items to the top so they're immediately visible without scrolling
-  const displayItems = errorCount > 0
-    ? [...items].sort((a, b) => (a.status === 'error' ? -1 : b.status === 'error' ? 1 : 0))
-    : items;
+  const displayItems =
+    errorCount > 0 ? [...items].sort((a, b) => (a.status === 'error' ? -1 : b.status === 'error' ? 1 : 0)) : items;
 
   const [displayedBytes, setDisplayedBytes] = useState(confirmedBytes);
   const [batchSpeed, setBatchSpeed] = useState(0);
-  const animRef        = useRef(null);
-  const speedRef       = useRef(0);
-  const floorRef       = useRef(confirmedBytes);
-  const samplesRef     = useRef([]); // rolling-window samples: [{t: ms, bytes: number}]
+  const animRef = useRef(null);
+  const speedRef = useRef(0);
+  const floorRef = useRef(confirmedBytes);
+  const samplesRef = useRef([]); // rolling-window samples: [{t: ms, bytes: number}]
 
   useEffect(() => {
     floorRef.current = confirmedBytes;
-    setDisplayedBytes(prev => Math.max(prev, confirmedBytes));
+    setDisplayedBytes((prev) => Math.max(prev, confirmedBytes));
   }, [confirmedBytes]);
 
   useEffect(() => {
@@ -115,9 +138,7 @@ export function BatchSummary({ items, provider, collapsed, onToggleCollapse, onC
       setBatchSpeed(rollingSpeed);
       const dt = (now - last) / 1000;
       last = now;
-      setDisplayedBytes(prev =>
-        Math.min(Math.max(prev + rollingSpeed * dt, floorRef.current), totalBytes)
-      );
+      setDisplayedBytes((prev) => Math.min(Math.max(prev + rollingSpeed * dt, floorRef.current), totalBytes));
       animRef.current = requestAnimationFrame(tick);
     }
     animRef.current = requestAnimationFrame(tick);
@@ -131,18 +152,20 @@ export function BatchSummary({ items, provider, collapsed, onToggleCollapse, onC
 
   const summaryTop = (
     <div class="batch-summary-top">
-      {isActive  && <span class="spinner" style={{ flexShrink: 0 }} />}
-      {!isActive && allDone                           && <span class="batch-status-icon batch-status-ok">✓</span>}
-      {!isActive && !allDone && (errorCount > 0 || abortedCount > 0) && <span class="batch-status-icon batch-status-err">✕</span>}
+      {isActive && <span class="spinner" style={{ flexShrink: 0 }} />}
+      {!isActive && allDone && <span class="batch-status-icon batch-status-ok">✓</span>}
+      {!isActive && !allDone && (errorCount > 0 || abortedCount > 0) && (
+        <span class="batch-status-icon batch-status-err">✕</span>
+      )}
       <span class="batch-summary-count">
         {completedCount} / {totalFiles} file{totalFiles !== 1 ? 's' : ''}
         {queuedCount > 0 && <span class="batch-queued"> · {queuedCount} queued</span>}
-        {errorCount  > 0 && <span class="batch-errors"> · {errorCount} failed</span>}
+        {errorCount > 0 && <span class="batch-errors"> · {errorCount} failed</span>}
         {abortedCount > 0 && errorCount === 0 && <span class="batch-queued"> · {abortedCount} cancelled</span>}
       </span>
       <span class="batch-spacer" />
       {batchSpeed > 0 && <span class="batch-speed">{formatSpeed(batchSpeed)}</span>}
-      {liveEta !== null  && <span class="batch-eta"> · {formatEta(liveEta)}</span>}
+      {liveEta !== null && <span class="batch-eta"> · {formatEta(liveEta)}</span>}
       {(isActive || queuedCount > 0) && (
         <button
           class="btn btn-ghost btn-sm"
@@ -156,7 +179,11 @@ export function BatchSummary({ items, provider, collapsed, onToggleCollapse, onC
         <button
           class="btn btn-ghost btn-sm"
           style={{ flexShrink: 0, color: notifSuppressed ? 'var(--text-muted)' : undefined }}
-          title={notifSuppressed ? 'Desktop notifications muted — click to unmute' : 'Mute desktop notifications for this queue'}
+          title={
+            notifSuppressed
+              ? 'Desktop notifications muted — click to unmute'
+              : 'Mute desktop notifications for this queue'
+          }
           onClick={onToggleNotifs}
         >
           {notifSuppressed ? 'Notifs off' : 'Notifs on'}
@@ -183,17 +210,30 @@ export function BatchSummary({ items, provider, collapsed, onToggleCollapse, onC
     <div class={`batch-summary${errorClass}`}>
       {summaryTop}
 
-      <div class="progress-bar-wrap" role="progressbar" aria-valuenow={Math.round(displayProgress)} aria-valuemin={0} aria-valuemax={100} aria-label="Upload progress">
+      <div
+        class="progress-bar-wrap"
+        role="progressbar"
+        aria-valuenow={Math.round(displayProgress)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label="Upload progress"
+      >
         <div class="progress-bar" style={{ width: `${displayProgress.toFixed(2)}%` }} />
       </div>
 
       <div class="batch-summary-meta">
-        <span>{formatBytes(displayedBytes)} / {formatBytes(totalBytes)}</span>
-        {allDone && <span class="batch-all-done" data-testid="queue-complete">✓ All complete</span>}
+        <span>
+          {formatBytes(displayedBytes)} / {formatBytes(totalBytes)}
+        </span>
+        {allDone && (
+          <span class="batch-all-done" data-testid="queue-complete">
+            ✓ All complete
+          </span>
+        )}
       </div>
 
       <div class="batch-inflight">
-        {displayItems.map(item => (
+        {displayItems.map((item) => (
           <UploadItem
             key={item.id}
             item={item}

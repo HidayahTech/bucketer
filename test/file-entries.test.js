@@ -58,7 +58,10 @@ describe('collectFileEntries — flat file list', () => {
   test('returns multiple file entries in order', async () => {
     const entries = ['a.txt', 'b.jpg', 'c.mp4'].map(fileEntry);
     const result = await collectFileEntries(entries);
-    assert.deepEqual(result.map(r => r.relativePath), ['a.txt', 'b.jpg', 'c.mp4']);
+    assert.deepEqual(
+      result.map((r) => r.relativePath),
+      ['a.txt', 'b.jpg', 'c.mp4'],
+    );
   });
 
   test('returns empty array for empty input', async () => {
@@ -68,31 +71,26 @@ describe('collectFileEntries — flat file list', () => {
 
 describe('collectFileEntries — folder traversal', () => {
   test('flattens a single level of nesting with correct paths', async () => {
-    const folder = directoryEntry('photos', [
-      fileEntry('a.jpg'), fileEntry('b.jpg'),
-    ]);
+    const folder = directoryEntry('photos', [fileEntry('a.jpg'), fileEntry('b.jpg')]);
     const result = await collectFileEntries([folder]);
-    assert.deepEqual(result.map(r => r.relativePath).sort(), ['photos/a.jpg', 'photos/b.jpg']);
+    assert.deepEqual(result.map((r) => r.relativePath).sort(), ['photos/a.jpg', 'photos/b.jpg']);
   });
 
   test('traverses deeply nested folders', async () => {
     const inner = directoryEntry('inner', [fileEntry('deep.txt')]);
     const outer = directoryEntry('outer', [inner, fileEntry('top.txt')]);
     const result = await collectFileEntries([outer]);
-    const paths = result.map(r => r.relativePath).sort();
+    const paths = result.map((r) => r.relativePath).sort();
     assert.ok(paths.includes('outer/inner/deep.txt'), 'deep file must be included');
-    assert.ok(paths.includes('outer/top.txt'),        'shallow file must be included');
+    assert.ok(paths.includes('outer/top.txt'), 'shallow file must be included');
     assert.equal(result.length, 2);
   });
 
   test('mixes files and folders at the root level', async () => {
-    const entries = [
-      fileEntry('root.txt'),
-      directoryEntry('sub', [fileEntry('child.txt')]),
-    ];
+    const entries = [fileEntry('root.txt'), directoryEntry('sub', [fileEntry('child.txt')])];
     const result = await collectFileEntries(entries);
-    const paths = result.map(r => r.relativePath).sort();
-    assert.ok(paths.includes('root.txt'),      'root file must be present');
+    const paths = result.map((r) => r.relativePath).sort();
+    assert.ok(paths.includes('root.txt'), 'root file must be present');
     assert.ok(paths.includes('sub/child.txt'), 'folder child must be present');
     assert.equal(result.length, 2);
   });
@@ -121,8 +119,10 @@ describe('collectFileEntries — readEntries pagination (>100 files)', () => {
     const files = Array.from({ length: 120 }, (_, i) => fileEntry(`img-${i}.png`));
     const folder = directoryEntry('gallery', files, 100);
     const result = await collectFileEntries([folder]);
-    assert.ok(result.every(r => r.relativePath.startsWith('gallery/')),
-      'all paths must carry the folder prefix');
+    assert.ok(
+      result.every((r) => r.relativePath.startsWith('gallery/')),
+      'all paths must carry the folder prefix',
+    );
   });
 });
 
@@ -133,12 +133,14 @@ describe('collectFileEntries — top-level entries traversed in parallel', () =>
   //
   // Proof: with parallel, readEntries for b is called before a's second readEntries call.
   // With sequential, a's entire subtree (both readEntries calls) finishes before b starts.
-  test("begins readEntries for all root dirs before completing any one traversal", async () => {
+  test('begins readEntries for all root dirs before completing any one traversal', async () => {
     const log = [];
 
     function trackedDir(name, children) {
       return {
-        isFile: false, isDirectory: true, name,
+        isFile: false,
+        isDirectory: true,
+        name,
         createReader: () => {
           let calls = 0;
           return {
@@ -157,16 +159,16 @@ describe('collectFileEntries — top-level entries traversed in parallel', () =>
     const b = trackedDir('b', [fileEntry('y.txt')]);
     await collectFileEntries([a, b]);
 
-    assert.equal(log.filter(e => e === 'readEntries:a').length, 2, 'a must be read twice (children + empty)');
-    assert.equal(log.filter(e => e === 'readEntries:b').length, 2, 'b must be read twice (children + empty)');
+    assert.equal(log.filter((e) => e === 'readEntries:a').length, 2, 'a must be read twice (children + empty)');
+    assert.equal(log.filter((e) => e === 'readEntries:b').length, 2, 'b must be read twice (children + empty)');
 
-    const bFirstIdx  = log.indexOf('readEntries:b');
+    const bFirstIdx = log.indexOf('readEntries:b');
     const aSecondIdx = log.indexOf('readEntries:a', log.indexOf('readEntries:a') + 1);
 
     assert.ok(
       bFirstIdx < aSecondIdx,
       `Expected parallel traversal: b's readEntries should start before a's second call. ` +
-      `Sequential traversal exhausts a entirely before starting b. Log: ${JSON.stringify(log)}`
+        `Sequential traversal exhausts a entirely before starting b. Log: ${JSON.stringify(log)}`,
     );
   });
 });
@@ -220,7 +222,12 @@ describe('resolveDroppedFiles — entries path', () => {
   });
 
   test('BUG-041: truthy entries whose file() errors fall back to files', async () => {
-    const broken = { isFile: true, isDirectory: false, name: 'a.txt', file: (_ok, err) => err(new Error('NotFoundError')) };
+    const broken = {
+      isFile: true,
+      isDirectory: false,
+      name: 'a.txt',
+      file: (_ok, err) => err(new Error('NotFoundError')),
+    };
     const dt = mockDataTransfer({ items: [itemWithEntry(broken)], files: [makeFile('a.txt')] });
     const result = await resolveDroppedFiles(dt);
     assert.equal(result.length, 1, 'the drop must not die silently');

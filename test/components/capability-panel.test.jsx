@@ -10,8 +10,8 @@ import { mount, fire } from '../helpers/render.js';
 import { CapabilityPanel } from '../../src/components/CapabilityPanel.jsx';
 
 const ALL_PERMITTED = { list: 'permitted', download: 'permitted', upload: 'permitted', delete: 'permitted' };
-const ALL_DENIED    = { list: 'denied',    download: 'denied',    upload: 'denied',    delete: 'denied' };
-const ALL_UNKNOWN   = { list: 'unknown',   download: 'unknown',   upload: 'unknown',   delete: 'unknown' };
+const ALL_DENIED = { list: 'denied', download: 'denied', upload: 'denied', delete: 'denied' };
+const ALL_UNKNOWN = { list: 'unknown', download: 'unknown', upload: 'unknown', delete: 'unknown' };
 
 describe('CapabilityPanel — permitted state', () => {
   test('shows the permitted checkmark (✓) for every permitted operation', () => {
@@ -101,7 +101,14 @@ describe('CapabilityPanel — operation labels', () => {
 describe('CapabilityPanel — Refresh button', () => {
   test('clicking Refresh Permissions calls onRefresh', () => {
     let called = 0;
-    const { query, cleanup } = mount(h(CapabilityPanel, { capabilities: ALL_PERMITTED, onRefresh: () => { called++; } }));
+    const { query, cleanup } = mount(
+      h(CapabilityPanel, {
+        capabilities: ALL_PERMITTED,
+        onRefresh: () => {
+          called++;
+        },
+      }),
+    );
     const btn = query('button');
     assert.ok(btn, 'Refresh Permissions button must be present');
     fire(btn, 'click');

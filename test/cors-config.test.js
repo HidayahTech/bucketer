@@ -90,8 +90,8 @@ describe('corsJson — ExposeHeaders', () => {
     assert.ok(
       expose.includes('x-amz-meta-*'),
       'x-amz-meta-* must be in ExposeHeaders — without it the browser strips custom ' +
-      'metadata headers (e.g. x-amz-meta-file-mtime) from HeadObject and GET responses ' +
-      'before JavaScript can read them, making all stored object metadata invisible'
+        'metadata headers (e.g. x-amz-meta-file-mtime) from HeadObject and GET responses ' +
+        'before JavaScript can read them, making all stored object metadata invisible',
     );
   });
 });
@@ -135,7 +135,7 @@ describe('corsJson — B2 ExposeHeaders (BUG-043)', () => {
       const rule = JSON.parse(corsJson('https://app.example.com', provider)).CORSRules[0];
       assert.ok(
         rule.ExposeHeaders.includes('x-amz-meta-*'),
-        `provider ${provider} must retain x-amz-meta-* so arbitrary object metadata stays readable`
+        `provider ${provider} must retain x-amz-meta-* so arbitrary object metadata stays readable`,
       );
     }
   });
@@ -158,7 +158,7 @@ describe('shellQuote — POSIX shell-quoting for corsCmd arguments (T5-3)', () =
     assert.ok(
       typeof shellQuote === 'function',
       'cors-config.js must export shellQuote — corsCmd interpolates bucket/endpoint ' +
-      'into shell commands; a single quote in the bucket name breaks the command'
+        'into shell commands; a single quote in the bucket name breaks the command',
     );
   });
 

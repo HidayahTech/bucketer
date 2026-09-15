@@ -27,8 +27,13 @@
 // only collision-suffixed names, bounded by how many files the browser actually renamed.
 
 import {
-  loadJob, updateJob, updateItem, takeItemsPage, countItemsByLocalName,
-  ITEM_STATUS, JOB_STATUS,
+  loadJob,
+  updateJob,
+  updateItem,
+  takeItemsPage,
+  countItemsByLocalName,
+  ITEM_STATUS,
+  JOB_STATUS,
 } from './download-records.js';
 
 const VERIFY_PAGE = 500;
@@ -65,7 +70,10 @@ export function matchDownloads(items, filesOnDisk) {
   const out = { confirmed: [], missing: [], mismatched: [], ambiguous: [], renamed: [] };
 
   for (const it of items) {
-    if (claims.get(it.localName) > 1) { out.ambiguous.push(it.key); continue; }
+    if (claims.get(it.localName) > 1) {
+      out.ambiguous.push(it.key);
+      continue;
+    }
 
     if (!filesOnDisk.has(it.localName)) {
       // Absent under its own name, but a collision variant of the right SIZE exists: the
@@ -108,8 +116,11 @@ export async function verifyJob(jobId, dirHandle) {
     if (entry.kind !== 'file') continue;
     const base = collisionBase(entry.name);
     if (base === entry.name) continue;
-    try { renamedBySize.set(base, (await entry.getFile()).size); }
-    catch { /* unreadable entry — treat as not present */ }
+    try {
+      renamedBySize.set(base, (await entry.getFile()).size);
+    } catch {
+      /* unreadable entry — treat as not present */
+    }
   }
 
   const counts = { confirmed: 0, missing: 0, mismatched: 0, ambiguous: 0, renamed: 0 };
@@ -124,7 +135,7 @@ export async function verifyJob(jobId, dirHandle) {
     for (const it of page) {
       if (it.status !== ITEM_STATUS.ISSUED) continue;
 
-      if (await countItemsByLocalName(jobId, it.localName) > 1) {
+      if ((await countItemsByLocalName(jobId, it.localName)) > 1) {
         counts.ambiguous += 1;
         continue;
       }
@@ -133,7 +144,9 @@ export async function verifyJob(jobId, dirHandle) {
       try {
         const handle = await dirHandle.getFileHandle(it.localName);
         size = (await handle.getFile()).size;
-      } catch { /* not found or unreadable — absent */ }
+      } catch {
+        /* not found or unreadable — absent */
+      }
 
       if (size === null) {
         if (renamedBySize.get(it.localName) === it.size) {
@@ -141,7 +154,8 @@ export async function verifyJob(jobId, dirHandle) {
         } else {
           counts.missing += 1;
           await updateItem(jobId, it.key, {
-            status: ITEM_STATUS.FAILED, error: 'Not found in the folder you chose.',
+            status: ITEM_STATUS.FAILED,
+            error: 'Not found in the folder you chose.',
           });
         }
       } else if (size === it.size) {
