@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { devices } from 'playwright';
 import { PutObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
 import {
+  scaleTimeout,
   startMock,
   startAppServer,
   connectApp,
@@ -72,7 +73,7 @@ describe('issue #49 — mobile (Pixel-5-emulated): per-row actions are reachable
     try {
       await page.goto(app.url, { waitUntil: 'domcontentloaded' });
       await connectApp(page, ctx.browserEndpoint);
-      await page.locator('[data-testid="file-row:reflow.txt"]').waitFor({ timeout: 10000 });
+      await page.locator('[data-testid="file-row:reflow.txt"]').waitFor({ timeout: scaleTimeout(10000) });
 
       // The page itself must not scroll sideways (the pre-fix symptom).
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
@@ -98,16 +99,16 @@ describe('issue #49 — mobile (Pixel-5-emulated): per-row actions are reachable
       await page.goto(app.url, { waitUntil: 'domcontentloaded' });
       await connectApp(page, ctx.browserEndpoint);
       const row = page.locator('[data-testid="file-row:doomed.txt"]');
-      await row.waitFor({ timeout: 10000 });
+      await row.waitFor({ timeout: scaleTimeout(10000) });
 
       await row.locator('button[title="Delete"]').click(); // actionability-checked: must be reachable
       const modal = page.locator('.modal-overlay');
-      await modal.waitFor({ timeout: 5000 });
+      await modal.waitFor({ timeout: scaleTimeout(5000) });
       await page.locator('[data-testid="delete-confirm"]').click();
-      await modal.waitFor({ state: 'detached', timeout: 5000 });
+      await modal.waitFor({ state: 'detached', timeout: scaleTimeout(5000) });
 
-      await row.waitFor({ state: 'detached', timeout: 10000 });
-      const deadline = Date.now() + 10000;
+      await row.waitFor({ state: 'detached', timeout: scaleTimeout(10000) });
+      const deadline = Date.now() + scaleTimeout(10000);
       let keys;
       do {
         const r = await ctx.client.send(new ListObjectsV2Command({ Bucket: BUCKET }));
@@ -129,11 +130,11 @@ describe('issue #49 — mobile (Pixel-5-emulated): per-row actions are reachable
       await page.goto(app.url, { waitUntil: 'domcontentloaded' });
       await connectApp(page, ctx.browserEndpoint);
       const row = page.locator('[data-testid="file-row:linked.txt"]');
-      await row.waitFor({ timeout: 10000 });
+      await row.waitFor({ timeout: scaleTimeout(10000) });
 
       await row.locator('button[title="Copy link"]').click();
       const popover = page.locator('.copy-link-popover');
-      await popover.waitFor({ timeout: 5000 });
+      await popover.waitFor({ timeout: scaleTimeout(5000) });
       const vw = await page.evaluate(() => window.innerWidth);
       const box = await popover.boundingBox();
       assert.ok(box, 'popover must be visible');

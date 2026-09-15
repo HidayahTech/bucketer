@@ -5,6 +5,7 @@ import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
 import {
+  scaleTimeout,
   startMock,
   startAppServer,
   connectApp,
@@ -43,14 +44,14 @@ const fileInput = (page) => page.locator('[data-testid="file-input"]');
 async function newFolder(page, name) {
   await page.locator('button[title="Create a new folder"]').click();
   const ni = page.locator('.modal-overlay input.form-input');
-  await ni.waitFor({ timeout: 5000 });
+  await ni.waitFor({ timeout: scaleTimeout(5000) });
   await ni.fill(name);
   await ni.press('Enter');
-  await page.locator(`[data-testid="folder-row:${name}"]`).waitFor({ timeout: 5000 });
+  await page.locator(`[data-testid="folder-row:${name}"]`).waitFor({ timeout: scaleTimeout(5000) });
 }
 async function waitForUploadTarget(page, prefix) {
   const input = page.locator('input[placeholder="(root of bucket)"]');
-  const deadline = Date.now() + 5000;
+  const deadline = Date.now() + scaleTimeout(5000);
   while (Date.now() < deadline) {
     if ((await input.inputValue().catch(() => '')) === prefix) return;
     await page.waitForTimeout(100);
@@ -84,11 +85,11 @@ describe('drag-and-drop matrix', () => {
     try {
       await newFolder(page, 'sub');
       await page.locator('[data-testid="folder-row:sub"]').click();
-      await page.locator('.breadcrumb .current', { hasText: 'sub' }).waitFor({ timeout: 5000 });
+      await page.locator('.breadcrumb .current', { hasText: 'sub' }).waitFor({ timeout: scaleTimeout(5000) });
       await waitForUploadTarget(page, 'sub/');
       await fileInput(page).setInputFiles({ name: 'up.txt', mimeType: 'text/plain', buffer: Buffer.from('x') });
-      await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: 20000 });
-      await page.locator('[data-testid="file-row:up.txt"]').waitFor({ timeout: 10000 });
+      await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: scaleTimeout(20000) });
+      await page.locator('[data-testid="file-row:up.txt"]').waitFor({ timeout: scaleTimeout(10000) });
       assert.ok((await bucketKeys()).includes('sub/up.txt'));
 
       // Drag the file onto the "root" crumb → it moves to the bucket root.
@@ -124,14 +125,14 @@ describe('drag-and-drop matrix', () => {
         { name: 'm2.txt', mimeType: 'text/plain', buffer: Buffer.from('2') },
         { name: 'keep.txt', mimeType: 'text/plain', buffer: Buffer.from('k') },
       ]);
-      await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: 20000 });
+      await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: scaleTimeout(20000) });
       for (const n of ['m1.txt', 'm2.txt', 'keep.txt'])
-        await page.locator(`[data-testid="file-row:${n}"]`).waitFor({ timeout: 10000 });
+        await page.locator(`[data-testid="file-row:${n}"]`).waitFor({ timeout: scaleTimeout(10000) });
 
       // Select m1 and m2, then drag m1 onto dest/ — the whole selection should move.
       await page.locator('[data-testid="file-row:m1.txt"]').locator('input[type=checkbox]').check({ force: true });
       await page.locator('[data-testid="file-row:m2.txt"]').locator('input[type=checkbox]').check({ force: true });
-      await page.locator('.batch-bar', { hasText: '2 files' }).waitFor({ timeout: 5000 });
+      await page.locator('.batch-bar', { hasText: '2 files' }).waitFor({ timeout: scaleTimeout(5000) });
       await dragDrop(page, '[data-testid="file-row:m1.txt"]', '[data-testid="folder-row:dest"]');
 
       await waitUntil(async () => (await bucketKeys()).includes('dest/m1.txt'));

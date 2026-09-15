@@ -7,6 +7,7 @@ import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import {
+  scaleTimeout,
   startMock,
   startAppServer,
   connectApp,
@@ -64,7 +65,7 @@ describe(`browser e2e — PDF preview renders (BUG #46) [${e2eEngineName()}]`, (
     // produce the PDF iframe, and that iframe must permit scripts — the BUG #46 fix. On the
     // regressed sandbox="" this assertion fails; on sandbox="allow-scripts" it passes.
     const iframe = page.locator('iframe.preview-pdf');
-    await iframe.waitFor({ state: 'attached', timeout: 15000 });
+    await iframe.waitFor({ state: 'attached', timeout: scaleTimeout(15000) });
     const sandbox = await iframe.getAttribute('sandbox');
     assert.ok(
       sandbox === null || sandbox.split(/\s+/).filter(Boolean).includes('allow-scripts'),

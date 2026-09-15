@@ -5,6 +5,7 @@ import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
 import {
+  scaleTimeout,
   startMock,
   startAppServer,
   connectApp,
@@ -48,10 +49,13 @@ describe('BUG-009 — multipart permission failure aborts the session', () => {
         .setInputFiles({ name: 'big.bin', mimeType: 'application/octet-stream', buffer: big });
 
       // Wait for the failure to surface (the item enters the error state with a Retry button).
-      await page.locator('button:has-text("Retry")').first().waitFor({ timeout: 20000 });
+      await page
+        .locator('button:has-text("Retry")')
+        .first()
+        .waitFor({ timeout: scaleTimeout(20000) });
 
       // The orphaned multipart session was aborted — the mock holds no in-flight uploads.
-      const deadline = Date.now() + 10000;
+      const deadline = Date.now() + scaleTimeout(10000);
       const uploadsLeft = () => ctx.mock.buckets.get(BUCKET)?.uploads.size ?? 0;
       while (uploadsLeft() > 0 && Date.now() < deadline) await page.waitForTimeout(150);
       assert.equal(uploadsLeft(), 0, 'the multipart session was aborted (no orphan)');

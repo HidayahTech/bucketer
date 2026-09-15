@@ -5,6 +5,7 @@ import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { ListObjectsV2Command, ListObjectVersionsCommand } from '@aws-sdk/client-s3';
 import {
+  scaleTimeout,
   startMock,
   startAppServer,
   connectApp,
@@ -50,15 +51,15 @@ describe('versioning — delete marker then undelete', () => {
       await page
         .locator('[data-testid="file-input"]')
         .setInputFiles({ name: 'v.txt', mimeType: 'text/plain', buffer: Buffer.from('keepme') });
-      await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: 20000 });
-      await page.locator('[data-testid="file-row:v.txt"]').waitFor({ timeout: 10000 });
+      await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: scaleTimeout(20000) });
+      await page.locator('[data-testid="file-row:v.txt"]').waitFor({ timeout: scaleTimeout(10000) });
 
       await page.locator('[data-testid="file-row:v.txt"]').locator('button[title="Delete"]').click({ force: true });
       await page.locator('[data-testid="delete-confirm"]').click();
-      await page.locator('[data-testid="file-row:v.txt"]').waitFor({ state: 'detached', timeout: 10000 });
+      await page.locator('[data-testid="file-row:v.txt"]').waitFor({ state: 'detached', timeout: scaleTimeout(10000) });
 
       // Server state: object hidden by a marker, but the version is retained.
-      let deadline = Date.now() + 10000;
+      let deadline = Date.now() + scaleTimeout(10000);
       while ((await liveKeys()).includes('v.txt') && Date.now() < deadline) await page.waitForTimeout(150);
       assert.ok(!(await liveKeys()).includes('v.txt'), 'a versioned delete hides the file');
       assert.equal(await markerCount(), 1, 'a delete marker exists');
@@ -66,13 +67,13 @@ describe('versioning — delete marker then undelete', () => {
       // Open the Hidden Versions panel and undelete (remove the delete marker).
       await page.locator('button:has-text("Show hidden versions")').click();
       const undeleteBtn = page.locator('.hidden-versions button[title*="Undelete"]');
-      await undeleteBtn.first().waitFor({ timeout: 10000 });
+      await undeleteBtn.first().waitFor({ timeout: scaleTimeout(10000) });
       await undeleteBtn.first().click();
       // Confirm dialog → the action button reads "Undelete".
       await page.locator('.hidden-versions button:has-text("Undelete")').last().click();
 
       // Server state: the marker is gone and the file is current (visible) again.
-      deadline = Date.now() + 10000;
+      deadline = Date.now() + scaleTimeout(10000);
       while (!(await liveKeys()).includes('v.txt') && Date.now() < deadline) await page.waitForTimeout(150);
       assert.ok((await liveKeys()).includes('v.txt'), 'removing the delete marker undeletes the file');
       assert.equal(await markerCount(), 0, 'the delete marker was removed');

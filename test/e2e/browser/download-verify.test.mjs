@@ -15,6 +15,7 @@ import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import {
+  scaleTimeout,
   startMock,
   startAppServer,
   connectApp,
@@ -60,18 +61,18 @@ describe('browser e2e — folder verification keeps every job reachable', () => 
   e2eTest('a clean run is retained and offered for checking', async () => {
     const page = await newAppPage(null);
     await page.locator('[data-testid="folder-row:dv"]').click();
-    await page.locator('[data-testid="file-row:a.txt"]').waitFor({ timeout: 10000 });
+    await page.locator('[data-testid="file-row:a.txt"]').waitFor({ timeout: scaleTimeout(10000) });
     await openPanel(page);
     await page.locator('[data-testid="scan"]').click();
-    await page.locator('[data-testid="start"]').waitFor({ timeout: 30000 });
+    await page.locator('[data-testid="start"]').waitFor({ timeout: scaleTimeout(30000) });
     await page.locator('[data-testid="start"]').click();
     await page
       .getByText(/Sent 3 of 3/)
       .first()
-      .waitFor({ timeout: 60000 });
+      .waitFor({ timeout: scaleTimeout(60000) });
 
     await openPanel(page);
-    await page.getByText(/Sent, but not yet confirmed/).waitFor({ timeout: 10000 });
+    await page.getByText(/Sent, but not yet confirmed/).waitFor({ timeout: scaleTimeout(10000) });
     assert.equal(
       (await page.locator('[data-testid^="discard-"]').count()) >= 1,
       true,
@@ -88,7 +89,10 @@ describe('browser e2e — folder verification keeps every job reachable', () => 
       /* gone.txt absent */
     ]);
     await openPanel(page);
-    await page.locator('[data-testid^="verify-"]').first().waitFor({ timeout: 10000 });
+    await page
+      .locator('[data-testid^="verify-"]')
+      .first()
+      .waitFor({ timeout: scaleTimeout(10000) });
     await page.locator('[data-testid^="verify-"]').first().click();
 
     // The verdicts render from the job record, and the job — now carrying failures —
@@ -96,11 +100,11 @@ describe('browser e2e — folder verification keeps every job reachable', () => 
     await page
       .getByText(/1 missing/)
       .first()
-      .waitFor({ timeout: 15000 });
+      .waitFor({ timeout: scaleTimeout(15000) });
     await page
       .getByText(/1 the wrong size/)
       .first()
-      .waitFor({ timeout: 5000 });
+      .waitFor({ timeout: scaleTimeout(5000) });
     assert.equal(
       await page.locator('[data-testid^="resume-"]').count(),
       1,
@@ -118,20 +122,26 @@ describe('browser e2e — folder verification keeps every job reachable', () => 
       { name: 'gone.txt', size: 33 },
     ]);
     await openPanel(page);
-    await page.locator('[data-testid^="resume-"]').first().waitFor({ timeout: 10000 });
+    await page
+      .locator('[data-testid^="resume-"]')
+      .first()
+      .waitFor({ timeout: scaleTimeout(10000) });
     await page.locator('[data-testid^="resume-"]').first().click();
     await page
       .getByText(/Sent 2 of 2/)
       .first()
-      .waitFor({ timeout: 60000 });
+      .waitFor({ timeout: scaleTimeout(60000) });
 
     await openPanel(page);
-    await page.locator('[data-testid^="verify-"]').first().waitFor({ timeout: 10000 });
+    await page
+      .locator('[data-testid^="verify-"]')
+      .first()
+      .waitFor({ timeout: scaleTimeout(10000) });
     await page.locator('[data-testid^="verify-"]').first().click();
 
     // Everything now on disk at the right size: the job settles, still discardable.
-    await page.getByText(/Confirmed complete/).waitFor({ timeout: 15000 });
-    await page.getByText(/all 3 files confirmed/).waitFor({ timeout: 5000 });
+    await page.getByText(/Confirmed complete/).waitFor({ timeout: scaleTimeout(15000) });
+    await page.getByText(/all 3 files confirmed/).waitFor({ timeout: scaleTimeout(5000) });
     const discard = page.locator('[data-testid^="discard-"]').first();
     await discard.click();
     await page.waitForTimeout(500);
@@ -150,20 +160,20 @@ describe('browser e2e — folder verification keeps every job reachable', () => 
   e2eTest('a sent job is discardable even where no directory picker exists', async () => {
     const page = await newAppPage(null);
     await page.locator('[data-testid="folder-row:dv"]').click();
-    await page.locator('[data-testid="file-row:a.txt"]').waitFor({ timeout: 10000 });
+    await page.locator('[data-testid="file-row:a.txt"]').waitFor({ timeout: scaleTimeout(10000) });
     await openPanel(page);
     await page.locator('[data-testid="scan"]').click();
-    await page.locator('[data-testid="start"]').waitFor({ timeout: 30000 });
+    await page.locator('[data-testid="start"]').waitFor({ timeout: scaleTimeout(30000) });
     await page.locator('[data-testid="start"]').click();
     await page
       .getByText(/Sent 3 of 3/)
       .first()
-      .waitFor({ timeout: 60000 });
+      .waitFor({ timeout: scaleTimeout(60000) });
 
     await openPanel(page);
-    await page.getByText(/Sent, but not yet confirmed/).waitFor({ timeout: 10000 });
+    await page.getByText(/Sent, but not yet confirmed/).waitFor({ timeout: scaleTimeout(10000) });
     const discard = page.locator('[data-testid^="discard-"]').first();
-    await discard.waitFor({ timeout: 5000 });
+    await discard.waitFor({ timeout: scaleTimeout(5000) });
     await discard.click();
     await page.waitForTimeout(500);
     assert.equal(await page.locator('[data-testid^="discard-"]').count(), 0);

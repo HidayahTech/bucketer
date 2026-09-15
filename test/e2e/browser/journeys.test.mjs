@@ -60,7 +60,7 @@ function fileInput(page) {
 // the Destination folder input to reflect it before uploading, so the object lands in the folder.
 async function waitForUploadTarget(page, prefix) {
   const input = page.locator('input[placeholder="(root of bucket)"]');
-  const deadline = Date.now() + 5000;
+  const deadline = Date.now() + scaleTimeout(5000);
   while (Date.now() < deadline) {
     if ((await input.inputValue().catch(() => '')) === prefix) return;
     await page.waitForTimeout(100);
@@ -78,10 +78,10 @@ describe('B3 — batch upload', () => {
         { name: 'b.txt', mimeType: 'text/plain', buffer: Buffer.from('b') },
         { name: 'c.txt', mimeType: 'text/plain', buffer: Buffer.from('c') },
       ]);
-      await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: 20000 });
+      await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: scaleTimeout(20000) });
       assert.deepEqual(await bucketKeys(), ['a.txt', 'b.txt', 'c.txt']);
       for (const n of ['a.txt', 'b.txt', 'c.txt'])
-        await page.locator(`[data-testid="file-row:${n}"]`).waitFor({ timeout: 10000 });
+        await page.locator(`[data-testid="file-row:${n}"]`).waitFor({ timeout: scaleTimeout(10000) });
     } finally {
       await context.close();
     }
@@ -96,20 +96,20 @@ describe('B4 — folder journey + stay-put', () => {
       // Create folder via the New folder dialog.
       await page.locator('button[title="Create a new folder"]').click();
       const nameInput = page.locator('.modal-overlay input.form-input');
-      await nameInput.waitFor({ timeout: 5000 });
+      await nameInput.waitFor({ timeout: scaleTimeout(5000) });
       await nameInput.fill('docs');
       await nameInput.press('Enter');
       // Navigate into it.
       await page.locator('[data-testid="folder-row:docs"]').click();
-      await page.locator('.breadcrumb .current', { hasText: 'docs' }).waitFor({ timeout: 5000 });
+      await page.locator('.breadcrumb .current', { hasText: 'docs' }).waitFor({ timeout: scaleTimeout(5000) });
       // Upload into the folder (wait for the target prefix to propagate to the upload queue first).
       await waitForUploadTarget(page, 'docs/');
       await fileInput(page).setInputFiles({ name: 'note.txt', mimeType: 'text/plain', buffer: Buffer.from('hi') });
-      await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: 20000 });
+      await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: scaleTimeout(20000) });
       // Object landed under the prefix.
       assert.ok((await bucketKeys()).includes('docs/note.txt'));
       // STILL in the folder — breadcrumb shows docs, URL hash retains the prefix (BUG-029).
-      await page.locator('[data-testid="file-row:note.txt"]').waitFor({ timeout: 10000 });
+      await page.locator('[data-testid="file-row:note.txt"]').waitFor({ timeout: scaleTimeout(10000) });
       assert.ok(
         (await page.locator('.breadcrumb .current', { hasText: 'docs' }).count()) >= 1,
         'still in docs/ after upload',
@@ -129,13 +129,13 @@ describe('B6 — move (picker + drag-and-drop)', () => {
       // Seed a folder and a file at root.
       await page.locator('button[title="Create a new folder"]').click();
       const nameInput = page.locator('.modal-overlay input.form-input');
-      await nameInput.waitFor({ timeout: 5000 });
+      await nameInput.waitFor({ timeout: scaleTimeout(5000) });
       await nameInput.fill('dest');
       await nameInput.press('Enter');
-      await page.locator('[data-testid="folder-row:dest"]').waitFor({ timeout: 5000 });
+      await page.locator('[data-testid="folder-row:dest"]').waitFor({ timeout: scaleTimeout(5000) });
       await fileInput(page).setInputFiles({ name: 'm.txt', mimeType: 'text/plain', buffer: Buffer.from('x') });
-      await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: 20000 });
-      await page.locator('[data-testid="file-row:m.txt"]').waitFor({ timeout: 10000 });
+      await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: scaleTimeout(20000) });
+      await page.locator('[data-testid="file-row:m.txt"]').waitFor({ timeout: scaleTimeout(10000) });
 
       // Open the move picker from the file row, drill into dest/, Move here.
       await page
@@ -157,13 +157,13 @@ describe('B6 — move (picker + drag-and-drop)', () => {
     try {
       await page.locator('button[title="Create a new folder"]').click();
       const nameInput = page.locator('.modal-overlay input.form-input');
-      await nameInput.waitFor({ timeout: 5000 });
+      await nameInput.waitFor({ timeout: scaleTimeout(5000) });
       await nameInput.fill('box');
       await nameInput.press('Enter');
-      await page.locator('[data-testid="folder-row:box"]').waitFor({ timeout: 5000 });
+      await page.locator('[data-testid="folder-row:box"]').waitFor({ timeout: scaleTimeout(5000) });
       await fileInput(page).setInputFiles({ name: 'drag.txt', mimeType: 'text/plain', buffer: Buffer.from('x') });
-      await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: 20000 });
-      await page.locator('[data-testid="file-row:drag.txt"]').waitFor({ timeout: 10000 });
+      await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: scaleTimeout(20000) });
+      await page.locator('[data-testid="file-row:drag.txt"]').waitFor({ timeout: scaleTimeout(10000) });
 
       // HTML5 DnD: dispatch dragstart on the source row, dragover + drop on the folder row, sharing a
       // DataTransfer. (Playwright's mouse-based dragTo doesn't drive native draggable handlers reliably.)
@@ -201,12 +201,12 @@ describe('B7 — presigned download', () => {
         mimeType: 'text/plain',
         buffer: Buffer.from('download-me'),
       });
-      await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: 20000 });
+      await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: scaleTimeout(20000) });
       const row = page.locator('[data-testid="file-row:dl.txt"]');
-      await row.waitFor({ timeout: 10000 });
+      await row.waitFor({ timeout: scaleTimeout(10000) });
       const [response] = await Promise.all([
         page.waitForResponse((r) => r.url().includes('X-Amz-Signature') && r.url().includes('dl.txt'), {
-          timeout: 10000,
+          timeout: scaleTimeout(10000),
         }),
         row.locator('button[title="Download"]').click(),
       ]);

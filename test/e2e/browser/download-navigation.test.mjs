@@ -11,6 +11,7 @@ import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import {
+  scaleTimeout,
   startMock,
   startAppServer,
   connectApp,
@@ -48,7 +49,7 @@ after(async () => {
 async function startFolderDownload() {
   await page.locator('[data-testid="open-download-job"]').dispatchEvent('click');
   await page.locator('[data-testid="scan"]').click();
-  await page.locator('[data-testid="start"]').waitFor({ timeout: 15000 });
+  await page.locator('[data-testid="start"]').waitFor({ timeout: scaleTimeout(15000) });
   await page.locator('[data-testid="start"]').click();
 }
 
@@ -58,7 +59,7 @@ describe('browser e2e — a failing download cannot navigate the app away', () =
     await connectApp(page, ctx.browserEndpoint);
     await page.locator('[data-testid="folder-row:dl"]').click();
     // Row testids are relative to the current prefix, not the full key.
-    await page.locator('[data-testid="file-row:a.txt"]').waitFor({ timeout: 10000 });
+    await page.locator('[data-testid="file-row:a.txt"]').waitFor({ timeout: scaleTimeout(10000) });
   });
 
   // Every file is probed before it is issued, so a plain 404 never reaches a frame any
@@ -75,12 +76,15 @@ describe('browser e2e — a failing download cannot navigate the app away', () =
     const before = page.url();
 
     await startFolderDownload();
-    await page.locator('#bucketer-download-frames iframe').first().waitFor({ state: 'attached', timeout: 15000 });
+    await page
+      .locator('#bucketer-download-frames iframe')
+      .first()
+      .waitFor({ state: 'attached', timeout: scaleTimeout(15000) });
     // Let the run finish issuing all three before asserting on its traffic.
     await page
       .getByText(/Sent 3 of 3/)
       .first()
-      .waitFor({ timeout: 15000 });
+      .waitFor({ timeout: scaleTimeout(15000) });
 
     assert.equal(page.url(), before, 'the application must still be the document in the top frame');
     assert.ok((await page.locator('#app').count()) > 0, 'the app root must still be mounted');
@@ -104,7 +108,7 @@ describe('browser e2e — a failing download cannot navigate the app away', () =
           .filter((r) => r.isNavGet)
           .map((r) => r.path),
       );
-    const deadline = Date.now() + 5000;
+    const deadline = Date.now() + scaleTimeout(5000);
     while (navPaths().size < 3 && Date.now() < deadline) await new Promise((r) => setTimeout(r, 100));
     assert.equal(
       navPaths().size,
@@ -135,7 +139,7 @@ describe('browser e2e — a failing download cannot navigate the app away', () =
     await page
       .getByText(/refused the download/i)
       .first()
-      .waitFor({ timeout: 15000 });
+      .waitFor({ timeout: scaleTimeout(15000) });
     assert.equal(page.url().startsWith(app.url), true, 'a blocked job must not navigate either');
     assert.equal(
       ctx.mock.requestLog.list().filter((r) => r.isNavGet).length,

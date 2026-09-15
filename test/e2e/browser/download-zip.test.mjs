@@ -50,6 +50,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import {
+  scaleTimeout,
   startMock,
   startAppServer,
   connectApp,
@@ -220,10 +221,10 @@ describe('browser e2e — zip download', () => {
       await page.goto(app.url, { waitUntil: 'domcontentloaded' });
       await connectApp(page, ctx.httpsBrowserEndpoint);
       await page.locator('[data-testid="folder-row:zsel"]').click();
-      await page.locator('[data-testid="file-row:a.txt"]').waitFor({ timeout: 10000 });
+      await page.locator('[data-testid="file-row:a.txt"]').waitFor({ timeout: scaleTimeout(10000) });
       await openPanel(page);
       await page.locator('[data-testid="scan"]').click();
-      await page.locator('[data-testid="start-zip"]').waitFor({ timeout: 15000 });
+      await page.locator('[data-testid="start-zip"]').waitFor({ timeout: scaleTimeout(15000) });
       await page.locator('[data-testid="start-zip"]').click();
 
       await downloads.waitForCount(1, 30000);
@@ -291,10 +292,10 @@ describe('browser e2e — zip download', () => {
       await page.goto(app.url, { waitUntil: 'domcontentloaded' });
       await connectApp(page, ctx.httpsBrowserEndpoint);
       await page.locator('[data-testid="folder-row:zint"]').click();
-      await page.locator('[data-testid="file-row:f1.txt"]').waitFor({ timeout: 10000 });
+      await page.locator('[data-testid="file-row:f1.txt"]').waitFor({ timeout: scaleTimeout(10000) });
       await openPanel(page);
       await page.locator('[data-testid="scan"]').click();
-      await page.locator('[data-testid="start-zip"]').waitFor({ timeout: 15000 });
+      await page.locator('[data-testid="start-zip"]').waitFor({ timeout: scaleTimeout(15000) });
       await page.locator('[data-testid="start-zip"]').click();
 
       // f1.txt and f3.txt succeed, f2.bin fails on the dropped connection: MasterQueue's
@@ -302,18 +303,18 @@ describe('browser e2e — zip download', () => {
       await page
         .getByText(/Paused — 2 of 3 zipped, 1 failed/)
         .first()
-        .waitFor({ timeout: 30000 });
+        .waitFor({ timeout: scaleTimeout(30000) });
       assert.equal(downloads.list().length, 0, 'an unfinished zip (a failure still pending) must never export');
 
       ctx.mock.configure({ faults: [] });
       await openPanel(page);
-      await page.locator('[data-testid^="resume-"]').waitFor({ timeout: 10000 });
+      await page.locator('[data-testid^="resume-"]').waitFor({ timeout: scaleTimeout(10000) });
       await page.locator('[data-testid^="resume-"]').first().click();
 
       await page
         .getByText(/ZIP handed to your browser/)
         .first()
-        .waitFor({ timeout: 30000 });
+        .waitFor({ timeout: scaleTimeout(30000) });
       await downloads.waitForCount(1, 15000);
       await downloads.settle(3000);
       assert.equal(downloads.list().length, 1, 'the resumed job must export exactly one zip, not one per run');
@@ -345,10 +346,10 @@ describe('browser e2e — zip download', () => {
       await page.goto(app.url, { waitUntil: 'domcontentloaded' });
       await connectApp(page, ctx.httpsBrowserEndpoint);
       await page.locator('[data-testid="folder-row:zmany"]').click();
-      await page.locator('[data-testid="file-row:f01.txt"]').waitFor({ timeout: 10000 });
+      await page.locator('[data-testid="file-row:f01.txt"]').waitFor({ timeout: scaleTimeout(10000) });
       await openPanel(page);
       await page.locator('[data-testid="scan"]').click();
-      await page.locator('[data-testid="start-zip"]').waitFor({ timeout: 15000 });
+      await page.locator('[data-testid="start-zip"]').waitFor({ timeout: scaleTimeout(15000) });
       await page.locator('[data-testid="start-zip"]').click();
 
       await downloads.waitForCount(1, 30000);
@@ -377,10 +378,10 @@ describe('browser e2e — zip download', () => {
       await page.goto(app.url, { waitUntil: 'domcontentloaded' });
       await connectApp(page, ctx.httpsBrowserEndpoint);
       await page.locator('[data-testid="folder-row:zwk"]').click();
-      await page.locator('[data-testid="file-row:only.txt"]').waitFor({ timeout: 10000 });
+      await page.locator('[data-testid="file-row:only.txt"]').waitFor({ timeout: scaleTimeout(10000) });
       await openPanel(page);
       await page.locator('[data-testid="scan"]').click();
-      await page.locator('[data-testid="start"]').waitFor({ timeout: 15000 });
+      await page.locator('[data-testid="start"]').waitFor({ timeout: scaleTimeout(15000) });
 
       // start-zip is gated by an async effect (zipGate() reads live storage quota); give it
       // room to resolve before treating its absence as meaningful rather than "not yet".

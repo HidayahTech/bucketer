@@ -22,6 +22,7 @@ import { describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import {
+  scaleTimeout,
   startMock,
   startAppServer,
   connectApp,
@@ -75,15 +76,15 @@ async function runFolderDownload(endpoint, folder, firstFile, fileCount) {
   await page.goto(app.url, { waitUntil: 'domcontentloaded' });
   await connectApp(page, endpoint);
   await page.locator(`[data-testid="folder-row:${folder}"]`).click();
-  await page.locator(`[data-testid="file-row:${firstFile}"]`).waitFor({ timeout: 10000 });
+  await page.locator(`[data-testid="file-row:${firstFile}"]`).waitFor({ timeout: scaleTimeout(10000) });
   await page.locator('[data-testid="open-download-job"]').dispatchEvent('click');
   await page.locator('[data-testid="scan"]').click();
-  await page.locator('[data-testid="start"]').waitFor({ timeout: 30000 });
+  await page.locator('[data-testid="start"]').waitFor({ timeout: scaleTimeout(30000) });
   await page.locator('[data-testid="start"]').click();
   await page
     .getByText(new RegExp(`Sent ${fileCount} of ${fileCount}`))
     .first()
-    .waitFor({ timeout: 180000 });
+    .waitFor({ timeout: scaleTimeout(180000) });
 }
 
 // Distinct object paths, not raw request count: once the download manager takes over a

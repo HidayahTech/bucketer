@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 import { devices } from 'playwright';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
 import {
+  scaleTimeout,
   startMock,
   startAppServer,
   connectApp,
@@ -50,11 +51,11 @@ describe('issue #3 — mobile (Android-emulated): upload does not teleport to ro
       // Navigate into a nested folder.
       await page.locator('button[title="Create a new folder"]').click();
       const ni = page.locator('.modal-overlay input.form-input');
-      await ni.waitFor({ timeout: 5000 });
+      await ni.waitFor({ timeout: scaleTimeout(5000) });
       await ni.fill('mob');
       await ni.press('Enter');
       await page.locator('[data-testid="folder-row:mob"]').click();
-      await page.locator('.breadcrumb .current', { hasText: 'mob' }).waitFor({ timeout: 5000 });
+      await page.locator('.breadcrumb .current', { hasText: 'mob' }).waitFor({ timeout: scaleTimeout(5000) });
       // Let the upload target propagate to the folder.
       const dest = page.locator('input[placeholder="(root of bucket)"]');
       for (let i = 0; i < 50 && (await dest.inputValue().catch(() => '')) !== 'mob/'; i++)
@@ -64,7 +65,7 @@ describe('issue #3 — mobile (Android-emulated): upload does not teleport to ro
       await page
         .locator('[data-testid="file-input"]')
         .setInputFiles({ name: 'phone.jpg', mimeType: 'image/jpeg', buffer: Buffer.from('img') });
-      await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: 20000 });
+      await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: scaleTimeout(20000) });
 
       // The object landed in the folder…
       const r = await ctx.client.send(new ListObjectsV2Command({ Bucket: BUCKET }));

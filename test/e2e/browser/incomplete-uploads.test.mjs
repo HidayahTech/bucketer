@@ -6,6 +6,7 @@ import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { CreateMultipartUploadCommand, ListMultipartUploadsCommand } from '@aws-sdk/client-s3';
 import {
+  scaleTimeout,
   startMock,
   startAppServer,
   connectApp,
@@ -45,12 +46,12 @@ describe('incomplete uploads — discover and discard', () => {
 
       // The orphan is discovered and listed.
       const row = page.locator(`[data-testid="incomplete-row:${uploadId}"]`);
-      await row.waitFor({ timeout: 10000 });
+      await row.waitFor({ timeout: scaleTimeout(10000) });
       assert.ok((await row.textContent()).includes('orphan/big.bin'));
 
       // Discard it: the row goes away and the server stops listing it.
       await page.locator(`[data-testid="discard:${uploadId}"]`).click();
-      await row.waitFor({ state: 'detached', timeout: 10000 });
+      await row.waitFor({ state: 'detached', timeout: scaleTimeout(10000) });
 
       const after = await ctx.client.send(new ListMultipartUploadsCommand({ Bucket: BUCKET }));
       assert.deepEqual(after.Uploads ?? [], [], 'the incomplete upload is gone server-side');

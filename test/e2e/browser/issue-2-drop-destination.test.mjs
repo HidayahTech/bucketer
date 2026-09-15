@@ -10,6 +10,7 @@ import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
 import {
+  scaleTimeout,
   startMock,
   startAppServer,
   connectApp,
@@ -62,11 +63,11 @@ describe('issue #2 — drag-dropped uploads target the current folder, not root'
       // Create and enter a nested folder.
       await page.locator('button[title="Create a new folder"]').click();
       const ni = page.locator('.modal-overlay input.form-input');
-      await ni.waitFor({ timeout: 5000 });
+      await ni.waitFor({ timeout: scaleTimeout(5000) });
       await ni.fill('sub');
       await ni.press('Enter');
       await page.locator('[data-testid="folder-row:sub"]').click();
-      await page.locator('.breadcrumb .current', { hasText: 'sub' }).waitFor({ timeout: 5000 });
+      await page.locator('.breadcrumb .current', { hasText: 'sub' }).waitFor({ timeout: scaleTimeout(5000) });
       // Wait for the upload destination to reflect the folder (a real user takes far longer than this
       // to start a drag). The bug is the STALE CLOSURE: even fully settled, the captured addFiles read
       // the mount-time root prefix — waiting proves the fix, not the unrelated propagation lag.
@@ -78,7 +79,7 @@ describe('issue #2 — drag-dropped uploads target the current folder, not root'
       await dropFile(page, 'dropped.txt');
 
       // It must land under sub/, never at the bucket root.
-      const deadline = Date.now() + 15000;
+      const deadline = Date.now() + scaleTimeout(15000);
       let keys = await bucketKeys();
       while (!keys.includes('sub/dropped.txt') && !keys.includes('dropped.txt') && Date.now() < deadline) {
         await page.waitForTimeout(150);

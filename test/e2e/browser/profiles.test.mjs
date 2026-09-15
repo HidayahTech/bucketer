@@ -4,6 +4,7 @@
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  scaleTimeout,
   startMock,
   startAppServer,
   connectApp,
@@ -57,10 +58,10 @@ describe('BUG-047 — a share link survives disconnect', () => {
       const region = page.locator('input[placeholder="us-east-1"]');
       if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
       await page.locator('button[type="submit"]:has-text("Connect")').click();
-      await page.locator('[data-testid="file-input"]').waitFor({ state: 'attached', timeout: 15000 });
+      await page.locator('[data-testid="file-input"]').waitFor({ state: 'attached', timeout: scaleTimeout(15000) });
 
       await page.locator('button:has-text("Sign out")').click();
-      await page.locator('input[type="url"]').waitFor({ timeout: 5000 });
+      await page.locator('input[type="url"]').waitFor({ timeout: scaleTimeout(5000) });
 
       assert.equal(
         await page.locator('input[type="url"]').inputValue(),
@@ -89,12 +90,12 @@ describe('BUG-018 — Save-as-profile enablement', () => {
     const { context, page } = await freshPage();
     try {
       const trigger = page.locator('.bucket-save-trigger');
-      await trigger.waitFor({ timeout: 5000 });
+      await trigger.waitFor({ timeout: scaleTimeout(5000) });
       assert.ok(await trigger.isDisabled(), 'disabled with an empty form');
       await fillCreds(page, { endpoint: 'https://s3.example.com', bucket: 'my-bucket', keyId: 'AKIAEXAMPLE' });
       await assert.doesNotReject(trigger.waitFor({ state: 'visible' }));
       // poll for enablement (onFormChange propagates through App → AccountsManager)
-      const deadline = Date.now() + 5000;
+      const deadline = Date.now() + scaleTimeout(5000);
       while ((await trigger.isDisabled()) && Date.now() < deadline) await page.waitForTimeout(100);
       assert.ok(!(await trigger.isDisabled()), 'enabled once required fields are valid (BUG-018)');
     } finally {
@@ -115,16 +116,16 @@ describe('BUG-020 — save profile pre-connect', () => {
         secret: 'sekret',
       });
       const trigger = page.locator('.bucket-save-trigger');
-      const deadline = Date.now() + 5000;
+      const deadline = Date.now() + scaleTimeout(5000);
       while ((await trigger.isDisabled()) && Date.now() < deadline) await page.waitForTimeout(100);
       await trigger.click();
       const nameInput = page.locator('input[placeholder="Name"]');
-      await nameInput.waitFor({ timeout: 5000 });
+      await nameInput.waitFor({ timeout: scaleTimeout(5000) });
       await nameInput.fill('My Profile');
       await page.locator('button[type="submit"]:has-text("Save")').click();
 
       // A profile row now exists…
-      await page.locator('.bucket-row', { hasText: 'realbucket' }).waitFor({ timeout: 5000 });
+      await page.locator('.bucket-row', { hasText: 'realbucket' }).waitFor({ timeout: scaleTimeout(5000) });
       // …and the form was NOT cleared (BUG-020 cleared it and stored empties).
       assert.equal(
         await page.locator('input[placeholder="my-bucket"]').inputValue(),
@@ -149,21 +150,21 @@ describe('BUG-027 — post-disconnect form is populated', () => {
       const region = page.locator('input[placeholder="us-east-1"]');
       if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
       const trigger = page.locator('.bucket-save-trigger');
-      const deadline = Date.now() + 5000;
+      const deadline = Date.now() + scaleTimeout(5000);
       while ((await trigger.isDisabled()) && Date.now() < deadline) await page.waitForTimeout(100);
       await trigger.click();
       const nameInput = page.locator('input[placeholder="Name"]');
-      await nameInput.waitFor({ timeout: 5000 });
+      await nameInput.waitFor({ timeout: scaleTimeout(5000) });
       await nameInput.fill('Mock');
       await page.locator('button[type="submit"]:has-text("Save")').click();
-      await page.locator('.bucket-row', { hasText: 'test-bucket' }).waitFor({ timeout: 5000 });
+      await page.locator('.bucket-row', { hasText: 'test-bucket' }).waitFor({ timeout: scaleTimeout(5000) });
 
       await page.locator('button[type="submit"]:has-text("Connect")').click();
-      await page.locator('[data-testid="file-input"]').waitFor({ state: 'attached', timeout: 15000 });
+      await page.locator('[data-testid="file-input"]').waitFor({ state: 'attached', timeout: scaleTimeout(15000) });
 
       // Disconnect → the splash returns with the profile's fields pre-filled (minus secret).
       await page.locator('button:has-text("Sign out")').click();
-      await page.locator('input[type="url"]').waitFor({ timeout: 5000 });
+      await page.locator('input[type="url"]').waitFor({ timeout: scaleTimeout(5000) });
       assert.equal(
         await page.locator('input[type="url"]').inputValue(),
         ctx.browserEndpoint,
@@ -189,20 +190,20 @@ describe('BUG-026 — region re-inference after profile load', () => {
       // Save a B2 profile (region auto-inferred from the endpoint).
       await fillCreds(page, { endpoint: 'https://s3.us-west-004.backblazeb2.com', bucket: 'b2bucket', keyId: 'b2key' });
       const trigger = page.locator('.bucket-save-trigger');
-      const deadline = Date.now() + 5000;
+      const deadline = Date.now() + scaleTimeout(5000);
       while ((await trigger.isDisabled()) && Date.now() < deadline) await page.waitForTimeout(100);
       await trigger.click();
       const nameInput = page.locator('input[placeholder="Name"]');
-      await nameInput.waitFor({ timeout: 5000 });
+      await nameInput.waitFor({ timeout: scaleTimeout(5000) });
       await nameInput.fill('B2');
       await page.locator('button[type="submit"]:has-text("Save")').click();
-      await page.locator('.bucket-row', { hasText: 'b2bucket' }).waitFor({ timeout: 5000 });
+      await page.locator('.bucket-row', { hasText: 'b2bucket' }).waitFor({ timeout: scaleTimeout(5000) });
 
       // Reload — the app pre-fills the form from the saved profile (regionOverride set). This is the
       // exact state BUG-026 broke: the region stayed stuck after a profile load.
       await page.reload({ waitUntil: 'domcontentloaded' });
       const regionInput = page.locator('input[placeholder="us-east-1"]');
-      await regionInput.waitFor({ timeout: 5000 });
+      await regionInput.waitFor({ timeout: scaleTimeout(5000) });
 
       // The pre-fill is asynchronous. On a slow lane, filling the endpoint BEFORE the
       // pre-fill lands lets the pre-fill overwrite it right back — the region then stays
@@ -210,7 +211,7 @@ describe('BUG-026 — region re-inference after profile load', () => {
       // issue #55). Wait for the pre-fill to have settled: the url field must show the
       // saved endpoint first.
       const urlInput = page.locator('input[type="url"]');
-      const settle = Date.now() + 10000;
+      const settle = Date.now() + scaleTimeout(10000);
       while ((await urlInput.inputValue()) !== 'https://s3.us-west-004.backblazeb2.com' && Date.now() < settle) {
         await page.waitForTimeout(100);
       }
@@ -218,7 +219,7 @@ describe('BUG-026 — region re-inference after profile load', () => {
 
       // Change the endpoint to a different B2 region → the region must re-infer.
       await urlInput.fill('https://s3.eu-central-003.backblazeb2.com');
-      const deadline2 = Date.now() + 10000;
+      const deadline2 = Date.now() + scaleTimeout(10000);
       while ((await regionInput.inputValue()) !== 'eu-central-003' && Date.now() < deadline2)
         await page.waitForTimeout(100);
       assert.equal(
