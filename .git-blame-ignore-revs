@@ -1,0 +1,7 @@
+# Revisions to skip in `git blame` — bulk mechanical reformats with no behaviour change.
+# Configure locally with:  git config blame.ignoreRevsFile .git-blame-ignore-revs
+# (GitHub/GitLab honour this file automatically in their blame views.)
+
+# Whole-repo Prettier reformat (③b, v1.62.0) — introduced the formatter + reformatted all
+# first-party JS/JSX/mjs in one pass.
+268ee2c3c3041e33a28d2432ef6c7a429dc7e9a3

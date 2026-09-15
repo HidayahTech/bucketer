@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.62.0] — 2026-09-15 — Code formatter (Prettier)
+
+No user-facing change. Adds [Prettier](https://prettier.io/) (exact-pinned) as the code formatter — ③(b) of the code-cleanup ladder — with config matched to the codebase's existing style (single quotes, 120-column width; other settings are Prettier defaults that already matched). A one-time whole-repo reformat of all first-party JS/JSX/mjs establishes a consistent style; a **blocking CI `format` job** (`prettier --check`) plus a warn-only pre-push step keep it that way, mirroring the lint/dead-code gates. The reformat commit is recorded in `.git-blame-ignore-revs` so `git blame` skips it. The shipped bundle is functionally identical — it differs only by one internal minified variable name (esbuild assigns short names sensitively to source structure), and the build stays deterministic and byte-reproducible. See `docs/superpowers/plans/formatter-execution-plan-2026-09-15.md`.
+
 ## [1.61.1] — 2026-09-14 — Dependency-audit advisory + lint guardrails
 
 No user-facing change. Two small quality-pipeline additions (③a of the code-cleanup ladder), CI and config only. (1) A **non-blocking `npm audit` CI job** (`allow_failure`, production scope) surfaces known-CVE production dependencies as an ongoing security signal without ever blocking a push — a fresh transitive advisory is triaged, not force-fixed under push pressure (a guard test keeps it advisory). (2) Five genuine bug-catcher rules enabled in oxlint beyond the correctness category — `no-self-compare`, `no-template-curly-in-string`, `no-constant-binary-expression`, `no-unsafe-negation`, `no-unreachable-loop` — all with zero findings today, so they add forward protection with no churn. oxlint's full `suspicious` category was investigated and deliberately **not** adopted (103 findings, no real bugs — dominated by naming style, plus false positives on Web Worker `postMessage`).
