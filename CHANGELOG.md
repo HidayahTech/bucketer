@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.62.1] — 2026-09-15 — Complexity advisory
+
+No user-facing change. Adds a non-blocking cyclomatic-complexity advisory — ③(c), the final rung of the code-cleanup ladder — reusing oxlint (no new dependency). A dedicated CI `complexity` job runs oxlint's `complexity` rule at warn-level (threshold 20, `.oxlintrc.complexity.json`) over `src/` and prints the functions above threshold as a refactor-candidate list. It's a **signal, never a gate**: warn-level exits 0, so the job is a green informational report (not a permanent yellow, since there are always findings until the largest components are refactored), and `allow_failure` guards against a future severity bump ever blocking a push. CI-only; a guard test keeps it advisory. No source changes. This completes the quality-gate ladder (dead-code → correctness-lint → audit + lint guardrails → formatter → complexity). See `docs/superpowers/plans/complexity-advisory-execution-plan-2026-09-15.md`.
+
 ## [1.62.0] — 2026-09-15 — Code formatter (Prettier)
 
 No user-facing change. Adds [Prettier](https://prettier.io/) (exact-pinned) as the code formatter — ③(b) of the code-cleanup ladder — with config matched to the codebase's existing style (single quotes, 120-column width; other settings are Prettier defaults that already matched). A one-time whole-repo reformat of all first-party JS/JSX/mjs establishes a consistent style; a **blocking CI `format` job** (`prettier --check`) plus a warn-only pre-push step keep it that way, mirroring the lint/dead-code gates. The reformat commit is recorded in `.git-blame-ignore-revs` so `git blame` skips it. The shipped bundle is functionally identical — it differs only by one internal minified variable name (esbuild assigns short names sensitively to source structure), and the build stays deterministic and byte-reproducible. See `docs/superpowers/plans/formatter-execution-plan-2026-09-15.md`.
