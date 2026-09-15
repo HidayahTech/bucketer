@@ -9,7 +9,8 @@
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { ListObjectsV2Command } from '@aws-sdk/client-s3';
-import { scaleTimeout,
+import {
+  scaleTimeout,
   startMock,
   startAppServer,
   connectApp,

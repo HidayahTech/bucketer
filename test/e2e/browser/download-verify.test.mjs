@@ -14,7 +14,8 @@
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
-import { scaleTimeout,
+import {
+  scaleTimeout,
   startMock,
   startAppServer,
   connectApp,
@@ -88,7 +89,10 @@ describe('browser e2e — folder verification keeps every job reachable', () => 
       /* gone.txt absent */
     ]);
     await openPanel(page);
-    await page.locator('[data-testid^="verify-"]').first().waitFor({ timeout: scaleTimeout(10000) });
+    await page
+      .locator('[data-testid^="verify-"]')
+      .first()
+      .waitFor({ timeout: scaleTimeout(10000) });
     await page.locator('[data-testid^="verify-"]').first().click();
 
     // The verdicts render from the job record, and the job — now carrying failures —
@@ -118,7 +122,10 @@ describe('browser e2e — folder verification keeps every job reachable', () => 
       { name: 'gone.txt', size: 33 },
     ]);
     await openPanel(page);
-    await page.locator('[data-testid^="resume-"]').first().waitFor({ timeout: scaleTimeout(10000) });
+    await page
+      .locator('[data-testid^="resume-"]')
+      .first()
+      .waitFor({ timeout: scaleTimeout(10000) });
     await page.locator('[data-testid^="resume-"]').first().click();
     await page
       .getByText(/Sent 2 of 2/)
@@ -126,7 +133,10 @@ describe('browser e2e — folder verification keeps every job reachable', () => 
       .waitFor({ timeout: scaleTimeout(60000) });
 
     await openPanel(page);
-    await page.locator('[data-testid^="verify-"]').first().waitFor({ timeout: scaleTimeout(10000) });
+    await page
+      .locator('[data-testid^="verify-"]')
+      .first()
+      .waitFor({ timeout: scaleTimeout(10000) });
     await page.locator('[data-testid^="verify-"]').first().click();
 
     // Everything now on disk at the right size: the job settles, still discardable.

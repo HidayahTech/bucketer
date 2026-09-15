@@ -10,7 +10,8 @@
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
-import { scaleTimeout,
+import {
+  scaleTimeout,
   startMock,
   startAppServer,
   connectApp,
@@ -75,7 +76,10 @@ describe('browser e2e — a failing download cannot navigate the app away', () =
     const before = page.url();
 
     await startFolderDownload();
-    await page.locator('#bucketer-download-frames iframe').first().waitFor({ state: 'attached', timeout: scaleTimeout(15000) });
+    await page
+      .locator('#bucketer-download-frames iframe')
+      .first()
+      .waitFor({ state: 'attached', timeout: scaleTimeout(15000) });
     // Let the run finish issuing all three before asserting on its traffic.
     await page
       .getByText(/Sent 3 of 3/)

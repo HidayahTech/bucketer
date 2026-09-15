@@ -3,7 +3,8 @@
 // content-hash stamp — all of which depend on the correct CORS ExposeHeaders (the BUG-028 surface).
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { scaleTimeout,
+import {
+  scaleTimeout,
   startMock,
   startAppServer,
   connectApp,

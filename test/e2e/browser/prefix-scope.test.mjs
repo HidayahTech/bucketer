@@ -8,7 +8,15 @@
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
-import { scaleTimeout, startMock, startAppServer, launchBrowser, newE2EContext, newE2EPage, e2eTest } from '../harness.mjs';
+import {
+  scaleTimeout,
+  startMock,
+  startAppServer,
+  launchBrowser,
+  newE2EContext,
+  newE2EPage,
+  e2eTest,
+} from '../harness.mjs';
 
 const BUCKET = 'test-bucket';
 const SCOPE = 'clients/acme/';

@@ -134,7 +134,9 @@ describe('select-all, filter, sort', () => {
       // Starts-with match: the placeholder carries a "( / )" shortcut-hint suffix.
       await page.locator('input[placeholder^="Filter by name"]').fill('ap');
       // Only the two "ap…" files remain visible.
-      await page.locator('[data-testid="file-row:banana.txt"]').waitFor({ state: 'detached', timeout: scaleTimeout(5000) });
+      await page
+        .locator('[data-testid="file-row:banana.txt"]')
+        .waitFor({ state: 'detached', timeout: scaleTimeout(5000) });
       assert.equal(await page.locator('[data-testid="file-row:apple.txt"]').count(), 1);
       assert.equal(await page.locator('[data-testid="file-row:apricot.txt"]').count(), 1);
       assert.equal(await page.locator('[data-testid="file-row:banana.txt"]').count(), 0);

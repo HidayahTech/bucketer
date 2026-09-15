@@ -3,7 +3,8 @@
 // screen, so the mock S3 server is only needed for the connect→disconnect flow (BUG-027).
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { scaleTimeout,
+import {
+  scaleTimeout,
   startMock,
   startAppServer,
   connectApp,
