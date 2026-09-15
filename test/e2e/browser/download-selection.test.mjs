@@ -4,7 +4,7 @@
 import { describe, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
-import {
+import { scaleTimeout,
   startMock,
   startAppServer,
   connectApp,
@@ -63,7 +63,7 @@ describe('browser e2e — selection download', () => {
     await page.goto(app.url, { waitUntil: 'domcontentloaded' });
     await connectApp(page, ctx.httpsBrowserEndpoint);
     await page.locator('[data-testid="folder-row:sel"]').click();
-    await page.locator('[data-testid="file-row:a.txt"]').waitFor({ timeout: 10000 });
+    await page.locator('[data-testid="file-row:a.txt"]').waitFor({ timeout: scaleTimeout(10000) });
 
     // Tick a.txt, b.txt and the sub/ folder — leave untouched.txt alone.
     for (const row of ['file-row:a.txt', 'file-row:b.txt', 'folder-row:sub']) {
@@ -71,12 +71,12 @@ describe('browser e2e — selection download', () => {
     }
     await page.getByRole('button', { name: /^Download 3$/ }).click();
     await page.locator('[data-testid="scan"]').click();
-    await page.locator('[data-testid="start"]').waitFor({ timeout: 30000 });
+    await page.locator('[data-testid="start"]').waitFor({ timeout: scaleTimeout(30000) });
     await page.locator('[data-testid="start"]').click();
     await page
       .getByText(/Sent 4 of 4/)
       .first()
-      .waitFor({ timeout: 60000 });
+      .waitFor({ timeout: scaleTimeout(60000) });
 
     if (isWebKit()) {
       await downloads.settle(4000);
@@ -101,22 +101,22 @@ describe('browser e2e — selection download', () => {
     await page.goto(app.url, { waitUntil: 'domcontentloaded' });
     await connectApp(page, ctx.httpsBrowserEndpoint);
     await page.locator('[data-testid="folder-row:sel"]').click();
-    await page.locator('[data-testid="file-row:a.txt"]').waitFor({ timeout: 10000 });
+    await page.locator('[data-testid="file-row:a.txt"]').waitFor({ timeout: scaleTimeout(10000) });
     await page.locator('[data-testid="download-folder:sel/sub/"]').click();
 
     // The click must open the job panel without navigating the listing into sel/sub/ — if
     // stopPropagation() were ever dropped from the row's download button, the row's own
     // onClick would also fire, the listing would move into sel/sub/, and this testid
     // (relative to the new prefix) would no longer exist.
-    await page.locator('[data-testid="folder-row:sub"]').waitFor({ timeout: 5000 });
+    await page.locator('[data-testid="folder-row:sub"]').waitFor({ timeout: scaleTimeout(5000) });
 
     await page.locator('[data-testid="scan"]').click();
-    await page.locator('[data-testid="start"]').waitFor({ timeout: 30000 });
+    await page.locator('[data-testid="start"]').waitFor({ timeout: scaleTimeout(30000) });
     await page.locator('[data-testid="start"]').click();
     await page
       .getByText(/Sent 2 of 2/)
       .first()
-      .waitFor({ timeout: 60000 });
+      .waitFor({ timeout: scaleTimeout(60000) });
 
     if (isWebKit()) {
       await downloads.settle(4000);

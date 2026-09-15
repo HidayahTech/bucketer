@@ -8,7 +8,7 @@
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
-import { startMock, startAppServer, launchBrowser, newE2EContext, newE2EPage, e2eTest } from '../harness.mjs';
+import { scaleTimeout, startMock, startAppServer, launchBrowser, newE2EContext, newE2EPage, e2eTest } from '../harness.mjs';
 
 const BUCKET = 'test-bucket';
 const SCOPE = 'clients/acme/';
@@ -69,7 +69,7 @@ describe('prefix-scoped keys — normal connect screen', () => {
     try {
       await fillConnect(page, { baseFolder: SCOPE });
       // Presence: a row from inside the scope renders (keyed relative to the floor).
-      await page.locator('[data-testid="file-row:report.pdf"]').waitFor({ timeout: 15000 });
+      await page.locator('[data-testid="file-row:report.pdf"]').waitFor({ timeout: scaleTimeout(15000) });
       // Absence, next to it: the app never asked for the bucket root.
       assert.equal(
         rootLists().length,
@@ -89,7 +89,7 @@ describe('prefix-scoped keys — normal connect screen', () => {
     const { context, page } = await freshPage();
     try {
       await fillConnect(page); // no base folder → initial root list → mock 403
-      await page.locator('.error-block').waitFor({ timeout: 15000 });
+      await page.locator('.error-block').waitFor({ timeout: scaleTimeout(15000) });
       const text = await page.locator('.error-block').textContent();
       assert.ok(
         text.includes('Base folder'),
@@ -125,7 +125,7 @@ describe('prefix-scoped keys — shared link screen', () => {
       const region = page.locator('input[placeholder="us-east-1"]');
       if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
       await page.locator('button[type="submit"]:has-text("Connect")').click();
-      await page.locator('[data-testid="file-row:report.pdf"]').waitFor({ timeout: 15000 });
+      await page.locator('[data-testid="file-row:report.pdf"]').waitFor({ timeout: scaleTimeout(15000) });
       assert.equal(rootLists().length, 0, 'no root list on the shared-link path either');
     } finally {
       await context.close();
@@ -153,7 +153,7 @@ describe('prefix-scoped keys — shared link screen', () => {
       const region = page.locator('input[placeholder="us-east-1"]');
       if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
       await page.locator('button[type="submit"]:has-text("Connect")').click();
-      await page.locator('[data-testid="file-row:inner.txt"]').waitFor({ timeout: 15000 });
+      await page.locator('[data-testid="file-row:inner.txt"]').waitFor({ timeout: scaleTimeout(15000) });
       assert.equal(rootLists().length, 0, 'no root list while restoring an in-floor deep link');
     } finally {
       await context.close();
@@ -179,7 +179,7 @@ describe('prefix-scoped keys — shared link screen', () => {
       if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
       await page.locator('button[type="submit"]:has-text("Connect")').click();
       // Presence: the floor listing renders (clamped landing).
-      await page.locator('[data-testid="file-row:report.pdf"]').waitFor({ timeout: 15000 });
+      await page.locator('[data-testid="file-row:report.pdf"]').waitFor({ timeout: scaleTimeout(15000) });
       // The clamp is announced, not silent.
       const bodyText = await page.locator('body').textContent();
       assert.ok(bodyText.includes('outside this connection’s base folder'), 'the clamp notice must be visible');

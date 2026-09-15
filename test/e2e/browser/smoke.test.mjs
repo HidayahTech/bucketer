@@ -62,12 +62,12 @@ describe('browser e2e — connect, upload, list, delete', () => {
       mimeType: 'text/plain',
       buffer: Buffer.from('hello from e2e'),
     });
-    await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: 20000 });
+    await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: scaleTimeout(20000) });
 
     // Real bucket state: the object actually landed.
     await waitForKeys(['e2e-upload.txt']);
     // DOM: the file appears in the browser listing (auto-refresh after upload drain).
-    await page.getByText('e2e-upload.txt').first().waitFor({ timeout: 10000 });
+    await page.getByText('e2e-upload.txt').first().waitFor({ timeout: scaleTimeout(10000) });
   });
 
   e2eTest('deleting the file removes it from the bucket and the listing', async () => {
@@ -78,12 +78,12 @@ describe('browser e2e — connect, upload, list, delete', () => {
     await row.locator('button[title="Delete"]').click({ force: true });
     // DeleteConfirmModal → confirm, then wait for the modal to close (confirm fired).
     const modal = page.locator('.modal-overlay');
-    await modal.waitFor({ timeout: 5000 });
+    await modal.waitFor({ timeout: scaleTimeout(5000) });
     await page.locator('[data-testid="delete-confirm"]').click();
-    await modal.waitFor({ state: 'detached', timeout: 5000 });
+    await modal.waitFor({ state: 'detached', timeout: scaleTimeout(5000) });
 
     // DOM: the row is removed (auto-retries until the optimistic re-render flushes).
-    await page.locator('[data-testid="file-row:e2e-upload.txt"]').waitFor({ state: 'detached', timeout: 10000 });
+    await page.locator('[data-testid="file-row:e2e-upload.txt"]').waitFor({ state: 'detached', timeout: scaleTimeout(10000) });
     // Real bucket state: poll until the delete lands server-side.
     await waitForKeys([]);
   });

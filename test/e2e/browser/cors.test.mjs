@@ -6,7 +6,7 @@
 import { describe, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { ListObjectsV2Command, HeadObjectCommand } from '@aws-sdk/client-s3';
-import {
+import { scaleTimeout,
   startMock,
   startAppServer,
   connectApp,
@@ -43,15 +43,15 @@ async function uploadOne(page, name, content = 'data') {
   await page
     .locator('[data-testid="file-input"]')
     .setInputFiles({ name, mimeType: 'text/plain', buffer: Buffer.from(content) });
-  await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: 20000 });
-  await page.locator(`[data-testid="file-row:${name}"]`).waitFor({ timeout: 10000 });
+  await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: scaleTimeout(20000) });
+  await page.locator(`[data-testid="file-row:${name}"]`).waitFor({ timeout: scaleTimeout(10000) });
 }
 
 // ── B1 — BUG-028: ExposeHeaders must include x-amz-meta-* or custom metadata is invisible ──
 describe('B1 — BUG-028: custom metadata visibility depends on CORS ExposeHeaders', () => {
   async function openProps(page, name) {
     await page.locator(`[data-testid="file-row:${name}"]`).locator('button[title="Properties"]').click({ force: true });
-    await page.locator('[data-testid="properties-modal"]').waitFor({ timeout: 5000 });
+    await page.locator('[data-testid="properties-modal"]').waitFor({ timeout: scaleTimeout(5000) });
   }
 
   e2eTest('NEGATIVE — narrowed ExposeHeaders (no x-amz-meta-*) hides File Modified', async () => {
@@ -83,7 +83,7 @@ describe('B1 — BUG-028: custom metadata visibility depends on CORS ExposeHeade
       await connectApp(page, ctx.browserEndpoint);
       await uploadOne(page, 'meta.txt');
       await openProps(page, 'meta.txt');
-      await page.locator('[data-testid="meta-file-modified"]').waitFor({ timeout: 5000 });
+      await page.locator('[data-testid="meta-file-modified"]').waitFor({ timeout: scaleTimeout(5000) });
       assert.ok(
         (await page.locator('[data-testid="meta-file-modified"]').count()) >= 1,
         'with the correct ExposeHeaders, File Modified must be visible',
@@ -119,7 +119,7 @@ describe('B2 — BUG-012: HTTP DELETE must be in CORS AllowedMethods', () => {
       await connectApp(page, ctx.browserEndpoint);
       await uploadOne(page, 'orig.txt');
       await renameRow(page, 'orig.txt', 'renamed.txt');
-      await page.locator('[data-testid="file-row:renamed.txt"]').waitFor({ timeout: 10000 });
+      await page.locator('[data-testid="file-row:renamed.txt"]').waitFor({ timeout: scaleTimeout(10000) });
       const keys = await bucketKeys();
       assert.ok(!keys.includes('orig.txt') && keys.includes('renamed.txt'), 'with DELETE allowed the rename completes');
     } finally {
@@ -138,7 +138,7 @@ async function renameRow(page, name, newName) {
   for (let attempt = 0; ; attempt++) {
     await row.locator('button[title="Rename"]').click();
     try {
-      await input.waitFor({ timeout: 2500 });
+      await input.waitFor({ timeout: scaleTimeout(2500) });
       break;
     } catch (err) {
       if (attempt >= 2) throw err;

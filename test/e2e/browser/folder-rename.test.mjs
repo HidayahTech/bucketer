@@ -3,7 +3,7 @@
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { PutObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
-import {
+import { scaleTimeout,
   startMock,
   startAppServer,
   connectApp,
@@ -48,7 +48,7 @@ describe('browser e2e — folder rename', () => {
     await page.locator('.rename-inline button', { hasText: '✓' }).click();
 
     // Poll the real bucket until the rename has fully applied.
-    const deadline = Date.now() + 15000;
+    const deadline = Date.now() + scaleTimeout(15000);
     let k = await keys();
     while (JSON.stringify(k) !== JSON.stringify(['guides/a.txt', 'guides/sub/b.txt']) && Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 200));

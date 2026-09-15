@@ -43,8 +43,8 @@ async function uploadFiles(page, names) {
   await page
     .locator('[data-testid="file-input"]')
     .setInputFiles(names.map((n) => ({ name: n, mimeType: 'text/plain', buffer: Buffer.from(n) })));
-  await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: 20000 });
-  for (const n of names) await page.locator(`[data-testid="file-row:${n}"]`).waitFor({ timeout: 10000 });
+  await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: scaleTimeout(20000) });
+  for (const n of names) await page.locator(`[data-testid="file-row:${n}"]`).waitFor({ timeout: scaleTimeout(10000) });
 }
 // force: the post-upload re-render (listing refetch + BatchSummary auto-collapse) keeps rows
 // briefly "unstable" for Playwright; the checkboxes are functional.
@@ -71,12 +71,12 @@ describe('batch delete', () => {
       await uploadFiles(page, ['a.txt', 'b.txt', 'c.txt']);
       await selectRow(page, 'a.txt');
       await selectRow(page, 'c.txt');
-      await page.locator('.batch-bar', { hasText: 'selected' }).waitFor({ timeout: 5000 });
+      await page.locator('.batch-bar', { hasText: 'selected' }).waitFor({ timeout: scaleTimeout(5000) });
       await page.locator('.batch-bar button.btn-danger').click(); // Delete N
       const modal = page.locator('.modal-overlay');
-      await modal.waitFor({ timeout: 5000 });
+      await modal.waitFor({ timeout: scaleTimeout(5000) });
       await page.locator('[data-testid="delete-confirm"]').click();
-      await modal.waitFor({ state: 'detached', timeout: 5000 });
+      await modal.waitFor({ state: 'detached', timeout: scaleTimeout(5000) });
       await waitForKeys(['b.txt']);
     } finally {
       await context.close();
@@ -91,10 +91,10 @@ describe('batch move', () => {
       // Make a destination folder, then three files.
       await page.locator('button[title="Create a new folder"]').click();
       const ni = page.locator('.modal-overlay input.form-input');
-      await ni.waitFor({ timeout: 5000 });
+      await ni.waitFor({ timeout: scaleTimeout(5000) });
       await ni.fill('dest');
       await ni.press('Enter');
-      await page.locator('[data-testid="folder-row:dest"]').waitFor({ timeout: 5000 });
+      await page.locator('[data-testid="folder-row:dest"]').waitFor({ timeout: scaleTimeout(5000) });
       await uploadFiles(page, ['x.txt', 'y.txt', 'z.txt']);
 
       await selectRow(page, 'x.txt');
@@ -120,7 +120,7 @@ describe('select-all, filter, sort', () => {
     try {
       await uploadFiles(page, ['one.txt', 'two.txt', 'three.txt']);
       await page.locator('th.col-check input[type="checkbox"]').check({ force: true });
-      await page.locator('.batch-bar', { hasText: '3 files' }).waitFor({ timeout: 5000 });
+      await page.locator('.batch-bar', { hasText: '3 files' }).waitFor({ timeout: scaleTimeout(5000) });
       assert.ok((await page.locator('.batch-bar').textContent()).includes('3 files'));
     } finally {
       await context.close();
@@ -134,7 +134,7 @@ describe('select-all, filter, sort', () => {
       // Starts-with match: the placeholder carries a "( / )" shortcut-hint suffix.
       await page.locator('input[placeholder^="Filter by name"]').fill('ap');
       // Only the two "ap…" files remain visible.
-      await page.locator('[data-testid="file-row:banana.txt"]').waitFor({ state: 'detached', timeout: 5000 });
+      await page.locator('[data-testid="file-row:banana.txt"]').waitFor({ state: 'detached', timeout: scaleTimeout(5000) });
       assert.equal(await page.locator('[data-testid="file-row:apple.txt"]').count(), 1);
       assert.equal(await page.locator('[data-testid="file-row:apricot.txt"]').count(), 1);
       assert.equal(await page.locator('[data-testid="file-row:banana.txt"]').count(), 0);
@@ -182,7 +182,7 @@ describe('copy-link popover', () => {
       // The popover offers expiry presets; pick 1 hour and capture the generated URL via clipboard
       // is environment-dependent — instead assert the popover opened and a preset is clickable.
       const popover = page.locator('.copy-link-wrap .copy-link-popover, .copy-link-popover');
-      await popover.first().waitFor({ timeout: 5000 });
+      await popover.first().waitFor({ timeout: scaleTimeout(5000) });
       assert.ok(await popover.first().isVisible(), 'copy-link popover opens with expiry options');
     } finally {
       await context.close();

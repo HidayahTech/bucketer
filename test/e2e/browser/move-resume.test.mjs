@@ -60,16 +60,16 @@ describe('move — resume after reload', () => {
       // Destination folder + two files.
       await page.locator('button[title="Create a new folder"]').click();
       const ni = page.locator('.modal-overlay input.form-input');
-      await ni.waitFor({ timeout: 5000 });
+      await ni.waitFor({ timeout: scaleTimeout(5000) });
       await ni.fill('dest');
       await ni.press('Enter');
-      await page.locator('[data-testid="folder-row:dest"]').waitFor({ timeout: 5000 });
+      await page.locator('[data-testid="folder-row:dest"]').waitFor({ timeout: scaleTimeout(5000) });
       await page.locator('[data-testid="file-input"]').setInputFiles([
         { name: 'a.txt', mimeType: 'text/plain', buffer: Buffer.from('aaa') },
         { name: 'b.txt', mimeType: 'text/plain', buffer: Buffer.from('bbb') },
       ]);
-      await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: 20000 });
-      await page.locator('[data-testid="file-row:a.txt"]').waitFor({ timeout: 10000 });
+      await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: scaleTimeout(20000) });
+      await page.locator('[data-testid="file-row:a.txt"]').waitFor({ timeout: scaleTimeout(10000) });
 
       // Interrupt deterministically: fail the source deletes so the move copies each object to
       // the destination but never completes cleanly — the resumable record persists.
@@ -102,7 +102,7 @@ describe('move — resume after reload', () => {
 
       // The interrupted move surfaces as a paused row offering Resume.
       const resume = page.locator('[data-testid="move-resume"]');
-      await resume.waitFor({ timeout: 10000 });
+      await resume.waitFor({ timeout: scaleTimeout(10000) });
       await resume.click();
 
       // Resume finishes the move: the sources are gone, only the destination copies remain.
@@ -124,16 +124,16 @@ describe('move — resume inline after errors (no reload)', () => {
 
       await page.locator('button[title="Create a new folder"]').click();
       const ni = page.locator('.modal-overlay input.form-input');
-      await ni.waitFor({ timeout: 5000 });
+      await ni.waitFor({ timeout: scaleTimeout(5000) });
       await ni.fill('dest');
       await ni.press('Enter');
-      await page.locator('[data-testid="folder-row:dest"]').waitFor({ timeout: 5000 });
+      await page.locator('[data-testid="folder-row:dest"]').waitFor({ timeout: scaleTimeout(5000) });
       await page.locator('[data-testid="file-input"]').setInputFiles([
         { name: 'a.txt', mimeType: 'text/plain', buffer: Buffer.from('aaa') },
         { name: 'b.txt', mimeType: 'text/plain', buffer: Buffer.from('bbb') },
       ]);
-      await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: 20000 });
-      await page.locator('[data-testid="file-row:a.txt"]').waitFor({ timeout: 10000 });
+      await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: scaleTimeout(20000) });
+      await page.locator('[data-testid="file-row:a.txt"]').waitFor({ timeout: scaleTimeout(10000) });
 
       // Every copy fails, as a storage-cap block would, so the move ends with errors.
       ctx.mock.configure({
@@ -153,7 +153,7 @@ describe('move — resume inline after errors (no reload)', () => {
 
       // The key observable: WITHOUT any reload, the errored move offers Resume in-session.
       const resume = page.locator('[data-testid="move-resume"]');
-      await resume.waitFor({ timeout: 10000 });
+      await resume.waitFor({ timeout: scaleTimeout(10000) });
 
       // Clear the fault and resume → the move completes.
       ctx.mock.configure({ faults: [] });

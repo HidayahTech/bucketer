@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.62.2] — 2026-09-15 — E2E deadline robustness
+
+No user-facing change. Routes the remaining hand-coded timing deadlines in the browser e2e specs through the existing per-lane `scaleTimeout()` factor (GitLab #62). Previously ~164 `waitFor({ timeout: N })` and `Date.now() + N` poll deadlines across 25 specs used raw literals, so the slow lanes (WebKit ×2, mobile ×1.5) blew them under shared-runner CPU load — a different spec each run — leaving the v1.60.1 CI retry to absorb it. Scaling every deadline by the lane factor gives those lanes proportional headroom so the specs are robust to a slow runner on their own; the one deliberate best-effort probe (an optional-field `waitFor(...).catch()`) is left short by design. Test-infra only — the shipped bundle changes only in its embedded version string. See `docs/superpowers/plans/e2e-robustness-execution-plan-2026-09-15.md`.
+
 ## [1.62.1] — 2026-09-15 — Complexity advisory
 
 No user-facing change. Adds a non-blocking cyclomatic-complexity advisory — ③(c), the final rung of the code-cleanup ladder — reusing oxlint (no new dependency). A dedicated CI `complexity` job runs oxlint's `complexity` rule at warn-level (threshold 20, `.oxlintrc.complexity.json`) over `src/` and prints the functions above threshold as a refactor-candidate list. It's a **signal, never a gate**: warn-level exits 0, so the job is a green informational report (not a permanent yellow, since there are always findings until the largest components are refactored), and `allow_failure` guards against a future severity bump ever blocking a push. CI-only; a guard test keeps it advisory. No source changes. This completes the quality-gate ladder (dead-code → correctness-lint → audit + lint guardrails → formatter → complexity). See `docs/superpowers/plans/complexity-advisory-execution-plan-2026-09-15.md`.

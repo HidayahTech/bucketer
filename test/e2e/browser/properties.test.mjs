@@ -3,7 +3,7 @@
 // content-hash stamp — all of which depend on the correct CORS ExposeHeaders (the BUG-028 surface).
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import {
+import { scaleTimeout,
   startMock,
   startAppServer,
   connectApp,
@@ -40,16 +40,16 @@ describe('properties modal — full metadata matrix', () => {
         mimeType: 'application/octet-stream',
         buffer: Buffer.from('property-matrix-bytes'),
       });
-      await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: 20000 });
-      await page.locator('[data-testid="file-row:props.bin"]').waitFor({ timeout: 10000 });
+      await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: scaleTimeout(20000) });
+      await page.locator('[data-testid="file-row:props.bin"]').waitFor({ timeout: scaleTimeout(10000) });
 
       await page
         .locator('[data-testid="file-row:props.bin"]')
         .locator('button[title="Properties"]')
         .click({ force: true });
-      await page.locator('[data-testid="properties-modal"]').waitFor({ timeout: 5000 });
+      await page.locator('[data-testid="properties-modal"]').waitFor({ timeout: scaleTimeout(5000) });
       // Wait for the async HeadObject to populate the metadata table (the modal opens on "Loading…").
-      await page.locator('[data-testid="meta-file-modified"]').waitFor({ timeout: 5000 });
+      await page.locator('[data-testid="meta-file-modified"]').waitFor({ timeout: scaleTimeout(5000) });
       const body = await page.locator('.meta-dialog .modal-body').textContent();
 
       assert.match(body, /Content-Type/, 'Content-Type row present');

@@ -63,18 +63,18 @@ describe('move — non-Latin-1 key (BUG-060)', () => {
       // Destination folder.
       await page.locator('button[title="Create a new folder"]').click();
       const ni = page.locator('.modal-overlay input.form-input');
-      await ni.waitFor({ timeout: 5000 });
+      await ni.waitFor({ timeout: scaleTimeout(5000) });
       await ni.fill('dest');
       await ni.press('Enter');
-      await page.locator('[data-testid="folder-row:dest"]').waitFor({ timeout: 5000 });
+      await page.locator('[data-testid="folder-row:dest"]').waitFor({ timeout: scaleTimeout(5000) });
 
       // Seed the weird-named object via upload — upload puts the name in the URL path, which
       // the SDK encodes, so it succeeds where the copy-source *header* previously did not.
       await page
         .locator('[data-testid="file-input"]')
         .setInputFiles([{ name: NAME, mimeType: 'audio/ogg', buffer: Buffer.from('opus-bytes') }]);
-      await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: 20000 });
-      await page.locator(`[data-testid="file-row:${NAME}"]`).waitFor({ timeout: 10000 });
+      await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: scaleTimeout(20000) });
+      await page.locator(`[data-testid="file-row:${NAME}"]`).waitFor({ timeout: scaleTimeout(10000) });
       await waitForKeys([NAME, 'dest/'].sort());
 
       // Move it into dest: select the row, open the picker, drop it in.

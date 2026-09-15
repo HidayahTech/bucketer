@@ -8,7 +8,7 @@
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
-import {
+import { scaleTimeout,
   startMock,
   startAppServer,
   connectApp,
@@ -70,12 +70,12 @@ describe('issue #4 part 2 — a sub-folder created by an upload appears without 
     // #215). Gating on a rendered row closes that window.
     const { context, page } = await freshSession({ seed: 'anchor.txt' });
     try {
-      await page.locator('[data-testid="file-row:anchor.txt"]').waitFor({ timeout: 10000 });
+      await page.locator('[data-testid="file-row:anchor.txt"]').waitFor({ timeout: scaleTimeout(10000) });
       // At root, drop a file whose relativePath creates a new sub-folder "newdir".
       await dropFile(page, 'newdir/x.txt');
       // The new folder must appear in the listing WITHOUT a page reload (the drained prefix is
       // "newdir/", a descendant of the current view "").
-      await page.locator('[data-testid="folder-row:newdir"]').waitFor({ timeout: 15000 });
+      await page.locator('[data-testid="folder-row:newdir"]').waitFor({ timeout: scaleTimeout(15000) });
       assert.equal(await page.locator('[data-testid="folder-row:newdir"]').count(), 1);
     } finally {
       await context.close();
@@ -99,7 +99,7 @@ describe('issue #4 part 1 — the Refresh button pulls changes made by another c
     await page.goto(app.url, { waitUntil: 'domcontentloaded' });
     await connectApp(page, ctx.browserEndpoint);
     try {
-      await page.locator('[data-testid="file-row:already-here.txt"]').waitFor({ timeout: 10000 });
+      await page.locator('[data-testid="file-row:already-here.txt"]').waitFor({ timeout: scaleTimeout(10000) });
       // Simulate "another device" writing directly to the bucket (no UI involved).
       await ctx.client.send(
         new PutObjectCommand({ Bucket: BUCKET, Key: 'from-other-device.txt', Body: new TextEncoder().encode('x') }),
@@ -108,7 +108,7 @@ describe('issue #4 part 1 — the Refresh button pulls changes made by another c
       assert.equal(await page.locator('[data-testid="file-row:from-other-device.txt"]').count(), 0);
       // …until the user clicks Refresh.
       await page.locator('[data-testid="refresh-listing"]').click();
-      await page.locator('[data-testid="file-row:from-other-device.txt"]').waitFor({ timeout: 10000 });
+      await page.locator('[data-testid="file-row:from-other-device.txt"]').waitFor({ timeout: scaleTimeout(10000) });
       assert.equal(await page.locator('[data-testid="file-row:from-other-device.txt"]').count(), 1);
     } finally {
       await context.close();
