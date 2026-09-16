@@ -1,9 +1,15 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.62.2';
+export const CURRENT_VERSION = '1.62.3';
 
 export const CHANGELOG = [
+  {
+    "version": "1.62.3",
+    "date": "2026-09-15",
+    "title": "Defer browser e2e to CI in the pre-push hook",
+    "changes": []
+  },
   {
     "version": "1.62.2",
     "date": "2026-09-15",

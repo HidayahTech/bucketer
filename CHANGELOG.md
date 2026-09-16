@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.62.3] — 2026-09-15 — Defer browser e2e to CI in the pre-push hook
+
+No user-facing change. The pre-push hook now runs only the fast **node** e2e layer (mock-S3 + protocol, no browser) locally; the **browser** e2e is deferred to CI, where the GitLab runner already runs the full 3×3 matrix (chromium/firefox/webkit × desktop/mobile, with retry). The host can only run chromium anyway (WebKit needs the container), so local browser e2e was partial coverage that duplicated CI while slowing every push. Trade-off: browser-only regressions (e.g. the BUG-035 multipart-completion class) are now caught by the CI browser lanes rather than pre-push — don't merge a red pipeline. Developer-workflow change only; the shipped bundle changes only in its version string.
+
 ## [1.62.2] — 2026-09-15 — E2E deadline robustness
 
 No user-facing change. Routes the remaining hand-coded timing deadlines in the browser e2e specs through the existing per-lane `scaleTimeout()` factor (GitLab #62). Previously ~164 `waitFor({ timeout: N })` and `Date.now() + N` poll deadlines across 25 specs used raw literals, so the slow lanes (WebKit ×2, mobile ×1.5) blew them under shared-runner CPU load — a different spec each run — leaving the v1.60.1 CI retry to absorb it. Scaling every deadline by the lane factor gives those lanes proportional headroom so the specs are robust to a slow runner on their own; the one deliberate best-effort probe (an optional-field `waitFor(...).catch()`) is left short by design. Test-infra only — the shipped bundle changes only in its embedded version string. See `docs/superpowers/plans/e2e-robustness-execution-plan-2026-09-15.md`.

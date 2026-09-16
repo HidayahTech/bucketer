@@ -5,11 +5,15 @@
 # Reads stdin to detect tag-only pushes (recursive calls when the hook pushes the version
 # tag itself) and skips the build/test cycle in those cases.
 #
-# The e2e browser layer is the ONLY suite that exercises the multipart upload-completion
-# path (uploadMultipart runs inside the UploadQueue component closure, unreachable from
-# unit/component tests). BUG-035 — a ReferenceError on every non-probe multipart
-# completion — shipped in v1.29.0/v1.30.0 precisely because e2e was not gating pushes.
-# npm run test:e2e self-builds to perf/ (gitignored), so it does not touch dist/.
+# The e2e BROWSER layer is deferred to CI (the GitLab runner runs the full 3×3 matrix —
+# chromium/firefox/webkit × desktop/mobile — with retry); only the fast NODE e2e layer
+# (mock-S3 + protocol, no browser) runs here as a local gate. Rationale: the host can only
+# run chromium anyway (WebKit needs the container), so local browser e2e was partial coverage
+# that duplicated CI while slowing every push. Trade-off: browser-only regressions — e.g.
+# BUG-035, a ReferenceError on multipart upload-completion (uploadMultipart runs inside the
+# UploadQueue closure, unreachable from unit/component tests; shipped in v1.29.0/v1.30.0 when
+# e2e was not gating) — are now caught by the CI browser lanes, NOT locally. Do not merge a
+# red pipeline. npm run test:e2e:node self-builds to perf/ (gitignored), so it does not touch dist/.
 #
 # To override in an emergency (human operator only):
 #   git push --no-verify
@@ -50,8 +54,8 @@ if [ "$branch_refs" -gt 0 ]; then
   echo "Running component tests..."
   npm run test:ui
 
-  echo "Running e2e (node + browser)..."
-  npm run test:e2e
+  echo "Running e2e (node layer only; browser matrix runs in CI)..."
+  npm run test:e2e:node
 
   echo "Tests passed — push proceeding."
 fi
