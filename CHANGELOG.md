@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.63.3] — 2026-09-16 — E2E spec lane fixes for the prefix-access batch
+
+No user-facing change; test infrastructure only. The prefix-access e2e cases now switch buckets through the sidebar on narrow viewports (the header tab strip is hidden below 640px), open a pinned Pixel 5 context through the harness's Firefox quirk, and let the failed state's hash-change listener attach before firing the event — the three reasons the first post-fix container run failed on mobile and Firefox lanes. `E2E_FILES` no longer makes the node layer exit 1 when it names browser-only specs (a misspelled spec still fails loudly). Post-fix container evidence at this state: both specs 22/22 on all nine lanes. The shipped bundle changes only in its version string.
+
 ## [1.63.2] — 2026-09-16 — Review follow-ups for the prefix-access batch
 
 Four small tightenings from the security and UX reviews of v1.62.4–v1.63.1. On the failed-connect screen, changing the address bar's hash to a link naming a different endpoint now clears the secret from the form (it stayed filled, one click from signing to the new host). A base folder that arrived in a share link is never written into a saved connection by the recovery path — only a folder you typed is. Provider errors that are neither a folder restriction nor a wrong key (clock skew, expired or invalid session tokens, account state) no longer get the base-folder hint or a wrong "key is wrong" line; the provider's own message stands. The copy-link toast keeps its second line ("Includes your access key ID…") on its own line, the CORS-masked explanation no longer ends with a contradictory generic CORS tip, and the breadcrumb 🔗 button says in its tooltip when the session's key-ID choice applies. README wording corrected: a link carrying a base folder your key does not have fails to connect with the hint, not silently.

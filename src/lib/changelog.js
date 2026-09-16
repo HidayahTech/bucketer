@@ -1,9 +1,15 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.63.2';
+export const CURRENT_VERSION = '1.63.3';
 
 export const CHANGELOG = [
+  {
+    "version": "1.63.3",
+    "date": "2026-09-16",
+    "title": "E2E spec lane fixes for the prefix-access batch",
+    "changes": []
+  },
   {
     "version": "1.63.2",
     "date": "2026-09-16",
