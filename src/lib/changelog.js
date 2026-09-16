@@ -1,9 +1,15 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.62.3';
+export const CURRENT_VERSION = '1.62.4';
 
 export const CHANGELOG = [
+  {
+    "version": "1.62.4",
+    "date": "2026-09-16",
+    "title": "Failed connect is seen, and says what to do",
+    "changes": []
+  },
   {
     "version": "1.62.3",
     "date": "2026-09-15",

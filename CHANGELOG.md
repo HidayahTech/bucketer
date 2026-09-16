@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.62.4] — 2026-09-16 — Failed connect is seen, and says what to do
+
+Fixes the "pressing Connect does nothing" experience with a key that is limited to a folder inside the bucket (a Backblaze B2 application key with a Name Prefix, or an AWS key with a prefix condition) and no **Base folder** set (GitLab #65). The explanation existed but rendered below the fold on every viewport with focus left on the page body, so the only visible change was the header pill turning to "Failed". Now the error scrolls into view and takes focus; it leads with the most likely cause in plain words, and carries a **Set base folder** button that jumps to the field. On the CORS-masked shape ("Failed to fetch") the same block names both possible causes and the curl escape hatch instead of burying the folder-restriction cause at the end of a CORS paragraph. A parsed 403 no longer tells you to check CORS; a bad key ID or secret (`SignatureDoesNotMatch` / `InvalidAccessKeyId`) is stated as such and never gets the base-folder hint; a floor that is set yet still denied gets its own wording; a failed quick-switch names the bucket it tried to open. Test-infra: `E2E_FILES` scopes the e2e runners to named specs for matched-pair runs. See `docs/superpowers/specs/2026-09-16-prefix-access-design.md`.
+
 ## [1.62.3] — 2026-09-15 — Defer browser e2e to CI in the pre-push hook
 
 No user-facing change. The pre-push hook now runs only the fast **node** e2e layer (mock-S3 + protocol, no browser) locally; the **browser** e2e is deferred to CI, where the GitLab runner already runs the full 3×3 matrix (chromium/firefox/webkit × desktop/mobile, with retry). The host can only run chromium anyway (WebKit needs the container), so local browser e2e was partial coverage that duplicated CI while slowing every push. Trade-off: browser-only regressions (e.g. the BUG-035 multipart-completion class) are now caught by the CI browser lanes rather than pre-push — don't merge a red pipeline. Developer-workflow change only; the shipped bundle changes only in its version string.
