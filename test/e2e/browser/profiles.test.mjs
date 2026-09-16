@@ -117,6 +117,38 @@ describe('#70 — a link that changes the connection does not auto-connect', () 
     }
   });
 
+  // Diff review S-1: on the failed screen the form still holds the secret; a fragment-only
+  // navigation (hashchange, no reload) to a link naming another endpoint must clear it.
+  e2eTest('a hash change to a different endpoint on the failed screen clears the secret from the form', async () => {
+    ctx.mock.reset();
+    ctx.mock.configure({ faults: [{ op: 'ListObjectsV2', status: 403, code: 'AccessDenied', message: 'no' }] });
+    const other = await startMock();
+    const { context, page } = await freshPage();
+    try {
+      await fillCreds(page, { endpoint: ctx.browserEndpoint, bucket: 'test-bucket', keyId: 'k', secret: 'sekret' });
+      const region = page.locator('input[placeholder="us-east-1"]');
+      if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
+      await page.locator('button[type="submit"]:has-text("Connect")').click();
+      await page.locator('.error-block').waitFor({ timeout: scaleTimeout(15000) });
+      await page.evaluate(
+        (hash) => {
+          window.location.hash = hash;
+        },
+        '#endpoint=' + encodeURIComponent(other.browserEndpoint) + '&bucket=evil-bucket',
+      );
+      await page.waitForFunction(
+        (ep) => document.querySelector('input[type="url"]')?.value === ep,
+        other.browserEndpoint,
+        { timeout: scaleTimeout(5000) },
+      );
+      assert.equal(await page.locator('input[placeholder="Secret Access Key"]').inputValue(), '', 'secret cleared');
+      assert.equal(other.mock.requestLog.list().length, 0, 'nothing was sent to the other endpoint');
+    } finally {
+      await context.close();
+      await other.mock.close();
+    }
+  });
+
   e2eTest('a link that repeats the stored connection still auto-connects (reload-my-link path)', async () => {
     ctx.mock.reset();
     const { context, page } = await freshPage();

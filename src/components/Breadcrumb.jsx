@@ -24,6 +24,7 @@ export function Breadcrumb({
   onMoveDrop,
   moveHoverTarget,
   onCopyLink,
+  copyLinkIncludesKeyId = false,
 }) {
   // Props for a droppable crumb. The class is always `crumb` (+ highlight when hovered);
   // drag handlers attach only when move handlers are supplied.
@@ -48,8 +49,16 @@ export function Breadcrumb({
       type="button"
       class="crumb-link"
       onClick={onCopyLink}
-      aria-label="Copy a link to this folder"
-      title="Copy a link that opens Bucketer in this folder"
+      aria-label={
+        copyLinkIncludesKeyId
+          ? 'Copy a link to this folder, including your access key ID'
+          : 'Copy a link to this folder'
+      }
+      title={
+        copyLinkIncludesKeyId
+          ? 'Copy a link that opens Bucketer in this folder — includes your access key ID (session choice in the Copy link menu)'
+          : 'Copy a link that opens Bucketer in this folder'
+      }
       data-testid="crumb-copy-link"
     >
       🔗

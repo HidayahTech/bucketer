@@ -392,8 +392,9 @@ Bucketer makes two kinds of link, and they mean different things:
   `#`), which browsers never send to any server — but it does land in both parties' browser
   history and in whatever chat or mail you paste it into. A link to a folder therefore names
   that folder wherever the link travels; if folder names are sensitive, treat the link
-  accordingly. A link into a folder the recipient's key cannot reach lands them at their own
-  base folder with a note, never in an error.
+  accordingly. A link into a folder the recipient's own base folder does not cover lands
+  them at their base folder with a note; a link carrying a base folder their key does not
+  have fails to connect with the base-folder hint rather than silently.
 - **Share this file** (the link button on a file row) — a presigned URL that *is* access to
   that one file for the chosen duration (up to 7 days). Anyone holding it can open the file
   with no sign-in. Treat it like a password.

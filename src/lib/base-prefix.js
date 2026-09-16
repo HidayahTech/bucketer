@@ -51,7 +51,10 @@ export function sanitizeNavPrefix(raw) {
 // and the live connection just listed successfully at one. Returns the floor to persist,
 // or null. Never overrides a stored floor — editing an existing floor is the explicit
 // Save flow's job, where the floor is part of a connection's identity.
-export function discoveredFloor(recordFloor, liveFloor) {
+// linkFloor: the base folder the current share link supplied, if any — a floor that came
+// from a link was not typed by the user and is never persisted this way.
+export function discoveredFloor(recordFloor, liveFloor, linkFloor = '') {
   const live = normalizeBasePrefix(liveFloor);
-  return !normalizeBasePrefix(recordFloor) && live ? live : null;
+  if (!live || normalizeBasePrefix(recordFloor)) return null;
+  return live === normalizeBasePrefix(linkFloor) ? null : live;
 }

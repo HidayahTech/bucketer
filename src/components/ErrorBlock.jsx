@@ -35,6 +35,16 @@ const STATUS_ICONS = { pass: '✓', fail: '✗', skip: '–' };
 // bad secret / key ID are unverified — the live probe item records them). A base folder
 // cannot fix these, so the scope hint stays out of the way.
 const BAD_CREDENTIAL_CODES = new Set(['SignatureDoesNotMatch', 'InvalidAccessKeyId']);
+// Other 403/401 codes that are not a prefix restriction either (clock skew, expired or
+// invalid session tokens, account state): the provider's own message is the explanation,
+// so the scope hint stays out of the way without claiming the credential is wrong.
+const NON_SCOPE_CODES = new Set([
+  'RequestTimeTooSkewed',
+  'ExpiredToken',
+  'InvalidToken',
+  'AccountProblem',
+  'AllAccessDisabled',
+]);
 
 export function ErrorBlock({
   error,
@@ -69,7 +79,9 @@ export function ErrorBlock({
     parsed.status === null;
   const isBadCredential = BAD_CREDENTIAL_CODES.has(parsed.code);
   const isDeniedLike =
-    !isBadCredential && (parsed.code === 'AccessDenied' || parsed.status === 403 || parsed.status === 401);
+    !isBadCredential &&
+    !NON_SCOPE_CODES.has(parsed.code) &&
+    (parsed.code === 'AccessDenied' || parsed.status === 403 || parsed.status === 401);
   // Which scope-hint variant, if any: 'unset' (no base folder, readable or masked denial),
   // 'set' (a floor is set yet the first listing was still denied — only meaningful on the
   // connect screen, signalled by the action callback), or null.
@@ -180,7 +192,9 @@ export function ErrorBlock({
           </ul>
         </div>
       )}
-      {guidance && <div style={{ marginTop: '.3rem' }}>{guidance}</div>}
+      {/* (ux built-review 2) the masked two-cause block already ends with the curl escape
+          hatch; the caller's generic CORS guidance would contradict the honest verdict. */}
+      {guidance && scopeHint !== 'unset-masked' && <div style={{ marginTop: '.3rem' }}>{guidance}</div>}
       {(parsed.code || parsed.status || parsed.requestId) && (
         <details>
           <summary>Provider response details</summary>

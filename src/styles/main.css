@@ -1173,6 +1173,7 @@ details[open] .sv-summary::before { transform: rotate(90deg); }
 }
 .toast {
   pointer-events: auto;
+  white-space: pre-line; /* #69: the key-ID disclosure is a second line of the copy toast */
   font: inherit; font-size: .85rem; text-align: left;
   background: var(--surface); color: var(--text);
   border: 1px solid var(--border); border-left: 3px solid var(--text-success);

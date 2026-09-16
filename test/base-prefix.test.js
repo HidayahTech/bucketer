@@ -112,6 +112,13 @@ test('sanitizeNavPrefix keeps spaces and unicode — prefixes are arbitrary key 
   assert.equal(sanitizeNavPrefix('my photos/2026 été/'), 'my photos/2026 été/');
 });
 
+test('discoveredFloor ignores a floor that the current link supplied (diff review S-2)', () => {
+  assert.equal(discoveredFloor('', 'team/alice/', 'team/alice/'), null, 'link-supplied, not typed');
+  assert.equal(discoveredFloor('', 'team/alice/', 'team/alice'), null, 'compared normalized');
+  assert.equal(discoveredFloor('', 'team/alice/', 'team/bob/'), 'team/alice/', 'typed over a different link floor');
+  assert.equal(discoveredFloor('', 'team/alice/', ''), 'team/alice/');
+});
+
 test('discoveredFloor is null when nothing was discovered', () => {
   assert.equal(discoveredFloor('', ''), null);
   assert.equal(discoveredFloor('', undefined), null);

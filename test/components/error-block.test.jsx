@@ -168,6 +168,20 @@ describe('ErrorBlock', () => {
     });
   }
 
+  for (const code of ['RequestTimeTooSkewed', 'ExpiredToken', 'AllAccessDisabled']) {
+    test(`#65: no scope hint and no bad-credential claim on ${code} (diff review S-4)`, () => {
+      const err = { name: code, Code: code, message: 'provider says so', $metadata: { httpStatusCode: 403 } };
+      const { text, query, cleanup } = mount(
+        h(ErrorBlock, { error: err, basePrefixUnset: true, onSetBaseFolder: () => {} }),
+      );
+      assert.equal(query('.scope-hint'), null);
+      assert.ok(!text().includes('Base folder'));
+      assert.ok(!text().includes('key ID or secret key is wrong'), 'the provider message is the explanation');
+      assert.ok(text().includes('provider says so'));
+      cleanup();
+    });
+  }
+
   test('#65: a floor that is set yet denied gets the set-but-denied variant naming the floor', () => {
     const { text, query, cleanup } = mount(
       h(ErrorBlock, { error: denied403(), basePrefix: 'team/alice/', onSetBaseFolder: () => {} }),

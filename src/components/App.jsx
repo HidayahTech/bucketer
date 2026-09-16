@@ -278,7 +278,10 @@ export function App() {
       // and visibly (a credential property changing silently would be a surprise).
       if (op === 'list' && state === 'permitted' && selectedConnectionId) {
         const rec = resolveConnection(selectedConnectionId);
-        const floor = rec && discoveredFloor(rec.basePrefix, credentialsRef.current?.basePrefix);
+        // (diff review S-2) a floor the current link supplied is not "discovered" — it
+        // stays with the explicit Save flow, so a link can never write into a saved record.
+        const floor =
+          rec && discoveredFloor(rec.basePrefix, credentialsRef.current?.basePrefix, readUrlParams().basePrefix);
         if (floor) {
           saveConnectionRecord({ id: selectedConnectionId, basePrefix: floor });
           setConnections(listResolvedConnections());
@@ -555,8 +558,13 @@ export function App() {
       const fromUrl = readUrlParams();
       if (Object.keys(fromUrl).length === 0) return;
       setUrlHadKeyId(!!fromUrl.keyId);
-      setCredentials((prev) => ({ ...prev, ...fromUrl }));
-      setLiveFormData((prev) => ({ ...prev, ...fromUrl }));
+      // #70 (diff review S-1): a link that changes the connection must not keep the
+      // previous connection's secret sitting in the form — that would be one click from
+      // signing to the new host. Same rule as the mount-time guard.
+      const merge = (prev) =>
+        urlChangesConnection(fromUrl, prev) ? { ...prev, ...fromUrl, secretKey: '' } : { ...prev, ...fromUrl };
+      setCredentials(merge);
+      setLiveFormData(merge);
       setFormResetKey((k) => k + 1);
     };
     window.addEventListener('hashchange', onHashChange);

@@ -1170,6 +1170,7 @@ export function Browser({
             ? () => copyConnectionLink({ credentials, prefix, includeKeyId: getIncludeKeyId() })
             : undefined
         }
+        copyLinkIncludesKeyId={getIncludeKeyId()}
       />
 
       <div class="browser-toolbar">
