@@ -163,7 +163,12 @@ export function ErrorBlock({
       {diag && diag !== 'running' && (
         <div style={{ marginTop: '.3rem' }}>
           <div>
-            <strong>{VERDICT_MESSAGES[diag.verdict]}</strong>
+            {/* #66: the two-cause verdict defers to the hint block above, so no emphasis */}
+            {diag.verdict === 'cors-blocked-or-scoped' ? (
+              VERDICT_MESSAGES[diag.verdict]
+            ) : (
+              <strong>{VERDICT_MESSAGES[diag.verdict]}</strong>
+            )}
           </div>
           <ul style={{ margin: '.3rem 0 0', paddingLeft: '1.2rem', listStyle: 'none' }}>
             {diag.checks.map((c) => (

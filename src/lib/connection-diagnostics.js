@@ -30,18 +30,27 @@ export const VERDICT_MESSAGES = {
   // same masked TypeError — so connected sessions get this softer verdict.
   'cors-blocked-transient':
     "Your storage responded, but this request was blocked or interrupted. Since this connection was already working, a transient network interruption is more likely than a CORS problem — retry the operation. If it keeps happening, re-check the bucket's CORS configuration.",
+  // #66: on the connect screen with no Base folder, all-probes-pass cannot tell a CORS
+  // block from a provider denial sent without CORS headers (a prefix-restricted key
+  // probing the bucket root looks exactly like this). Both causes stay open; the
+  // free one is named first. Never "almost certainly" while that hypothesis is untested.
+  'cors-blocked-or-scoped':
+    "Your storage is reachable and its hostname resolves, so the endpoint and bucket name look right. These checks can't tell a CORS block apart from a denial your provider sent without CORS headers — so both causes above are still open. Try the base folder first; it costs nothing.",
 };
 
 // Builds the ErrorBlock `diagnostics` prop from a stored credentials object.
 // connected: pass true from error blocks that only render inside a working
 // session (Browser, HiddenVersions) — it selects the transient variant of the
 // cors-blocked verdict (#52). The connect screen leaves it false.
+// basePrefixUnset (#66): true when the connection has no Base folder; only the
+// connect screen acts on it (selects the cors-blocked-or-scoped verdict).
 export function diagnosticsProps(credentials, connected = false) {
   return {
     endpoint: credentials.endpoint,
     bucket: credentials.bucket,
     forcePathStyle: requiresPathStyle(credentials.provider),
     connected,
+    basePrefixUnset: !credentials.basePrefix,
   };
 }
 
@@ -64,6 +73,7 @@ export async function runDiagnostics({
   bucket,
   forcePathStyle,
   connected,
+  basePrefixUnset,
   fetchFn,
   pageProtocol,
   onLine,
@@ -143,7 +153,9 @@ export async function runDiagnostics({
 
   // 6 (implicit). Reachable everywhere yet the SDK saw a masked TypeError → CORS
   // layer for request-time blocks; on an already-working connection a transient
-  // mid-transfer interruption is the likelier cause (#52).
-  if (!verdict) verdict = connected ? 'cors-blocked-transient' : 'cors-blocked';
+  // mid-transfer interruption is the likelier cause (#52); on the connect screen with
+  // no Base folder a masked denial from a prefix-restricted key is equally likely (#66).
+  if (!verdict)
+    verdict = connected ? 'cors-blocked-transient' : basePrefixUnset ? 'cors-blocked-or-scoped' : 'cors-blocked';
   return { checks, verdict };
 }

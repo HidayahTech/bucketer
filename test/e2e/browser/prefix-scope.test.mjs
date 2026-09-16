@@ -193,6 +193,45 @@ describe('prefix-scoped keys — normal connect screen', () => {
       await context.close();
     }
   });
+
+  // #66 observable — the CORS-masked shape. The mock's corsOnErrors:false models the
+  // hypothesis that a provider omits CORS headers on error responses; it does not establish
+  // that Backblaze B2 does. No e2e coverage: harness cannot represent B2's real
+  // denial/CORS behaviour. Provider override MinIO → path-style, so the diagnostics'
+  // bucket-hostname probe is skipped and no engine depends on *.localhost resolution.
+  e2eTest(
+    'a CORS-masked denial with no Base folder still offers Set base folder, and diagnostics name both causes',
+    async () => {
+      await seedScoped();
+      ctx.mock.configure({ corsOnErrors: false });
+      const { context, page } = await freshPage();
+      try {
+        await page.locator('#cred-provider').selectOption('minio');
+        await fillConnect(page);
+        const block = page.locator('.error-block');
+        await block.waitFor({ timeout: scaleTimeout(15000) });
+        const text = await block.textContent();
+        assert.ok(
+          !text.includes('Access Denied'),
+          `the denial must be opaque to the browser, got: ${text.slice(0, 80)}`,
+        );
+        assert.ok(text.includes('two likely causes'), 'the masked two-cause block renders');
+        await block.locator('button:has-text("Set base folder")').waitFor({ timeout: scaleTimeout(5000) });
+        await block.locator('button:has-text("Run diagnostics")').click();
+        await page.waitForFunction(
+          () => document.querySelector('.error-block').textContent.includes('both causes above are still open'),
+          null,
+          { timeout: scaleTimeout(15000) },
+        );
+        const after = await block.textContent();
+        assert.ok(!after.includes('almost certainly'), 'the verdict must not confidently blame CORS');
+        // Presence, beside the absence above: the root list did reach the mock and was denied.
+        assert.ok(rootLists().length >= 1, 'the root list reached the mock');
+      } finally {
+        await context.close();
+      }
+    },
+  );
 });
 
 // #65: a failed quick-switch names the bucket it tried to open, so a tab click that fails

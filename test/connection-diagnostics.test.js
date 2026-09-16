@@ -154,12 +154,47 @@ describe('runDiagnostics verdicts', () => {
     const { verdict } = await runDiagnostics({ ...BASE, fetchFn: fetchFail, connected: true });
     assert.equal(verdict, 'endpoint-unreachable');
   });
+
+  // #66: on the connect screen with no Base folder, all-probes-pass cannot separate a CORS
+  // block from a masked denial of a prefix-restricted key — the verdict must say so.
+  test('no base folder on the connect screen: all-pass yields cors-blocked-or-scoped (#66)', async () => {
+    const { verdict } = await runDiagnostics({ ...BASE, fetchFn: fetchOk, basePrefixUnset: true });
+    assert.equal(verdict, 'cors-blocked-or-scoped');
+  });
+
+  test('a set base folder keeps the plain cors-blocked verdict (#66)', async () => {
+    const { verdict } = await runDiagnostics({ ...BASE, fetchFn: fetchOk, basePrefixUnset: false });
+    assert.equal(verdict, 'cors-blocked');
+  });
+
+  test('connected outranks basePrefixUnset — in-session blocks keep the transient verdict (#66)', async () => {
+    const { verdict } = await runDiagnostics({ ...BASE, fetchFn: fetchOk, connected: true, basePrefixUnset: true });
+    assert.equal(verdict, 'cors-blocked-transient');
+  });
+
+  test('basePrefixUnset does not change failure verdicts (#66)', async () => {
+    const { verdict } = await runDiagnostics({ ...BASE, fetchFn: fetchFail, basePrefixUnset: true });
+    assert.equal(verdict, 'endpoint-unreachable');
+  });
+
+  test('the or-scoped message names both causes and never says "almost certainly" (#66)', () => {
+    const msg = VERDICT_MESSAGES['cors-blocked-or-scoped'];
+    assert.ok(msg.includes('CORS'), 'names CORS');
+    assert.ok(msg.toLowerCase().includes('base folder'), 'names the base folder');
+    assert.ok(!msg.includes('almost certainly'));
+  });
 });
 
 describe('diagnosticsProps', () => {
   test('derives forcePathStyle from provider', () => {
     const p = diagnosticsProps({ endpoint: 'https://x.example.com', bucket: 'b', provider: 'minio' });
-    assert.deepEqual(p, { endpoint: 'https://x.example.com', bucket: 'b', forcePathStyle: true, connected: false });
+    assert.deepEqual(p, {
+      endpoint: 'https://x.example.com',
+      bucket: 'b',
+      forcePathStyle: true,
+      connected: false,
+      basePrefixUnset: true,
+    });
   });
 
   test('virtual-host provider yields forcePathStyle false', () => {
