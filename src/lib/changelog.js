@@ -1,9 +1,15 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.62.6';
+export const CURRENT_VERSION = '1.62.7';
 
 export const CHANGELOG = [
+  {
+    "version": "1.62.7",
+    "date": "2026-09-16",
+    "title": "Folder deep links are validated and normalized",
+    "changes": []
+  },
   {
     "version": "1.62.6",
     "date": "2026-09-16",

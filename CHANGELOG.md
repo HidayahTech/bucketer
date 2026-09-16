@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.62.7] — 2026-09-16 — Folder deep links are validated and normalized
+
+Security hardening (GitLab #68). The navigation `prefix` in a link's hash was read raw at three places and only clamped to the base folder — never normalized or validated. A link written as `#prefix=clients/acme` (no trailing slash) listed every key that merely *starts with* `clients/acme` under a breadcrumb claiming a folder, and **New folder** under it composed a sibling key (`clients/acmeReports/`); `..` segments, backslashes and over-long values passed through. The navigation prefix now has one validated read applying the Base-folder rule (≤1024 chars, no backslash, no `..`), normalized to a folder, before the floor clamp; the `region` link param gets the same guard as the key ID. Existing well-formed links behave exactly as before.
+
 ## [1.62.6] — 2026-09-16 — A Base folder set on recovery is saved to the connection
 
 A saved connection with an empty **Base folder** fails on a folder-limited key; you set the base folder on the failed screen and connect successfully; then a quick-switch tab click (or sidebar select) back to that connection failed again with the field blank (GitLab #67). The recovered floor lived only in the last-connected mirror, never in the saved record the switch re-reads. After the first successful listing at the floor, Bucketer now writes it into the selected saved connection — only when the record had no floor, never over one you set deliberately — and says so with a toast ("Base folder saved to <name>"). A plain reload had happened to work all along; the quick-switch path is what looped, and that is what the new test measures.
