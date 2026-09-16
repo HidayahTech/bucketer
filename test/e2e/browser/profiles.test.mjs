@@ -130,6 +130,9 @@ describe('#70 — a link that changes the connection does not auto-connect', () 
       if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
       await page.locator('button[type="submit"]:has-text("Connect")').click();
       await page.locator('.error-block').waitFor({ timeout: scaleTimeout(15000) });
+      // The hashchange listener for the failed state attaches in an effect after paint; let
+      // it settle before firing the event, or a fast lane can race it.
+      await page.waitForTimeout(scaleTimeout(300));
       await page.evaluate(
         (hash) => {
           window.location.hash = hash;

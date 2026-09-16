@@ -17,6 +17,8 @@ import {
   newE2EContext,
   newE2EPage,
   e2eTest,
+  applyEngineQuirks,
+  e2eEngineName,
 } from '../harness.mjs';
 
 const BUCKET = 'test-bucket';
@@ -153,7 +155,9 @@ describe('prefix-scoped keys — normal connect screen', () => {
 
   e2eTest('… and on a Pixel 5 viewport, where the field is a full screen above the error', async () => {
     await seedScoped();
-    const context = await newE2EContext(browser, { ...devices['Pixel 5'] });
+    // applyEngineQuirks: Firefox rejects isMobile; the harness strips it for the lane device
+    // and specs that pin their own device must do the same (see issue-3-mobile).
+    const context = await newE2EContext(browser, applyEngineQuirks(e2eEngineName(), devices['Pixel 5']));
     const page = await newE2EPage(context);
     try {
       await page.goto(app.url, { waitUntil: 'domcontentloaded' });
@@ -251,6 +255,19 @@ describe('prefix-scoped keys — quick-switch failure', () => {
     await page.locator('.bucket-row', { hasText: bucket }).waitFor({ timeout: scaleTimeout(5000) });
   }
 
+  // Quick-switch to a saved bucket the way the current viewport offers it: the header tab
+  // strip on desktop, the sidebar's bucket row below 640px (the strip is display:none there).
+  // Both drive App's switchToConnection.
+  async function quickSwitchTo(page, bucket) {
+    const tab = page.locator('.connection-tab', { hasText: bucket });
+    if (await tab.isVisible().catch(() => false)) {
+      await tab.click();
+      return;
+    }
+    await page.locator('button:has-text("☰")').click();
+    await page.locator('.bucket-row', { hasText: bucket }).click();
+  }
+
   e2eTest('switching to a saved bucket the key cannot list titles the error with that bucket', async () => {
     await seedScoped();
     const { context, page } = await freshPage();
@@ -282,7 +299,7 @@ describe('prefix-scoped keys — quick-switch failure', () => {
       await page.locator('[data-testid="file-row:report.pdf"]').waitFor({ timeout: scaleTimeout(15000) });
 
       ctx.mock.requestLog.reset();
-      await page.locator('.connection-tab', { hasText: 'other-bucket' }).click();
+      await quickSwitchTo(page, 'other-bucket');
       const block = page.locator('.error-block');
       await block.waitFor({ timeout: scaleTimeout(15000) });
       assert.equal(
@@ -332,7 +349,7 @@ describe('prefix-scoped keys — quick-switch failure', () => {
 
       // Quick-switch back to the same connection: re-resolves the record.
       ctx.mock.requestLog.reset();
-      await page.locator('.connection-tab', { hasText: BUCKET }).click();
+      await quickSwitchTo(page, BUCKET);
       await page.locator('[data-testid="file-row:report.pdf"]').waitFor({ timeout: scaleTimeout(15000) });
       assert.equal(rootLists().length, 0, 'no root list on the quick-switch after recovery');
       assert.equal(await page.locator('.error-block').count(), 0, 'no failure after the switch');
