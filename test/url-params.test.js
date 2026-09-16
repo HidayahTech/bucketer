@@ -21,6 +21,8 @@ import {
   buildShareUrl,
   pushPrefixHistory,
   readHashPrefix,
+  urlChangesConnection,
+  describeUrlParams,
 } from '../src/lib/url-params.js';
 
 describe('buildShareUrl', () => {
@@ -320,6 +322,50 @@ describe('readHashPrefix', () => {
   test('is empty when the param is absent', () => {
     loc.hash = '#bucket=b';
     assert.equal(readHashPrefix(), '');
+  });
+});
+
+// #70: a link that changes the connection must not auto-connect a secret-holding tab.
+describe('urlChangesConnection', () => {
+  const stored = {
+    endpoint: 'https://s3.example.com',
+    bucket: 'b',
+    keyId: 'AKID1',
+    provider: 'generic',
+    regionOverride: 'us-east-1',
+    basePrefix: 'team/',
+  };
+
+  test('false when the link only repeats stored values (the reload-my-link path)', () => {
+    assert.equal(urlChangesConnection({ endpoint: 'https://s3.example.com', bucket: 'b' }, stored), false);
+    assert.equal(urlChangesConnection({}, stored), false);
+  });
+
+  test('tolerates a trailing slash on the endpoint and an unnormalized base folder', () => {
+    assert.equal(urlChangesConnection({ endpoint: 'https://s3.example.com/', basePrefix: 'team' }, stored), false);
+  });
+
+  test('true when any supplied field differs', () => {
+    assert.equal(urlChangesConnection({ endpoint: 'https://attacker.example' }, stored), true);
+    assert.equal(urlChangesConnection({ bucket: 'other' }, stored), true);
+    assert.equal(urlChangesConnection({ basePrefix: 'team/bob/' }, stored), true);
+    assert.equal(urlChangesConnection({ keyId: 'AKID2' }, stored), true);
+  });
+
+  test('a link that sets a floor where none was stored counts as a change', () => {
+    assert.equal(urlChangesConnection({ basePrefix: 'team/' }, { ...stored, basePrefix: '' }), true);
+  });
+});
+
+describe('describeUrlParams', () => {
+  test('names what the link set, including the base folder value', () => {
+    assert.deepEqual(describeUrlParams({ endpoint: 'x', bucket: 'b', basePrefix: 'team/', keyId: 'k' }), [
+      'endpoint',
+      'bucket',
+      'base folder team/',
+      'key ID',
+    ]);
+    assert.deepEqual(describeUrlParams({}), []);
   });
 });
 

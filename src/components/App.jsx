@@ -60,7 +60,13 @@ import {
   credentialFingerprint,
 } from '../lib/connections.js';
 import { cacheSecret, getCachedSecret } from '../lib/secret-cache.js';
-import { readUrlParams, hasUrlParams, buildShareUrl } from '../lib/url-params.js';
+import {
+  readUrlParams,
+  hasUrlParams,
+  buildShareUrl,
+  urlChangesConnection,
+  describeUrlParams,
+} from '../lib/url-params.js';
 import { normalizeBasePrefix, discoveredFloor } from '../lib/base-prefix.js';
 import { isForegroundTask } from '../lib/task-routing.js';
 import { vaultExists, isUnlocked, recallSecret, rememberSecret, createVault, VAULT_ENABLED } from '../lib/vault.js';
@@ -617,8 +623,19 @@ export function App() {
       // pick up the credentials update above — force it explicitly.
       setFormResetKey((k) => k + 1);
     }
-    if (merged.endpoint && merged.bucket && merged.keyId && merged.secretKey) {
+    // #70: a link that CHANGES the connection never auto-connects a secret-holding tab —
+    // the stored key would otherwise sign requests to whatever endpoint/bucket/floor the
+    // link named (a pasted link, a duplicated tab, or a stale hash after a quick-switch).
+    // Fall through to the pre-filled form with the secret cleared; the banner names what
+    // the link set. A link that merely repeats the stored connection still reloads.
+    const linkChangesConnection = Object.keys(fromUrl).length > 0 && urlChangesConnection(fromUrl, base);
+    if (merged.endpoint && merged.bucket && merged.keyId && merged.secretKey && !linkChangesConnection) {
       handleConnect(merged);
+    } else if (linkChangesConnection) {
+      const prefill = { ...merged, secretKey: '' };
+      setCredentials(prefill);
+      setLiveFormData(prefill);
+      setFormResetKey((k) => k + 1);
     } else if (isUnlocked() && conn) {
       // Vault-backed auto-connect (contract: "auto-connect through the vault" — this
       // is the whole point of the feature). The flat-credential check above requires
@@ -1650,9 +1667,10 @@ export function App() {
                 {urlParamsPresent && (
                   <div class="banner banner-info" style={{ marginBottom: '1rem' }}>
                     <div class="banner-body">
-                      {urlHadKeyId
-                        ? 'Connection details pre-filled from URL — enter your Secret Key to connect.'
-                        : 'Endpoint and bucket pre-filled from URL — enter your Key ID and Secret Key to connect.'}
+                      {/* #70: name what the link set — a base folder from a link is never silent */}
+                      {`Pre-filled from the link: ${describeUrlParams(readUrlParams()).join(', ')} — enter your ${
+                        urlHadKeyId ? 'Secret Key' : 'Key ID and Secret Key'
+                      } to connect.`}
                     </div>
                   </div>
                 )}

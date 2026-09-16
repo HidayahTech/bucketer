@@ -23,6 +23,34 @@ export function readHashPrefix() {
   return sanitizeNavPrefix(hashParams().get('prefix'));
 }
 
+// #70: does a link's connection config differ from what is stored? The mount-time
+// auto-connect (a tab that still holds a secret) may only proceed when the answer is no —
+// otherwise a pasted or stale link would silently sign the stored key's requests to a
+// different endpoint/bucket/floor. Only fields the link actually set are compared.
+const CONNECTION_FIELDS = ['endpoint', 'bucket', 'keyId', 'provider', 'regionOverride', 'basePrefix'];
+function canon(field, value) {
+  const v = (value || '').trim();
+  if (field === 'endpoint') return v.replace(/\/$/, '');
+  if (field === 'basePrefix') return normalizeBasePrefix(v);
+  return v;
+}
+export function urlChangesConnection(fromUrl, stored) {
+  return CONNECTION_FIELDS.some((f) => f in (fromUrl || {}) && canon(f, fromUrl[f]) !== canon(f, (stored || {})[f]));
+}
+
+// #70: what the link set, in the user's words, for the pre-fill banner — so a floor
+// arriving from a link is never silent.
+export function describeUrlParams(fromUrl) {
+  const out = [];
+  if (fromUrl.endpoint) out.push('endpoint');
+  if (fromUrl.bucket) out.push('bucket');
+  if (fromUrl.basePrefix) out.push(`base folder ${fromUrl.basePrefix}`);
+  if (fromUrl.keyId) out.push('key ID');
+  if (fromUrl.regionOverride) out.push('region');
+  if (fromUrl.provider) out.push('provider');
+  return out;
+}
+
 // Read config fields from the hash (endpoint, bucket, provider, region, keyId).
 // Returned object is merged over stored credentials so the form is pre-filled.
 export function readUrlParams() {
