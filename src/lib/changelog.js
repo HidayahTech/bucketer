@@ -1,9 +1,15 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.63.0';
+export const CURRENT_VERSION = '1.63.1';
 
 export const CHANGELOG = [
+  {
+    "version": "1.63.1",
+    "date": "2026-09-16",
+    "title": "A pasted link never silently reconnects your key elsewhere",
+    "changes": []
+  },
   {
     "version": "1.63.0",
     "date": "2026-09-16",
