@@ -1577,7 +1577,9 @@ export function App() {
         <span class="spacer" />
         {providerLabel && session === 'connected' && <span class="header-status">{providerLabel}</span>}
         <StatusBadge session={session} />
-        {session === 'connected' && buildShareUrl(credentials) && <ShareLinkMenu credentials={credentials} />}
+        {session === 'connected' && buildShareUrl(credentials) && (
+          <ShareLinkMenu credentials={credentials} prefix={currentPrefix} />
+        )}
         {session === 'connected' && capabilities.list !== 'denied' && (
           <button
             type="button"

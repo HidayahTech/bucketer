@@ -481,3 +481,116 @@ describe('prefix-scoped keys — shared link screen', () => {
     }
   });
 });
+
+// #69 observable: a folder link copied from inside a folder, opened by a recipient who
+// supplies their own key, lands INSIDE that folder — a row from the folder renders and the
+// mock saw no root (or floor-only) listing. The clipboard is stubbed on the context so the
+// copied text is readable on every engine without clipboard-read permissions.
+describe('folder links (#69)', () => {
+  async function pageWithClipboardStub(hash = '') {
+    const context = await newE2EContext(browser);
+    await context.addInitScript(() => {
+      window.__copied = null;
+      Object.defineProperty(navigator, 'clipboard', {
+        configurable: true,
+        value: { writeText: async (t) => void (window.__copied = t) },
+      });
+    });
+    const page = await newE2EPage(context);
+    await page.goto(app.url + hash, { waitUntil: 'domcontentloaded' });
+    return { context, page };
+  }
+
+  async function seedWithSub() {
+    await seedScoped();
+    await ctx.client.send(
+      new PutObjectCommand({ Bucket: BUCKET, Key: SCOPE + 'sub/inner.txt', Body: new TextEncoder().encode('i') }),
+    );
+    ctx.mock.requestLog.reset();
+  }
+
+  async function openAsRecipient(url) {
+    const context = await newE2EContext(browser);
+    const page = await newE2EPage(context);
+    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    // The link supplies everything but the key: the recipient brings their own.
+    await page.locator('input[placeholder="Access Key ID"]').fill('scoped-key');
+    await page.locator('input[placeholder="Secret Access Key"]').fill('s');
+    const region = page.locator('input[placeholder="us-east-1"]');
+    if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
+    await page.locator('button[type="submit"]:has-text("Connect")').click();
+    return { context, page };
+  }
+
+  e2eTest('the breadcrumb button copies a link that opens the recipient inside the folder', async () => {
+    await seedWithSub();
+    const { context, page } = await pageWithClipboardStub();
+    let url;
+    try {
+      await fillConnect(page, { baseFolder: SCOPE });
+      await page.locator('[data-testid="folder-row:sub"]').click();
+      await page.locator('[data-testid="file-row:inner.txt"]').waitFor({ timeout: scaleTimeout(15000) });
+      await page.locator('[data-testid="crumb-copy-link"]').click();
+      await page.locator('.toast', { hasText: 'Link copied — opens at ' + SCOPE + 'sub/' }).waitFor({
+        timeout: scaleTimeout(5000),
+      });
+      url = await page.evaluate(() => window.__copied);
+      const p = new URLSearchParams(url.split('#')[1]);
+      assert.equal(p.get('prefix'), SCOPE + 'sub/', 'the link carries the folder');
+      assert.equal(p.get('basePrefix'), SCOPE, 'and the floor');
+      assert.equal(p.get('keyId'), null, 'and no key ID unless asked');
+    } finally {
+      await context.close();
+    }
+
+    ctx.mock.requestLog.reset();
+    const recipient = await openAsRecipient(url);
+    try {
+      await recipient.page.locator('[data-testid="file-row:inner.txt"]').waitFor({ timeout: scaleTimeout(15000) });
+      const lists = ctx.mock.requestLog.list().filter((r) => r.isList);
+      assert.ok(
+        lists.some((r) => r.listPrefix === SCOPE + 'sub/'),
+        'the recipient listed the folder',
+      );
+      assert.equal(rootLists().length, 0, 'never the bucket root');
+      assert.ok(!lists.some((r) => r.listPrefix === SCOPE), 'and did not land at the floor first');
+    } finally {
+      await recipient.context.close();
+    }
+  });
+
+  e2eTest('the header menu offers the same folder link, and the top item omits the folder', async () => {
+    await seedWithSub();
+    const { context, page } = await pageWithClipboardStub();
+    try {
+      await fillConnect(page, { baseFolder: SCOPE });
+      await page.locator('[data-testid="folder-row:sub"]').click();
+      await page.locator('[data-testid="file-row:inner.txt"]').waitFor({ timeout: scaleTimeout(15000) });
+      await page.locator('button:has-text("Copy link")').click();
+      await page.locator('[data-testid="share-link-folder"]').click();
+      const folderLink = await page.evaluate(() => window.__copied);
+      assert.equal(new URLSearchParams(folderLink.split('#')[1]).get('prefix'), SCOPE + 'sub/');
+      await page.locator('button:has-text("Copy link")').click();
+      await page.locator('[data-testid="share-link-top"]').click();
+      const topLink = await page.evaluate(() => window.__copied);
+      assert.equal(new URLSearchParams(topLink.split('#')[1]).get('prefix'), null, 'top link carries no folder');
+      await page
+        .locator('.toast', { hasText: 'opens at the top of ' + SCOPE })
+        .waitFor({ timeout: scaleTimeout(5000) });
+    } finally {
+      await context.close();
+    }
+  });
+
+  e2eTest('no breadcrumb link button at the floor', async () => {
+    await seedWithSub();
+    const { context, page } = await pageWithClipboardStub();
+    try {
+      await fillConnect(page, { baseFolder: SCOPE });
+      await page.locator('[data-testid="file-row:report.pdf"]').waitFor({ timeout: scaleTimeout(15000) });
+      assert.equal(await page.locator('[data-testid="crumb-copy-link"]').count(), 0);
+    } finally {
+      await context.close();
+    }
+  });
+});

@@ -18,7 +18,8 @@ import { Modal } from './Modal.jsx';
 import { PreviewMedia } from './PreviewMedia.jsx';
 import { defaultMaxKeys } from '../lib/provider.js';
 import { loadMaxKeys, loadListingCacheTTL, loadFileMtimeAutoLoad } from '../lib/storage.js';
-import { pushPrefixHistory, readHashPrefix } from '../lib/url-params.js';
+import { pushPrefixHistory, readHashPrefix, buildShareUrl } from '../lib/url-params.js';
+import { copyConnectionLink, getIncludeKeyId, isLinkableFolder } from '../lib/connection-link.js';
 import { mediaKind, mimeType, mimeKind } from '../lib/media.js';
 import { resolveDroppedFiles } from '../lib/file-entries.js';
 import { PRESIGN_EXPIRES, DOWNLOAD_PRESIGN_EXPIRES, TEXT_PREVIEW_LIMIT, FILE_MTIME_KEY } from '../lib/constants.js';
@@ -1161,6 +1162,14 @@ export function Browser({
         onMoveLeave={handleTargetDragLeave}
         onMoveDrop={handleInternalDrop}
         moveHoverTarget={dndHoverTarget}
+        // #69: one-click folder link, only where it would change anything (not root/floor)
+        // and only where a link can be built (not file://). Same builder and key-ID choice as
+        // the header menu.
+        onCopyLink={
+          isLinkableFolder(prefix, basePrefix) && buildShareUrl(credentials || {})
+            ? () => copyConnectionLink({ credentials, prefix, includeKeyId: getIncludeKeyId() })
+            : undefined
+        }
       />
 
       <div class="browser-toolbar">

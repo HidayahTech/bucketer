@@ -84,7 +84,13 @@ export function hasUrlParams() {
 // never included. The access key ID is included only when includeKeyId is set — this
 // is the "everything but the secret" variant, so a recipient only enters the secret.
 // Returns null when running from file:// (no meaningful origin to share).
-export function buildShareUrl(credentials, { includeKeyId = false } = {}) {
+// prefix (#69): the folder the link should open in. Emitted only when non-empty AND
+// different from the connection's floor, so a link copied at the root of an unscoped
+// connection, or at the floor of a scoped one, is byte-identical to pre-#69 output. The
+// recipient's floor still outranks it (Browser clamps with a notice), so a folder link can
+// never turn into a 403. `prefix` is navigation state, not connection config: readUrlParams
+// deliberately never consumes it (readHashPrefix does).
+export function buildShareUrl(credentials, { includeKeyId = false, prefix = '' } = {}) {
   if (window.location.protocol === 'file:') return null;
   const p = new URLSearchParams();
   if (credentials.endpoint) p.set('endpoint', credentials.endpoint);
@@ -93,6 +99,8 @@ export function buildShareUrl(credentials, { includeKeyId = false } = {}) {
   if (credentials.regionOverride) p.set('region', credentials.regionOverride);
   if (credentials.basePrefix) p.set('basePrefix', credentials.basePrefix);
   if (includeKeyId && credentials.keyId) p.set('keyId', credentials.keyId);
+  const folder = normalizeBasePrefix(prefix);
+  if (folder && folder !== normalizeBasePrefix(credentials.basePrefix)) p.set('prefix', folder);
   const hash = p.toString();
   const base = window.location.origin + window.location.pathname;
   return hash ? `${base}#${hash}` : base;

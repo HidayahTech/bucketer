@@ -9,7 +9,22 @@
 // doomed click — and the leftmost crumb becomes the floor itself, labeled with its leaf
 // segment and navigating to the floor rather than ''. floor='' reproduces the unscoped
 // rendering byte-for-byte.
-export function Breadcrumb({ prefix, floor = '', onNavigate, onMoveOver, onMoveLeave, onMoveDrop, moveHoverTarget }) {
+//
+// onCopyLink (#69): when supplied, a real <button> after the current crumb copies a link
+// that opens Bucketer in this folder — the breadcrumb is where the current folder is
+// already named, and a per-row button would crowd mobile rows (BUG-042 class) next to the
+// per-file presigned link, which means something else. The caller decides when it makes
+// sense (not at the root or the floor). Keyboard-operable with a visible focus ring.
+export function Breadcrumb({
+  prefix,
+  floor = '',
+  onNavigate,
+  onMoveOver,
+  onMoveLeave,
+  onMoveDrop,
+  moveHoverTarget,
+  onCopyLink,
+}) {
   // Props for a droppable crumb. The class is always `crumb` (+ highlight when hovered);
   // drag handlers attach only when move handlers are supplied.
   function crumbProps(target) {
@@ -28,6 +43,19 @@ export function Breadcrumb({ prefix, floor = '', onNavigate, onMoveOver, onMoveL
     };
   }
 
+  const copyLinkButton = onCopyLink ? (
+    <button
+      type="button"
+      class="crumb-link"
+      onClick={onCopyLink}
+      aria-label="Copy a link to this folder"
+      title="Copy a link that opens Bucketer in this folder"
+      data-testid="crumb-copy-link"
+    >
+      🔗
+    </button>
+  ) : null;
+
   // Defensive: a prefix outside the floor should be impossible (every caller clamps),
   // but must not crash — fall back to unscoped rendering.
   const effectiveFloor = floor && (prefix || '').startsWith(floor) ? floor : '';
@@ -41,6 +69,7 @@ export function Breadcrumb({ prefix, floor = '', onNavigate, onMoveOver, onMoveL
         <span class="current" title={rootTitle}>
           {effectiveFloor ? rootLabel : '/ (root)'}
         </span>
+        {copyLinkButton}
       </div>
     );
   const parts = prefix.split('/').filter(Boolean).slice(floorParts.length);
@@ -67,6 +96,7 @@ export function Breadcrumb({ prefix, floor = '', onNavigate, onMoveOver, onMoveL
           ),
         ];
       })}
+      {copyLinkButton}
     </div>
   );
 }
