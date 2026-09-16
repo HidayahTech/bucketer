@@ -61,7 +61,7 @@ import {
 } from '../lib/connections.js';
 import { cacheSecret, getCachedSecret } from '../lib/secret-cache.js';
 import { readUrlParams, hasUrlParams, buildShareUrl } from '../lib/url-params.js';
-import { normalizeBasePrefix } from '../lib/base-prefix.js';
+import { normalizeBasePrefix, discoveredFloor } from '../lib/base-prefix.js';
 import { isForegroundTask } from '../lib/task-routing.js';
 import { vaultExists, isUnlocked, recallSecret, rememberSecret, createVault, VAULT_ENABLED } from '../lib/vault.js';
 import { FileBanner } from './FileBanner.jsx';
@@ -265,6 +265,20 @@ export function App() {
   // them to a global key is what let bucket A's state apply to bucket B.
   const handleCapabilityChange = useCallback(
     (op, state) => {
+      // #67: a Base folder discovered on the failed-connect screen lived only in the flat
+      // last-connected mirror; the saved record kept an empty floor, so a quick-switch
+      // (which re-resolves the record) failed again. Persist it into the record — only
+      // after a listing at that floor succeeded, only when the record's floor is empty,
+      // and visibly (a credential property changing silently would be a surprise).
+      if (op === 'list' && state === 'permitted' && selectedConnectionId) {
+        const rec = resolveConnection(selectedConnectionId);
+        const floor = rec && discoveredFloor(rec.basePrefix, credentialsRef.current?.basePrefix);
+        if (floor) {
+          saveConnectionRecord({ id: selectedConnectionId, basePrefix: floor });
+          setConnections(listResolvedConnections());
+          showToast(`Base folder saved to ${rec.name}`);
+        }
+      }
       setCapabilities((prev) => {
         if (prev[op] === state) return prev;
         const next = { ...prev, [op]: state };
@@ -283,6 +297,9 @@ export function App() {
   useEffect(() => {
     selectedConnectionIdRef.current = selectedConnectionId;
   }, [selectedConnectionId]);
+  // Live mirror of the credentials in use, for callbacks memoized on other deps (#67).
+  const credentialsRef = useRef(credentials);
+  credentialsRef.current = credentials;
 
   // Apply a capability result to the connection a TASK belongs to, not the live selection.
   // Foreground task → update the shown capabilities (handleCapabilityChange). Background

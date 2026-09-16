@@ -33,3 +33,12 @@ export function withinFloor(prefix, floor) {
 export function clampToFloor(prefix, floor) {
   return withinFloor(prefix, floor) ? prefix || '' : floor;
 }
+
+// A floor "discovered" on the failed-connect screen (#67): the saved record has no floor
+// and the live connection just listed successfully at one. Returns the floor to persist,
+// or null. Never overrides a stored floor — editing an existing floor is the explicit
+// Save flow's job, where the floor is part of a connection's identity.
+export function discoveredFloor(recordFloor, liveFloor) {
+  const live = normalizeBasePrefix(liveFloor);
+  return !normalizeBasePrefix(recordFloor) && live ? live : null;
+}

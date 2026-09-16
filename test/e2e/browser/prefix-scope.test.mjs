@@ -296,6 +296,50 @@ describe('prefix-scoped keys — quick-switch failure', () => {
       await context.close();
     }
   });
+
+  // #67 observable: a Base folder typed on the failed screen reaches the SAVED record, so a
+  // quick-switch back to that connection (which re-resolves the record) lists inside the
+  // floor with no root list. A same-tab reload already worked through the flat mirror on
+  // pre-fix code, so a reload-based check would be a proxy — this measures the path that
+  // looped (QA reproduction 2026-09-16, docs/review-prefix-access/40-qa-plan.md).
+  e2eTest('a Base folder set on recovery is saved to the connection, so quick-switch no longer loops', async () => {
+    await seedScoped();
+    const { context, page } = await freshPage();
+    try {
+      await page.locator('input[type="url"]').fill(ctx.browserEndpoint);
+      await page.locator('input[placeholder="my-bucket"]').fill(BUCKET);
+      await page.locator('input[placeholder="Access Key ID"]').fill('scoped-key');
+      await page.locator('input[placeholder="Secret Access Key"]').fill('s');
+      const region0 = page.locator('input[placeholder="us-east-1"]');
+      await region0.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+      if (await region0.isVisible().catch(() => false)) await region0.fill('us-east-1');
+      await saveCurrentAs(page, 'ScopedConn', BUCKET); // record saved with an EMPTY floor
+      await page.locator('button[type="submit"]:has-text("Connect")').click();
+      await page.locator('.error-block').waitFor({ timeout: scaleTimeout(15000) });
+      assert.ok(rootLists().length >= 1, 'precondition: the empty-floor connect was denied at the root');
+
+      // Recover on the failed screen.
+      ctx.mock.requestLog.reset();
+      await page.locator('#cred-baseprefix').fill(SCOPE);
+      await page.locator('button[type="submit"]:has-text("Connect")').click();
+      await page.locator('[data-testid="file-row:report.pdf"]').waitFor({ timeout: scaleTimeout(15000) });
+      await page.locator('.toast', { hasText: 'Base folder saved to ScopedConn' }).waitFor({
+        timeout: scaleTimeout(5000),
+      });
+      const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('s3b_connections') || '{}'));
+      const rec = (stored.connections || []).find((c) => c.name === 'ScopedConn');
+      assert.equal(rec?.basePrefix, SCOPE, 'the saved record itself now carries the floor');
+
+      // Quick-switch back to the same connection: re-resolves the record.
+      ctx.mock.requestLog.reset();
+      await page.locator('.connection-tab', { hasText: BUCKET }).click();
+      await page.locator('[data-testid="file-row:report.pdf"]').waitFor({ timeout: scaleTimeout(15000) });
+      assert.equal(rootLists().length, 0, 'no root list on the quick-switch after recovery');
+      assert.equal(await page.locator('.error-block').count(), 0, 'no failure after the switch');
+    } finally {
+      await context.close();
+    }
+  });
 });
 
 describe('prefix-scoped keys — shared link screen', () => {
