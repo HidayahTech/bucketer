@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.63.2] — 2026-09-16 — Review follow-ups for the prefix-access batch
+
+Four small tightenings from the security and UX reviews of v1.62.4–v1.63.1. On the failed-connect screen, changing the address bar's hash to a link naming a different endpoint now clears the secret from the form (it stayed filled, one click from signing to the new host). A base folder that arrived in a share link is never written into a saved connection by the recovery path — only a folder you typed is. Provider errors that are neither a folder restriction nor a wrong key (clock skew, expired or invalid session tokens, account state) no longer get the base-folder hint or a wrong "key is wrong" line; the provider's own message stands. The copy-link toast keeps its second line ("Includes your access key ID…") on its own line, the CORS-masked explanation no longer ends with a contradictory generic CORS tip, and the breadcrumb 🔗 button says in its tooltip when the session's key-ID choice applies. README wording corrected: a link carrying a base folder your key does not have fails to connect with the hint, not silently.
+
 ## [1.63.1] — 2026-09-16 — A pasted link never silently reconnects your key elsewhere
 
 Security hardening (GitLab #70). If a tab still held a secret from an earlier session and a share link was loaded into it as a full navigation (pasting over the address bar, a duplicated tab, or the stale hash a bucket quick-switch leaves behind), Bucketer merged the link's endpoint, bucket and base folder over the stored connection and connected with no click — signing the stored key's requests to whatever host the link named. Now a link that *changes* the connection lands on the pre-filled form with the secret cleared, and the banner names what the link set ("Pre-filled from the link: endpoint, bucket, base folder team/ — …"), so a base folder arriving from a link is never silent. Reloading a tab whose link merely repeats the stored connection still reconnects as before.
