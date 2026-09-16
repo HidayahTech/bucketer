@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.62.6] — 2026-09-16 — A Base folder set on recovery is saved to the connection
+
+A saved connection with an empty **Base folder** fails on a folder-limited key; you set the base folder on the failed screen and connect successfully; then a quick-switch tab click (or sidebar select) back to that connection failed again with the field blank (GitLab #67). The recovered floor lived only in the last-connected mirror, never in the saved record the switch re-reads. After the first successful listing at the floor, Bucketer now writes it into the selected saved connection — only when the record had no floor, never over one you set deliberately — and says so with a toast ("Base folder saved to <name>"). A plain reload had happened to work all along; the quick-switch path is what looped, and that is what the new test measures.
+
 ## [1.62.5] — 2026-09-16 — Diagnostics stop blaming CORS when a folder-limited key is just as likely
 
 On the connect screen, when no **Base folder** is set and the provider's denial reaches the browser as an opaque "Failed to fetch", **Run diagnostics** used to return five green ticks and, in bold, "almost certainly missing or incorrect CORS configuration" — a confident wrong answer for a key that is merely limited to a folder (GitLab #66). Those probes cannot tell a CORS block from a denial sent without CORS headers, so the verdict now says exactly that, names both causes, and points at the free one first (try the base folder). Every other context keeps its existing verdict: a set base folder still gets the plain CORS verdict, and in-session errors keep the transient one. Test-infra: the e2e mock gains a `corsOnErrors:false` knob so the masked shape is exercised; it models the hypothesis that a provider omits CORS headers on error responses and does not establish that Backblaze B2 does — no e2e coverage of B2's real denial/CORS behaviour (harness cannot represent it).
