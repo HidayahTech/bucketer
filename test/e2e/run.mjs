@@ -44,7 +44,18 @@ try {
     console.log('\n── Building app for browser e2e (→ perf/index.html) ──\n');
     run(['build.mjs', '--mode=perf']);
   }
-  const files = dirs.flatMap(collect);
+  // E2E_FILES: comma-separated spec paths (relative to the repo root) to run instead of the
+  // whole layer — for a matched-pair run of one spec across the container matrix. Never a
+  // coverage claim: a filtered run proves only the specs it ran.
+  const only = (process.env.E2E_FILES || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const files = dirs.flatMap(collect).filter((f) => only.length === 0 || only.includes(f));
+  if (only.length && files.length !== only.length) {
+    console.error(`E2E_FILES names ${only.length} spec(s) but ${files.length} matched: ${only.join(', ')}`);
+    process.exit(1);
+  }
   console.log(`\n── Running e2e layer: ${layer} (${files.length} files) ──\n`);
   // Serialize test files (--test-concurrency=1): the browser specs each launch Chromium, and
   // running them concurrently overloads the machine and causes timeout flakes. Serial is slower

@@ -50,6 +50,7 @@ npm test        # unit + structural + build tests (no browser required)
 npm run test:ui # component rendering tests (jsdom — no real browser required)
 npm run test:e2e:matrix    # e2e across E2E_ENGINES × E2E_DEVICES ("desktop" = no profile)
 npm run test:e2e:container # full 3×3 e2e matrix incl. WebKit, in the Playwright image (Podman/Docker)
+# E2E_FILES=test/e2e/browser/x.test.mjs scopes either matrix runner to named spec(s) — for a matched-pair run, never a coverage claim
 ```
 
 Run **every** engine through `test:e2e:container`, not just WebKit. WebKit cannot launch on a

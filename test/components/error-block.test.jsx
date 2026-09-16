@@ -108,12 +108,97 @@ describe('ErrorBlock', () => {
     cleanup();
   });
 
-  test('the CORS note mentions prefix-restricted keys when no base folder is set', () => {
-    const { text, cleanup } = mount(h(ErrorBlock, { error: new Error('Failed to fetch'), basePrefixUnset: true }));
-    assert.ok(
-      text().includes('restricted to a folder'),
-      'a real B2 denial can present as a CORS-shaped failure — the note must mention the folder-restriction cause',
+  // #65: on the CORS-masked shape the folder-restriction cause is its own ranked block,
+  // not a sentence appended to the CORS paragraph, and the generic CORS note is not
+  // repeated beneath it (the block already says both causes and the curl escape hatch).
+  test('a CORS-masked failure with no base folder gets the two-cause block, not the generic CORS note', () => {
+    const { text, query, cleanup } = mount(
+      h(ErrorBlock, { error: new Error('Failed to fetch'), basePrefixUnset: true, onSetBaseFolder: () => {} }),
     );
+    assert.ok(query('.scope-hint'), 'the scope hint block must render');
+    assert.ok(text().includes('limited to a folder'), 'names the folder-restriction cause');
+    assert.ok(text().includes('CORS rules'), 'names the CORS cause too');
+    assert.ok(!text().includes('This may be a CORS error'), 'the generic CORS note must not be repeated');
+    cleanup();
+  });
+
+  const denied403 = () => ({
+    name: 'AccessDenied',
+    Code: 'AccessDenied',
+    message: 'Access Denied',
+    $metadata: { httpStatusCode: 403 },
+  });
+
+  test('#65: the scope hint renders before any CORS text and carries a Set base folder button', () => {
+    let clicked = 0;
+    const { query, queryAll, cleanup } = mount(
+      h(ErrorBlock, { error: denied403(), basePrefixUnset: true, onSetBaseFolder: () => clicked++ }),
+    );
+    const btn = queryAll('button').find((b) => b.textContent.includes('Set base folder'));
+    assert.ok(btn, 'the action button must be present');
+    assert.equal(btn.getAttribute('type'), 'button');
+    assert.ok(query('.scope-hint').contains(btn), 'the button lives inside the hint block');
+    fire(btn, 'click');
+    assert.equal(clicked, 1, 'clicking invokes the call site action');
+    cleanup();
+  });
+
+  test('#65: no Set base folder button without the action callback (in-session blocks)', () => {
+    const { queryAll, cleanup } = mount(h(ErrorBlock, { error: denied403(), basePrefixUnset: true }));
+    assert.ok(!queryAll('button').some((b) => b.textContent.includes('Set base folder')));
+    cleanup();
+  });
+
+  test('#65: a readable 403 shows no CORS text at all', () => {
+    const { text, cleanup } = mount(h(ErrorBlock, { error: denied403(), basePrefixUnset: true }));
+    assert.ok(!text().includes('CORS'), 'a parsed HTTP response proves CORS is fine');
+    cleanup();
+  });
+
+  for (const code of ['SignatureDoesNotMatch', 'InvalidAccessKeyId']) {
+    test(`#65: no scope hint on ${code} even with no base folder — a base folder cannot fix a bad credential`, () => {
+      const bad = { name: code, Code: code, message: 'nope', $metadata: { httpStatusCode: 403 } };
+      const { text, query, cleanup } = mount(
+        h(ErrorBlock, { error: bad, basePrefixUnset: true, onSetBaseFolder: () => {} }),
+      );
+      assert.equal(query('.scope-hint'), null, 'no hint block');
+      assert.ok(!text().includes('Base folder'), 'the field is not named');
+      assert.ok(text().includes('key ID or secret key is wrong'), 'the plain cause is stated instead');
+      cleanup();
+    });
+  }
+
+  test('#65: a floor that is set yet denied gets the set-but-denied variant naming the floor', () => {
+    const { text, query, cleanup } = mount(
+      h(ErrorBlock, { error: denied403(), basePrefix: 'team/alice/', onSetBaseFolder: () => {} }),
+    );
+    assert.ok(query('.scope-hint'), 'the block renders');
+    assert.ok(text().includes('team/alice/'), 'names the current floor');
+    assert.ok(text().includes('correct the Base folder'), 'asks for a correction, not a first entry');
+    cleanup();
+  });
+
+  test('#65: the set-but-denied variant never renders for in-session blocks (no action callback)', () => {
+    const { query, cleanup } = mount(h(ErrorBlock, { error: denied403(), basePrefix: 'team/alice/' }));
+    assert.equal(query('.scope-hint'), null);
+    cleanup();
+  });
+
+  test('#65: focusOnMount makes the block focusable and focuses it on a new error', () => {
+    const { query, container, cleanup } = mount(h(ErrorBlock, { error: denied403(), focusOnMount: true }));
+    const block = query('.error-block');
+    assert.equal(block.getAttribute('tabindex'), '-1');
+    assert.equal(document.activeElement, block, 'focus moved to the alert on mount');
+    document.body.focus();
+    act(() => render(h(ErrorBlock, { error: new Error('second'), focusOnMount: true }), container));
+    assert.equal(document.activeElement, query('.error-block'), 'a new error re-focuses the alert');
+    cleanup();
+  });
+
+  test('#65: without focusOnMount the block is not focusable and focus stays put', () => {
+    const { query, cleanup } = mount(h(ErrorBlock, { error: denied403() }));
+    assert.equal(query('.error-block').getAttribute('tabindex'), null);
+    assert.notEqual(document.activeElement, query('.error-block'));
     cleanup();
   });
 
