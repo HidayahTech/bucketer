@@ -430,4 +430,54 @@ describe('prefix-scoped keys — shared link screen', () => {
       await context.close();
     }
   });
+
+  // #68 observable: a slash-less link prefix lands in the FOLDER (normalized), and "New
+  // folder" under it composes a child key — on v1.62.3 `#prefix=clients/acme/sub` listed the
+  // bare string prefix and New folder → "Reports" PUT `clients/acme/subReports/`.
+  e2eTest('a slash-less deep-link prefix is normalized, so New folder creates a child, not a sibling', async () => {
+    await seedScoped();
+    await ctx.client.send(
+      new PutObjectCommand({ Bucket: BUCKET, Key: SCOPE + 'sub/inner.txt', Body: new TextEncoder().encode('i') }),
+    );
+    const hash =
+      '#endpoint=' +
+      encodeURIComponent(ctx.browserEndpoint) +
+      '&bucket=' +
+      BUCKET +
+      '&keyId=scoped-key' +
+      '&basePrefix=' +
+      encodeURIComponent(SCOPE) +
+      '&prefix=' +
+      encodeURIComponent(SCOPE + 'sub'); // no trailing slash
+    const { context, page } = await freshPage(hash);
+    try {
+      await page.locator('input[placeholder="Secret Access Key"]').fill('s');
+      const region = page.locator('input[placeholder="us-east-1"]');
+      if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
+      await page.locator('button[type="submit"]:has-text("Connect")').click();
+      // Presence: the folder's own row renders, i.e. the listing asked for `…/sub/`.
+      await page.locator('[data-testid="file-row:inner.txt"]').waitFor({ timeout: scaleTimeout(15000) });
+      const lists = ctx.mock.requestLog.list().filter((r) => r.isList);
+      assert.ok(
+        lists.some((r) => r.listPrefix === SCOPE + 'sub/'),
+        'the listing must use the normalized folder',
+      );
+      assert.ok(!lists.some((r) => r.listPrefix === SCOPE + 'sub'), 'never the bare string prefix');
+
+      await page.locator('button[title="Create a new folder"]').click();
+      const nameInput = page.locator('.modal-overlay input.form-input');
+      await nameInput.waitFor({ timeout: scaleTimeout(5000) });
+      await nameInput.fill('Reports');
+      await nameInput.press('Enter');
+      await page.locator('[data-testid="folder-row:Reports"]').waitFor({ timeout: scaleTimeout(10000) });
+      const puts = ctx.mock.requestLog.list().filter((r) => r.method === 'PUT');
+      assert.ok(
+        puts.some((r) => decodeURIComponent(r.path).endsWith('/' + SCOPE + 'sub/Reports/')),
+        `New folder must land under the folder; PUTs: ${puts.map((r) => r.path).join(', ')}`,
+      );
+      assert.ok(!puts.some((r) => decodeURIComponent(r.path).includes('subReports')), 'never a sibling key');
+    } finally {
+      await context.close();
+    }
+  });
 });

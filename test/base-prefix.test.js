@@ -3,7 +3,13 @@
 // Contract shared with the whole codebase: '' = unscoped; non-empty prefixes end in '/'.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeBasePrefix, withinFloor, clampToFloor, discoveredFloor } from '../src/lib/base-prefix.js';
+import {
+  normalizeBasePrefix,
+  withinFloor,
+  clampToFloor,
+  discoveredFloor,
+  sanitizeNavPrefix,
+} from '../src/lib/base-prefix.js';
 
 test('normalizeBasePrefix appends a trailing slash', () => {
   assert.equal(normalizeBasePrefix('team/alice'), 'team/alice/');
@@ -83,6 +89,27 @@ test('discoveredFloor returns the live floor when the record has none', () => {
 test('discoveredFloor never overrides a stored floor', () => {
   assert.equal(discoveredFloor('team/alice/', 'team/bob/'), null);
   assert.equal(discoveredFloor('team/alice/', 'team/alice/'), null);
+});
+
+// #68: the one validated read for a navigation prefix from the hash or history state.
+test('sanitizeNavPrefix normalizes a slash-less folder to the prefix contract', () => {
+  assert.equal(sanitizeNavPrefix('clients/acme'), 'clients/acme/');
+  assert.equal(sanitizeNavPrefix('/clients//acme/'), 'clients/acme/');
+  assert.equal(sanitizeNavPrefix('clients/acme/'), 'clients/acme/');
+});
+
+test('sanitizeNavPrefix rejects traversal, backslashes, overlong and non-string values', () => {
+  assert.equal(sanitizeNavPrefix('../'), '');
+  assert.equal(sanitizeNavPrefix('a/../b/'), '');
+  assert.equal(sanitizeNavPrefix('a\\b/'), '');
+  assert.equal(sanitizeNavPrefix('x'.repeat(1025) + '/'), '');
+  assert.equal(sanitizeNavPrefix(null), '');
+  assert.equal(sanitizeNavPrefix(undefined), '');
+  assert.equal(sanitizeNavPrefix(42), '');
+});
+
+test('sanitizeNavPrefix keeps spaces and unicode — prefixes are arbitrary key fragments', () => {
+  assert.equal(sanitizeNavPrefix('my photos/2026 été/'), 'my photos/2026 été/');
 });
 
 test('discoveredFloor is null when nothing was discovered', () => {

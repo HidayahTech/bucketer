@@ -34,6 +34,19 @@ export function clampToFloor(prefix, floor) {
   return withinFloor(prefix, floor) ? prefix || '' : floor;
 }
 
+// Navigation prefix intake (#68): the one validated read for a prefix that arrives from
+// outside the app's own writes — the URL hash of a share link, or history state. Applies
+// the same rule as the Base folder field (cap 1024, no backslash, no '..' segment) and
+// normalizes to the prefix contract (non-empty ⇒ ends in '/'), so a slash-less
+// `#prefix=clients/acme` lists the folder `clients/acme/` rather than every key that
+// merely starts with `clients/acme` — and so "New folder" under it never composes a
+// sibling key. Anything invalid becomes '' (the floor, once clamped).
+export function sanitizeNavPrefix(raw) {
+  const v = typeof raw === 'string' ? raw : '';
+  if (!v || v.length > 1024 || v.includes('\\') || v.split('/').some((s) => s === '..')) return '';
+  return normalizeBasePrefix(v);
+}
+
 // A floor "discovered" on the failed-connect screen (#67): the saved record has no floor
 // and the live connection just listed successfully at one. Returns the floor to persist,
 // or null. Never overrides a stored floor — editing an existing floor is the explicit

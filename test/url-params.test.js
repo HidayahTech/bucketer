@@ -15,7 +15,13 @@ global.window = {
   },
 };
 
-import { readUrlParams, hasUrlParams, buildShareUrl, pushPrefixHistory } from '../src/lib/url-params.js';
+import {
+  readUrlParams,
+  hasUrlParams,
+  buildShareUrl,
+  pushPrefixHistory,
+  readHashPrefix,
+} from '../src/lib/url-params.js';
 
 describe('buildShareUrl', () => {
   beforeEach(() => {
@@ -124,6 +130,14 @@ describe('readUrlParams', () => {
   test('maps the region param to regionOverride', () => {
     loc.hash = '#region=us-east-1';
     assert.equal(readUrlParams().regionOverride, 'us-east-1');
+  });
+
+  // #68: region was the one connection param read raw; it reaches the SigV4 scope.
+  test('rejects a region with whitespace or an overlong value (#68)', () => {
+    loc.hash = '#region=us%20east';
+    assert.equal(readUrlParams().regionOverride, undefined);
+    loc.hash = '#region=' + 'x'.repeat(65);
+    assert.equal(readUrlParams().regionOverride, undefined);
   });
 
   test('reads provider param when it is a valid identifier', () => {
@@ -239,6 +253,35 @@ describe('readUrlParams', () => {
     const p = readUrlParams();
     assert.equal(p.basePrefix, 'team/alice/');
     assert.equal(p.prefix, undefined, 'readUrlParams must not consume the navigation prefix param');
+  });
+});
+
+// #68: the navigation prefix gets one validated, normalizing read of its own.
+describe('readHashPrefix', () => {
+  beforeEach(() => {
+    loc.hash = '';
+  });
+
+  test('normalizes a slash-less folder', () => {
+    loc.hash = '#prefix=clients%2Facme';
+    assert.equal(readHashPrefix(), 'clients/acme/');
+  });
+
+  test('passes a contract-shaped prefix through unchanged', () => {
+    loc.hash = '#prefix=clients%2Facme%2Fsub%2F';
+    assert.equal(readHashPrefix(), 'clients/acme/sub/');
+  });
+
+  test('rejects traversal and backslashes to the empty prefix', () => {
+    loc.hash = '#prefix=..%2F';
+    assert.equal(readHashPrefix(), '');
+    loc.hash = '#prefix=a%5Cb%2F';
+    assert.equal(readHashPrefix(), '');
+  });
+
+  test('is empty when the param is absent', () => {
+    loc.hash = '#bucket=b';
+    assert.equal(readHashPrefix(), '');
   });
 });
 

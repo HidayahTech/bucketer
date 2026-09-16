@@ -10,10 +10,17 @@
 // The secret key is never included, so a recipient always authenticates by entering
 // at least their secret key.
 
-import { normalizeBasePrefix } from './base-prefix.js';
+import { normalizeBasePrefix, sanitizeNavPrefix } from './base-prefix.js';
 
 function hashParams() {
   return new URLSearchParams(window.location.hash.slice(1));
+}
+
+// The navigation `prefix` param, validated and normalized (#68). Deliberately NOT part of
+// readUrlParams(): `prefix` is navigation state, not connection config, and a bare
+// `#prefix=` must never count as "connection details pre-filled from URL".
+export function readHashPrefix() {
+  return sanitizeNavPrefix(hashParams().get('prefix'));
 }
 
 // Read config fields from the hash (endpoint, bucket, provider, region, keyId).
@@ -48,7 +55,12 @@ export function readUrlParams() {
     // whitespace-bearing values so a crafted link cannot inject free text into the form.
     if (v && v.length <= 128 && !/\s/.test(v)) out.keyId = v;
   }
-  if (p.has('region')) out.regionOverride = p.get('region');
+  if (p.has('region')) {
+    const v = p.get('region');
+    // Same guard as keyId (#68): a region is a short identifier; it reaches the SigV4
+    // credential scope, so a crafted link must not inject free text.
+    if (v && v.length <= 64 && !/\s/.test(v)) out.regionOverride = v;
+  }
   if (p.has('basePrefix')) {
     const v = p.get('basePrefix');
     // Same defensive posture as bucket: reject traversal and Windows-path pastes,
