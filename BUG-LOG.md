@@ -4,6 +4,195 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-067 — A pasted or stale share link auto-connected the stored key to the link's endpoint
+
+**Date:** 2026-09-16 · GitLab #70 · v1.63.1
+
+**Symptom.** A tab that still held a secret (sessionStorage) and was then loaded, as a full
+navigation, with a share link naming a different endpoint/bucket/base folder connected with
+no click — the stored key's SigV4 requests went to whatever host the link named, and
+`saveCredentials` persisted the link's values as the last-connected connection. The benign
+variant: after a bucket quick-switch the hash still carried the previous link's connection
+params, so a reload connected the new record's key to the old link's target (at best a
+confusing 403). A link-supplied base folder also silently rewrote the stored floor; the
+pre-fill banner never mentioned it. Found by the security lane of the prefix-access design
+panel (`docs/review-prefix-access/30-security.md` F1/F3), verified by code reading; the
+browser path is now covered by the fix's spec.
+
+**Root cause.** The mount effect built `merged = { ...base, ...fromUrl }` and called
+`handleConnect(merged)` whenever endpoint/bucket/keyId/secret were all present — the
+presence of a secret was treated as consent to connect to whatever the URL said.
+
+**Fix (v1.63.1).** `urlChangesConnection(fromUrl, stored)` (url-params.js) compares only
+the fields the link set (endpoint sans trailing slash, bucket, keyId, provider, region,
+normalized basePrefix). When the link changes the connection, the mount effect skips
+auto-connect and pre-fills the form with the secret cleared; the banner enumerates what the
+link set via `describeUrlParams` ("Pre-filled from the link: endpoint, bucket, base folder
+team/ — …"). A link that merely repeats the stored connection still reloads.
+
+**Why it wasn't caught earlier.** Every share-link e2e opened the link in a fresh context
+with no stored secret, so the merge-and-connect path only ever ran the legitimate
+"reload my link" case; nobody modelled a secret-holding tab receiving a different link.
+
+**Test case.** `test/e2e/browser/profiles.test.mjs` "#70 — a link that changes the
+connection does not auto-connect": a connected tab navigated to
+`?x#endpoint=<a second mock>&bucket=evil-bucket` shows the form with the link's values, an
+empty secret and the banner naming "endpoint, bucket", mounts no file-input, and the
+second mock's request log stays empty; the control case still auto-connects. Unit table in
+`test/url-params.test.js` (equal / trailing slash / unnormalized floor / differing /
+newly-set floor). Matched pair in the container: recorded below in "Container evidence".
+
+---
+
+## BUG-066 — The navigation prefix in a link was read raw: "New folder" could write a sibling key
+
+**Date:** 2026-09-16 · GitLab #68 · v1.62.7
+
+**Symptom.** A link written as `#prefix=clients/acme` (no trailing slash) listed every key
+that merely starts with `clients/acme` (`clients/acme-old/`, `clients/acme.txt`) under a
+breadcrumb claiming the folder, and **New folder → Reports** PUT the sibling key
+`clients/acmeReports/`. `../`, backslashes and >1024-character values passed straight
+through. Demonstrated at unit level by the security lane (`30-security.md` F2).
+
+**Root cause.** Three Browser sites read `prefix` from the hash / history state and only
+`startsWith`-clamped it to the floor; `readUrlParams` deliberately never touched `prefix`,
+so the validation every connection param gets (and the Base folder gets) never applied, and
+`useNewFolder` composes `prefix + name + '/'` with no slash repair.
+
+**Fix (v1.62.7).** `sanitizeNavPrefix()` (base-prefix.js) applies the Base-folder rule and
+normalizes to the prefix contract; `readHashPrefix()` (url-params.js) is the one hash read;
+all three Browser sites use them before `clampToFloor`. `region` gets the keyId guard.
+
+**Why it wasn't caught earlier.** Every deep-link spec used contract-shaped prefixes ending
+in `/`; the reader's contract ("non-empty ⇒ ends in /") was assumed at the read site rather
+than enforced there.
+
+**Test case.** `test/e2e/browser/prefix-scope.test.mjs` "a slash-less deep-link prefix is
+normalized, so New folder creates a child, not a sibling" (mock log: the listing asks for
+`…/sub/`, never the bare string; the PUT lands at `…/sub/Reports/`). Unit tables in
+`test/base-prefix.test.js` and `test/url-params.test.js`; component cases in
+`test/components/browser-base-prefix.test.jsx` (slash-less normalized before the first
+listing; traversal rejected to the floor).
+
+---
+
+## BUG-065 — A Base folder set on recovery never reached the saved connection (quick-switch looped)
+
+**Date:** 2026-09-16 · GitLab #67 · v1.62.6
+
+**Symptom.** A saved connection with an empty Base folder fails on a prefix-restricted key;
+the user sets the Base folder on the failed screen and connects successfully; a later
+quick-switch tab click (or sidebar select) back to that connection fails again with the
+field reverted to empty and one denied root ListObjectsV2 reaching the provider. Reproduced
+live by the QA lane (`docs/review-prefix-access/40-qa-plan.md`): a same-tab reload happened
+to work, which is why the loop went unnoticed.
+
+**Root cause.** `saveConnectionRecord` was only called from the explicit Save action and
+the gated-off vault-offer path; a plain connect persisted the floor only to the flat
+last-connected mirror. Quick-switch re-resolves the record, whose floor was still `''`.
+`handleConnect` also rewrote the flat mirror on failure, so one failed switch clobbered the
+recovered reload path too.
+
+**Fix (v1.62.6).** On the `list → permitted` capability transition (a listing at the floor
+succeeded), if a saved connection is selected and its record's floor is empty while the live
+floor is set, write that one field (partial update), refresh the sidebar, toast "Base folder
+saved to <name>". `discoveredFloor()` never overrides a stored floor.
+
+**Why it wasn't caught earlier.** The prefix-scoped-key specs either connected with the
+Base folder already set or asserted the recovery hint; none recovered and then switched.
+The reload path masked the record-side gap.
+
+**Test case.** `test/e2e/browser/prefix-scope.test.mjs` "a Base folder set on recovery is
+saved to the connection, so quick-switch no longer loops" — the saved record itself carries
+the floor, and the switch renders a row from inside the floor with no root list; a
+reload-based check is deliberately not the measure. Unit: `discoveredFloor` table.
+
+---
+
+## BUG-064 — Diagnostics blamed CORS with certainty when a folder-limited key was equally likely
+
+**Date:** 2026-09-16 · GitLab #66 · v1.62.5
+
+**Symptom.** On the connect screen with no Base folder, when the provider's denial reached
+the browser without CORS headers ("Failed to fetch"), **Run diagnostics** returned five
+green ticks and, in bold, "almost certainly missing or incorrect CORS configuration" — a
+confident wrong answer for a key merely restricted to a folder. Reproduced by the UX lane by
+aborting only the list request at the network layer.
+
+**Root cause.** `runDiagnostics`' all-probes-pass branch had one verdict for the connect
+screen (`cors-blocked`); the 2026-07-26 inference ("correctly configured CORS would surface
+even bad credentials as a readable 403") holds only when the provider sends CORS headers on
+error responses, which is exactly the case the connect screen cannot know.
+
+**Fix (v1.62.5).** `diagnosticsProps` carries `basePrefixUnset`; `!connected &&
+basePrefixUnset` with all probes passing yields `cors-blocked-or-scoped`, whose text names
+both causes and never says "almost certainly"; every other context keeps its verdict.
+ErrorBlock renders that verdict without emphasis. Mock knob `corsOnErrors:false`.
+
+**Why it wasn't caught earlier.** The mock attached CORS headers to every response, so the
+masked shape could not occur in the harness and no spec ever clicked Run diagnostics.
+
+**Test case.** `test/e2e/browser/prefix-scope.test.mjs` "a CORS-masked denial with no Base
+folder still offers Set base folder, and diagnostics name both causes" (MinIO override so no
+engine depends on `*.localhost` resolution). Unit: verdict selection table in
+`test/connection-diagnostics.test.js`; mock self-tests in `test/e2e/mock-s3/server.test.mjs`.
+Harness fidelity: `corsOnErrors:false` models the hypothesis that a provider omits CORS
+headers on errors; it does not establish that Backblaze B2 does.
+
+---
+
+## BUG-063 — The failed-connect explanation for a prefix-restricted key was never seen
+
+**Date:** 2026-09-16 · GitLab #65 · v1.62.4
+
+**Symptom.** Reported by the operator on Backblaze B2: "when an application key is limited
+to accessing a prefix, login fails without any explanation or reason why." On v1.62.3 the
+explanation existed — but after the denied first listing the error block rendered at
+top≈914px in a 720px desktop viewport and top≈931px in a 727px Pixel 5 viewport, `scrollY`
+stayed 0 and focus stayed on `<body>`; the only visible change was the header pill turning
+to "Failed". Measured by the UX lane and re-measured by the EM
+(`.claude-scratch/prefix-access/verify-offscreen.mjs`). On the CORS-masked shape the
+folder-restriction cause was the last sentence of the CORS paragraph.
+
+**Root cause.** No scroll-into-view or focus on the `session='failed'` transition; the
+scope hint was a third red paragraph with no action; the field it named sat a whole form
+above; the generic guidance told the user to check CORS after a parsed 403. The 2026-08-13
+design declined a focus-jump with "reconsider if users miss it".
+
+**Fix (v1.62.4).** ErrorBlock `focusOnMount` (scroll + focus, tabIndex -1) on every new
+error; the scope hint is a first-class block before any CORS note on both wire shapes, with
+an inline **Set base folder** button that scrolls to and focuses `#cred-baseprefix`;
+set-but-denied variant; `SignatureDoesNotMatch`/`InvalidAccessKeyId` suppress the hint;
+generic CORS guidance dropped on a parsed permission response; a failed quick-switch titles
+the error "Couldn't open <bucket>"; stale "probe in flight" header comment corrected.
+
+**Why it wasn't caught earlier.** The existing spec asserted
+`textContent.includes('Base folder')`, which passes for text nobody can see — a proxy, not
+an observable (the 2026-07-31 postmortem class). Full-page screenshots in the design brief
+hid it too; only viewport capture showed it.
+
+**Test case.** `test/e2e/browser/prefix-scope.test.mjs` "connecting WITHOUT a Base folder:
+the denial is seen, focused, and Set base folder lands in the field" (+ Pixel 5): geometry
+(`getBoundingClientRect` inside `innerHeight`) and `document.activeElement`, then the field
+focused and in view after the click; "a SignatureDoesNotMatch denial gets no Base folder
+hint"; "switching to a saved bucket the key cannot list titles the error with that bucket".
+Component: `test/components/error-block.test.jsx` (#65 cases). Post-fix geometry on host
+chromium: desktop top 225 / Pixel 5 top 199, focused.
+
+**Container evidence (BUG-063…067, shared spec runs; image
+`mcr.microsoft.com/playwright:v1.60.0-noble`, podman, all three engines × desktop / Pixel 5 /
+iPhone 13).** Baseline on untouched `origin/main` @ 0b24aea: node layer 64/64; nine browser
+lanes 66 tests each, 0 failures (skips 1–4 per lane, device-gated). **Pre-fix (FAIL):** the
+final `prefix-scope.test.mjs` + `profiles.test.mjs` run against `origin/main` source (plus the
+new specs, mock knob and runner filter) — every lane 22 tests, 11 pass / 11 fail; the eleven
+failures are exactly the new cases (E1 ×3 incl. the bad-credential negative, E2, quick-switch
+title, E3 loop, S1, L1 ×2, S2 ×2) and every pre-existing case passes. **Post-fix (PASS):**
+the same two specs against the fixed source (c48c7d9) — every lane 22 tests, 22 pass, 0
+fail (chromium, firefox, webkit × desktop, Pixel 5, iPhone 13). The full post-change matrix
+is recorded in the run debrief (`docs/superpowers/plans/prefix-access-debrief-2026-09-16.md`). Logs under `.claude-scratch/prefix-access/`.
+
+---
+
 ## BUG-062 — Renaming a file whose key has a non-Latin-1 character fails ("Headers constructor")
 
 **Symptom.** Inline-renaming a file whose key contains a character above U+00FF (e.g.
