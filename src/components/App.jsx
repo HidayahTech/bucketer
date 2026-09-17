@@ -5,9 +5,10 @@
 //   locked:       a vault exists but has not been unlocked this session; only the
 //                 vault passphrase screen (VaultUnlock) is shown
 //   disconnected: no credentials; only credential entry UI shown
-//   connecting:   credentials saved, initial ListObjectsV2 probe in flight
-//   connected:    probe succeeded; full Browser UI rendered
-//   failed:       probe failed (auth, CORS, network); error + option to reconfigure
+//   connecting:   credentials being applied (momentary; handleConnect does not probe)
+//   connected:    client built; Browser mounted, whose first listing is the real probe
+//   failed:       Browser's first listing failed (auth, CORS, network) and reported it via
+//                 onInitialListFailed; error + option to reconfigure
 //
 // Credential lifecycle: load from localStorage on mount, merge URL hash params
 // (endpoint/bucket from a share link override stored values; secret key never comes
@@ -28,6 +29,7 @@ import { ToastHost } from './ToastHost.jsx';
 import { showToast } from '../lib/toast.js';
 import { createS3Client } from '../lib/s3-client.js';
 import { diagnosticsProps } from '../lib/connection-diagnostics.js';
+import { isPermissionError } from '../lib/format.js';
 import { detectProvider, PROVIDER_LABELS } from '../lib/provider.js';
 import {
   loadCredentials,
@@ -58,8 +60,14 @@ import {
   credentialFingerprint,
 } from '../lib/connections.js';
 import { cacheSecret, getCachedSecret } from '../lib/secret-cache.js';
-import { readUrlParams, hasUrlParams, buildShareUrl } from '../lib/url-params.js';
-import { normalizeBasePrefix } from '../lib/base-prefix.js';
+import {
+  readUrlParams,
+  hasUrlParams,
+  buildShareUrl,
+  urlChangesConnection,
+  describeUrlParams,
+} from '../lib/url-params.js';
+import { normalizeBasePrefix, discoveredFloor } from '../lib/base-prefix.js';
 import { isForegroundTask } from '../lib/task-routing.js';
 import { vaultExists, isUnlocked, recallSecret, rememberSecret, createVault, VAULT_ENABLED } from '../lib/vault.js';
 import { FileBanner } from './FileBanner.jsx';
@@ -263,6 +271,23 @@ export function App() {
   // them to a global key is what let bucket A's state apply to bucket B.
   const handleCapabilityChange = useCallback(
     (op, state) => {
+      // #67: a Base folder discovered on the failed-connect screen lived only in the flat
+      // last-connected mirror; the saved record kept an empty floor, so a quick-switch
+      // (which re-resolves the record) failed again. Persist it into the record — only
+      // after a listing at that floor succeeded, only when the record's floor is empty,
+      // and visibly (a credential property changing silently would be a surprise).
+      if (op === 'list' && state === 'permitted' && selectedConnectionId) {
+        const rec = resolveConnection(selectedConnectionId);
+        // (diff review S-2) a floor the current link supplied is not "discovered" — it
+        // stays with the explicit Save flow, so a link can never write into a saved record.
+        const floor =
+          rec && discoveredFloor(rec.basePrefix, credentialsRef.current?.basePrefix, readUrlParams().basePrefix);
+        if (floor) {
+          saveConnectionRecord({ id: selectedConnectionId, basePrefix: floor });
+          setConnections(listResolvedConnections());
+          showToast(`Base folder saved to ${rec.name}`);
+        }
+      }
       setCapabilities((prev) => {
         if (prev[op] === state) return prev;
         const next = { ...prev, [op]: state };
@@ -281,6 +306,9 @@ export function App() {
   useEffect(() => {
     selectedConnectionIdRef.current = selectedConnectionId;
   }, [selectedConnectionId]);
+  // Live mirror of the credentials in use, for callbacks memoized on other deps (#67).
+  const credentialsRef = useRef(credentials);
+  credentialsRef.current = credentials;
 
   // Apply a capability result to the connection a TASK belongs to, not the live selection.
   // Foreground task → update the shown capabilities (handleCapabilityChange). Background
@@ -308,11 +336,18 @@ export function App() {
     setBrowserKey((k) => k + 1); // re-mount browser → triggers new listing probe
   }
 
+  // True while the in-flight connect came from a quick-switch (tab strip / sidebar), so a
+  // failure can name the bucket it tried to open (#65). Every other connect clears it.
+  const connectViaSwitchRef = useRef(false);
+  const [failedViaSwitch, setFailedViaSwitch] = useState(false);
+
   async function handleConnect(creds, { reconnect = false } = {}) {
     // reconnect:true keeps session='connected' to avoid a flash to the splash view when
     // the user updates credentials from the sidebar while already browsing (§4.14).
     if (!reconnect) setSession('connecting');
     setConnectionError(null);
+    setFailedViaSwitch(connectViaSwitchRef.current);
+    connectViaSwitchRef.current = false;
 
     const provider = creds.provider || detectProvider(creds.endpoint);
     const fullCreds = { ...creds, provider };
@@ -523,8 +558,13 @@ export function App() {
       const fromUrl = readUrlParams();
       if (Object.keys(fromUrl).length === 0) return;
       setUrlHadKeyId(!!fromUrl.keyId);
-      setCredentials((prev) => ({ ...prev, ...fromUrl }));
-      setLiveFormData((prev) => ({ ...prev, ...fromUrl }));
+      // #70 (diff review S-1): a link that changes the connection must not keep the
+      // previous connection's secret sitting in the form — that would be one click from
+      // signing to the new host. Same rule as the mount-time guard.
+      const merge = (prev) =>
+        urlChangesConnection(fromUrl, prev) ? { ...prev, ...fromUrl, secretKey: '' } : { ...prev, ...fromUrl };
+      setCredentials(merge);
+      setLiveFormData(merge);
       setFormResetKey((k) => k + 1);
     };
     window.addEventListener('hashchange', onHashChange);
@@ -591,8 +631,19 @@ export function App() {
       // pick up the credentials update above — force it explicitly.
       setFormResetKey((k) => k + 1);
     }
-    if (merged.endpoint && merged.bucket && merged.keyId && merged.secretKey) {
+    // #70: a link that CHANGES the connection never auto-connects a secret-holding tab —
+    // the stored key would otherwise sign requests to whatever endpoint/bucket/floor the
+    // link named (a pasted link, a duplicated tab, or a stale hash after a quick-switch).
+    // Fall through to the pre-filled form with the secret cleared; the banner names what
+    // the link set. A link that merely repeats the stored connection still reloads.
+    const linkChangesConnection = Object.keys(fromUrl).length > 0 && urlChangesConnection(fromUrl, base);
+    if (merged.endpoint && merged.bucket && merged.keyId && merged.secretKey && !linkChangesConnection) {
       handleConnect(merged);
+    } else if (linkChangesConnection) {
+      const prefill = { ...merged, secretKey: '' };
+      setCredentials(prefill);
+      setLiveFormData(prefill);
+      setFormResetKey((k) => k + 1);
     } else if (isUnlocked() && conn) {
       // Vault-backed auto-connect (contract: "auto-connect through the vault" — this
       // is the whole point of the feature). The flat-credential check above requires
@@ -1288,6 +1339,16 @@ export function App() {
     taskStore.remove(task.id);
   }
 
+  // "Set base folder" action on the failed-connect error (#65): the field sits a whole form
+  // above the error, so the action scrolls to it and focuses it. The id is CredentialForm's
+  // stable field id (the e2e specs key on it too).
+  function focusBaseFolderField() {
+    const field = document.getElementById('cred-baseprefix');
+    if (!field) return;
+    field.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+    field.focus({ preventScroll: true });
+  }
+
   function handleSelectProfile(id) {
     const conn = resolveConnection(id);
     if (!conn) return;
@@ -1315,6 +1376,8 @@ export function App() {
       const creds = { ...conn, secretKey: secret };
       setCredentials(creds);
       setLiveFormData(creds);
+      // #65: a failed switch must read as "couldn't open that bucket", not as a sign-out.
+      connectViaSwitchRef.current = true;
       handleConnect(creds, { reconnect: session === 'connected' });
     } else {
       handleSelectProfile(id);
@@ -1539,7 +1602,9 @@ export function App() {
         <span class="spacer" />
         {providerLabel && session === 'connected' && <span class="header-status">{providerLabel}</span>}
         <StatusBadge session={session} />
-        {session === 'connected' && buildShareUrl(credentials) && <ShareLinkMenu credentials={credentials} />}
+        {session === 'connected' && buildShareUrl(credentials) && (
+          <ShareLinkMenu credentials={credentials} prefix={currentPrefix} />
+        )}
         {session === 'connected' && capabilities.list !== 'denied' && (
           <button
             type="button"
@@ -1610,9 +1675,10 @@ export function App() {
                 {urlParamsPresent && (
                   <div class="banner banner-info" style={{ marginBottom: '1rem' }}>
                     <div class="banner-body">
-                      {urlHadKeyId
-                        ? 'Connection details pre-filled from URL — enter your Secret Key to connect.'
-                        : 'Endpoint and bucket pre-filled from URL — enter your Key ID and Secret Key to connect.'}
+                      {/* #70: name what the link set — a base folder from a link is never silent */}
+                      {`Pre-filled from the link: ${describeUrlParams(readUrlParams()).join(', ')} — enter your ${
+                        urlHadKeyId ? 'Secret Key' : 'Key ID and Secret Key'
+                      } to connect.`}
                     </div>
                   </div>
                 )}
@@ -1628,10 +1694,19 @@ export function App() {
                   <div style={{ marginTop: '1rem' }}>
                     <ErrorBlock
                       error={connectionError}
-                      title="Connection failed"
-                      guidance="Check your endpoint URL, bucket name, and credentials. If this looks like a CORS error, ensure CORS is configured on your bucket."
+                      title={failedViaSwitch ? `Couldn't open ${credentials.bucket}` : 'Connection failed'}
+                      // A parsed permission response proves CORS is fine and the scope hint
+                      // carries the next step; the generic guidance would contradict it (#65).
+                      guidance={
+                        isPermissionError(connectionError)
+                          ? undefined
+                          : 'Check your endpoint URL, bucket name, and credentials. If this looks like a CORS error, ensure CORS is configured on your bucket.'
+                      }
                       diagnostics={diagnosticsProps(credentials)}
                       basePrefixUnset={!credentials.basePrefix}
+                      basePrefix={credentials.basePrefix}
+                      onSetBaseFolder={focusBaseFolderField}
+                      focusOnMount
                     />
                   </div>
                 )}

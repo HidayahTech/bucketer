@@ -77,12 +77,19 @@ export function CopyLinkPopover({ client, bucket, fileKey, fileKeys, onClose, on
     copyLinks(seconds);
   }
 
+  // #69: these links ARE access (presigned), unlike the header's "Open in Bucketer" links,
+  // which need the recipient's own key. Say so at the point of choice, in plain words.
   const note = isBatch
-    ? `${keys.length} link${keys.length !== 1 ? 's' : ''}, one per line. Expires after selected duration.`
-    : 'Link expires after the selected duration.';
+    ? `${keys.length} link${keys.length !== 1 ? 's' : ''}, one per line. Expires after the selected duration. No sign-in needed — treat them like passwords.`
+    : 'Link expires after the selected duration. No sign-in needed — treat it like a password.';
 
   return (
     <div class={`copy-link-popover${direction === 'up' ? ' copy-link-popover--up' : ''}`}>
+      <div class="copy-link-heading">
+        {isBatch
+          ? 'Share these files — anyone with a link can open it'
+          : 'Share this file — anyone with the link can open it'}
+      </div>
       <div class="copy-link-presets">
         {COPY_LINK_PRESETS.map((p) => (
           <button key={p.seconds} class="btn btn-ghost btn-sm" onClick={() => copyLinks(p.seconds)} disabled={copying}>
@@ -134,7 +141,7 @@ export function CopyLinkPopover({ client, bucket, fileKey, fileKeys, onClose, on
             ))}
           </div>
           <div class="copy-link-note">
-            Share via Bucketer — opens in the app, hides raw credentials from server logs.
+            Share via Bucketer — same access, opened inside the app so the raw link stays out of server logs.
           </div>
         </>
       )}

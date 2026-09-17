@@ -44,7 +44,29 @@ try {
     console.log('\n── Building app for browser e2e (→ perf/index.html) ──\n');
     run(['build.mjs', '--mode=perf']);
   }
-  const files = dirs.flatMap(collect);
+  // E2E_FILES: comma-separated spec paths (relative to the repo root) to run instead of the
+  // whole layer — for a matched-pair run of one spec across the container matrix. Never a
+  // coverage claim: a filtered run proves only the specs it ran.
+  const only = (process.env.E2E_FILES || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const all = dirs.flatMap(collect);
+  const files = all.filter((f) => only.length === 0 || only.includes(f));
+  if (only.length && layer !== 'node') {
+    // A misspelled spec must fail loudly, not silently run nothing.
+    const missing = only.filter((f) => !all.includes(f));
+    if (missing.length) {
+      console.error(`E2E_FILES names spec(s) that do not exist: ${missing.join(', ')}`);
+      process.exit(1);
+    }
+  }
+  if (only.length && files.length === 0) {
+    // The matrix runs the node layer first with the same env; browser-only E2E_FILES simply
+    // have nothing to run there.
+    console.log(`E2E_FILES: none of ${only.join(', ')} is in layer "${layer}" — nothing to run.`);
+    process.exit(0);
+  }
   console.log(`\n── Running e2e layer: ${layer} (${files.length} files) ──\n`);
   // Serialize test files (--test-concurrency=1): the browser specs each launch Chromium, and
   // running them concurrently overloads the machine and causes timeout flakes. Serial is slower

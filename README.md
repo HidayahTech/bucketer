@@ -381,6 +381,24 @@ Bucketer **never overwrites**: if an object already exists at the destination, t
 
 ---
 
+### Sharing links
+
+Bucketer makes two kinds of link, and they mean different things:
+
+- **Open in Bucketer** (header **Copy link**, or the 🔗 button beside the breadcrumb) — a link
+  that opens Bucketer on this connection, optionally in the folder you are looking at. The
+  recipient still needs their own access key: the secret is never included, and the key ID
+  only when you tick *Include my access key ID*. Everything rides in the URL fragment (after
+  `#`), which browsers never send to any server — but it does land in both parties' browser
+  history and in whatever chat or mail you paste it into. A link to a folder therefore names
+  that folder wherever the link travels; if folder names are sensitive, treat the link
+  accordingly. A link into a folder the recipient's own base folder does not cover lands
+  them at their base folder with a note; a link carrying a base folder their key does not
+  have fails to connect with the base-folder hint rather than silently.
+- **Share this file** (the link button on a file row) — a presigned URL that *is* access to
+  that one file for the chosen duration (up to 7 days). Anyone holding it can open the file
+  with no sign-in. Treat it like a password.
+
 ## Credential security
 
 - Secret key input is `type="password"` — masked and excluded from browser autofill history.

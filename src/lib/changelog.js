@@ -1,9 +1,57 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.62.3';
+export const CURRENT_VERSION = '1.63.3';
 
 export const CHANGELOG = [
+  {
+    "version": "1.63.3",
+    "date": "2026-09-16",
+    "title": "E2E spec lane fixes for the prefix-access batch",
+    "changes": []
+  },
+  {
+    "version": "1.63.2",
+    "date": "2026-09-16",
+    "title": "Review follow-ups for the prefix-access batch",
+    "changes": []
+  },
+  {
+    "version": "1.63.1",
+    "date": "2026-09-16",
+    "title": "A pasted link never silently reconnects your key elsewhere",
+    "changes": []
+  },
+  {
+    "version": "1.63.0",
+    "date": "2026-09-16",
+    "title": "Share a link to the folder you are in",
+    "changes": []
+  },
+  {
+    "version": "1.62.7",
+    "date": "2026-09-16",
+    "title": "Folder deep links are validated and normalized",
+    "changes": []
+  },
+  {
+    "version": "1.62.6",
+    "date": "2026-09-16",
+    "title": "A Base folder set on recovery is saved to the connection",
+    "changes": []
+  },
+  {
+    "version": "1.62.5",
+    "date": "2026-09-16",
+    "title": "Diagnostics stop blaming CORS when a folder-limited key is just as likely",
+    "changes": []
+  },
+  {
+    "version": "1.62.4",
+    "date": "2026-09-16",
+    "title": "Failed connect is seen, and says what to do",
+    "changes": []
+  },
   {
     "version": "1.62.3",
     "date": "2026-09-15",

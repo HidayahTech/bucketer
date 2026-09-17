@@ -18,7 +18,8 @@ import { Modal } from './Modal.jsx';
 import { PreviewMedia } from './PreviewMedia.jsx';
 import { defaultMaxKeys } from '../lib/provider.js';
 import { loadMaxKeys, loadListingCacheTTL, loadFileMtimeAutoLoad } from '../lib/storage.js';
-import { pushPrefixHistory } from '../lib/url-params.js';
+import { pushPrefixHistory, readHashPrefix, buildShareUrl } from '../lib/url-params.js';
+import { copyConnectionLink, getIncludeKeyId, isLinkableFolder } from '../lib/connection-link.js';
 import { mediaKind, mimeType, mimeKind } from '../lib/media.js';
 import { resolveDroppedFiles } from '../lib/file-entries.js';
 import { PRESIGN_EXPIRES, DOWNLOAD_PRESIGN_EXPIRES, TEXT_PREVIEW_LIMIT, FILE_MTIME_KEY } from '../lib/constants.js';
@@ -32,7 +33,7 @@ import { Breadcrumb } from './Breadcrumb.jsx';
 import { SortTh } from './SortTh.jsx';
 import { MovePickerModal } from './MovePickerModal.jsx';
 import { dragPayload, dropAccepted } from '../lib/move-drag.js';
-import { normalizeBasePrefix, withinFloor, clampToFloor } from '../lib/base-prefix.js';
+import { normalizeBasePrefix, withinFloor, clampToFloor, sanitizeNavPrefix } from '../lib/base-prefix.js';
 
 function formatDate(dateStr) {
   if (!dateStr) return '';
@@ -67,18 +68,17 @@ export function Browser({
   // The connection's floor (#60): every navigation entry point clamps to it, so a
   // prefix-scoped key never sees a request above its base prefix. '' = unscoped.
   const basePrefix = normalizeBasePrefix(credentials?.basePrefix);
+  // Every prefix arriving from the hash or history state passes through the one validated
+  // read (#68: sanitizeNavPrefix / readHashPrefix) before the floor clamp.
   const [prefix, setPrefix] = useState(() => {
-    if (isFirstMount) {
-      const fromHash = new URLSearchParams(window.location.hash.slice(1)).get('prefix') || '';
-      return clampToFloor(fromHash, basePrefix);
-    }
+    if (isFirstMount) return clampToFloor(readHashPrefix(), basePrefix);
     return clampToFloor('', basePrefix);
   });
   // Say the clamp out loud (once, dismissible): a deep link that pointed outside
   // the floor lands on the floor instead — silence would read as a broken link.
   const [clampNotice, setClampNotice] = useState(() => {
     if (!isFirstMount || !basePrefix) return false;
-    const fromHash = new URLSearchParams(window.location.hash.slice(1)).get('prefix') || '';
+    const fromHash = readHashPrefix();
     return !!fromHash && !withinFloor(fromHash, basePrefix);
   });
   const [items, setItems] = useState([]);
@@ -421,10 +421,7 @@ export function Browser({
   // Back / forward button support — restore prefix from history state
   useEffect(() => {
     function onPopState(e) {
-      const newPrefix =
-        e.state?.prefix !== undefined
-          ? e.state.prefix
-          : new URLSearchParams(window.location.hash.slice(1)).get('prefix') || '';
+      const newPrefix = e.state?.prefix !== undefined ? sanitizeNavPrefix(e.state.prefix) : readHashPrefix();
       navigateRef.current(newPrefix, { historyMode: 'none' });
     }
     window.addEventListener('popstate', onPopState);
@@ -1165,6 +1162,15 @@ export function Browser({
         onMoveLeave={handleTargetDragLeave}
         onMoveDrop={handleInternalDrop}
         moveHoverTarget={dndHoverTarget}
+        // #69: one-click folder link, only where it would change anything (not root/floor)
+        // and only where a link can be built (not file://). Same builder and key-ID choice as
+        // the header menu.
+        onCopyLink={
+          isLinkableFolder(prefix, basePrefix) && buildShareUrl(credentials || {})
+            ? () => copyConnectionLink({ credentials, prefix, includeKeyId: getIncludeKeyId() })
+            : undefined
+        }
+        copyLinkIncludesKeyId={getIncludeKeyId()}
       />
 
       <div class="browser-toolbar">

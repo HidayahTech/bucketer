@@ -26,6 +26,38 @@ describe('Breadcrumb — root prefix', () => {
   });
 });
 
+// #69: the copy-link control is a real, labelled button that appears only when the caller
+// supplies the action (Browser does so below the floor), never as a bare span.
+describe('Breadcrumb — copy-link button (#69)', () => {
+  test('absent without onCopyLink', () => {
+    const { query, cleanup } = mount(h(Breadcrumb, { prefix: 'photos/2024/', onNavigate: () => {} }));
+    assert.equal(query('[data-testid="crumb-copy-link"]'), null);
+    cleanup();
+  });
+
+  test('a keyboard-operable button that invokes the action', () => {
+    let clicks = 0;
+    const { query, cleanup } = mount(
+      h(Breadcrumb, { prefix: 'photos/2024/', onNavigate: () => {}, onCopyLink: () => clicks++ }),
+    );
+    const btn = query('[data-testid="crumb-copy-link"]');
+    assert.equal(btn.tagName, 'BUTTON');
+    assert.equal(btn.getAttribute('type'), 'button');
+    assert.equal(btn.getAttribute('aria-label'), 'Copy a link to this folder');
+    fire(btn, 'click');
+    assert.equal(clicks, 1);
+    cleanup();
+  });
+
+  test('renders beside a floored breadcrumb too', () => {
+    const { query, cleanup } = mount(
+      h(Breadcrumb, { prefix: 'team/alice/2026/', floor: 'team/alice/', onNavigate: () => {}, onCopyLink: () => {} }),
+    );
+    assert.ok(query('[data-testid="crumb-copy-link"]'));
+    cleanup();
+  });
+});
+
 describe('Breadcrumb — nested prefix', () => {
   test('shows the "root" home link', () => {
     const { query, cleanup } = mount(h(Breadcrumb, { prefix: 'photos/', onNavigate: () => {} }));

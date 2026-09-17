@@ -345,6 +345,41 @@ describe('mock S3 — CORS expose honors config (BUG-028 substrate)', () => {
   });
 });
 
+// #66: the corsOnErrors:false knob strips CORS headers from error responses only, so a
+// browser sees a denial as an opaque failure. It models a hypothesis about providers,
+// not a measured behaviour of any of them (see the knob's comment in server.mjs).
+describe('mock S3 — corsOnErrors knob (#66)', () => {
+  const denied = () =>
+    fetch(`http://127.0.0.1:${port}/${BUCKET}?list-type=2&prefix=`, { headers: { Origin: 'http://app.test' } });
+
+  test('by default a scope denial carries CORS headers (a readable 403)', async () => {
+    mock.configure({ scopePrefix: 'clients/acme/' });
+    const resp = await denied();
+    assert.equal(resp.status, 403);
+    assert.equal(resp.headers.get('access-control-allow-origin'), 'http://app.test');
+  });
+
+  test('corsOnErrors:false omits CORS headers from the 403 but not from a 200', async () => {
+    mock.configure({ scopePrefix: 'clients/acme/', corsOnErrors: false });
+    const resp = await denied();
+    assert.equal(resp.status, 403);
+    assert.equal(resp.headers.get('access-control-allow-origin'), null, 'error must be CORS-opaque');
+    const ok = await fetch(`http://127.0.0.1:${port}/${BUCKET}?list-type=2&prefix=clients%2Facme%2F`, {
+      headers: { Origin: 'http://app.test' },
+    });
+    assert.equal(ok.status, 200);
+    assert.equal(ok.headers.get('access-control-allow-origin'), 'http://app.test', 'successes keep CORS');
+  });
+
+  test('reset() restores CORS on errors', async () => {
+    mock.configure({ scopePrefix: 'clients/acme/', corsOnErrors: false });
+    mock.reset();
+    mock.configure({ scopePrefix: 'clients/acme/' });
+    const resp = await denied();
+    assert.equal(resp.headers.get('access-control-allow-origin'), 'http://app.test');
+  });
+});
+
 describe('mock S3 — versioning', () => {
   test('with versioning on, delete creates a marker and ListObjectVersions shows history', async () => {
     mock.configure({ bucket: BUCKET, versioning: true });

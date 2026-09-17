@@ -134,6 +134,7 @@ export function createMockS3(opts = {}) {
     cors = DEFAULT_CORS();
     latencyMs = bootLatencyMs;
     scopePrefix = null;
+    corsOnErrors = true;
     requestLog.reset();
   }
   function configure(cfg) {
@@ -142,7 +143,15 @@ export function createMockS3(opts = {}) {
     if (typeof cfg.latencyMs === 'number') latencyMs = cfg.latencyMs;
     if (cfg.bucket && typeof cfg.versioning === 'boolean') bkt(cfg.bucket).versioning = cfg.versioning;
     if ('scopePrefix' in cfg) scopePrefix = cfg.scopePrefix || null;
+    if (typeof cfg.corsOnErrors === 'boolean') corsOnErrors = cfg.corsOnErrors;
   }
+
+  // corsOnErrors:false (#66) models the HYPOTHESIS that a provider omits CORS headers on
+  // error responses, so a browser sees a denial as an opaque "Failed to fetch" instead of
+  // a readable 403. It does not establish that any real provider (Backblaze B2 included)
+  // behaves this way — only a live probe with a real restricted key can. Default true:
+  // errors carry CORS headers like every other response.
+  let corsOnErrors = true;
 
   // Prefix-scoped credential simulation (#60): a standing per-instance constraint
   // (the mock ignores signatures, so there is no per-request identity). Models a B2
@@ -243,7 +252,8 @@ export function createMockS3(opts = {}) {
   }
 
   function sendXml(req, res, status, body, extra = {}) {
-    res.writeHead(status, { ...corsHeaders(req), 'Content-Type': 'application/xml', ...extra });
+    const cors = status >= 400 && !corsOnErrors ? {} : corsHeaders(req);
+    res.writeHead(status, { ...cors, 'Content-Type': 'application/xml', ...extra });
     res.end(`<?xml version="1.0" encoding="UTF-8"?>\n${body}`);
   }
   function sendError(req, res, status, code, message = code) {

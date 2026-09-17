@@ -84,6 +84,88 @@ describe('BUG-047 — a share link survives disconnect', () => {
   });
 });
 
+// ── #70: a link that changes the connection must not auto-connect a tab that still holds a secret ──
+// The mount-time merge used to spread the link's endpoint/bucket/basePrefix over the stored
+// credentials and connect with no click, signing the stored key's requests to whatever host
+// the link named. Observable: the OTHER endpoint receives no request at all (its own mock's
+// log stays empty) while the form shows the link's values with the secret cleared; the
+// control case (a link that repeats the stored connection) still auto-connects.
+describe('#70 — a link that changes the connection does not auto-connect', () => {
+  e2eTest('a differing endpoint/bucket in the hash lands on the form; the other endpoint sees nothing', async () => {
+    ctx.mock.reset();
+    const other = await startMock();
+    const { context, page } = await freshPage();
+    try {
+      await connectApp(page, ctx.browserEndpoint); // secret now held in sessionStorage
+      // Full navigation (query string change defeats the fragment-only path), same tab.
+      const hash = '#endpoint=' + encodeURIComponent(other.browserEndpoint) + '&bucket=evil-bucket';
+      await page.goto(app.url + '?x' + hash, { waitUntil: 'domcontentloaded' });
+      await page.locator('input[type="url"]').waitFor({ timeout: scaleTimeout(10000) });
+      // Presence: the form shows the link's values and names what the link set.
+      assert.equal(await page.locator('input[type="url"]').inputValue(), other.browserEndpoint);
+      assert.equal(await page.locator('input[placeholder="my-bucket"]').inputValue(), 'evil-bucket');
+      assert.equal(await page.locator('input[placeholder="Secret Access Key"]').inputValue(), '', 'secret cleared');
+      const banner = await page.locator('.banner-body').textContent();
+      assert.ok(banner.includes('endpoint, bucket'), `banner names the link's fields: ${banner}`);
+      // Give any (wrong) auto-connect time to fire, then assert the absences beside it.
+      await page.waitForTimeout(scaleTimeout(1500));
+      assert.equal(await page.locator('[data-testid="file-input"]').count(), 0, 'not connected');
+      assert.equal(other.mock.requestLog.list().length, 0, 'the other endpoint must receive no request');
+    } finally {
+      await context.close();
+      await other.mock.close();
+    }
+  });
+
+  // Diff review S-1: on the failed screen the form still holds the secret; a fragment-only
+  // navigation (hashchange, no reload) to a link naming another endpoint must clear it.
+  e2eTest('a hash change to a different endpoint on the failed screen clears the secret from the form', async () => {
+    ctx.mock.reset();
+    ctx.mock.configure({ faults: [{ op: 'ListObjectsV2', status: 403, code: 'AccessDenied', message: 'no' }] });
+    const other = await startMock();
+    const { context, page } = await freshPage();
+    try {
+      await fillCreds(page, { endpoint: ctx.browserEndpoint, bucket: 'test-bucket', keyId: 'k', secret: 'sekret' });
+      const region = page.locator('input[placeholder="us-east-1"]');
+      if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
+      await page.locator('button[type="submit"]:has-text("Connect")').click();
+      await page.locator('.error-block').waitFor({ timeout: scaleTimeout(15000) });
+      // The hashchange listener for the failed state attaches in an effect after paint; let
+      // it settle before firing the event, or a fast lane can race it.
+      await page.waitForTimeout(scaleTimeout(300));
+      await page.evaluate(
+        (hash) => {
+          window.location.hash = hash;
+        },
+        '#endpoint=' + encodeURIComponent(other.browserEndpoint) + '&bucket=evil-bucket',
+      );
+      await page.waitForFunction(
+        (ep) => document.querySelector('input[type="url"]')?.value === ep,
+        other.browserEndpoint,
+        { timeout: scaleTimeout(5000) },
+      );
+      assert.equal(await page.locator('input[placeholder="Secret Access Key"]').inputValue(), '', 'secret cleared');
+      assert.equal(other.mock.requestLog.list().length, 0, 'nothing was sent to the other endpoint');
+    } finally {
+      await context.close();
+      await other.mock.close();
+    }
+  });
+
+  e2eTest('a link that repeats the stored connection still auto-connects (reload-my-link path)', async () => {
+    ctx.mock.reset();
+    const { context, page } = await freshPage();
+    try {
+      await connectApp(page, ctx.browserEndpoint);
+      const hash = '#endpoint=' + encodeURIComponent(ctx.browserEndpoint) + '&bucket=test-bucket';
+      await page.goto(app.url + '?y' + hash, { waitUntil: 'domcontentloaded' });
+      await page.locator('[data-testid="file-input"]').waitFor({ state: 'attached', timeout: scaleTimeout(15000) });
+    } finally {
+      await context.close();
+    }
+  });
+});
+
 // ── BUG-018: "Save as profile…" stays disabled until the form has valid required fields ──
 describe('BUG-018 — Save-as-profile enablement', () => {
   e2eTest('disabled on an empty form, enabled once endpoint/bucket/keyId are valid', async () => {

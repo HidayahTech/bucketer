@@ -3,7 +3,13 @@
 // Contract shared with the whole codebase: '' = unscoped; non-empty prefixes end in '/'.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeBasePrefix, withinFloor, clampToFloor } from '../src/lib/base-prefix.js';
+import {
+  normalizeBasePrefix,
+  withinFloor,
+  clampToFloor,
+  discoveredFloor,
+  sanitizeNavPrefix,
+} from '../src/lib/base-prefix.js';
 
 test('normalizeBasePrefix appends a trailing slash', () => {
   assert.equal(normalizeBasePrefix('team/alice'), 'team/alice/');
@@ -72,4 +78,49 @@ test('clampToFloor substitutes the floor for out-of-floor prefixes', () => {
   assert.equal(clampToFloor('', 'team/alice/'), 'team/alice/');
   assert.equal(clampToFloor('team/', 'team/alice/'), 'team/alice/');
   assert.equal(clampToFloor('team/bob/', 'team/alice/'), 'team/alice/');
+});
+
+// #67: a floor discovered on recovery is persisted into an empty-floor record only.
+test('discoveredFloor returns the live floor when the record has none', () => {
+  assert.equal(discoveredFloor('', 'team/alice/'), 'team/alice/');
+  assert.equal(discoveredFloor(undefined, 'team/alice'), 'team/alice/', 'normalized on the way out');
+});
+
+test('discoveredFloor never overrides a stored floor', () => {
+  assert.equal(discoveredFloor('team/alice/', 'team/bob/'), null);
+  assert.equal(discoveredFloor('team/alice/', 'team/alice/'), null);
+});
+
+// #68: the one validated read for a navigation prefix from the hash or history state.
+test('sanitizeNavPrefix normalizes a slash-less folder to the prefix contract', () => {
+  assert.equal(sanitizeNavPrefix('clients/acme'), 'clients/acme/');
+  assert.equal(sanitizeNavPrefix('/clients//acme/'), 'clients/acme/');
+  assert.equal(sanitizeNavPrefix('clients/acme/'), 'clients/acme/');
+});
+
+test('sanitizeNavPrefix rejects traversal, backslashes, overlong and non-string values', () => {
+  assert.equal(sanitizeNavPrefix('../'), '');
+  assert.equal(sanitizeNavPrefix('a/../b/'), '');
+  assert.equal(sanitizeNavPrefix('a\\b/'), '');
+  assert.equal(sanitizeNavPrefix('x'.repeat(1025) + '/'), '');
+  assert.equal(sanitizeNavPrefix(null), '');
+  assert.equal(sanitizeNavPrefix(undefined), '');
+  assert.equal(sanitizeNavPrefix(42), '');
+});
+
+test('sanitizeNavPrefix keeps spaces and unicode — prefixes are arbitrary key fragments', () => {
+  assert.equal(sanitizeNavPrefix('my photos/2026 été/'), 'my photos/2026 été/');
+});
+
+test('discoveredFloor ignores a floor that the current link supplied (diff review S-2)', () => {
+  assert.equal(discoveredFloor('', 'team/alice/', 'team/alice/'), null, 'link-supplied, not typed');
+  assert.equal(discoveredFloor('', 'team/alice/', 'team/alice'), null, 'compared normalized');
+  assert.equal(discoveredFloor('', 'team/alice/', 'team/bob/'), 'team/alice/', 'typed over a different link floor');
+  assert.equal(discoveredFloor('', 'team/alice/', ''), 'team/alice/');
+});
+
+test('discoveredFloor is null when nothing was discovered', () => {
+  assert.equal(discoveredFloor('', ''), null);
+  assert.equal(discoveredFloor('', undefined), null);
+  assert.equal(discoveredFloor('', '  '), null);
 });

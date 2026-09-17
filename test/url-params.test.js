@@ -15,7 +15,15 @@ global.window = {
   },
 };
 
-import { readUrlParams, hasUrlParams, buildShareUrl, pushPrefixHistory } from '../src/lib/url-params.js';
+import {
+  readUrlParams,
+  hasUrlParams,
+  buildShareUrl,
+  pushPrefixHistory,
+  readHashPrefix,
+  urlChangesConnection,
+  describeUrlParams,
+} from '../src/lib/url-params.js';
 
 describe('buildShareUrl', () => {
   beforeEach(() => {
@@ -76,6 +84,44 @@ describe('buildShareUrl', () => {
     assert.ok(!url.includes('basePrefix'), 'unscoped links must be byte-identical to pre-feature output');
   });
 
+  // #69: the current folder rides on the connection link — only when it would change
+  // where the recipient lands. Root / floor links stay byte-identical to pre-#69 output.
+  test('prefix is emitted, normalized, when it differs from the floor (#69)', () => {
+    const url = buildShareUrl(
+      { endpoint: 'https://s3.example.com', bucket: 'my-bucket' },
+      { prefix: 'clients/acme/sub' },
+    );
+    const p = new URLSearchParams(url.split('#')[1]);
+    assert.equal(p.get('prefix'), 'clients/acme/sub/');
+  });
+
+  test('no prefix param at the root, at the floor, or when omitted (#69 back-compat anchor)', () => {
+    const creds = { endpoint: 'https://s3.example.com', bucket: 'my-bucket', basePrefix: 'team/alice/' };
+    const plain = buildShareUrl(creds);
+    assert.equal(buildShareUrl(creds, { prefix: '' }), plain);
+    assert.equal(buildShareUrl(creds, { prefix: 'team/alice/' }), plain, 'the floor itself adds nothing');
+    assert.equal(buildShareUrl(creds, { prefix: 'team/alice' }), plain, 'even unnormalized');
+    assert.ok(!plain.includes('prefix='), 'no prefix param at the floor');
+    const root = buildShareUrl({ endpoint: 'https://s3.example.com', bucket: 'my-bucket' }, { prefix: '' });
+    assert.ok(!root.includes('prefix='), 'no prefix param at the root of an unscoped connection');
+  });
+
+  test('prefix and basePrefix coexist; keyId still only on request (#69)', () => {
+    const url = buildShareUrl(
+      { endpoint: 'https://s3.example.com', bucket: 'my-bucket', basePrefix: 'team/alice/', keyId: 'AKID123' },
+      { prefix: 'team/alice/reports/', includeKeyId: true },
+    );
+    const p = new URLSearchParams(url.split('#')[1]);
+    assert.equal(p.get('basePrefix'), 'team/alice/');
+    assert.equal(p.get('prefix'), 'team/alice/reports/');
+    assert.equal(p.get('keyId'), 'AKID123');
+    const noKey = buildShareUrl(
+      { endpoint: 'https://s3.example.com', bucket: 'my-bucket', keyId: 'AKID123' },
+      { prefix: 'x/' },
+    );
+    assert.ok(!noKey.includes('keyId'), 'a folder link does not imply the key ID');
+  });
+
   test('returns base URL without hash when credentials are all empty', () => {
     const url = buildShareUrl({});
     assert.equal(url, 'https://app.example.com/');
@@ -124,6 +170,14 @@ describe('readUrlParams', () => {
   test('maps the region param to regionOverride', () => {
     loc.hash = '#region=us-east-1';
     assert.equal(readUrlParams().regionOverride, 'us-east-1');
+  });
+
+  // #68: region was the one connection param read raw; it reaches the SigV4 scope.
+  test('rejects a region with whitespace or an overlong value (#68)', () => {
+    loc.hash = '#region=us%20east';
+    assert.equal(readUrlParams().regionOverride, undefined);
+    loc.hash = '#region=' + 'x'.repeat(65);
+    assert.equal(readUrlParams().regionOverride, undefined);
   });
 
   test('reads provider param when it is a valid identifier', () => {
@@ -239,6 +293,79 @@ describe('readUrlParams', () => {
     const p = readUrlParams();
     assert.equal(p.basePrefix, 'team/alice/');
     assert.equal(p.prefix, undefined, 'readUrlParams must not consume the navigation prefix param');
+  });
+});
+
+// #68: the navigation prefix gets one validated, normalizing read of its own.
+describe('readHashPrefix', () => {
+  beforeEach(() => {
+    loc.hash = '';
+  });
+
+  test('normalizes a slash-less folder', () => {
+    loc.hash = '#prefix=clients%2Facme';
+    assert.equal(readHashPrefix(), 'clients/acme/');
+  });
+
+  test('passes a contract-shaped prefix through unchanged', () => {
+    loc.hash = '#prefix=clients%2Facme%2Fsub%2F';
+    assert.equal(readHashPrefix(), 'clients/acme/sub/');
+  });
+
+  test('rejects traversal and backslashes to the empty prefix', () => {
+    loc.hash = '#prefix=..%2F';
+    assert.equal(readHashPrefix(), '');
+    loc.hash = '#prefix=a%5Cb%2F';
+    assert.equal(readHashPrefix(), '');
+  });
+
+  test('is empty when the param is absent', () => {
+    loc.hash = '#bucket=b';
+    assert.equal(readHashPrefix(), '');
+  });
+});
+
+// #70: a link that changes the connection must not auto-connect a secret-holding tab.
+describe('urlChangesConnection', () => {
+  const stored = {
+    endpoint: 'https://s3.example.com',
+    bucket: 'b',
+    keyId: 'AKID1',
+    provider: 'generic',
+    regionOverride: 'us-east-1',
+    basePrefix: 'team/',
+  };
+
+  test('false when the link only repeats stored values (the reload-my-link path)', () => {
+    assert.equal(urlChangesConnection({ endpoint: 'https://s3.example.com', bucket: 'b' }, stored), false);
+    assert.equal(urlChangesConnection({}, stored), false);
+  });
+
+  test('tolerates a trailing slash on the endpoint and an unnormalized base folder', () => {
+    assert.equal(urlChangesConnection({ endpoint: 'https://s3.example.com/', basePrefix: 'team' }, stored), false);
+  });
+
+  test('true when any supplied field differs', () => {
+    assert.equal(urlChangesConnection({ endpoint: 'https://attacker.example' }, stored), true);
+    assert.equal(urlChangesConnection({ bucket: 'other' }, stored), true);
+    assert.equal(urlChangesConnection({ basePrefix: 'team/bob/' }, stored), true);
+    assert.equal(urlChangesConnection({ keyId: 'AKID2' }, stored), true);
+  });
+
+  test('a link that sets a floor where none was stored counts as a change', () => {
+    assert.equal(urlChangesConnection({ basePrefix: 'team/' }, { ...stored, basePrefix: '' }), true);
+  });
+});
+
+describe('describeUrlParams', () => {
+  test('names what the link set, including the base folder value', () => {
+    assert.deepEqual(describeUrlParams({ endpoint: 'x', bucket: 'b', basePrefix: 'team/', keyId: 'k' }), [
+      'endpoint',
+      'bucket',
+      'base folder team/',
+      'key ID',
+    ]);
+    assert.deepEqual(describeUrlParams({}), []);
   });
 });
 

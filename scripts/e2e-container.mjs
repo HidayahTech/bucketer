@@ -56,7 +56,7 @@ const script = [
 ].join('\n');
 
 // Harness/matrix env passes through so single-combo containerized runs work too.
-const PASS_ENV = ['E2E_ENGINES', 'E2E_DEVICES', 'E2E_ENGINE', 'E2E_DEVICE', 'E2E_JUNIT'];
+const PASS_ENV = ['E2E_ENGINES', 'E2E_DEVICES', 'E2E_ENGINE', 'E2E_DEVICE', 'E2E_JUNIT', 'E2E_FILES'];
 const envArgs = PASS_ENV.filter((k) => process.env[k]).flatMap((k) => ['-e', `${k}=${process.env[k]}`]);
 
 console.log(`── containerized e2e: ${runtime} + ${image} (volume ${VOLUME}) ──`);

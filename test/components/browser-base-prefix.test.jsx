@@ -103,6 +103,34 @@ describe('Browser — base prefix floor (#60)', () => {
     }
   });
 
+  // #68: the hash prefix is validated and normalized before it becomes navigation state.
+  test('a slash-less hash prefix is normalized to a folder before listing (#68)', async () => {
+    window.location.hash = '#prefix=' + encodeURIComponent('team/alice/2026');
+    const requests = [];
+    const { cleanup } = mountScoped(requests, { isFirstMount: true });
+    try {
+      await tick();
+      assert.equal(requests[0], 'team/alice/2026/', 'the listing must ask for the folder, not a bare string prefix');
+    } finally {
+      cleanup();
+      window.location.hash = '';
+    }
+  });
+
+  test('a traversal hash prefix is rejected and lands on the floor (#68)', async () => {
+    window.location.hash = '#prefix=' + encodeURIComponent('team/alice/../bob/');
+    const requests = [];
+    const { cleanup } = mountScoped(requests, { isFirstMount: true });
+    try {
+      await tick();
+      assert.equal(requests[0], 'team/alice/');
+      assert.ok(!requests.some((r) => r.includes('..')), 'no request may carry a traversal segment');
+    } finally {
+      cleanup();
+      window.location.hash = '';
+    }
+  });
+
   test('a popstate carrying an out-of-floor prefix is clamped', async () => {
     const requests = [];
     const { cleanup } = mountScoped(requests);
