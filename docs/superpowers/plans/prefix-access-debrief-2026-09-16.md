@@ -7,9 +7,17 @@ operator confirmed 2026-09-16 16:53 CDT · debrief written 2026-09-16 evening CD
 
 ## Merges performed and grant changes
 
-- Merges: **none.** `merge_branches` and `merge_prod_branches` stayed empty; `main` is prod
-  and the merge of !18 is the operator's act.
-- Grant changes during the run: **none.**
+- During the build: **none.** `merge_branches` and `merge_prod_branches` stayed empty.
+- After the final review (addendum, 2026-09-16 20:23–20:26 CDT): the operator said
+  "merge !18. Approved." and, to the prod-confirmation question, "yes, merge to main".
+  Grant written: `merge_prod_branches: main` (one-off). !18 was un-drafted
+  (`glab mr update 18 --ready`) and merged (`glab mr merge 18`) → `main` @ 16d6958
+  (merge commit over 4229d71). Grant then cleared. Both pipelines on 4229d71 were green
+  before the merge (full 3×3 browser matrix on the runner). The automatic Forge deploy of
+  16d6958 failed on Forge's side ("cat: ~/.forge/provision-219102094.output: No such file";
+  disk 65%, `.forge` writable, no step ran on the server); the operator re-deployed by
+  hand at ~20:29 CDT. Live verified 20:30 CDT: app-version 1.63.3, live bundle SHA-256
+  b21281b19628… identical to the committed dist/index.html on main.
 
 ## Planned vs shipped
 
