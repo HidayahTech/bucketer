@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.64.1] — 2026-10-16 — Release of the v1.64.0 design floor
+
+No change to the app beyond v1.64.0, whose GitLab Release never published. One test file in the v1.64.0 commit was not formatted, so CI's format check failed and blocked the release job. The same thing happened to v1.62.2. This release carries the formatting fix, and the pre-push check now refuses to push unformatted code before it tags a version (BUG-080). Everything in v1.64.0 below ships here.
+
 ## [1.64.0] — 2026-10-16 — Readable, keyboard-usable and reachable on every screen
 
 The design floor from the 2026-10-16 deep-dive, ahead of the redesign. **Readable:** the teal used for buttons, file and folder names, breadcrumbs and the active sort column was too pale to read comfortably (2.98:1 in light, 2.38:1 in dark; the accessibility minimum is 4.5:1). It is now a deeper teal in light mode and a lighter one in dark mode, both above 5:1, with dark-mode buttons in dark text. Success and warning text are darker too. Selected rows no longer turn into a bright band in dark mode, and checkboxes follow the theme. **Keyboard:** folders, file previews, breadcrumb crumbs, column sorting and saved buckets now work with Tab and Enter. Every dialog takes focus when it opens, keeps Tab inside, closes on Escape, and returns focus to whatever opened it. The closed sidebar no longer holds invisible Tab stops. **Phones and tablets:** after selecting files on a phone, the Copy and Delete buttons sat off the right edge of the screen and the page could freeze for seconds. The selection bar now wraps onto a second line. Long file names no longer push a row's buttons off-screen on phones in landscape and small tablets (641–1024 px). Buttons, checkboxes and breadcrumb crumbs are at least 44 × 44 px on phones and touch screens. **"+ bucket" from the sidebar:** while connected, it left the file list showing an error and the form showing the old bucket. It now opens the new-bucket form for that account, with the account's secret already filled in if this tab holds it.
