@@ -172,53 +172,45 @@ describe('AccountsManager — bucket selection', () => {
   });
 });
 
+// 4b step 6 (v1.66.0 ux-review, known item): collapsing every account but the active one hid
+// the buckets the drawer exists to switch to. Small lists (≤ 8 buckets) open every account;
+// above that, the active account opens and a collapsed header says how many it hides.
+const MORE_AWS = Array.from({ length: 6 }, (_, i) => ({ ...AWS_ASSETS, id: 10 + i, bucket: `aws-${i}` }));
+const NINE = [B2_PHOTOS, B2_BACKUPS, AWS_ASSETS, ...MORE_AWS];
+
 describe('AccountsManager — expansion', () => {
-  test('the account without the active bucket is collapsed', () => {
+  test('with eight buckets or fewer, every account is open, the inactive one too', () => {
     const { queryAll, cleanup } = mount(
-      h(
-        AccountsManager,
-        defaultProps({
-          connections: [B2_PHOTOS, B2_BACKUPS, AWS_ASSETS],
-          selectedId: 1,
-        }),
-      ),
+      h(AccountsManager, defaultProps({ connections: [B2_PHOTOS, B2_BACKUPS, AWS_ASSETS], selectedId: 1 })),
     );
+    const awsGroup = queryAll('.account-group').find((g) => g.textContent.includes('AWS S3'));
+    assert.equal(awsGroup.querySelectorAll('.bucket-row').length, 1, 'inactive account is open');
+    cleanup();
+  });
+
+  test('above eight buckets, the account without the active bucket is collapsed and says how many it holds', () => {
+    const { queryAll, cleanup } = mount(h(AccountsManager, defaultProps({ connections: NINE, selectedId: 1 })));
     const groups = queryAll('.account-group');
     const awsGroup = groups.find((g) => g.textContent.includes('AWS S3'));
     const b2Group = groups.find((g) => g.textContent.includes('Backblaze B2'));
     assert.equal(awsGroup.querySelectorAll('.bucket-row').length, 0, 'inactive account is collapsed');
+    assert.match(awsGroup.querySelector('.account-toggle').textContent, /7 buckets/);
     assert.equal(b2Group.querySelectorAll('.bucket-row').length, 2, 'active account is expanded');
     cleanup();
   });
 
   test('clicking a collapsed account header expands it', () => {
-    const { queryAll, cleanup } = mount(
-      h(
-        AccountsManager,
-        defaultProps({
-          connections: [B2_PHOTOS, AWS_ASSETS],
-          selectedId: 1,
-        }),
-      ),
-    );
+    const { queryAll, cleanup } = mount(h(AccountsManager, defaultProps({ connections: NINE, selectedId: 1 })));
     const awsGroup = queryAll('.account-group').find((g) => g.textContent.includes('AWS S3'));
     assert.equal(awsGroup.querySelectorAll('.bucket-row').length, 0, 'collapsed initially');
     fire(awsGroup.querySelector('.account-header'), 'click');
     const awsAfter = queryAll('.account-group').find((g) => g.textContent.includes('AWS S3'));
-    assert.equal(awsAfter.querySelectorAll('.bucket-row').length, 1, 'expanded after header click');
+    assert.equal(awsAfter.querySelectorAll('.bucket-row').length, 7, 'expanded after header click');
     cleanup();
   });
 
   test('the account toggle is a button carrying aria-expanded, and activating it expands the account', () => {
-    const { queryAll, cleanup } = mount(
-      h(
-        AccountsManager,
-        defaultProps({
-          connections: [B2_PHOTOS, AWS_ASSETS],
-          selectedId: 1,
-        }),
-      ),
-    );
+    const { queryAll, cleanup } = mount(h(AccountsManager, defaultProps({ connections: NINE, selectedId: 1 })));
     const awsToggle = () =>
       queryAll('.account-group')
         .find((g) => g.textContent.includes('AWS S3'))
@@ -227,7 +219,7 @@ describe('AccountsManager — expansion', () => {
     fire(awsToggle(), 'click');
     assert.equal(awsToggle().getAttribute('aria-expanded'), 'true', 'expanded after the toggle button is activated');
     const awsGroup = queryAll('.account-group').find((g) => g.textContent.includes('AWS S3'));
-    assert.equal(awsGroup.querySelectorAll('.bucket-row').length, 1, 'its bucket is now listed');
+    assert.equal(awsGroup.querySelectorAll('.bucket-row').length, 7, 'its buckets are now listed');
     cleanup();
   });
 });
@@ -326,6 +318,8 @@ describe('AccountsManager — add bucket to an account', () => {
       ),
     );
     const b2Group = queryAll('.account-group').find((g) => g.textContent.includes('Backblaze B2'));
+    // 4b step 9 (ux-review finding 8): "+ bucket" was cryptic; its meaning lived in a hover title.
+    assert.equal(b2Group.querySelector('.account-add-bucket').textContent, 'Add bucket for this key');
     fire(b2Group.querySelector('.account-add-bucket'), 'click');
     assert.equal(added, 'credB2');
     cleanup();

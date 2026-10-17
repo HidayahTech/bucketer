@@ -16,6 +16,7 @@ import {
   newE2EContext,
   newE2EPage,
   e2eTest,
+  rowAction,
 } from '../harness.mjs';
 
 let ctx, app, browser;
@@ -51,7 +52,7 @@ async function uploadOne(page, name, content = 'data') {
 // ── B1 — BUG-028: ExposeHeaders must include x-amz-meta-* or custom metadata is invisible ──
 describe('B1 — BUG-028: custom metadata visibility depends on CORS ExposeHeaders', () => {
   async function openProps(page, name) {
-    await page.locator(`[data-testid="file-row:${name}"]`).locator('button[title="Properties"]').click({ force: true });
+    await rowAction(page.locator(`[data-testid="file-row:${name}"]`), 'Properties', { force: true });
     await page.locator('[data-testid="properties-modal"]').waitFor({ timeout: scaleTimeout(5000) });
   }
 
@@ -137,7 +138,7 @@ async function renameRow(page, name, newName) {
   // selectRow documents; flaked on firefox desktop, pipeline #185). Retry until the rename
   // input actually opens.
   for (let attempt = 0; ; attempt++) {
-    await row.locator('button[title="Rename"]').click();
+    await rowAction(row, 'Rename');
     try {
       await input.waitFor({ timeout: scaleTimeout(2500) });
       break;

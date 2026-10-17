@@ -377,7 +377,8 @@ describe('#76 — Sign out forgets cached secrets', () => {
         if (await tab.isVisible().catch(() => false)) await tab.click();
         else {
           await page.locator('button[aria-label="Open menu"]').click();
-          // B's connect is remembered (v1.66.0) and selected, so A's account starts collapsed.
+          // B's connect is remembered (v1.66.0) and selected; A's account opens by default in a
+          // list this short (4b), but expand it if a longer list ever collapses it.
           const rowA = page.locator('.bucket-row', { hasText: 'person-a-bucket' });
           if (!(await rowA.isVisible().catch(() => false)))
             await page.locator('.account-header', { hasText: `key …${KEY_A.slice(-4)}` }).click();

@@ -15,6 +15,7 @@ import {
   newE2EPage,
   e2eTest,
   scaleTimeout,
+  rowAction,
 } from '../harness.mjs';
 
 let ctx, app, browser, context, page;
@@ -78,7 +79,7 @@ describe('browser e2e — connect, upload, list, delete', () => {
     // containing the just-uploaded filename, and matching one (hidden) makes the detach
     // wait below time out (flaked on firefox desktop, pipeline #181).
     const row = page.locator('[data-testid="file-row:e2e-upload.txt"]');
-    await row.locator('button[title="Delete"]').click({ force: true });
+    await rowAction(row, 'Delete…', { force: true });
     // DeleteConfirmModal → confirm, then wait for the modal to close (confirm fired).
     const modal = page.locator('.modal-overlay');
     await modal.waitFor({ timeout: scaleTimeout(5000) });

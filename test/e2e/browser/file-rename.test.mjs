@@ -17,6 +17,7 @@ import {
   newE2EContext,
   newE2EPage,
   e2eTest,
+  rowAction,
 } from '../harness.mjs';
 
 let ctx, app, browser, context, page;
@@ -48,7 +49,7 @@ describe('browser e2e — file rename', () => {
     await connectApp(page, ctx.browserEndpoint);
 
     // Open rename on the file row (its Rename button), fill the new name, commit.
-    await page.locator(`[data-testid="file-row:${oldKey}"] button[title="Rename"]`).click();
+    await rowAction(page.locator(`[data-testid="file-row:${oldKey}"]`), 'Rename');
     await page.locator('.rename-input').fill(newKey);
     await page.locator('.rename-inline button[aria-label="Save name"]').click();
 
@@ -83,7 +84,7 @@ describe('browser e2e — file rename', () => {
       await p.locator('[data-testid="file-row:b.txt"]').waitFor({ timeout: scaleTimeout(15000) });
       assert.equal(await p.locator('[data-testid="file-row:z.txt"]').count(), 0, 'z.txt must be on an unloaded page');
 
-      await p.locator('[data-testid="file-row:a.txt"] button[title="Rename"]').click();
+      await rowAction(p.locator('[data-testid="file-row:a.txt"]'), 'Rename');
       await p.locator('.rename-input').fill('z.txt');
       await p.locator('.rename-inline button[aria-label="Save name"]').click();
       const body = async (Key) => {

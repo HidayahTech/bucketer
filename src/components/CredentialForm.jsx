@@ -351,7 +351,7 @@ export function CredentialForm({
           autocomplete="current-password"
         />
         {errors.secretKey && <span class="field-error">{errors.secretKey}</span>}
-        <span class="hint">Stored in sessionStorage — cleared on tab close.</span>
+        <span class="hint">Your secret is kept only until you close this tab. It is never saved.</span>
       </div>
 
       <details class="more-options" open={moreOpen} onToggle={(e) => setMoreOpen(e.currentTarget.open)}>

@@ -1609,6 +1609,41 @@ describe('App — "+ bucket" pre-fills the form from the account', () => {
   });
 });
 
+// 4b step 8 (v1.66.0 ux-review finding 6): after picking a remembered bucket on the splash the
+// secret is the one field left, so it takes focus (and the browser scrolls to it).
+describe('App — picking a remembered bucket focuses the secret', () => {
+  test('clicking a bucket row on the splash leaves focus in the Secret Key field', () => {
+    clearAppStorage();
+    localStorage.setItem(
+      's3b_credentials',
+      JSON.stringify({
+        version: 1,
+        credentials: [
+          { id: 'credA', endpoint: 'https://s3.us-west-002.backblazeb2.com', keyId: 'K1ABCDEF', provider: 'b2' },
+        ],
+      }),
+    );
+    localStorage.setItem(
+      's3b_connections',
+      JSON.stringify({
+        version: 2,
+        connections: [{ id: 1, name: 'B2 — photos', credentialId: 'credA', bucket: 'photos', capabilities: null }],
+      }),
+    );
+    localStorage.setItem('s3b_connections_migrated', '1');
+
+    const { query, cleanup } = mount(h(App, {}));
+    try {
+      fire(query('.bucket-row .bucket-name'), 'click');
+      assert.equal(query('#cred-bucket').value, 'photos', 'the pick filled the form');
+      assert.equal(document.activeElement, query('#cred-secretkey'), 'the secret field has focus');
+    } finally {
+      cleanup();
+      clearAppStorage();
+    }
+  });
+});
+
 // Slice 4A: "+ bucket" lets a user re-enter a bucket already saved under the account.
 // Saving it must update the existing connection in place, not create a duplicate row.
 describe('App — re-adding a saved bucket does not duplicate it', () => {

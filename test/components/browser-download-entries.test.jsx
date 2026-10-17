@@ -98,3 +98,18 @@ describe('Browser — download entry points', () => {
     cleanup();
   });
 });
+
+// ux-review 4b H2: a filter can hide a selected row while Delete/Move still act on it.
+describe('Browser — batch bar and the filter', () => {
+  test('the bar says how many selected items the filter is hiding', async () => {
+    const { query, queryAll, cleanup } = mountBrowser(() => {});
+    await tick();
+    fire(query('[data-testid="file-row:a.txt"] .col-check input'), 'change');
+    assert.equal(query('[data-testid="batch-hidden"]'), null, 'nothing hidden before filtering');
+    const filter = queryAll('input').find((i) => (i.getAttribute('aria-label') || '').startsWith('Filter'));
+    filter.value = 'zzz';
+    fire(filter, 'input');
+    assert.match(query('[data-testid="batch-hidden"]').textContent, /1 not shown by the filter/);
+    cleanup();
+  });
+});

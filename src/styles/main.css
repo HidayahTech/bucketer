@@ -211,6 +211,16 @@ h1, h2, h3 { color: var(--ink); line-height: 1.25; }
 .hamburger:hover { border-color: currentColor; }
 
 .main-content { flex: 1; padding: 1rem; overflow-y: auto; min-width: 0; }
+/* Wider screens, where supported: clip, not hidden/auto, because those make scroll containers
+   and the batch bar's position: sticky (slice 4b) then sticks to a box that never scrolls
+   instead of the window. Phones keep the scroll container: the bar is fixed there, and a
+   table wider than the screen (Hidden versions) must still scroll sideways to its buttons. */
+@supports (overflow: clip) {
+  @media (min-width: 641px) {
+    .app-body { overflow-x: clip; }
+    .main-content { overflow: visible; overflow-x: clip; }
+  }
+}
 
 /* ── Banners ──────────────────────────────────────────────────────────────── */
 .banner {
@@ -702,6 +712,12 @@ details[open] .upload-log-summary::before { transform: rotate(90deg); }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .modal-caveat { color: var(--text-muted); line-height: 1.5; }
+/* Layout A (v1.68.0): what the delete reaches — bucket (on host) and folder. */
+.delete-scope { display: grid; grid-template-columns: auto 1fr; gap: .25rem .75rem; margin: 0; font-size: .875rem; }
+.delete-scope dt { color: var(--text-muted); }
+.delete-scope dd { margin: 0; overflow-wrap: anywhere; }
+.delete-scope code { font-family: var(--mono); font-size: .8rem; }
+.delete-scope-host { color: var(--text-muted); }
 .modal-error {
   color: var(--text-danger); background: var(--danger-bg);
   border-radius: var(--radius); padding: .35rem .5rem; font-size: .8rem;
@@ -917,6 +933,12 @@ details[open] .upload-log-summary::before { transform: rotate(90deg); }
   }
   .browser-has-selection { padding-bottom: 10rem; }
   html:has(.browser-has-selection) { scroll-padding-bottom: 10rem; }
+}
+/* Wider screens (slice 4b): the bar stays at the top of the view while you scroll a long list,
+   so Copy/Move/Delete for the selection are never a scroll away (layout A mockup: sticky).
+   The header does not stick, so top: 0; z-index under popovers (50) and the drawer. */
+@media (min-width: 641px) {
+  .batch-bar { position: sticky; top: 0; z-index: 15; box-shadow: var(--shadow); }
 }
 .batch-count { font-weight: 700; color: var(--ink); }
 .col-check { width: 2.75rem; text-align: center; padding: .4rem .25rem; }
@@ -1143,6 +1165,20 @@ details[open] .sv-summary::before { transform: rotate(90deg); }
 .bucket-tools-wrap { position: relative; display: inline-block; }
 .bucket-tools-btn { display: inline-flex; align-items: center; gap: .35rem; }
 .bucket-tools-menu .btn { width: 100%; justify-content: flex-start; text-align: left; }
+/* Row ⋯ menu (layout A, slice 4b): same popover; on phones the ≤640 px rule below turns every
+   .copy-link-popover into a bottom sheet, this one included. */
+.row-menu-wrap { position: relative; display: inline-block; }
+.row-menu { min-width: 200px; gap: 2px; text-align: left; white-space: normal; }
+.row-menu-label { margin: 0; padding: .15rem .5rem .25rem; font-size: .75rem; color: var(--text-muted); overflow-wrap: anywhere; }
+.row-menu .row-menu-item { width: 100%; justify-content: flex-start; text-align: left; gap: .5rem; }
+.row-menu .row-menu-danger { color: var(--text-danger); }
+.row-menu-sep { height: 1px; background: var(--border); margin: .2rem 0; }
+.row-actions { display: inline-flex; align-items: center; gap: .25rem; }
+.row-menu-btn .icon { stroke-width: 3; } /* the ⋯ dots read faint at the icon set's stroke 2 */
+.row-menu-cancel { display: none; }
+@media (max-width: 640px) {
+  .row-menu .row-menu-cancel { display: flex; width: 100%; justify-content: center; margin-top: .25rem; }
+}
 .copy-link-presets { display: flex; gap: .3rem; flex-wrap: wrap; }
 .copy-link-custom { display: flex; gap: .3rem; align-items: center; }
 .copy-link-num {
@@ -1257,18 +1293,23 @@ details[open] .sv-summary::before { transform: rotate(90deg); }
 .accounts-manager { margin-bottom: 1.25rem; }
 .account-group { margin-bottom: .5rem; }
 .account-header {
-  display: flex; align-items: center; gap: .4rem; cursor: pointer;
+  display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; cursor: pointer;
   padding: .3rem .25rem; user-select: none;
   font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
   color: var(--text-muted); transition: color var(--transition);
 }
 .account-header:hover { color: var(--text); }
-.account-toggle { display: flex; align-items: center; gap: .4rem; flex: 1; min-width: 0; }
+/* flex-basis 12rem: the label wraps (finding 3), so without a floor it was squeezed to one
+   letter per line beside "Add bucket for this key"; now the button drops below instead. */
+.account-toggle { display: flex; align-items: center; gap: .4rem; flex: 1 1 12rem; min-width: 0; }
 .account-disclosure { width: .9em; flex-shrink: 0; text-align: center; }
-.account-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Wraps rather than truncating (4b, ux-review finding 3): on a phone the ellipsis cut the key tail,
+   the only part that tells two keys on one provider apart. */
+.account-name { flex: 1; overflow-wrap: anywhere; }
 .account-add-bucket {
-  flex-shrink: 0; font-size: .7rem; text-transform: none; letter-spacing: 0;
-  color: var(--text-muted); padding: .15rem .4rem; border-radius: 3px;
+  flex-shrink: 0; font-size: .75rem; font-weight: 600; text-transform: none; letter-spacing: 0;
+  color: var(--text-muted); padding: .15rem .5rem; border: 1px solid var(--border); border-radius: var(--radius);
+  min-height: 32px; /* ux-review finding 8: rendered ~18 px tall, under WCAG 2.5.8's 24 px */
   transition: color var(--transition);
 }
 .account-add-bucket:hover { color: var(--accent); }
@@ -1387,7 +1428,7 @@ details[open] .sv-summary::before { transform: rotate(90deg); }
 /* Touch targets ≥ 44 × 44 px (REPORT M3; WCAG 2.5.5, Apple HIG) on phones and any
    touch-first device. The row checkbox's target is its whole cell (the cell toggles). */
 @media (max-width: 640px), (pointer: coarse) {
-  .btn, .btn-version, .hamburger, .connection-tab, .breadcrumb .crumb, .breadcrumb .crumb-link {
+  .btn, .btn-version, .hamburger, .connection-tab, .breadcrumb .crumb, .breadcrumb .crumb-link, .account-add-bucket {
     min-height: 44px; min-width: 44px;
   }
   .breadcrumb .crumb { padding: 0 .5rem; }

@@ -38,16 +38,53 @@ describe('DeleteConfirmModal — confirm dialog titles', () => {
     cleanup();
   });
 
-  test('folder title: "Delete 1 folder?" for one folder', () => {
+  test('folder title names the one folder: "Delete folder “photos”?"', () => {
     const { text, cleanup } = mount(
       h(DeleteConfirmModal, {
-        request: { files: [], prefixes: ['photos/'] },
+        request: { files: [], prefixes: ['2026/photos/'] },
         provider: 'r2',
         ...NO_CALLBACKS,
       }),
     );
-    assert.ok(text().includes('Delete 1 folder?'));
+    assert.ok(text().includes('Delete folder “photos”?'), text());
     cleanup();
+  });
+
+  test('names the bucket, its storage address and the folder; the button carries the count', () => {
+    const { text, query, cleanup } = mount(
+      h(DeleteConfirmModal, {
+        request: { files: ['2026/trip/a.jpg', '2026/trip/b.pdf'], prefixes: [], capturedPrefix: '2026/trip/' },
+        provider: 'r2',
+        bucket: 'family-photos',
+        endpoint: 'https://s3.us-west-004.backblazeb2.com',
+        ...NO_CALLBACKS,
+      }),
+    );
+    try {
+      assert.ok(text().includes('Delete 2 files from family-photos?'), text());
+      const scope = query('.delete-scope').textContent;
+      assert.ok(scope.includes('family-photos') && scope.includes('s3.us-west-004.backblazeb2.com'), scope);
+      assert.ok(scope.includes('2026/trip/'), scope);
+      assert.equal(query('[data-testid="delete-confirm"]').textContent.trim(), 'Delete 2 files');
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('at the top of the bucket, the folder line says so', () => {
+    const { query, cleanup } = mount(
+      h(DeleteConfirmModal, {
+        request: { files: ['a.txt'], prefixes: [], capturedPrefix: '' },
+        provider: 'r2',
+        bucket: 'b',
+        ...NO_CALLBACKS,
+      }),
+    );
+    try {
+      assert.ok(query('.delete-scope').textContent.includes('Top of the bucket'));
+    } finally {
+      cleanup();
+    }
   });
 
   test('mixed title: "Delete N files and M folders?" for mixed selection', () => {

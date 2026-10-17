@@ -113,6 +113,14 @@ export async function openMoreOptions(page) {
   if (!(await d.evaluate((el) => el.open))) await d.locator('summary').click();
 }
 
+// Row actions other than Download sit in the row's ⋯ menu (slice 4b). Open it and pick the item
+// labelled `label` (exact text, e.g. 'Rename', 'Delete…', 'Delete folder…'). `row` is the row's
+// locator; `clickOpts` (e.g. { force: true }) apply to both clicks.
+export async function rowAction(row, label, clickOpts = {}) {
+  await row.locator('.row-menu-btn').click(clickOpts);
+  await row.locator('.row-menu').getByRole('button', { name: label, exact: true }).click(clickOpts);
+}
+
 export async function connectApp(page, endpoint, bucket = BUCKET) {
   await page.locator('input[type="url"]').fill(endpoint);
   await page.locator('input[placeholder="my-bucket"]').fill(bucket);
