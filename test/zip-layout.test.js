@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { localHeaderBytes, dataDescriptorBytes, dosDateTime, createZipWriter } from '../src/lib/zip-writer.js';
 import { computeZipLayout } from '../src/lib/zip-layout.js';
+import { allocateZipPaths } from '../src/lib/zip-naming.js';
 
 test('localHeaderBytes: 30 + name length, independent of size', () => {
   const b = localHeaderBytes('a/b.txt', { time: 0, date: 0x21 });
@@ -75,4 +76,38 @@ test('computeZipLayout matches serial writer entry offsets for same order', asyn
   }
   assert.equal(recs[0].start, entries[0].headerOffset);
   assert.equal(recs[1].start, entries[1].headerOffset);
+});
+
+// #79 (R06): allocateZipPaths gives every key a distinct archive path.
+
+test('allocateZipPaths: sanitizer collisions get " (n)" suffixes; unique keys are untouched', () => {
+  const m = allocateZipPaths(['p/a:b.txt', 'p/a?b.txt', 'p/plain.txt'], 'p/');
+  assert.equal(m.get('p/plain.txt'), 'plain.txt');
+  assert.deepEqual([m.get('p/a:b.txt'), m.get('p/a?b.txt')].sort(), ['a_b (1).txt', 'a_b.txt']);
+});
+
+test('allocateZipPaths: a file never takes a path that is a folder in the archive', () => {
+  const m = allocateZipPaths(['docs', 'docs/inner.txt']);
+  assert.equal(m.get('docs/inner.txt'), 'docs/inner.txt');
+  assert.equal(m.get('docs'), 'docs (1)');
+});
+
+test('allocateZipPaths: case-only differences are kept apart', () => {
+  const m = allocateZipPaths(['A.txt', 'a.txt']);
+  assert.notEqual(m.get('A.txt').toLowerCase(), m.get('a.txt').toLowerCase());
+});
+
+test('allocateZipPaths: deterministic regardless of input order (resume / engine fallback)', () => {
+  const keys = ['x/a:b', 'x/a?b', 'x/a|b', 'x/Q', 'x/q'];
+  const a = allocateZipPaths(keys, 'x/');
+  const b = allocateZipPaths([...keys].reverse(), 'x/');
+  assert.deepEqual([...a.entries()].sort(), [...b.entries()].sort());
+});
+
+test('computeZipLayout: colliding keys get distinct entry paths (#79)', () => {
+  const { entries } = computeZipLayout([
+    { key: 'a:b.txt', size: 3 },
+    { key: 'a?b.txt', size: 3 },
+  ]);
+  assert.equal(new Set(entries.map((e) => e.path)).size, 2);
 });

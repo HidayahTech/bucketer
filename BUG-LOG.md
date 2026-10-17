@@ -4,6 +4,76 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-075 — Distinct object keys could share one path inside a downloaded ZIP
+
+**Date:** 2026-10-16 · GitLab #79 · v1.63.5
+
+**Symptom.** Keys that sanitize to the same archive path — `a:b.txt`/`a?b.txt` → `a_b.txt`,
+`trail.txt`/`trail.txt.`, NFC/NFD `café.txt`, `p/q`/`p//q` — became duplicate entries. Readers
+addressing by name saw one; `unzip -o` extracted 4 files from 8 entries, silently dropping
+the rest. Found by the Codex review (R06), reproduced with an independent reader and
+extractor by BUCKET-1 lane 09.
+
+**Root cause.** `zipEntryPath` maps each key independently; neither engine (in-place
+`computeZipLayout`, serial `runSerialZipJob`) had a job-wide uniqueness step.
+
+**Fix (v1.63.5).** `allocateZipPaths(keys, prefix)` (zip-naming.js) assigns one path per key,
+processing keys in sorted order: a path already taken, compared NFC + case-insensitively
+(macOS/Windows extract `A.txt` and `a.txt` onto one file), or equal to a folder elsewhere in
+the archive gets the move code's " (n)" suffix (`freeFileKey`). Folders are never renamed.
+Both engines use it over the job's full non-SKIPPED key set, so a resume and the in-place →
+serial fallback assign identical paths. Behaviour change: a bucket holding case-only
+variants now gets a suffixed second name in its ZIPs. Not addressed: path-length truncation
+limits of extractors.
+
+**Why it wasn't caught earlier.** ZIP fixtures used ordinary names; sanitization was tested
+per key, never across a job.
+
+**Test case.** `test/e2e/browser/download-zip.test.mjs` "distinct keys that sanitize to one
+name still get distinct entries (#79)" (8 colliding keys: 8 entries, 8 case-insensitively
+distinct names, every body present; read with `test/helpers/zip-reader.js`);
+`test/zip-job-run.test.js` test 13 (serial engine, interrupted then resumed);
+`test/zip-layout.test.js` allocateZipPaths cases (suffixing, file-vs-folder, case, order
+independence). Matched pair: see "Container evidence".
+
+---
+
+## BUG-074 — "Clear all app data" left downloaded object bytes and object names behind
+
+**Date:** 2026-10-16 · GitLab #78 · v1.63.5
+
+**Symptom.** After "Yes, clear everything" and the reload, OPFS still held
+`bucketer-zip-*.zip` staging files (real downloaded object bytes; completed ZIP downloads keep
+theirs too) and localStorage still held `bucketer:mtime:<bucket>:<key>:<ts>` entries (bucket
+and object names). With the job records gone, the staged bytes were orphaned with no UI path
+to remove them. Found by the Codex review (R05), reproduced in Chromium with a real UI ZIP
+download by BUCKET-1 lane 09.
+
+**Root cause.** `wipeAllAppData` removed an enumerated list of `s3b_*` keys; the mtime cache
+lives outside that namespace. Nothing in the wipe touched OPFS; the startup sweep only
+removes aged `bucketer-tmp-*` files.
+
+**Fix (v1.63.5).** `wipeAllAppData` also removes every `bucketer:mtime:` key (by prefix). The
+wipe action then calls `wipeAppOpfsFiles(root)` (zip-prefetch.js), which removes every
+`bucketer-zip-*` and `bucketer-tmp-*` OPFS file regardless of age, best-effort per entry. Other
+features' storage on the origin is untouched. The dialog's list now names both stores. Not
+addressed: a second tab blocking `deleteDatabase` (still resolves on `onblocked`), completed
+ZIP downloads keeping staging until cleared, staged-byte usage in Storage & Privacy.
+
+**Why it wasn't caught earlier.** The wipe had unit tests per enumerated key; no test seeded
+a store outside the enumeration, and no browser test ran the wipe.
+
+**Test case.** `test/e2e/browser/storage-wipe.test.mjs` (seeds OPFS staging/temp/foreign
+files and mtime/s3b_/foreign keys, runs the real UI wipe, checks after reload: app files and
+keys gone, foreign ones kept); `test/storage.test.js` "wipeAllAppData clears the file-mtime
+cache (#78)"; `test/zip-prefetch.test.js` wipeAppOpfsFiles cases. Harness fidelity: WebKit
+exposes no OPFS in this harness, so its lane covers the localStorage half only. Matched pair:
+see "Container evidence".
+
+**Container evidence (BUG-074, 075).** Image `mcr.microsoft.com/playwright:v1.60.0-noble` (Chromium 148.0.7778.96, Firefox 150.0.2, WebKit 26.4), desktop lanes, pre-fix tree = origin/main 6a5514d + these specs. **#79** (`download-zip.test.mjs`, 6 tests/lane): pre-fix the new arm FAILS on chromium and firefox (names `a_b.txt`, `café.txt`, `trail.txt` each twice), post-fix 5 pass + 1 skip there; WebKit has no ZIP button (arm skipped by design). **#78** (`storage-wipe.test.mjs`): pre-fix FAIL on all three (`mtime keys must be gone`), post-fix PASS on all three. The pre-fix run stops at the mtime assertion, so the OPFS half's fail-before evidence is a host-Chromium run with only the mtime half fixed: `only the foreign OPFS file survives` FAILED with `bucketer-tmp-p0` and `bucketer-zip-review-fixture.zip` still present. **Re-run after rebasing onto v1.63.4 (6b071e2)**, same image, both specs in one run: pre-fix tree = 6b071e2 + these specs → chromium 3 pass / 2 fail / 1 skip, firefox 3/2/1, webkit 1/1/4 (the same assertions as above); fixed tree → chromium 5/0/1, firefox 5/0/1, webkit 2/0/4. Mobile lanes not run (device-invariant); CI runs the 3×3.
+
+---
+
 ## BUG-073 — A crafted `#dl=` link framed attacker HTML inside Bucketer's download page
 
 **Date:** 2026-10-16 · GitLab #77 · v1.63.4

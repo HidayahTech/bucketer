@@ -4,13 +4,17 @@
 // every offset is fixed before any byte is downloaded. See
 // docs/superpowers/specs/2026-08-04-inplace-offset-composition-design.md.
 import { localHeaderBytes, dosDateTime } from './zip-writer.js';
-import { zipEntryPath } from './zip-naming.js';
+import { allocateZipPaths } from './zip-naming.js';
 
 export function computeZipLayout(items, prefix = '', { zip64Limit = 0xffffffff, startOffset = 0 } = {}) {
   const entries = [];
   let offset = startOffset;
+  const paths = allocateZipPaths(
+    items.map((it) => it.key),
+    prefix,
+  );
   for (const it of items) {
-    const path = zipEntryPath(it.key, prefix);
+    const path = paths.get(it.key);
     const { time, date } = dosDateTime(it.lastModified);
     const declaredSize = it.size || 0;
     const zip64 = declaredSize >= zip64Limit;

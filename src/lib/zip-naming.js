@@ -7,6 +7,7 @@
 // existing importers are unaffected.
 
 import { sanitizeSegment } from './download-naming.js';
+import { freeFileKey } from './move-key.js';
 
 // Keys keep their real folder structure inside the zip — that is the point of the format.
 // Relative to the scope's captured prefix; a key outside it (possible in a selection with
@@ -14,6 +15,35 @@ import { sanitizeSegment } from './download-naming.js';
 export function zipEntryPath(key, capturedPrefix = '') {
   const rel = capturedPrefix && key.startsWith(capturedPrefix) ? key.slice(capturedPrefix.length) : key;
   return rel.split('/').filter(Boolean).map(sanitizeSegment).join('/');
+}
+
+// One unique archive path per key (GitLab #79 / R06). Sanitizing can map distinct keys to one
+// path (`a:b`/`a?b` → `a_b`, a trailing dot, `//`, NFC vs NFD), and extractors then keep one
+// and silently drop the rest. Paths are also kept distinct case-insensitively (macOS and
+// Windows extract `A.txt` and `a.txt` onto one file), and a file never takes a path that is
+// a folder elsewhere in the archive. A loser gets the " (n)" suffix moves use. Folders are
+// never renamed, so the tree stays recognisable.
+//
+// Deterministic over the key SET (keys are processed in sorted order), so both engines, a
+// resumed run and the in-place→serial fallback all assign the same paths, provided they pass
+// the job's full key list rather than only the keys a run streams.
+export function allocateZipPaths(keys, capturedPrefix = '') {
+  const fold = (p) => p.normalize('NFC').toLowerCase();
+  const sorted = [...keys].sort();
+  const base = new Map(sorted.map((k) => [k, zipEntryPath(k, capturedPrefix)]));
+  const folders = new Set();
+  for (const p of base.values()) {
+    const segs = p.split('/');
+    for (let i = 1; i < segs.length; i++) folders.add(fold(segs.slice(0, i).join('/')));
+  }
+  const taken = new Set();
+  const out = new Map();
+  for (const k of sorted) {
+    const path = freeFileKey(base.get(k), (c) => taken.has(fold(c)) || folders.has(fold(c)));
+    taken.add(fold(path));
+    out.set(k, path);
+  }
+  return out;
 }
 
 export function zipFileName(bucket, capturedPrefix = '', now = new Date()) {

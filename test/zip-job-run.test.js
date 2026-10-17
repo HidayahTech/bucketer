@@ -900,4 +900,50 @@ describe('runZipJob — entry naming', () => {
       [zipEntryPath('videos/sub/d.txt', 'videos/')],
     );
   });
+
+  // #79 (R06): distinct keys that sanitize to one archive path must still get distinct
+  // entries — and the SAME ones after an interruption and resume (the allocation is
+  // computed over the whole job, not the items a run happens to stream).
+  test('13. colliding sanitized names get distinct, resume-stable entry paths (#79)', async () => {
+    const bodies = {
+      'videos/a:b.txt': 'colon',
+      'videos/a?b.txt': 'question',
+      'videos/Case.txt': 'upper',
+      'videos/case.txt': 'lower',
+    };
+    await saveJob(job());
+    await appendManifestPage(
+      'zjob-1',
+      Object.entries(bodies).map(([k, b]) => item(k, b)),
+      {},
+    );
+    const root = fakeOpfsRoot();
+    const fetchImpl = fetchFake(Object.fromEntries(Object.entries(bodies).map(([k, b]) => [k, [[enc(b)]]])));
+
+    let doneCount = 0;
+    const r1 = await runZipJob(await loadJob('zjob-1'), {
+      presign,
+      fetchImpl,
+      root,
+      concurrency: 1,
+      shouldCancel: () => doneCount >= 2,
+      onProgress: (p) => {
+        doneCount = p.done;
+      },
+    });
+    assert.equal(r1.finished, false, 'precondition: run 1 was interrupted');
+    const r2 = await runZipJob(await loadJob('zjob-1'), { presign, fetchImpl, root });
+    assert.equal(r2.finished, true);
+
+    const staging = await root.getFileHandle('bucketer-zip-zjob-1.zip');
+    const entries = readZip(new Uint8Array(await (await staging.getFile()).arrayBuffer()));
+    const names = entries.map((e) => e.name);
+    assert.equal(entries.length, 4);
+    assert.equal(new Set(names.map((n) => n.toLowerCase())).size, 4, `distinct names; got ${JSON.stringify(names)}`);
+    assert.deepEqual(
+      entries.map((e) => dec(e.data)).sort(),
+      Object.values(bodies).sort(),
+      'every object’s bytes are in the archive',
+    );
+  });
 });

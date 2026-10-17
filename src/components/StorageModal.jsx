@@ -38,6 +38,7 @@ import {
   clearActiveUploads,
 } from '../lib/indexeddb.js';
 import { formatBytes } from '../lib/format.js';
+import { wipeAppOpfsFiles } from '../lib/zip-prefetch.js';
 import { Modal } from './Modal.jsx';
 import { ConfirmDialog } from './ConfirmDialog.jsx';
 
@@ -154,6 +155,9 @@ export function StorageModal({ onClose, isConnected }) {
       setWiping(true);
       wipeAllAppData();
       await deleteDatabase();
+      // OPFS holds ZIP staging — real object bytes (#78). Best-effort; absent where unsupported.
+      const root = await navigator.storage?.getDirectory?.().catch(() => null);
+      if (root) await wipeAppOpfsFiles(root);
       window.location.reload();
       return;
     }
@@ -632,7 +636,9 @@ export function StorageModal({ onClose, isConnected }) {
           {/* ── Wipe All ──────────────────────────────────────── */}
           <div class="sv-wipe-block">
             <div class="sv-wipe-title">Remove all Bucketer data from this browser</div>
-            <p class="sv-wipe-desc">Removes every key written to localStorage, sessionStorage, and IndexedDB:</p>
+            <p class="sv-wipe-desc">
+              Removes everything Bucketer wrote to localStorage, sessionStorage, IndexedDB and browser file storage:
+            </p>
             <ul class="sv-wipe-list">
               <li>Connection details and credential fields</li>
               <li>All saved buckets</li>
@@ -640,6 +646,8 @@ export function StorageModal({ onClose, isConnected }) {
               <li>Upload history and resume records</li>
               <li>All settings</li>
               <li>Capability state and the active-uploads tracker</li>
+              <li>Cached file dates (which hold object names)</li>
+              <li>ZIP downloads staged in browser storage, including finished ones</li>
             </ul>
             <p class="sv-wipe-note">
               After clearing, the app reloads to a fresh state.{' '}
