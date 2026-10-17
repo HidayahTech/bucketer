@@ -4,6 +4,36 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-080 — The pre-push hook tagged commits that CI's format gate rejects, so the version got no Release
+
+**Date:** 2026-10-16 · v1.62.2 and v1.64.0 affected · fix in the next release
+
+**Symptom.** v1.64.0's tag pipeline failed `format`; `reproducibility` was skipped and
+`release` (which needs it) never ran, so v1.64.0 has a tag but no GitLab Release. v1.62.2
+went the same way (2026-09-15, a codemod's unformatted output).
+
+**Root cause (verified).** `.githooks/pre-push` ran `npm run format:check || echo …` — advisory —
+then built, tested and created + pushed the version tag. CI's `format` job is blocking and
+`release` needs `reproducibility`, which a red test stage skips. The v1.64.0 push log shows the
+warning followed by "Tests passed — push proceeding. Tag v1.64.0 created." Contributing (the
+agent's own step, not repo code): the "fix" before that push was
+`npx --prefix <worktree> prettier --write <abs path>` run from the main checkout. Prettier resolves
+`.prettierignore` from the working directory, and the main checkout's ignores `.claude-scratch/`
+(line 8), where agent worktrees live, so the file was skipped with "All matched files use Prettier
+code style!" and exit 0 (reproduced; with `--ignore-path` the same call reports the file, exit 1).
+
+**Fix.** The hook's format step blocks: `npm run format:check || { echo …; exit 1; }`, before the
+build and before the tag. Formatting runs from the package root (`npm run format`), which is
+correct in any worktree.
+
+**Why it wasn't caught earlier.** The step was deliberately advisory during the formatter's
+bake-in; nothing linked "CI format red" to "no Release" until it happened twice.
+
+**Test case.** `test/source-invariants.test.js` "pre-push hook: formatting blocks the push
+(BUG-080)" (fails on the `|| echo` line). Manual repro: an unformatted `test/zz-*.mjs` + a
+branch push line on stdin → pre-fix: warning, build, tests, tag (the v1.64.0 push log); fix:
+"Formatting is not clean …", exit 1, no build, no tag.
+
 > **Container evidence for BUG-076…079 (v1.64.0).** Image `mcr.microsoft.com/playwright:v1.60.0-noble`
 > (chromium-1223, firefox-1522, webkit-2287), desktop lanes; `E2E_FILES` = `keyboard.test.mjs`,
 > `contrast.test.mjs`, `issue-49-mobile-actions.test.mjs` (the mobile cases pin their own Pixel 5 /

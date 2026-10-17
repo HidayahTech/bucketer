@@ -1683,6 +1683,31 @@ describe('package-lock.json tracks package.json', () => {
   });
 });
 
+// BUG-080: the pre-push hook auto-tags the version commit, and CI's `format` job blocks — a
+// failing `format` skips `reproducibility`, which `release` needs, so the tag gets NO GitLab
+// Release (v1.62.2 and v1.64.0 both shipped tagless this way). The hook's format check was
+// advisory (`|| echo`), so it let the doomed commit through and tagged it. It must abort.
+describe('pre-push hook: formatting blocks the push (BUG-080)', () => {
+  const hook = readFileSync(resolve(ROOT, '.githooks/pre-push'), 'utf8');
+  const line = hook.split('\n').find((l) => /npm run format:check/.test(l) && !l.trim().startsWith('#'));
+
+  test('the hook runs format:check', () => {
+    assert.ok(line, '.githooks/pre-push must run `npm run format:check`');
+  });
+
+  test('a format:check failure is not swallowed', () => {
+    assert.ok(!/\|\|\s*echo/.test(line), `format:check failure must abort the push, got: ${line.trim()}`);
+    assert.ok(/exit 1/.test(line) || !/\|\|/.test(line), `format:check must exit non-zero on failure: ${line.trim()}`);
+  });
+
+  test('format:check runs before the hook creates the version tag', () => {
+    assert.ok(
+      hook.indexOf('npm run format:check') < hook.indexOf('git tag'),
+      'format:check must run before the tag is created',
+    );
+  });
+});
+
 // Static-analysis tooling (knip, purgecss, oxlint) is pinned to an EXACT version, not a
 // caret/tilde range — a deliberate deviation from the repo's usual range style. Their
 // heuristics/rule sets shift between minor versions (new patterns recognised, defaults changed),
