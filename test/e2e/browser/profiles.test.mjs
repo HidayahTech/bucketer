@@ -314,3 +314,84 @@ describe('BUG-026 — region re-inference after profile load', () => {
     }
   });
 });
+
+// ── #76 (S1): Sign out must forget every secret cached this tab ──────────────────
+// The in-memory secret cache (secret-cache.js) let a quick-switch reconnect without a
+// prompt; Sign out cleared sessionStorage but never the cache, so on a shared machine the
+// next person could click the previous person's saved bucket and be connected as them.
+// Observable: after A signs out and B connects, clicking A's bucket shows the secret
+// prompt (presence) and no request is signed with A's key ID (absence).
+describe('#76 — Sign out forgets cached secrets', () => {
+  e2eTest(
+    "after Sign out, the next user clicking the previous user's saved bucket is prompted, not connected as them",
+    async () => {
+      const KEY_A = 'AKIAEXAMPLEPERSONA01';
+      const KEY_B = 'AKIAEXAMPLEPERSONB02';
+      const { context, page } = await freshPage();
+      const signers = [];
+      page.on('request', (r) => {
+        const m = (r.headers()['authorization'] || '').match(/Credential=([^/]+)/);
+        if (m) signers.push(m[1]);
+      });
+      async function fill(bucket, keyId, secret) {
+        await fillCreds(page, { endpoint: ctx.browserEndpoint, bucket, keyId, secret });
+        const region = page.locator('input[placeholder="us-east-1"]');
+        await region.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+        if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
+      }
+      try {
+        // A saves and connects to their bucket, then signs out.
+        await fill('person-a-bucket', KEY_A, 'example-secret-not-real-A');
+        const trigger = page.locator('.bucket-save-trigger');
+        await trigger.waitFor({ timeout: scaleTimeout(5000) });
+        const deadline = Date.now() + scaleTimeout(5000);
+        while ((await trigger.isDisabled()) && Date.now() < deadline) await page.waitForTimeout(100);
+        await trigger.click();
+        await page.locator('input[placeholder="Name"]').fill('Person A');
+        await page.locator('button[type="submit"]:has-text("Save")').click();
+        await page.locator('.bucket-row', { hasText: 'person-a-bucket' }).waitFor({ timeout: scaleTimeout(5000) });
+        await page.locator('button[type="submit"]:has-text("Connect")').click();
+        await page.locator('[data-testid="file-input"]').waitFor({ state: 'attached', timeout: scaleTimeout(15000) });
+        await page.locator('button:has-text("Sign out")').click();
+        await page.locator('h2:has-text("Connect to a bucket")').waitFor({ timeout: scaleTimeout(5000) });
+
+        // B connects in the same tab with their own unsaved key.
+        await page
+          .locator('.account-add-bucket')
+          .first()
+          .click()
+          .catch(() => {});
+        await fill('person-b-bucket', KEY_B, 'example-secret-not-real-B');
+        await page.locator('button[type="submit"]:has-text("Connect")').click();
+        await page.locator('[data-testid="file-input"]').waitFor({ state: 'attached', timeout: scaleTimeout(15000) });
+
+        // B clicks A's saved bucket the way the viewport offers it.
+        signers.length = 0;
+        const tab = page.locator('.connection-tab', { hasText: 'person-a-bucket' });
+        if (await tab.isVisible().catch(() => false)) await tab.click();
+        else {
+          await page.locator('button:has-text("☰")').click();
+          await page.locator('.bucket-row', { hasText: 'person-a-bucket' }).click();
+        }
+        // Settle on either outcome: the prompt, or (pre-fix) a request signed as A.
+        const prompt = page.locator('h2:has-text("Connect to a bucket")');
+        const settle = Date.now() + scaleTimeout(10000);
+        while (!(await prompt.isVisible().catch(() => false)) && !signers.includes(KEY_A) && Date.now() < settle)
+          await page.waitForTimeout(150);
+        await page.waitForTimeout(500);
+        assert.ok(
+          !signers.includes(KEY_A),
+          `no request may be signed with A's key; signers=${JSON.stringify(signers)}`,
+        );
+        assert.ok(await prompt.isVisible(), 'the secret prompt (connect form) is shown');
+        assert.equal(
+          await page.locator('input[placeholder="Secret Access Key"]').inputValue(),
+          '',
+          "the secret prompt is empty: A's secret is not pre-filled",
+        );
+      } finally {
+        await context.close();
+      }
+    },
+  );
+});

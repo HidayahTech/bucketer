@@ -11,7 +11,7 @@ import { loadMoveJob, clearAllMoveJobs, saveMoveJob } from '../src/lib/move-jobs
 
 const GiB = 1024 * 1024 * 1024;
 
-function mockClient({ destKeys = [], existingParts = [], copyReject } = {}) {
+function mockClient({ destKeys = [], existingParts = [], copyReject, etags = {} } = {}) {
   const calls = [];
   return {
     calls,
@@ -29,7 +29,7 @@ function mockClient({ destKeys = [], existingParts = [], copyReject } = {}) {
         case 'DeleteObjectCommand':
           return Promise.resolve({});
         case 'HeadObjectCommand':
-          return Promise.resolve({ ContentType: 'x', Metadata: {} });
+          return Promise.resolve({ ContentType: 'x', Metadata: {}, ETag: etags[input.Key] });
         case 'CreateMultipartUploadCommand':
           return Promise.resolve({ UploadId: 'up-new' });
         case 'ListPartsCommand':
@@ -72,10 +72,11 @@ describe('resumeMoveOperation', () => {
     await clearAllMoveJobs();
   });
 
-  test('skips an item already at the destination and deletes its lingering source', async () => {
-    await saveMoveJob(record());
-    const client = mockClient({ destKeys: ['arch/a.bin'] });
-    const updates = await collect((cb) => resumeMoveOperation(client, 'bk', record(), cb));
+  test('finishes an item this move already copied (proof in the record) by deleting its source', async () => {
+    const rec = record({ copied: { 'a.bin': { srcEtag: '"s"', destEtag: '"d"' } } });
+    await saveMoveJob(rec);
+    const client = mockClient({ destKeys: ['arch/a.bin'], etags: { 'a.bin': '"s"', 'arch/a.bin': '"d"' } });
+    const updates = await collect((cb) => resumeMoveOperation(client, 'bk', rec, cb));
     assert.ok(!client.calls.some((c) => c.name === 'CopyObjectCommand'), 'must not re-copy a finished item');
     assert.ok(
       client.calls.some((c) => c.name === 'DeleteObjectCommand' && c.input.Key === 'a.bin'),
@@ -83,6 +84,24 @@ describe('resumeMoveOperation', () => {
     );
     assert.equal(updates.find((u) => u.phase === 'done').moved, 1);
   });
+
+  // #74 (R02): an existing destination without this move's copy proof (another writer, or a
+  // pre-#74 record) must not license deleting the source.
+  for (const [label, copied, destEtag] of [
+    ['no proof in the record', undefined, '"d"'],
+    ['the destination was replaced since the copy', { 'a.bin': { srcEtag: '"s"', destEtag: '"d"' } }, '"other"'],
+  ]) {
+    test(`keeps the source when the destination exists but ${label}`, async () => {
+      const rec = record(copied ? { copied } : {});
+      await saveMoveJob(rec);
+      const client = mockClient({ destKeys: ['arch/a.bin'], etags: { 'a.bin': '"s"', 'arch/a.bin': destEtag } });
+      const updates = await collect((cb) => resumeMoveOperation(client, 'bk', rec, cb));
+      assert.ok(!client.calls.some((c) => c.name === 'DeleteObjectCommand'), 'must not delete the source');
+      const done = updates.find((u) => u.phase === 'done');
+      assert.equal(done.moved, 0);
+      assert.equal(done.errors.length, 1);
+    });
+  }
 
   test('copies a not-yet-done item and deletes its source', async () => {
     await saveMoveJob(record());

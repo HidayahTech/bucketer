@@ -43,7 +43,12 @@ function formatTimeRemaining(expiresAt) {
 
 export function DownloadPage({ presignedUrl }) {
   const fileName = leafName(new URL(presignedUrl).pathname);
-  const kind = mediaKind(fileName);
+  // No PDF preview here. PreviewMedia frames PDFs with sandbox="allow-scripts", which is safe
+  // only for URLs Bucketer itself presigned as application/pdf. A #dl= URL is chosen by
+  // whoever built the link: an attacker could serve HTML named *.pdf and run a phishing form
+  // inside this page (GitLab #77 / S2). PDFs are offered for download only.
+  const detected = mediaKind(fileName);
+  const kind = detected === 'pdf' ? null : detected;
   const expiresAt = parseExpiry(presignedUrl);
   const remaining = expiresAt ? formatTimeRemaining(expiresAt) : null;
   const expired = !remaining;

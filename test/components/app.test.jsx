@@ -1765,3 +1765,57 @@ describe('App — header quick-switch tab-strip', () => {
     }
   });
 });
+
+// #76 (S1): deleting a saved connection forgets its cached secret once no other saved
+// connection uses that credential; a sibling bucket on the same credential keeps it.
+describe('App — deleting a saved connection forgets its cached secret (#76)', () => {
+  test('the secret survives deleting one of two buckets on a credential and is forgotten with the last', async () => {
+    const { getCachedSecret, clearSecretCache } = await import('../../src/lib/secret-cache.js');
+    const { credentialFingerprint } = await import('../../src/lib/connections.js');
+    clearAppStorage();
+    clearSecretCache();
+    const cred = {
+      id: 'credA',
+      endpoint: 'http://127.0.0.1:1',
+      keyId: 'K1',
+      provider: 'b2',
+      regionOverride: '',
+      label: 'B2 — K1',
+    };
+    localStorage.setItem('s3b_credentials', JSON.stringify({ version: 1, credentials: [cred] }));
+    localStorage.setItem(
+      's3b_connections',
+      JSON.stringify({
+        version: 2,
+        connections: [
+          { id: 1, name: 'B2 — photos', credentialId: 'credA', bucket: 'photos', capabilities: null },
+          { id: 2, name: 'B2 — docs', credentialId: 'credA', bucket: 'docs', capabilities: null },
+        ],
+      }),
+    );
+    localStorage.setItem('s3b_last_profile_id', '1');
+    localStorage.setItem('s3b_connections_migrated', '1');
+    const fp = credentialFingerprint(cred);
+
+    const { query, cleanup } = mount(h(App, {}));
+    try {
+      setInput(query('#cred-secretkey'), 'sekret');
+      fire(query('button[type="submit"]'), 'click'); // connect — caches the secret
+      assert.equal(getCachedSecret(fp), 'sekret', 'precondition: the connect cached the secret');
+
+      const del = (bucket) => {
+        const row = [...document.querySelectorAll('.bucket-row')].find((r) => r.textContent.includes(bucket));
+        fire(row.querySelector('.bucket-row-delete'), 'click');
+        fire(row.querySelector('.bucket-delete-confirm-yes'), 'click');
+      };
+      del('docs');
+      assert.equal(getCachedSecret(fp), 'sekret', 'photos still uses the credential: keep the secret');
+      del('photos');
+      assert.equal(getCachedSecret(fp), null, 'no saved connection uses the credential: forget the secret');
+    } finally {
+      cleanup();
+      clearAppStorage();
+      clearSecretCache();
+    }
+  });
+});

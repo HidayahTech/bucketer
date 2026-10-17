@@ -4,6 +4,205 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-073 — A crafted `#dl=` link framed attacker HTML inside Bucketer's download page
+
+**Date:** 2026-10-16 · GitLab #77 · v1.63.4
+
+**Symptom.** A `#dl=` share link whose URL ended in `.pdf` made the download page embed that
+URL in `<iframe sandbox="allow-scripts">`. The URL is chosen by whoever builds the link, so an
+attacker could serve HTML under a `.pdf` name and show a "session expired — re-enter your
+credentials" form, with working script, under the real Bucketer host in the address bar
+(the frame could not read Bucketer's storage; the risk is phishing). Found by the BUCKET-1
+deep-dive security lane (2026-10-16, S2), demonstrated in Chromium.
+
+**Root cause.** `DownloadPage` passed every previewable kind to `PreviewMedia`, whose PDF
+branch allows scripts for Firefox's pdf.js (#46). That is safe only for URLs Bucketer itself
+presigned with `ResponseContentType: application/pdf` (the in-app preview); `share-url.js`
+checks only the `https://` prefix of a `#dl=` URL.
+
+**Fix (v1.63.4).** `DownloadPage` no longer previews PDFs: they are offered through the
+Download link only. Image/audio/video/text previews are unchanged (none can run script). The
+in-app PDF preview is untouched.
+
+**Why it wasn't caught earlier.** Every `#dl=` test used a genuine presigned URL; the
+sandbox comment reasoned about the in-app URL only, and the v1.14.0 review rated the frame
+when it was `sandbox=""`.
+
+**Test case.** `test/components/download-page.test.jsx` "a .pdf link is offered for download
+only, never framed (#77, S2)"; `test/e2e/browser/pdf-preview.test.mjs` "#dl= page does not
+frame the link's PDF (#77)" (route-served HTML at `attacker.example.test/statement.pdf`:
+Download link present, no iframe, no document request for the URL), next to the BUG #46
+in-app PDF iframe test. Matched pair: see "Container evidence" below.
+
+---
+
+## BUG-072 — Sign out left other connections' secrets cached; the next user could switch into them
+
+**Date:** 2026-10-16 · GitLab #76 · v1.63.4
+
+**Symptom.** After person A signed out on a shared machine, person B could connect with any
+key, click A's saved bucket in the header tab strip or sidebar, and be connected as A with no
+secret prompt, until the tab was reloaded. Storage & Privacy meanwhile showed the secret as
+"Not stored". Found by the BUCKET-1 deep-dive security lane (S1), demonstrated in Chromium.
+
+**Root cause.** Every connect caches the secret in the in-memory quick-switch cache
+(`secret-cache.js`); `switchToConnection` connects whenever that cache has the credential's
+fingerprint. `handleDisconnect` (the Sign out button) cleared sessionStorage only;
+`clearSecretCache` and `forgetCachedSecret` had no callers. Deleting a saved connection did
+not forget its secret either.
+
+**Fix (v1.63.4).** `handleDisconnect` calls `clearSecretCache()`. `handleDeleteProfile`
+forgets the deleted connection's credential fingerprint unless another saved connection still
+uses it. Running transfers are not cancelled (their clients already hold the credentials);
+whether Sign out should also end background work is an open product question (Codex R12).
+
+**Why it wasn't caught earlier.** The cache was reviewed for at-rest risk ("zero new at-rest
+risk") and that holds; nobody tested sign-out followed by a second person in the same tab.
+
+**Test case.** `test/e2e/browser/profiles.test.mjs` "#76 — Sign out forgets cached secrets"
+(after A signs out and B connects, clicking A's bucket shows the connect form with an empty
+secret and no request is signed with A's key ID); `test/components/app.test.jsx` "deleting a
+saved connection forgets its cached secret (#76)". Matched pair: see "Container evidence".
+
+---
+
+## BUG-071 — A move deleted a source that was replaced between the copy and the delete
+
+**Date:** 2026-10-16 · GitLab #75 · v1.63.4
+
+**Symptom.** If another writer replaced a source object after Bucketer's server-side copy
+and before its delete, the move deleted the replacement and reported success; the
+destination held only the earlier bytes. Found by the Codex review (R04) and reproduced
+against the stateful mock S3 by BUCKET-1 lane 09.
+
+**Root cause.** Copy and delete were addressed by key only; nothing tied the deleted object
+to the one that was copied (no ETag/version check, no conditional headers).
+
+**Fix (v1.63.4).** For move and folder rename, `move-queue.js` reads the source ETag before
+the copy and again immediately before the delete; a changed source is kept and reported
+("The source changed while it was being moved, so it was kept…"). Provider-neutral (HEAD
+only), so it narrows the race rather than closing it: a write between the final HEAD and the
+DELETE is still not caught. Conditional copy/delete headers (#35) would close it where a
+provider supports them. Not addressed: the destination-side race (a writer creating the
+destination after the collision scan), and a resumed multipart copy whose source changed
+between sessions (parts from two versions).
+
+**Why it wasn't caught earlier.** Move tests use a single writer; no test injected a
+concurrent change between the copy and the delete.
+
+**Test case.** `test/e2e/node/move-identity.test.mjs` "#75" (a hooked real client PUTs new
+source bytes right after `CopyObject` returns; asserts the source still holds the
+replacement, the destination the original, `moved: 0`, one error). Matched pair (node layer,
+host): pre-fix FAIL "the replacement must survive", post-fix PASS. Harness fidelity: the mock
+returns real MD5 ETags on HEAD/Copy/Complete; providers that omit ETags get no protection
+(and no regression). Not verified against real providers.
+
+---
+
+## BUG-070 — Move resume deleted the source when an unrelated object sat at the destination
+
+**Date:** 2026-10-16 · GitLab #74 · v1.63.4
+
+**Symptom.** Resuming an interrupted move treated "the destination key exists" as proof the
+copy had finished and deleted the source. If anything else had created that key meanwhile,
+the original was lost and the move reported success. Found by the Codex review (R02),
+reproduced against the stateful mock S3 by BUCKET-1 lane 09.
+
+**Root cause.** `resumeMoveOperation` split items on `existing.has(it.destKey)` and deleted
+every "already" source unconditionally; the persisted record had no evidence of which copy
+it had written.
+
+**Fix (v1.63.4).** After each successful copy the job record now stores
+`copied[sourceKey] = { srcEtag, destEtag }` (the destination ETag returned by the copy
+itself; `copyObjectMultipart` now returns the Complete ETag), persisted before the source
+delete. Resume finishes an existing-destination item only if that proof exists, the
+destination's current ETag matches it, and the source is unchanged; otherwise the item is
+reported ("An object already exists at the destination that this move can't confirm it
+wrote, so the source was kept") and the source kept. Pending items on resume follow the same
+copy → proof → guarded-delete path. Records written before this fix carry no proof and are
+treated conservatively (their existing destinations are reported, sources kept). A crash
+between a copy and its proof being persisted also lands in the conservative case.
+
+**Why it wasn't caught earlier.** The resume unit test "skips an item already at the
+destination and deletes its lingering source" pinned the unsafe rule as intended behaviour;
+no test placed a foreign object at the destination.
+
+**Test case.** `test/e2e/node/move-identity.test.mjs` "#74" (real interrupted move, foreign
+destination written before resume: source bytes survive) and "#74 (positive)" (a genuine
+copied-but-not-deleted item is still finished). `test/move-resume.test.js`: the old test now
+requires proof; new cases for no proof and a replaced destination. Matched pair (node layer,
+host): pre-fix FAIL "the source must survive", post-fix PASS.
+
+---
+
+## BUG-069 — Inline rename overwrote an existing file that was not on the loaded listing page
+
+**Date:** 2026-10-16 · GitLab #73 · v1.63.4
+
+**Symptom.** Renaming a file to a name that existed in the bucket but was not among the
+loaded listing rows (a later page, or created since listing) copied over that object and
+deleted the source, with no error. Any folder larger than one page could trigger it.
+Contradicts README "Bucketer never overwrites". Found by the Codex review (R03), reproduced
+by BUCKET-1 lane 09.
+
+**Root cause.** `useRename.commitRename` checked collisions with
+`items.some((o) => o.Key === newKey)`; `items` holds only loaded pages. The copy that followed
+was unconditional.
+
+**Fix (v1.63.4).** Before copying, `commitRename` HEADs the target key: it proceeds only on a
+definite 404; an existing object is refused with "A file with that name already exists.", and
+any other HEAD failure refuses with its message rather than risking an overwrite. A writer
+racing between the HEAD and the copy is not closed (#75 / #35). The single-request-copy
+limit for files over 5 GB (also in R03) is unchanged.
+
+**Why it wasn't caught earlier.** The component test titled "renaming to an existing file
+name shows an error and does not copy" actually tested the `a/b` slash rejection, so the
+collision path had no test, and listings in tests fit on one page.
+
+**Test case.** `test/components/browser-file-rename.test.jsx` "renaming onto an existing key
+that is not on the loaded page is refused (#73, R03)" (mis-titled test renamed);
+`test/e2e/browser/file-rename.test.mjs` (`s3b_max_keys=2`, rename `a.txt`→`z.txt` where z is
+on page 2: both objects keep their bytes, refusal shown), next to the BUG-062 normal rename.
+Matched pair: see "Container evidence".
+
+---
+
+## BUG-068 — Dropped uploads went to the previously connected bucket after switching buckets
+
+**Date:** 2026-10-16 · GitLab #72 · v1.63.4
+
+**Symptom.** After switching from bucket A to bucket B (sidebar reconnect or saved-bucket
+quick-switch), a file dragged onto the browser was uploaded to A while the screen showed B
+and the queue reported "Done"; a same-named object in A was overwritten. Retrying an A
+upload after the switch went to B. The file picker was unaffected. Found by the Codex review
+(R01), reproduced in Chromium by BUCKET-1 lane 09.
+
+**Root cause.** The BUG-031 class again: `UploadQueue` exposes `addFiles` once via `onMount`
+(`[]` deps) and stays mounted across connected-to-connected switches, so drops ran the
+mount-time closure over `client`/`bucket`/`provider`/`credentials`. BUG-031 made only the
+destination prefix live. Per-item actions (Retry/Restart, Resume, Cancel) read the
+*current* connection instead of the item's.
+
+**Fix (v1.63.4).** `UploadQueue` keeps a live `originRef` ({client, bucket, provider,
+credentials}); `addFiles` stamps it on each new item, and every per-item path (upload,
+multipart, retry, resume, cancel, batch cancel) uses `item.origin`. A switch therefore
+neither sends new drops to the old bucket nor retargets existing items. Not changed: an A
+completion still calls `onCapabilityChange`/`onUploadsComplete` for whatever is on screen,
+and the log entry is written with A's origin as before.
+
+**Why it wasn't caught earlier.** BUG-031's fix and spec covered the folder half only; no
+test switched connections before dropping.
+
+**Test case.** `test/components/upload-queue-origin.test.jsx` (drop routed through the
+onMount `addFiles` after an A→B rerender goes to client B / `bucket-b`; Retry of a failed A
+item after the switch goes to A); `test/e2e/browser/issue-2-drop-destination.test.mjs` "#72"
+(sidebar reconnect and saved-bucket quick-switch, then drop: the bytes are in B, nothing in
+A), next to the BUG-031 folder case. Matched pair: see "Container evidence".
+
+**Container evidence (BUG-068, 069, 072, 073).** Image `mcr.microsoft.com/playwright:v1.60.0-noble` (Chromium 148.0.7778.96, Firefox 150.0.2, WebKit 26.4), desktop lanes, `E2E_FILES` = issue-2-drop-destination, file-rename, profiles, pdf-preview (16 tests per lane). Pre-fix (origin/main 6a5514d + these specs): 11 pass / 5 fail on each of chromium, firefox and webkit — exactly the five new cases (`must NOT land in bucket-a` ×2, `the existing z.txt is not overwritten`, `no request may be signed with A's key`, `no frame on the download page`). Post-fix: 16/16 on all three. Mobile lanes not run (the fixes are device-invariant); CI runs the full 3×3. BUG-070/071 are node-layer only (host Node 22).
+
+---
+
 ## BUG-067 — A pasted or stale share link auto-connected the stored key to the link's endpoint
 
 **Date:** 2026-09-16 · GitLab #70 · v1.63.1

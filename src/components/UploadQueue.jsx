@@ -151,6 +151,13 @@ export function UploadQueue({
   // Browser.jsx uses with prefixRef for its onMount-exposed actions.)
   const destinationPrefixRef = useRef(destinationPrefix);
   destinationPrefixRef.current = destinationPrefix;
+  // The connection has the same stale-closure problem: this component stays mounted across a
+  // connected-to-connected switch, so the onMount addFiles would upload a drop to the PREVIOUS
+  // bucket (GitLab #72 / R01). addFiles reads the live origin and stamps it on each item; every
+  // per-item path (upload, retry, resume, cancel) then uses the item's own origin, so a switch
+  // neither retargets existing items nor sends new ones to the old bucket.
+  const originRef = useRef(null);
+  originRef.current = { client, bucket, provider, credentials };
 
   // Prefix-scoped keys (#60): the free-text destination is the one upload surface
   // that can name an arbitrary path. While scoped, refuse anything outside the
@@ -216,12 +223,14 @@ export function UploadQueue({
     // than upload outside the floor.
     if (destOutsideFloorRef.current) return;
     const batchId = String(Date.now() + Math.random());
+    const origin = originRef.current;
     // Smallest-first: minimises time-to-first-completion, reduces active file count
     // quickly so the part-concurrency rebalancer kicks in sooner for large files.
     fileEntries.sort((a, b) => a.file.size - b.file.size);
     const newItems = fileEntries.map(({ file, relativePath }) => ({
       id: newId(),
       batchId,
+      origin,
       file,
       name: relativePath,
       size: file.size,
@@ -258,6 +267,7 @@ export function UploadQueue({
   // to explicitly choose Resume (continue) or Restart (abort old session) — we never
   // silently overwrite, because a restart at the wrong moment would lose the already-uploaded parts.
   async function enqueueUpload(item) {
+    const { bucket, provider, credentials } = item.origin;
     let existingRecord = null;
     try {
       existingRecord = await loadResumeRecord({
@@ -284,11 +294,12 @@ export function UploadQueue({
         updateItem(item.id, { status: 'aborted' }, true);
         return;
       }
-      return runUpload(item.id, item.file, item.destinationKey);
+      return runUpload(item.id, item.file, item.destinationKey, item.origin);
     });
   }
 
-  async function runUpload(id, file, destinationKey) {
+  async function runUpload(id, file, destinationKey, origin) {
+    const { client, bucket, provider, credentials } = origin;
     // Concurrent tab conflict detection (§4.15)
     if (isUploadActiveElsewhere(destinationKey)) {
       updateItem(
@@ -330,10 +341,10 @@ export function UploadQueue({
     try {
       if (file.size < MULTIPART_THRESHOLD) {
         // Small file — single PutObjectCommand
-        await uploadSmall(id, file, destinationKey, updateProgress);
+        await uploadSmall(id, file, destinationKey, updateProgress, origin);
       } else {
         // Large file — manual multipart with resume state
-        uploadAnnotation = await uploadMultipart(id, file, destinationKey, updateProgress, diag);
+        uploadAnnotation = await uploadMultipart(id, file, destinationKey, updateProgress, diag, origin);
       }
 
       const completedAt = Date.now();
@@ -454,7 +465,8 @@ export function UploadQueue({
     }
   }
 
-  async function uploadSmall(id, file, destinationKey, onProgress) {
+  async function uploadSmall(id, file, destinationKey, onProgress, origin) {
+    const { client, bucket } = origin;
     const controller = new AbortController();
     activeUploadsRef.current[id] = { abort: () => controller.abort() };
 
@@ -474,7 +486,8 @@ export function UploadQueue({
     onProgress(file.size, file.size);
   }
 
-  async function uploadMultipart(id, file, destinationKey, onProgress, diag = {}) {
+  async function uploadMultipart(id, file, destinationKey, onProgress, diag, origin) {
+    const { client, bucket, provider, credentials } = origin;
     const preferredBytes = (loadPartSizeMB() ?? 5) * 1024 * 1024;
     const partSize = calcPartSize(file.size, preferredBytes);
     const totalParts = Math.ceil(file.size / partSize);
@@ -682,6 +695,7 @@ export function UploadQueue({
   async function handleResume(id) {
     const item = items.find((it) => it.id === id);
     if (!item || !item.resumeRecord) return;
+    const { client, bucket, provider, credentials } = item.origin;
 
     updateItem(id, { status: 'resuming', error: null }, true);
 
@@ -818,6 +832,7 @@ export function UploadQueue({
   async function handleRestart(id) {
     const item = items.find((it) => it.id === id);
     if (!item) return;
+    const { client, bucket, provider, credentials } = item.origin;
 
     if (item.resumeRecord) {
       await abortMultipartSession(client, {
@@ -831,7 +846,7 @@ export function UploadQueue({
 
     updateItem(id, { status: 'queued', resumeRecord: null, error: null, progress: 0 }, true);
     queueRef.current.concurrency = effectiveFileConcurrency();
-    queueRef.current.enqueue(() => runUpload(id, item.file, item.destinationKey));
+    queueRef.current.enqueue(() => runUpload(id, item.file, item.destinationKey, item.origin));
   }
 
   function handleCancelBatch(batchId) {
@@ -849,6 +864,7 @@ export function UploadQueue({
         const active = activeUploadsRef.current[item.id];
         const uploadId = active?.uploadId ?? item.resumeRecord?.uploadId;
         if (uploadId) {
+          const { client, bucket, provider, credentials } = item.origin;
           abortMultipartSession(client, {
             bucket,
             key: item.destinationKey,
@@ -871,6 +887,7 @@ export function UploadQueue({
     const uploadId = active?.uploadId ?? item?.resumeRecord?.uploadId;
 
     if (uploadId && destinationKey) {
+      const { client, bucket, provider, credentials } = item.origin;
       try {
         await client.send(
           new AbortMultipartUploadCommand({

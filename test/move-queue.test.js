@@ -44,9 +44,11 @@ function mockClient(opts = {}) {
         const err = deleteReject?.(input);
         return err ? Promise.reject(err) : Promise.resolve({});
       }
+      // A move HEADs each source before the copy and again before the delete (#75); this
+      // stub's objects never change, so every HEAD answers the same (ETag-less) identity.
+      if (name === 'HeadObjectCommand')
+        return Promise.resolve({ ContentType: 'application/octet-stream', Metadata: {} });
       if (multipart) {
-        if (name === 'HeadObjectCommand')
-          return Promise.resolve({ ContentType: 'application/octet-stream', Metadata: {} });
         if (name === 'CreateMultipartUploadCommand') return Promise.resolve({ UploadId: 'up' });
         if (name === 'UploadPartCopyCommand')
           return Promise.resolve({ CopyPartResult: { ETag: `e-${input.PartNumber}` } });
@@ -376,6 +378,7 @@ describe('runMoveOperation — throttling retry', () => {
             return Promise.resolve({});
           }
           if (name === 'DeleteObjectCommand') return Promise.resolve({});
+          if (name === 'HeadObjectCommand') return Promise.resolve({});
           return Promise.reject(new Error(`unexpected ${name}`));
         },
       };
