@@ -139,7 +139,7 @@ describe('#72 — a drop after switching buckets uploads to the bucket on screen
         await tab.click();
         await showsBucketB(page);
       } else {
-        await page.locator('button:has-text("☰")').click();
+        await page.locator('button[aria-label="Open menu"]').click();
         await page.locator('.bucket-row', { hasText: B }).click();
         await showsBucketB(page);
         if (
@@ -148,7 +148,7 @@ describe('#72 — a drop after switching buckets uploads to the bucket on screen
             .isVisible()
             .catch(() => false)
         )
-          await page.locator('button:has-text("☰")').click();
+          await page.locator('button[aria-label="Open menu"]').click();
       }
       await dropAndSettle(page);
     } finally {

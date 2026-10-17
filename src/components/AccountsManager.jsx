@@ -11,6 +11,7 @@
 import { useState } from 'preact/hooks';
 import { PROVIDER_LABELS, detectProvider } from '../lib/provider.js';
 import { canSaveProfile } from '../lib/credential-validation.js';
+import { Icon } from './Icon.jsx';
 
 const KEY_TAIL = 4;
 
@@ -158,13 +159,15 @@ export function AccountsManager({ connections, selectedId, onSelect, onDelete, o
                     ) : (
                       <button
                         class="bucket-row-delete btn-ghost"
+                        type="button"
                         title="Forget this bucket"
+                        aria-label={`Forget ${c.bucket}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           setConfirmDeleteId(c.id);
                         }}
                       >
-                        ✕
+                        <Icon name="x" />
                       </button>
                     )}
                   </li>

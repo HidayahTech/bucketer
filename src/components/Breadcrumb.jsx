@@ -15,6 +15,8 @@
 // already named, and a per-row button would crowd mobile rows (BUG-042 class) next to the
 // per-file presigned link, which means something else. The caller decides when it makes
 // sense (not at the root or the floor). Keyboard-operable with a visible focus ring.
+import { Icon } from './Icon.jsx';
+
 export function Breadcrumb({
   prefix,
   floor = '',
@@ -61,7 +63,7 @@ export function Breadcrumb({
       }
       data-testid="crumb-copy-link"
     >
-      🔗
+      <Icon name="link" />
     </button>
   ) : null;
 

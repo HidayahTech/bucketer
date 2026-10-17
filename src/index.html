@@ -25,7 +25,7 @@
        reported "Sent N of N" (BUG-052). No new plaintext exposure: connect-src already
        carries credentials and object bytes over http when the user chooses an http
        endpoint. -->
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: https: blob:; media-src https: blob:; frame-src https: http:; connect-src https: http:; worker-src blob:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; font-src data:; img-src data: https: blob:; media-src https: blob:; frame-src https: http:; connect-src https: http:; worker-src blob:;">
 </head>
 <body>
   <div id="app"></div>

@@ -31,6 +31,7 @@ import { CopyLinkPopover } from './CopyLinkPopover.jsx';
 import { resolveShortcut, isEditableTarget } from '../lib/keyboard-shortcuts.js';
 import { Breadcrumb } from './Breadcrumb.jsx';
 import { SortTh } from './SortTh.jsx';
+import { Icon, fileIconName } from './Icon.jsx';
 import { MovePickerModal } from './MovePickerModal.jsx';
 import { dragPayload, dropAccepted } from '../lib/move-drag.js';
 import { normalizeBasePrefix, withinFloor, clampToFloor, sanitizeNavPrefix } from '../lib/base-prefix.js';
@@ -1030,7 +1031,7 @@ export function Browser({
                   </span>
                 )}
                 <button class="preview-close" onClick={closePreview} aria-label="Close">
-                  ✕
+                  <Icon name="x" size={18} />
                 </button>
               </div>
               <div class="preview-body">
@@ -1208,7 +1209,7 @@ export function Browser({
             title="Refresh listing (pull changes uploaded from other devices)"
             style={{ marginRight: '.25rem' }}
           >
-            ↺ Refresh
+            <Icon name="refresh" /> Refresh
           </button>
           <button
             class="btn btn-ghost btn-sm"
@@ -1217,10 +1218,10 @@ export function Browser({
             onClick={() => onDownloadRequest?.({ kind: 'folder', prefix })}
             title="Download this folder"
           >
-            ⤓ Download
+            <Icon name="download" /> Download
           </button>
           <button class="btn btn-ghost btn-sm" onClick={openNewFolder} title="Create a new folder">
-            + New folder
+            <Icon name="folder-plus" /> New folder
           </button>
         </div>
       </div>
@@ -1376,7 +1377,11 @@ export function Browser({
                 style={!mtimeLoadEnabled ? { cursor: 'pointer' } : undefined}
               >
                 File Modified
-                {!mtimeLoadEnabled && <span style={{ opacity: 0.5, marginLeft: '.3rem' }}>↓</span>}
+                {!mtimeLoadEnabled && (
+                  <span style={{ opacity: 0.6, marginLeft: '.3rem' }}>
+                    <Icon name="clock" size={12} />
+                  </span>
+                )}
                 {mtimeLoadEnabled && isMtimeLoading && <span class="spinner" style={{ marginLeft: '.4rem' }} />}
               </th>
               <th></th>
@@ -1408,7 +1413,9 @@ export function Browser({
                     />
                   </td>
                   <td class="col-name">
-                    <span class="file-icon">📁</span>
+                    <span class="file-icon file-icon-folder">
+                      <Icon name="folder" />
+                    </span>
                     {renamingKey === cp ? (
                       <span class="rename-inline">
                         <input
@@ -1432,8 +1439,10 @@ export function Browser({
                             e.stopPropagation();
                             commitFolderRename(cp);
                           }}
+                          aria-label="Save name"
+                          title="Save name"
                         >
-                          ✓
+                          <Icon name="check" />
                         </button>
                         <button
                           class="btn btn-ghost btn-sm"
@@ -1441,8 +1450,10 @@ export function Browser({
                             e.stopPropagation();
                             cancelRename();
                           }}
+                          aria-label="Cancel rename"
+                          title="Cancel rename"
                         >
-                          ✕
+                          <Icon name="x" />
                         </button>
                       </span>
                     ) : (
@@ -1466,7 +1477,7 @@ export function Browser({
                         }}
                         title="Download this folder"
                       >
-                        ⤓
+                        <Icon name="download" />
                       </button>
                       <button
                         class="btn btn-ghost btn-sm"
@@ -1478,7 +1489,7 @@ export function Browser({
                         disabled={!canMove}
                         title={!canMove ? 'Rename not permitted with current credentials' : 'Rename folder'}
                       >
-                        ✎
+                        <Icon name="pencil" />
                       </button>
                       <button
                         class="btn btn-ghost btn-sm"
@@ -1492,7 +1503,7 @@ export function Browser({
                           !canMove ? 'Move not permitted with current credentials' : 'Move folder to another folder'
                         }
                       >
-                        ↪
+                        <Icon name="move" />
                       </button>
                       <button
                         class="btn btn-ghost btn-sm"
@@ -1508,7 +1519,7 @@ export function Browser({
                             : 'Delete folder and all contents'
                         }
                       >
-                        ✕
+                        <Icon name="trash" />
                       </button>
                     </span>
                   </td>
@@ -1538,7 +1549,9 @@ export function Browser({
                     />
                   </td>
                   <td class="col-name">
-                    <span class="file-icon">📄</span>
+                    <span class="file-icon">
+                      <Icon name={fileIconName(obj.Key)} />
+                    </span>
                     {renamingKey === obj.Key ? (
                       <span class="rename-inline">
                         <input
@@ -1563,8 +1576,10 @@ export function Browser({
                             commitRename(obj.Key);
                           }}
                           disabled={renameSaving}
+                          aria-label="Save name"
+                          title="Save name"
                         >
-                          {renameSaving ? <span class="spinner" /> : '✓'}
+                          {renameSaving ? <span class="spinner" /> : <Icon name="check" />}
                         </button>
                         <button
                           class="btn btn-ghost btn-sm"
@@ -1573,8 +1588,10 @@ export function Browser({
                             cancelRename();
                           }}
                           disabled={renameSaving}
+                          aria-label="Cancel rename"
+                          title="Cancel rename"
                         >
-                          ✕
+                          <Icon name="x" />
                         </button>
                       </span>
                     ) : (
@@ -1616,7 +1633,7 @@ export function Browser({
                         title="Properties"
                         style={{ marginRight: '.25rem' }}
                       >
-                        ℹ
+                        <Icon name="info" />
                       </button>
                       <button
                         class="btn btn-ghost btn-sm"
@@ -1627,7 +1644,7 @@ export function Browser({
                         title="Rename"
                         style={{ marginRight: '.25rem' }}
                       >
-                        ✎
+                        <Icon name="pencil" />
                       </button>
                       <button
                         class="btn btn-ghost btn-sm"
@@ -1636,7 +1653,7 @@ export function Browser({
                         title={!canDownload ? 'Download not permitted with current credentials' : 'Download'}
                         style={{ marginRight: '.25rem' }}
                       >
-                        {isDownloading ? <span class="spinner" /> : '↓'}
+                        {isDownloading ? <span class="spinner" /> : <Icon name="download" />}
                       </button>
                       <div class="copy-link-wrap" ref={tableCopyKey === obj.Key ? tableCopyWrapRef : undefined}>
                         <button
@@ -1645,7 +1662,7 @@ export function Browser({
                           disabled={!canDownload}
                           title="Copy link"
                         >
-                          {tableCopied === obj.Key ? '✓' : '⎘'}
+                          {tableCopied === obj.Key ? <Icon name="check" /> : <Icon name="link" />}
                         </button>
                         {tableCopyKey === obj.Key && (
                           <CopyLinkPopover
@@ -1667,7 +1684,7 @@ export function Browser({
                         disabled={!canMove}
                         title={!canMove ? 'Move not permitted with current credentials' : 'Move to another folder'}
                       >
-                        ↪
+                        <Icon name="move" />
                       </button>
                       <button
                         class="btn btn-ghost btn-sm"
@@ -1676,7 +1693,7 @@ export function Browser({
                         disabled={!canDelete}
                         title={!canDelete ? 'Delete not permitted with current credentials' : 'Delete'}
                       >
-                        ✕
+                        <Icon name="trash" />
                       </button>
                     </span>
                   </td>

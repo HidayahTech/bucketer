@@ -168,8 +168,13 @@ const result = await esbuild.build({
 });
 
 const js = result.outputFiles[0].text;
-const rawCss = readFileSync('src/styles/main.css', 'utf8');
-const cssResult = await esbuild.transform(rawCss, { loader: 'css', minify: mode.minify });
+// The UI font is inlined as a data: URI so the single file stays self-contained (works over
+// file://, no font host). Licence: src/fonts/OFL.txt; the CSS carries a /*! */ notice.
+const FONT_PLACEHOLDER = '__HANKEN_GROTESK_WOFF2__';
+const fontDataUri = `data:font/woff2;base64,${readFileSync('src/fonts/hanken-grotesk.woff2').toString('base64')}`;
+const rawCss = readFileSync('src/styles/main.css', 'utf8').replace(FONT_PLACEHOLDER, () => fontDataUri);
+// legalComments: keep the font's /*! */ OFL notice in the shipped file (the OFL requires it).
+const cssResult = await esbuild.transform(rawCss, { loader: 'css', minify: mode.minify, legalComments: 'inline' });
 const css = cssResult.code;
 const html = readFileSync('src/index.html', 'utf8');
 const buildId = appVersion;
@@ -236,6 +241,22 @@ if (mode.invariants) {
     invariantFailed = true;
   } else {
     console.log('  ✓ assembler worker source inlined into bundle');
+  }
+
+  // UI font inlined AND allowed by the CSP: default-src 'self' blocks a data: font, and the
+  // browser then falls back silently (REPORT A8), so check both halves plus the OFL notice.
+  const fontInlined = out.includes('data:font/woff2;base64,') && !out.includes(FONT_PLACEHOLDER);
+  const cspAllowsFont = /font-src[^;"]*\bdata:/.test(out);
+  const oflNotice = out.includes('SIL Open Font License');
+  if (!fontInlined || !cspAllowsFont || !oflNotice) {
+    console.error(
+      `\nBuild invariant FAILED: UI font — inlined=${fontInlined}, CSP font-src data:=${cspAllowsFont}, ` +
+        `OFL notice=${oflNotice}. All three are required (src/styles/main.css @font-face, ` +
+        `src/index.html CSP, the /*! */ notice).`,
+    );
+    invariantFailed = true;
+  } else {
+    console.log('  ✓ UI font inlined, allowed by CSP font-src, OFL notice present');
   }
 
   // No source map comment leakage: esbuild should not embed sourceMappingURL

@@ -2,7 +2,8 @@
 // (2.98:1) and coloured every file/folder name, crumb and active sort header; dark #22b8cf
 // was 2.38:1. WCAG AA needs 4.5:1 for this text. The observable is the RENDERED pair —
 // computed text colour against the first opaque background behind it — in light and dark,
-// not the token values.
+// not the token values. Look B (v1.65.0) moved the header to its own --header-bg/--header-fg
+// pair, so the header buttons and wordmark are measured too, plus the muted size column.
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
@@ -68,46 +69,51 @@ function measure(selectors) {
 
 for (const scheme of ['light', 'dark']) {
   describe(`accent text contrast — ${scheme}`, () => {
-    e2eTest(`Connect, names, crumbs and the active sort header reach 4.5:1 (${scheme})`, async () => {
-      ctx.mock.reset();
-      await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'docs/a/inner.txt', Body: 'i' }));
-      await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'docs/a/file.txt', Body: 'f' }));
-      const context = await newE2EContext(browser, { colorScheme: scheme });
-      const page = await newE2EPage(context);
-      try {
-        await page.goto(app.url, { waitUntil: 'domcontentloaded' });
-        await page.locator('button[type="submit"].btn-primary').waitFor({ timeout: scaleTimeout(10000) });
-        const splash = await page.evaluate(measure, ['button[type="submit"].btn-primary']);
-        await connectApp(page, ctx.browserEndpoint);
-        await page.locator('[data-testid="folder-row:docs"]').waitFor({ timeout: scaleTimeout(10000) });
-        await page.locator('[data-testid="folder-row:docs"] .file-dir').click();
-        await page
-          .locator('[data-testid="folder-row:docs/a"], [data-testid="folder-row:a"]')
-          .first()
-          .waitFor({ timeout: scaleTimeout(10000) });
-        await page.locator('.file-dir').first().click();
-        await page
-          .locator('.file-name-previewable')
-          .first()
-          .waitFor({ timeout: scaleTimeout(10000) });
-        const connected = await page.evaluate(measure, [
-          '.file-name-previewable',
-          '.breadcrumb .crumb',
-          'th.col-sort-active',
-        ]);
-        await page.locator('.breadcrumb .crumb').last().click();
-        await page
-          .locator('.file-dir')
-          .first()
-          .waitFor({ timeout: scaleTimeout(10000) });
-        const folder = await page.evaluate(measure, ['.file-dir']);
-        for (const r of [...splash, ...connected, ...folder]) {
-          assert.ok(!r.missing, `${r.sel} must be on screen`);
-          assert.ok(r.ratio >= 4.5, `${r.sel}: ${r.ratio}:1 is below 4.5:1 (${scheme})`);
+    e2eTest(
+      `Connect, names, crumbs, sort header, size column and header controls reach 4.5:1 (${scheme})`,
+      async () => {
+        ctx.mock.reset();
+        await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'docs/a/inner.txt', Body: 'i' }));
+        await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'docs/a/file.txt', Body: 'f' }));
+        const context = await newE2EContext(browser, { colorScheme: scheme });
+        const page = await newE2EPage(context);
+        try {
+          await page.goto(app.url, { waitUntil: 'domcontentloaded' });
+          await page.locator('button[type="submit"].btn-primary').waitFor({ timeout: scaleTimeout(10000) });
+          const splash = await page.evaluate(measure, ['button[type="submit"].btn-primary', '.wordmark']);
+          await connectApp(page, ctx.browserEndpoint);
+          await page.locator('[data-testid="folder-row:docs"]').waitFor({ timeout: scaleTimeout(10000) });
+          await page.locator('[data-testid="folder-row:docs"] .file-dir').click();
+          await page
+            .locator('[data-testid="folder-row:docs/a"], [data-testid="folder-row:a"]')
+            .first()
+            .waitFor({ timeout: scaleTimeout(10000) });
+          await page.locator('.file-dir').first().click();
+          await page
+            .locator('.file-name-previewable')
+            .first()
+            .waitFor({ timeout: scaleTimeout(10000) });
+          const connected = await page.evaluate(measure, [
+            '.file-name-previewable',
+            '.breadcrumb .crumb',
+            'th.col-sort-active',
+            'header .hdr-btn',
+            'td.col-size',
+          ]);
+          await page.locator('.breadcrumb .crumb').last().click();
+          await page
+            .locator('.file-dir')
+            .first()
+            .waitFor({ timeout: scaleTimeout(10000) });
+          const folder = await page.evaluate(measure, ['.file-dir']);
+          for (const r of [...splash, ...connected, ...folder]) {
+            assert.ok(!r.missing, `${r.sel} must be on screen`);
+            assert.ok(r.ratio >= 4.5, `${r.sel}: ${r.ratio}:1 is below 4.5:1 (${scheme})`);
+          }
+        } finally {
+          await context.close();
         }
-      } finally {
-        await context.close();
-      }
-    });
+      },
+    );
   });
 }

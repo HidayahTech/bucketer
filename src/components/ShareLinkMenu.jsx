@@ -50,8 +50,7 @@ export function ShareLinkMenu({ credentials, prefix = '' }) {
   return (
     <div class="copy-link-wrap" ref={open ? wrapRef : undefined}>
       <button
-        class="btn btn-ghost btn-sm"
-        style={{ color: '#fff', borderColor: 'rgba(255,255,255,.4)' }}
+        class="btn btn-sm hdr-btn"
         onClick={() => setOpen((v) => !v)}
         title="Copy a link that opens Bucketer on this connection"
       >

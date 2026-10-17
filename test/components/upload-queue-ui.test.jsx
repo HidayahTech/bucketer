@@ -183,7 +183,7 @@ describe('UploadItem — done state', () => {
         },
       }),
     );
-    const btn = [...document.querySelectorAll('button')].find((b) => b.textContent.includes('✕'));
+    const btn = document.querySelector('button[aria-label="Remove from list"]');
     assert.ok(btn, '✕ remove button must appear for done items');
     fire(btn, 'click');
     assert.ok(removed, 'onRemove must be called when ✕ is clicked');
@@ -294,7 +294,7 @@ describe('UploadItem — aborted state', () => {
     const { cleanup } = mount(
       h(UploadItem, { item: makeItem({ status: 'aborted' }), provider: 'r2', ...NO_CALLBACKS }),
     );
-    const btn = [...document.querySelectorAll('button')].find((b) => b.textContent.includes('✕'));
+    const btn = document.querySelector('button[aria-label="Remove from list"]');
     assert.ok(btn, '✕ remove button must appear for aborted items');
     cleanup();
   });

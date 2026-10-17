@@ -74,7 +74,7 @@ describe('Browser — file rename', () => {
     );
     setInput(query('.rename-input'), 'renamed.txt');
     fire(
-      queryAll('.rename-inline button').find((b) => b.textContent.includes('✓')),
+      queryAll('.rename-inline button').find((b) => b.getAttribute('aria-label') === 'Save name'),
       'click',
     );
     await tick();
@@ -103,7 +103,7 @@ describe('Browser — file rename', () => {
     );
     setInput(query('.rename-input'), 'renamed.opus');
     fire(
-      queryAll('.rename-inline button').find((b) => b.textContent.includes('✓')),
+      queryAll('.rename-inline button').find((b) => b.getAttribute('aria-label') === 'Save name'),
       'click',
     );
     await tick();
@@ -125,7 +125,7 @@ describe('Browser — file rename', () => {
     );
     setInput(query('.rename-input'), 'z.txt');
     fire(
-      queryAll('.rename-inline button').find((b) => b.textContent.includes('✓')),
+      queryAll('.rename-inline button').find((b) => b.getAttribute('aria-label') === 'Save name'),
       'click',
     );
     await tick();
@@ -145,7 +145,7 @@ describe('Browser — file rename', () => {
     );
     setInput(query('.rename-input'), 'a/b');
     fire(
-      queryAll('.rename-inline button').find((b) => b.textContent.includes('✓')),
+      queryAll('.rename-inline button').find((b) => b.getAttribute('aria-label') === 'Save name'),
       'click',
     );
     await tick();

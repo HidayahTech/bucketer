@@ -330,11 +330,12 @@ describe('Breadcrumb — move drop targets (drag-and-drop move)', () => {
 // ─── SortTh ───────────────────────────────────────────────────────────────────
 
 describe('SortTh — inactive column', () => {
-  test('shows the ⇅ neutral sort indicator when not active', () => {
-    const { text, cleanup } = mount(
+  test('shows the neutral sort indicator when not active', () => {
+    const { query, cleanup } = mount(
       h(SortTh, { col: 'name', sortCol: 'size', sortDir: 'asc', onSort: () => {}, children: 'Name' }),
     );
-    assert.ok(text().includes('⇅'), '⇅ neutral indicator must show for non-active column');
+    assert.equal(query('.sort-indicator').dataset.sort, 'none');
+    assert.equal(query('.sort-indicator svg').dataset.icon, 'sort', 'neutral indicator for a non-active column');
     cleanup();
   });
 
@@ -351,19 +352,19 @@ describe('SortTh — inactive column', () => {
 });
 
 describe('SortTh — active column', () => {
-  test('shows ▲ for ascending sort on active column', () => {
-    const { text, cleanup } = mount(
+  test('shows the up chevron for ascending sort on active column', () => {
+    const { query, cleanup } = mount(
       h(SortTh, { col: 'name', sortCol: 'name', sortDir: 'asc', onSort: () => {}, children: 'Name' }),
     );
-    assert.ok(text().includes('▲'), '▲ must appear for ascending active column');
+    assert.equal(query('.sort-indicator svg').dataset.icon, 'chevron-up', 'ascending shows the up chevron');
     cleanup();
   });
 
-  test('shows ▼ for descending sort on active column', () => {
-    const { text, cleanup } = mount(
+  test('shows the down chevron for descending sort on active column', () => {
+    const { query, cleanup } = mount(
       h(SortTh, { col: 'name', sortCol: 'name', sortDir: 'desc', onSort: () => {}, children: 'Name' }),
     );
-    assert.ok(text().includes('▼'), '▼ must appear for descending active column');
+    assert.equal(query('.sort-indicator svg').dataset.icon, 'chevron-down', 'descending shows the down chevron');
     cleanup();
   });
 

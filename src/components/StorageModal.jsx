@@ -41,6 +41,7 @@ import { formatBytes } from '../lib/format.js';
 import { wipeAppOpfsFiles } from '../lib/zip-prefetch.js';
 import { Modal } from './Modal.jsx';
 import { ConfirmDialog } from './ConfirmDialog.jsx';
+import { Icon } from './Icon.jsx';
 
 function age(ts) {
   const s = Math.floor((Date.now() - ts) / 1000);
@@ -328,7 +329,7 @@ export function StorageModal({ onClose, isConnected }) {
                             }}
                             title="Forget this bucket"
                           >
-                            ✕
+                            <Icon name="x" />
                           </button>
                         </td>
                       </tr>

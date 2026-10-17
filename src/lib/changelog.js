@@ -1,9 +1,15 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.64.1';
+export const CURRENT_VERSION = '1.65.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.65.0",
+    "date": "2026-10-16",
+    "title": "A new look: one typeface, a deeper teal, real icons",
+    "changes": []
+  },
   {
     "version": "1.64.1",
     "date": "2026-10-16",

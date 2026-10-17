@@ -18,6 +18,7 @@ import { formatBytes } from '../lib/format.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
 import { Modal } from './Modal.jsx';
 import { purgeAllVersions, collectHiddenVersions } from '../lib/purge-versions.js';
+import { Icon } from './Icon.jsx';
 
 function formatDate(d) {
   if (!d) return '';
@@ -332,7 +333,7 @@ export function HiddenVersions({ client, bucket, prefix, provider, diagnostics }
                             : 'Permanently delete this version'
                         }
                       >
-                        ✕
+                        <Icon name={r.type === 'delete-marker' && r.isLatest ? 'undo' : 'trash'} />
                       </button>
                     </td>
                   </tr>

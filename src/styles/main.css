@@ -1,37 +1,58 @@
 /* ── Reset & base ─────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/*! Hanken Grotesk — Copyright 2021 The Hanken Grotesk Project Authors (https://github.com/marcologous/hanken-grotesk).
+    Licensed under the SIL Open Font License, Version 1.1 (https://scripts.sil.org/OFL); full text in src/fonts/OFL.txt. */
+@font-face {
+  font-family: "Hanken Grotesk";
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url("__HANKEN_GROTESK_WOFF2__") format("woff2");
+}
+
+/* Look B (v1.65.0; REPORT §1.2, Basil's pick 2026-10-16): sibling-consistent structure —
+   one web font, a deep AA-safe primary (--accent), a decorative-only sky (--brand-sky),
+   soft two-layer shadows, 8/12 px radii, an ink-teal header. Values from the BUCKET-1
+   mockup tokens (mockups/shared/tokens-b.css); every text pair is >= 4.5:1. Property names
+   are the theme contract: a future theme (e.g. the brand book) swaps these values only. */
 :root {
-  --bg: #f8f9fa;
+  color-scheme: light;
+  --bg: #f5f6f8;
   --surface: #ffffff;
-  --surface-raised: #f1f3f5;
-  --border: #dee2e6;
-  /* AA (REPORT A1): #1aa3c0 gave 2.98:1 for white-on-accent and accent text; these are
-     look B's primary values (5.86:1 both ways). --on-accent is text drawn on an accent fill. */
+  --surface-raised: #eef0f3;   /* table header, hover, raised strips */
+  --border: #dadee5;
   --border-focus: #0b6e85;
-  --text: #212529;
-  --text-muted: #6c757d;
-  --text-danger: #c92a2a;
+  --ink: #141515;              /* headings, file names */
+  --text: #3a3f45;             /* body text */
+  --text-muted: #636c7d;
+  --text-danger: #b42318;
   --text-success: #19703f;
   --text-warn: #9a5b00;
-  --accent: #0b6e85;
+  --accent: #0b6e85;           /* primary: fills, links, active states */
   --accent-hover: #095a6d;
-  --on-accent: #ffffff;
-  color-scheme: light;
-  --danger: #e03131;
-  --danger-hover: #c92a2a;
-  --success-bg: #ebfbee;
-  --warn-bg: #fff9db;
-  --danger-bg: #fff5f5;
-  --info-bg: #e0f7fb;
-  --font: system-ui, -apple-system, "Segoe UI", sans-serif;
-  --mono: "Cascadia Code", "Fira Code", "Consolas", monospace;
-  --radius: 6px;
-  --shadow: 0 1px 3px rgba(0,0,0,.08);
+  --accent-soft: #e3f3f7;      /* selected rows, chips, icon tiles */
+  --on-accent: #ffffff;        /* text on an --accent fill */
+  --brand-sky: #38bdf8;        /* decorative only (logo, rules); never text */
+  --danger: #b42318;           /* fill; white text 6.57:1 */
+  --danger-hover: #912018;
+  --success-bg: #e6f6ec;
+  --warn-bg: #fff4d6;
+  --danger-bg: #fdecea;
+  --info-bg: #e3f3f7;
+  --header-bg: #10202a;
+  --header-fg: #e8f1f4;
+  --font: "Hanken Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "Cascadia Code", "Fira Code", Consolas, monospace;
+  --radius: 8px;               /* controls */
+  --radius-card: 12px;         /* cards, modals, drawers */
+  --shadow: 0 1px 3px rgba(20, 21, 21, .08), 0 8px 24px rgba(20, 21, 21, .04);
+  --shadow-lift: 0 6px 18px rgba(11, 110, 133, .18);
+  --focus-ring: 0 0 0 3px rgba(11, 110, 133, .35);
   --transition: 140ms ease;
 }
 
-html { font-size: 15px; }
+html { font-size: 16px; -webkit-text-size-adjust: 100%; }
 
 /* Dark palette — applied two ways (see src/lib/theme.js + ThemeToggle.jsx):
    (1) System preference: no data-theme attribute is set, so this media query
@@ -41,78 +62,107 @@ html { font-size: 15px; }
    The two selectors share the same declarations; keep them in sync. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme]) {
-    --bg: #1a1b1e;
-    --surface: #25262b;
-    --surface-raised: #2c2e33;
-    --border: #373a40;
-    --border-focus: #35c4e0;
-    --text: #c1c2c5;
-    --text-muted: #909296;
-    --text-danger: #ff6b6b;
-    --text-success: #69db7c;
-    --text-warn: #fcc419;
+    color-scheme: dark;
+    --bg: #0e0f12;
+    --surface: #17181c;
+    --surface-raised: #1f2126;
+    --border: #2c2e34;
+    --border-focus: #4fc3e0;
+    --ink: #f4f5f7;
+    --text: #c7cbd2;
+    --text-muted: #8b93a1;
+    --text-danger: #ff8a80;
+    --text-success: #5ed39a;
+    --text-warn: #f2b45a;
     --accent: #4fc3e0;
     --accent-hover: #7ad3ea;
+    --accent-soft: #0f2a33;
     --on-accent: #0e0f12;
-    color-scheme: dark;
-    --danger: #fa5252;
-    --danger-hover: #f03e3e;
-    --success-bg: #0d2b14;
-    --warn-bg: #2b2100;
-    --danger-bg: #2b0f0f;
-    --info-bg: #0d2535;
-    --shadow: 0 1px 3px rgba(0,0,0,.3);
+    --danger: #c92a2a;
+    --danger-hover: #a51d1d;
+    --success-bg: #0f2a1c;
+    --warn-bg: #2e2410;
+    --danger-bg: #3a1512;
+    --info-bg: #0f2a33;
+    --header-bg: #0b1418;
+    --header-fg: #e8f1f4;
+    --shadow: 0 1px 3px rgba(0, 0, 0, .5), 0 8px 24px rgba(0, 0, 0, .35);
+    --shadow-lift: 0 6px 18px rgba(79, 195, 224, .18);
+    --focus-ring: 0 0 0 3px rgba(79, 195, 224, .45);
   }
 }
 :root[data-theme="dark"] {
-  --bg: #1a1b1e;
-  --surface: #25262b;
-  --surface-raised: #2c2e33;
-  --border: #373a40;
-  --border-focus: #35c4e0;
-  --text: #c1c2c5;
-  --text-muted: #909296;
-  --text-danger: #ff6b6b;
-  --text-success: #69db7c;
-  --text-warn: #fcc419;
+  color-scheme: dark;
+  --bg: #0e0f12;
+  --surface: #17181c;
+  --surface-raised: #1f2126;
+  --border: #2c2e34;
+  --border-focus: #4fc3e0;
+  --ink: #f4f5f7;
+  --text: #c7cbd2;
+  --text-muted: #8b93a1;
+  --text-danger: #ff8a80;
+  --text-success: #5ed39a;
+  --text-warn: #f2b45a;
   --accent: #4fc3e0;
   --accent-hover: #7ad3ea;
+  --accent-soft: #0f2a33;
   --on-accent: #0e0f12;
-  color-scheme: dark;
-  --danger: #fa5252;
-  --danger-hover: #f03e3e;
-  --success-bg: #0d2b14;
-  --warn-bg: #2b2100;
-  --danger-bg: #2b0f0f;
-  --info-bg: #0d2535;
-  --shadow: 0 1px 3px rgba(0,0,0,.3);
+  --danger: #c92a2a;
+  --danger-hover: #a51d1d;
+  --success-bg: #0f2a1c;
+  --warn-bg: #2e2410;
+  --danger-bg: #3a1512;
+  --info-bg: #0f2a33;
+  --header-bg: #0b1418;
+  --header-fg: #e8f1f4;
+  --shadow: 0 1px 3px rgba(0, 0, 0, .5), 0 8px 24px rgba(0, 0, 0, .35);
+  --shadow-lift: 0 6px 18px rgba(79, 195, 224, .18);
+  --focus-ring: 0 0 0 3px rgba(79, 195, 224, .45);
 }
 body { font-family: var(--font); background: var(--bg); color: var(--text); line-height: 1.5; }
+h1, h2, h3 { color: var(--ink); line-height: 1.25; }
+
+/* ── Icons (Icon.jsx) ─────────────────────────────────────────────────────── */
+.icon {
+  flex: none; display: inline-block; vertical-align: -0.125em;
+  fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+}
+.btn .icon { vertical-align: middle; }
 
 /* ── Layout ───────────────────────────────────────────────────────────────── */
 #app { display: flex; flex-direction: column; min-height: 100vh; }
 
 .app-header {
-  background: #1b2438;
-  color: #fff;
-  padding: .75rem 1.25rem;
+  background: var(--header-bg);
+  color: var(--header-fg);
+  min-height: 60px;
+  padding: .5rem 1.5rem;
   display: flex;
   align-items: center;
-  gap: 1rem;
-  box-shadow: 0 2px 4px rgba(0,0,0,.25);
+  gap: .75rem;
 }
-.app-logo { height: 3rem; width: auto; display: block; cursor: pointer; }
+.app-header :focus-visible { outline: 2px solid var(--header-fg); outline-offset: 2px; }
+/* Header buttons: header-coloured text and a faint resting outline, so they read as buttons
+   on touch screens with no hover (were inline white-on-dark styles). Scoped to the header to
+   outrank the later .btn rule's transparent border. */
+.app-header .hdr-btn { color: var(--header-fg); background: transparent; border-color: rgba(232, 241, 244, .3); }
+.hdr-btn:not(:disabled):hover { background: transparent; border-color: currentColor; }
+.app-logo { height: 2.75rem; width: auto; display: block; cursor: pointer; }
+/* The bucket body is near-black and vanished on the dark header (1.15:1, REPORT A6): rim it in the brand sky. */
+.app-header .app-logo .bk-body { stroke: var(--brand-sky); stroke-width: 3; }
+.wordmark { font-size: 1.125rem; font-weight: 800; letter-spacing: -0.01em; color: var(--header-fg); white-space: nowrap; }
 .app-header .spacer { flex: 1; }
 .app-header .header-status { font-size: .8rem; opacity: .85; }
 .connection-tabs { display: flex; align-items: center; gap: .3rem; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
 .connection-tab {
   flex-shrink: 0; max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-size: .78rem; padding: .25rem .6rem; border-radius: var(--radius); cursor: pointer;
-  color: #fff; background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .2);
-  transition: background var(--transition);
+  font-size: .875rem; font-weight: 600; min-height: 36px; padding: 0 .75rem; border-radius: var(--radius); cursor: pointer;
+  color: var(--header-fg); background: transparent; border: 1px solid transparent;
+  transition: background var(--transition), border-color var(--transition);
 }
-.connection-tab:hover { background: rgba(255, 255, 255, .16); }
-.connection-tab-active { background: rgba(255, 255, 255, .22); border-color: rgba(255, 255, 255, .55); font-weight: 600; }
+.connection-tab:hover { border-color: currentColor; }
+.connection-tab-active, .connection-tab-active:hover { color: var(--ink); background: var(--surface); border-color: transparent; box-shadow: var(--shadow); }
 
 .app-body { flex: 1; display: flex; gap: 0; position: relative; overflow-x: hidden; }
 .app-footer { padding: .5rem 1rem; font-size: .75rem; color: var(--text-muted); text-align: center; border-top: 1px solid var(--border); }
@@ -150,17 +200,16 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 }
 
 .hamburger {
+  display: inline-grid; place-items: center;
+  width: 36px; height: 36px; padding: 0;
   background: none;
-  border: 1px solid rgba(255,255,255,.3);
-  color: #fff;
+  border: 1px solid transparent;
+  color: var(--header-fg);
   border-radius: var(--radius);
-  padding: .3rem .55rem;
   cursor: pointer;
-  font-size: 1.15rem;
-  line-height: 1;
   flex-shrink: 0;
 }
-.hamburger:hover { background: rgba(255,255,255,.1); }
+.hamburger:hover { border-color: currentColor; }
 
 .main-content { flex: 1; padding: 1rem; overflow-y: auto; min-width: 0; }
 
@@ -174,10 +223,11 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
   align-items: flex-start;
   margin-bottom: 1rem;
 }
-.banner-info    { background: var(--info-bg);    border: 1px solid #74c0fc; }
-.banner-warn    { background: var(--warn-bg);    border: 1px solid #ffd43b; color: var(--text-warn); }
-.banner-danger  { background: var(--danger-bg);  border: 1px solid #ffa8a8; color: var(--text-danger); }
-.banner-success { background: var(--success-bg); border: 1px solid #8ce99a; color: var(--text-success); }
+/* Borders tint from each banner's text colour so dark mode follows (were light-only literals, A2). */
+.banner-info    { background: var(--info-bg);    border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+.banner-warn    { background: var(--warn-bg);    border: 1px solid color-mix(in srgb, var(--text-warn) 35%, transparent); color: var(--text-warn); }
+.banner-danger  { background: var(--danger-bg);  border: 1px solid color-mix(in srgb, var(--text-danger) 35%, transparent); color: var(--text-danger); }
+.banner-success { background: var(--success-bg); border: 1px solid color-mix(in srgb, var(--text-success) 35%, transparent); color: var(--text-success); }
 .banner .banner-body { flex: 1; }
 .banner .banner-title { font-weight: 600; margin-bottom: .2rem; }
 .banner a { color: var(--accent); }
@@ -190,13 +240,15 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 
 /* ── Forms ────────────────────────────────────────────────────────────────── */
 .form-group { display: flex; flex-direction: column; gap: .3rem; }
-.form-group label { font-size: .8rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+.form-group label { font-size: .875rem; font-weight: 600; color: var(--ink); }
+/* 16px text (1rem) and 44px height: below 16px iOS Safari zooms on focus (REPORT M5). */
 .form-group input,
 .form-group select {
-  padding: .45rem .6rem;
+  min-height: 44px;
+  padding: 0 .75rem;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  font-size: .9rem;
+  font-size: 1rem;
   font-family: var(--font);
   background: var(--surface);
   color: var(--text);
@@ -207,29 +259,30 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 .form-group select:focus {
   outline: none;
   border-color: var(--border-focus);
-  box-shadow: 0 0 0 3px rgba(74,173,247,.2);
+  box-shadow: var(--focus-ring);
 }
+.form-group input:hover, .form-group select:hover { border-color: var(--text-muted); }
 .form-group .hint { font-size: .75rem; color: var(--text-muted); }
 .field-error { display: block; font-size: .75rem; color: var(--danger, #c0392b); margin-top: .2rem; }
 
 /* ── Buttons ──────────────────────────────────────────────────────────────── */
 .btn {
-  display: inline-flex; align-items: center; gap: .4rem;
-  padding: .45rem .85rem; border-radius: var(--radius);
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  min-height: 36px; padding: 0 .75rem; border-radius: var(--radius);
   border: 1px solid transparent; cursor: pointer;
-  font-size: .9rem; font-family: var(--font); font-weight: 500;
-  transition: background var(--transition), border-color var(--transition), color var(--transition);
+  font-size: .875rem; font-family: var(--font); font-weight: 600;
+  transition: background var(--transition), border-color var(--transition), color var(--transition), box-shadow var(--transition);
   white-space: nowrap;
   user-select: none;
 }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 .btn-primary   { background: var(--accent);   color: var(--on-accent); }
-.btn-primary:not(:disabled):hover  { background: var(--accent-hover); }
+.btn-primary:not(:disabled):hover  { background: var(--accent-hover); box-shadow: var(--shadow-lift); }
 .btn-danger    { background: var(--danger);   color: #fff; }
 .btn-danger:not(:disabled):hover   { background: var(--danger-hover); }
-.btn-ghost     { background: transparent; border-color: var(--border); color: var(--text); }
+.btn-ghost     { background: var(--surface); border-color: var(--border); color: var(--ink); }
 .btn-ghost:not(:disabled):hover    { background: var(--surface-raised); }
-.btn-sm { padding: .3rem .6rem; font-size: .8rem; }
+.btn-sm { min-height: 32px; padding: 0 .6rem; font-size: .8125rem; }
 
 /* ── Section headings ─────────────────────────────────────────────────────── */
 .section-heading {
@@ -248,9 +301,9 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
   border-radius: 999px; font-weight: 500;
 }
 .status-badge .dot { width: 7px; height: 7px; border-radius: 50%; }
-.status-disconnected { background: #f1f3f5; color: var(--text-muted); }
+.status-disconnected { background: var(--surface-raised); color: var(--text-muted); }
 .status-disconnected .dot { background: var(--text-muted); }
-.status-connecting   { background: #fff9db; color: var(--text-warn); }
+.status-connecting   { background: var(--warn-bg); color: var(--text-warn); }
 .status-connecting .dot { background: var(--text-warn); animation: pulse 1s infinite; }
 .status-connected    { background: var(--success-bg); color: var(--text-success); }
 .status-connected .dot { background: var(--text-success); }
@@ -260,14 +313,14 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.3; } }
 
 /* ── File browser ─────────────────────────────────────────────────────────── */
-.breadcrumb { display: flex; align-items: center; gap: .3rem; flex-wrap: wrap; font-size: .85rem; margin-bottom: .75rem; }
+.breadcrumb { display: flex; align-items: center; gap: .3rem; flex-wrap: wrap; font-size: 1rem; font-weight: 600; margin-bottom: .75rem; }
 /* Text-looking buttons (K1): keyboard-operable without changing the look. */
 .link-btn, .breadcrumb .crumb { background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; text-align: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; }
 .link-btn:focus-visible, .breadcrumb .crumb:focus-visible, [role="button"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
 .breadcrumb .crumb { color: var(--accent); cursor: pointer; }
 .breadcrumb .crumb:hover { text-decoration: underline; }
 .breadcrumb .sep { color: var(--text-muted); }
-.breadcrumb .current { color: var(--text); font-weight: 500; }
+.breadcrumb .current { color: var(--ink); font-weight: 700; }
 /* #69: breadcrumb copy-link button — a real button, ≥32px target, visible focus ring. */
 .breadcrumb .crumb-link { background: none; border: 1px solid transparent; border-radius: 4px; color: var(--accent); cursor: pointer; font: inherit; line-height: 1; min-width: 32px; min-height: 32px; padding: .25rem .4rem; margin-left: .15rem; }
 .breadcrumb .crumb-link:hover { border-color: var(--border); }
@@ -278,28 +331,29 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 .file-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: .9rem;
+  font-size: .875rem;
+  font-variant-numeric: tabular-nums;
 }
 .file-table thead th {
   text-align: left;
-  padding: .35rem .6rem;
-  border-bottom: 2px solid var(--border);
-  font-size: .72rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .05em;
+  padding: .5rem .75rem;
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--border);
+  font-size: .75rem;
+  font-weight: 600;
   color: var(--text-muted);
   white-space: nowrap;
   user-select: none;
 }
 .file-table thead th.col-sortable { cursor: pointer; }
-.file-table thead th.col-sortable:hover { color: var(--text); }
-.file-table thead th.col-sort-active { color: var(--accent); }
-.sort-indicator { margin-left: .35rem; font-size: .65rem; opacity: .7; }
-.col-sort-active .sort-indicator { opacity: 1; }
+.file-table thead th.col-sortable:hover { color: var(--ink); }
+.file-table thead th.col-sort-active { color: var(--ink); }
+.sort-indicator { margin-left: .35rem; display: inline-flex; vertical-align: middle; }
+.col-sort-active .sort-indicator { opacity: 1; color: var(--accent); }
 
 .file-table td {
-  padding: .45rem .6rem;
+  height: 44px;
+  padding: .25rem .75rem;
   border-bottom: 1px solid var(--border);
   vertical-align: middle;
 }
@@ -307,14 +361,22 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 .file-table tbody .file-row:hover td { background: var(--surface-raised); }
 
 .col-name { width: 99%; }
-.col-name .file-icon { margin-right: .45rem; }
+/* File-type tile: a 28px rounded square holding the type icon (folders tinted with the primary). */
+.col-name .file-icon {
+  display: inline-grid; place-items: center; vertical-align: middle;
+  width: 28px; height: 28px; margin-right: .6rem; border-radius: var(--radius);
+  color: var(--text-muted); background: var(--surface-raised);
+}
+.col-name .file-icon-folder { color: var(--accent); background: var(--accent-soft); }
+.file-row:hover .file-icon, .file-row-selected .file-icon { background: var(--surface); }
 .col-name .file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; display: inline-block; vertical-align: middle; }
-.col-name .file-name-previewable { color: var(--accent); cursor: pointer; }
-.col-name .file-name-previewable:hover { text-decoration: underline; }
-.col-name .file-dir  { color: var(--accent); font-weight: 500; }
-.col-size     { white-space: nowrap; color: var(--text-muted); font-size: .85rem; padding-left: 1.5rem; }
-.col-modified { white-space: nowrap; color: var(--text-muted); font-size: .85rem; padding-left: 1rem; }
-.col-file-modified { white-space: nowrap; color: var(--text-muted); font-size: .85rem; padding-left: 1rem; }
+.col-name .file-name-previewable { color: var(--ink); font-weight: 600; cursor: pointer; }
+.col-name .file-name-previewable:hover { color: var(--accent); text-decoration: underline; }
+.col-name .file-dir  { color: var(--accent); font-weight: 600; cursor: pointer; }
+.col-name .file-dir:hover { text-decoration: underline; }
+.col-size     { white-space: nowrap; color: var(--text-muted); font-size: .875rem; padding-left: 1.5rem; }
+.col-modified { white-space: nowrap; color: var(--text-muted); font-size: .875rem; padding-left: 1rem; }
+.col-file-modified { white-space: nowrap; color: var(--text-muted); font-size: .875rem; padding-left: 1rem; }
 .col-actions  { white-space: nowrap; text-align: right; padding-left: .5rem; }
 
 .empty-state { color: var(--text-muted); font-size: .9rem; padding: 2rem 0; text-align: center; }
@@ -526,7 +588,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 
 /* ── Error block ──────────────────────────────────────────────────────────── */
 .error-block {
-  background: var(--danger-bg); border: 1px solid #ffa8a8;
+  background: var(--danger-bg); border: 1px solid color-mix(in srgb, var(--text-danger) 35%, transparent);
   border-radius: var(--radius); padding: .75rem 1rem;
   font-size: .85rem; color: var(--text-danger);
 }
@@ -616,13 +678,15 @@ details[open] .upload-log-summary::before { transform: rotate(90deg); }
 }
 .modal-dialog {
   background: var(--surface);
-  border-radius: var(--radius);
-  box-shadow: 0 8px 24px rgba(0,0,0,.2);
-  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow);
+  padding: 1.5rem;
   min-width: 320px; max-width: 480px; width: 100%;
   display: flex; flex-direction: column; gap: .75rem;
 }
-.modal-title { font-size: 1rem; font-weight: 700; }
+.modal-dialog:focus { outline: none; }
+.modal-title { font-size: 1.125rem; font-weight: 700; color: var(--ink); }
 .modal-body { display: flex; flex-direction: column; gap: .5rem; font-size: .875rem; }
 .modal-filename {
   font-family: var(--mono); font-size: .8rem;
@@ -762,7 +826,7 @@ details[open] .upload-log-summary::before { transform: rotate(90deg); }
 .browser-drop-active { outline: 2px dashed var(--accent); outline-offset: -4px; border-radius: var(--radius); }
 .browser-drop-overlay {
   position: absolute; inset: 0; z-index: 20;
-  background: rgba(26, 163, 192, .08);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
   display: flex; align-items: center; justify-content: center;
   font-size: 1rem; font-weight: 600; color: var(--accent);
   pointer-events: none;
@@ -804,13 +868,14 @@ details[open] .upload-log-summary::before { transform: rotate(90deg); }
    and that overflow also froze the page for seconds after selecting a row. */
 .batch-bar {
   display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
-  padding: .4rem .6rem; margin-bottom: .5rem;
-  background: var(--info-bg); border: 1px solid #74c0fc;
-  border-radius: var(--radius); font-size: .85rem;
+  padding: .5rem 1rem; margin-bottom: .5rem;
+  background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: var(--radius-card); font-size: .875rem;
 }
-.batch-count { font-weight: 600; }
-.col-check { width: 2rem; text-align: center; padding: .4rem .25rem; }
-.file-row-selected { background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
+.batch-count { font-weight: 700; color: var(--ink); }
+.col-check { width: 2.75rem; text-align: center; padding: .4rem .25rem; }
+.col-check input { accent-color: var(--accent); }
+.file-row-selected { background: var(--accent-soft); }
 
 /* ── Filter bar ──────────────────────────────────────────────────────────── */
 .filter-bar { display: flex; align-items: center; gap: .5rem; }
@@ -1006,8 +1071,8 @@ details[open] .sv-summary::before { transform: rotate(90deg); }
 .upstream-new { color: var(--accent); }
 .upstream-new a { color: inherit; text-decoration: underline; }
 .upstream-err { color: var(--text-danger); }
-.btn-version { background: none; border: none; color: rgba(255,255,255,.5); font-size: .72rem; cursor: pointer; padding: .2rem .4rem; border-radius: var(--radius); font-family: var(--mono); margin-left: .25rem; }
-.btn-version:hover { color: #fff; background: rgba(255,255,255,.1); }
+.btn-version { background: none; border: 1px solid transparent; color: var(--header-fg); opacity: .8; font-size: .75rem; cursor: pointer; padding: .2rem .4rem; border-radius: var(--radius); font-family: var(--mono); margin-left: .25rem; }
+.btn-version:hover { opacity: 1; border-color: currentColor; }
 
 /* ── Copy link popover ───────────────────────────────────────────────────── */
 .copy-link-wrap { position: relative; display: inline-block; }
@@ -1017,8 +1082,8 @@ details[open] .sv-summary::before { transform: rotate(90deg); }
   top: calc(100% + 4px);
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: 0 4px 12px rgba(0,0,0,.12);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow);
   padding: .5rem;
   z-index: 50;
   min-width: 230px;
@@ -1218,10 +1283,26 @@ details[open] .sv-summary::before { transform: rotate(90deg); }
 @media (max-width: 1024px) {
   .file-table .col-name { overflow-wrap: anywhere; }
   .file-table .col-name .file-name { white-space: normal; }
+  /* Leave room for the 28px type tile so a wrapped name stays beside it, not under it. */
+  .file-table .col-name .file-name,
+  .file-table .col-name .file-dir { display: inline-block; vertical-align: middle; max-width: calc(100% - 2.5rem); }
   .file-table .col-actions { min-width: 9.5rem; }
   .file-table .col-actions .row-actions {
     display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center;
   }
+}
+/* On phones the name cell is ~95px beside two columns of 44px actions: a name beside the
+   type tile got ~28px and broke every 3–4 characters, and a tile above it added a line.
+   Drop the tile there (folders stay distinct by colour) so the name keeps the full cell.
+   (The ⋯ row menu in the layout slice is the real fix.) The wordmark goes too, or it
+   pushes the version label onto a second header row. */
+@media (max-width: 640px) {
+  .file-table .col-name .file-icon { display: none; }
+  .file-table .col-name .file-name,
+  .file-table .col-name .file-dir { max-width: 100%; }
+}
+@media (max-width: 480px) {
+  .wordmark { display: none; }
 }
 
 /* Touch targets ≥ 44 × 44 px (REPORT M3; WCAG 2.5.5, Apple HIG) on phones and any

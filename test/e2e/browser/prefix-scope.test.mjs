@@ -264,7 +264,7 @@ describe('prefix-scoped keys — quick-switch failure', () => {
       await tab.click();
       return;
     }
-    await page.locator('button:has-text("☰")').click();
+    await page.locator('button[aria-label="Open menu"]').click();
     await page.locator('.bucket-row', { hasText: bucket }).click();
   }
 

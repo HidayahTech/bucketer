@@ -22,6 +22,7 @@ import { scanForDuplicates } from '../lib/dedup-scan.js';
 import { providerChecksumAdapter } from '../lib/provider-checksum.js';
 import { verifyAgainstReference } from '../lib/verify-bytes.js';
 import { saveScanResult, loadScanResult, deleteScanResult } from '../lib/dedup-scan-store.js';
+import { Icon } from './Icon.jsx';
 
 // ── Pure presentational report ─────────────────────────────────────────────────
 
@@ -79,7 +80,7 @@ function DupGroup({ group, canDownload, onSelectKeeper, onVerify, onDownload, on
                     title={canDownload ? 'Download' : 'Download not permitted with current credentials'}
                     onClick={() => onDownload(m.Key)}
                   >
-                    ↓
+                    <Icon name="download" />
                   </button>
                   <button
                     type="button"
@@ -97,7 +98,7 @@ function DupGroup({ group, canDownload, onSelectKeeper, onVerify, onDownload, on
                     title="Copy a shareable link"
                     onClick={() => onCopyLink(m.Key)}
                   >
-                    ⎘
+                    <Icon name="link" />
                   </button>
                 </td>
               </tr>

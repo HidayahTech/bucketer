@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.65.0] — 2026-10-16 — A new look: one typeface, a deeper teal, real icons
+
+The visual refresh picked in the 2026-10-16 design review ("look B"). **Typeface:** the interface now uses Hanken Grotesk, bundled inside the app (it adds about 46 KB to the download and needs no font server; licensed under the SIL Open Font License, whose notice ships inside the app). A host's Content-Security-Policy must allow `font-src data:`, as the README examples now show; without it the browser falls back to the system font and nothing else changes. **Colour and shape:** a deep teal primary for buttons, links and the selected state, with a lighter teal in dark mode; a dark ink-teal header; softer two-layer shadows and rounder corners; every text colour reads at 4.5:1 or better in light and dark, including the header buttons and the size column, now checked by the test suite. **Icons:** the emoji and Unicode symbols on buttons (📁 📄 ✎ ⎘ ↪ ✕ ☰ ☀ 🌙 and the rest) looked different on every system, and ✕ meant Delete, Cancel and Close in different places. They are now one set of line icons: a bin for Delete, ✕ only for Close and Cancel, and folder, document, image, video and archive tiles for file types. Icon-only buttons gained spoken names ("Save name", "Cancel rename", "Remove from list"). **Header:** the logo now shows on the dark header, with a "Bucketer" wordmark beside it. Nothing about how Bucketer works has changed; the layout regroup comes in a later release.
+
 ## [1.64.1] — 2026-10-16 — Release of the v1.64.0 design floor
 
 No change to the app beyond v1.64.0, whose GitLab Release never published. One test file in the v1.64.0 commit was not formatted, so CI's format check failed and blocked the release job. The same thing happened to v1.62.2. This release carries the formatting fix, and the pre-push check now refuses to push unformatted code before it tags a version (BUG-080). Everything in v1.64.0 below ships here.

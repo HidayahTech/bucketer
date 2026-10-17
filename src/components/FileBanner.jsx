@@ -1,5 +1,6 @@
 // Copyright (C) 2026 HidayahTech, LLC
 import { useState } from 'preact/hooks';
+import { Icon } from './Icon.jsx';
 
 // Browser context warning when running from file:// (§4.13).
 //
@@ -72,7 +73,7 @@ export function FileBanner() {
         }}
         aria-label="Dismiss"
       >
-        ✕
+        <Icon name="x" />
       </button>
     </div>
   );

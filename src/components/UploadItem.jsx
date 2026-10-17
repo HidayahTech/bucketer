@@ -3,6 +3,7 @@ import { formatBytes, formatSpeed, formatEta } from '../lib/format.js';
 import { MULTIPART_THRESHOLD, LARGE_FILE_WARN } from '../lib/constants.js';
 import { useInterpolatedProgress } from '../hooks/useInterpolatedProgress.js';
 import { ErrorDetailsPanel } from './ErrorDetailsPanel.jsx';
+import { Icon } from './Icon.jsx';
 
 export function UploadItem({ item, onResume, onRestart, onCancel, onRemove, onDismissLargeWarn, provider }) {
   const { name, size, status, bytesUploaded, speed, error, expiryWarning, resumeRecord, largeFileWarningDismissed } =
@@ -91,8 +92,13 @@ export function UploadItem({ item, onResume, onRestart, onCancel, onRemove, onDi
               </button>
             ))}
           {(status === 'done' || status === 'error' || status === 'aborted') && (
-            <button class="btn btn-ghost btn-sm" onClick={onRemove}>
-              ✕
+            <button
+              class="btn btn-ghost btn-sm"
+              onClick={onRemove}
+              aria-label="Remove from list"
+              title="Remove from list"
+            >
+              <Icon name="x" />
             </button>
           )}
         </div>
@@ -126,8 +132,8 @@ export function UploadItem({ item, onResume, onRestart, onCancel, onRemove, onDi
             throttling, and resumability outside browser constraints). You can still proceed in-browser, but be aware of
             these limitations.
           </div>
-          <button class="banner-close" onClick={() => onDismissLargeWarn()}>
-            ✕
+          <button class="banner-close" onClick={() => onDismissLargeWarn()} aria-label="Dismiss" title="Dismiss">
+            <Icon name="x" />
           </button>
         </div>
       )}

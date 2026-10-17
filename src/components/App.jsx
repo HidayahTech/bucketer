@@ -134,6 +134,7 @@ import { useConnectionTabs } from '../hooks/useConnectionTabs.js';
 import { StorageModal } from './StorageModal.jsx';
 import { TransferHandoff } from './TransferHandoff.jsx';
 import { DuplicatesModal } from './DuplicatesModal.jsx';
+import { Icon } from './Icon.jsx';
 import { CURRENT_VERSION } from '../lib/changelog.js';
 import { useWindowDragDrop } from '../hooks/useWindowDragDrop.js';
 import { useModalStates } from '../hooks/useModalStates.js';
@@ -1612,10 +1613,13 @@ export function App() {
             onClick={() => setSidebarOpen((o) => !o)}
             aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
           >
-            {sidebarOpen ? '✕' : '☰'}
+            <Icon name={sidebarOpen ? 'x' : 'menu'} size={20} />
           </button>
         )}
         <BucketerLogo />
+        <span class="wordmark" aria-hidden="true">
+          Bucketer
+        </span>
         {session === 'connected' && (
           <ConnectionTabs tabs={connectionTabs} selectedId={selectedConnectionId} onSelect={switchToConnection} />
         )}
@@ -1628,8 +1632,7 @@ export function App() {
         {session === 'connected' && capabilities.list !== 'denied' && (
           <button
             type="button"
-            class="btn btn-ghost btn-sm"
-            style={{ color: '#fff', borderColor: 'rgba(255,255,255,.4)' }}
+            class="btn btn-sm hdr-btn"
             onClick={() => setDuplicatesOpen(true)}
             title="Scan this bucket or folder for duplicate files"
           >
@@ -1639,8 +1642,7 @@ export function App() {
         {session === 'connected' && capabilities.list !== 'denied' && (
           <button
             type="button"
-            class="btn btn-ghost btn-sm"
-            style={{ color: '#fff', borderColor: 'rgba(255,255,255,.4)' }}
+            class="btn btn-sm hdr-btn"
             data-testid="open-incomplete-uploads"
             onClick={() => setIncompleteOpen(true)}
             title="Find and clean up unfinished multipart uploads still using storage"
@@ -1649,12 +1651,7 @@ export function App() {
           </button>
         )}
         {session === 'connected' && (
-          <button
-            type="button"
-            class="btn btn-ghost btn-sm"
-            style={{ color: '#fff', borderColor: 'rgba(255,255,255,.4)' }}
-            onClick={handleDisconnect}
-          >
+          <button type="button" class="btn btn-sm hdr-btn" onClick={handleDisconnect}>
             Sign out
           </button>
         )}
@@ -2035,7 +2032,7 @@ function VaultOfferBanner({ busy, error, onCreate, onDismiss }) {
         </form>
       </div>
       <button class="banner-close" onClick={onDismiss} aria-label="Dismiss">
-        ✕
+        <Icon name="x" />
       </button>
     </div>
   );

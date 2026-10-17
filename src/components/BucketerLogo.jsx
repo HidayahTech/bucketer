@@ -244,7 +244,7 @@ export function BucketerLogo(props) {
       />
 
       {/* Bucket body */}
-      <path d="M8,36 L22,104 L78,104 L92,36 Z" fill="#111827" stroke="#2D3748" strokeWidth="0.5" />
+      <path class="bk-body" d="M8,36 L22,104 L78,104 L92,36 Z" fill="#111827" stroke="#2D3748" strokeWidth="0.5" />
 
       {/* Objects (clipped to bucket body) */}
       <g clipPath="url(#bk-cc)">

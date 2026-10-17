@@ -370,7 +370,7 @@ describe('#76 — Sign out forgets cached secrets', () => {
         const tab = page.locator('.connection-tab', { hasText: 'person-a-bucket' });
         if (await tab.isVisible().catch(() => false)) await tab.click();
         else {
-          await page.locator('button:has-text("☰")').click();
+          await page.locator('button[aria-label="Open menu"]').click();
           await page.locator('.bucket-row', { hasText: 'person-a-bucket' }).click();
         }
         // Settle on either outcome: the prompt, or (pre-fix) a request signed as A.
