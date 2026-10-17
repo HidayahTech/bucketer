@@ -4,6 +4,51 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-082 — On a phone, selecting the first row made every row jump 122 px down the page
+
+**Date:** 2026-10-17 · present through v1.67.0 · fixed in v1.67.1
+
+**Symptom.** One red local lane: firefox × Pixel 5, `batch.test.mjs` "selecting two of three files
+and batch-deleting removes only those two", failed with `locator.check: Element is outside of the
+viewport` on c.txt's checkbox. It failed 3/3 on v1.66.0 (dc75008) and 2/3 on v1.67.0's tree. For a
+user on a phone, ticking one row shifts every row below it ~122 px down, so a quick second tap can
+land on a different row than the one aimed at, ahead of a batch delete or move.
+
+**Root cause (verified).** The batch bar renders in the document flow above the file list and only
+exists while something is selected. The first selection inserts it (114 px tall at 393 px wide, plus
+margin), and every row below moves down by its height. No engine compensates: probing chromium and
+firefox on Pixel 5 (`.claude-scratch/repro-batch.mjs` in the BUCKET-8 worktree) shows c.txt's
+checkbox going from viewport y≈650 to 772 with `scrollY` unchanged, past a 727 px viewport. In the
+spec, Playwright scrolls c.txt into view, then the bar lands, so the click point is off-screen.
+Chromium and webkit passed only because their render timing put the bar in place before the scroll.
+
+**Fix.** At ≤640 px the batch bar is fixed to the bottom of the screen, as in the layout A mockup
+(`mockups/ia/_src/components.css` `.batchbar`), so it moves nothing when it appears. While a
+selection exists, Browser's root gets `browser-has-selection`, which adds 10rem of bottom padding so
+the last rows can scroll clear of the bar, and `html:has(.browser-has-selection)` sets the same
+`scroll-padding-bottom`, so a row brought into view by focus or scrolling is not left under the bar.
+Without the scroll padding, the spec's next click landed on the bar instead of the row. Desktop
+keeps the in-flow bar (the mockup's desktop bar is sticky at the top of the list), so a smaller
+shift remains there by design. Firefox before 121 lacks `:has()`; there the scroll padding is absent
+and a row can sit under the bar until scrolled.
+
+**Test.** New: `batch.test.mjs` "selecting the first row does not move the rows below it" asserts
+c.txt's document y is unchanged after the first selection, next to the bar showing "1 file
+selected" (skips above 640 px). Matched pair, image `mcr.microsoft.com/playwright:v1.60.0-noble`
+(chromium-1223, firefox-1522, webkit-2287), `E2E_FILES=batch.test.mjs`, desktop + Pixel 5 + iPhone 13:
+**PRE v1.67.0 (0dde1e0) + new spec:** fails on all 6 phone lanes (y 1285.6 → 1407.6, a 121–122 px
+shift), skipped on the 3 desktop lanes. **POST:** passes on all 6 phone lanes. Sideways, POST,
+12 specs (batch, issue-49-mobile-actions, dnd, move-resume, move-unicode-key, download-selection,
+layout-a, smoke, keyboard, contrast, look-b, issue-3-mobile): 38/38 on each phone lane, 37 + 1 skip on
+each desktop lane. The original red lane, firefox × Pixel 5 `batch.test.mjs`: 3/3 runs green.
+
+**Why it wasn't caught earlier.** The spec forced its clicks (`check({ force: true })`) because rows
+re-render after uploads, which hid the moving target on chromium; the batch bar's mobile work
+(v1.64.0, M1/P1) checked that it fits on screen, not that its arrival leaves the list still. The
+browser matrix runs in CI only, and CI's timing had kept this lane green. Rule: a UI element that
+appears in response to a tap must not move what is under the next tap; assert document position,
+not just visibility.
+
 ## BUG-081 — On mobile WebKit in dark mode, v1.64.x lost its page background; file names read at 2.06:1
 
 **Date:** 2026-10-16 · v1.64.0 and v1.64.1 affected (never on `main`) · absent in v1.65.0

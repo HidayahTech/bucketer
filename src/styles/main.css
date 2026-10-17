@@ -904,6 +904,20 @@ details[open] .upload-log-summary::before { transform: rotate(90deg); }
   background: var(--accent-soft); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
   border-radius: var(--radius-card); font-size: .875rem;
 }
+/* Phone (BUG-082): in the flow above the list, the bar's arrival on the first selection pushed
+   every row down ~122 px under the user's finger. Fixed to the bottom of the screen it moves
+   nothing (layout A mockup); the padding keeps the last rows scrollable above it, and the
+   scroll padding keeps a row brought into view (by focus, or scrolling to it) out from under it. */
+@media (max-width: 640px) {
+  .batch-bar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; margin: 0;
+    padding: .5rem 1rem calc(.5rem + env(safe-area-inset-bottom));
+    background: var(--surface); border-width: 1px 0 0; border-radius: var(--radius-card) var(--radius-card) 0 0;
+    box-shadow: var(--shadow);
+  }
+  .browser-has-selection { padding-bottom: 10rem; }
+  html:has(.browser-has-selection) { scroll-padding-bottom: 10rem; }
+}
 .batch-count { font-weight: 700; color: var(--ink); }
 .col-check { width: 2.75rem; text-align: center; padding: .4rem .25rem; }
 .col-check input { accent-color: var(--accent); }

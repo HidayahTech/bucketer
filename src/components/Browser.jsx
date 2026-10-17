@@ -892,7 +892,14 @@ export function Browser({
 
   return (
     <div
-      class={tableDragOver ? 'browser-drop-active' : undefined}
+      class={
+        [
+          tableDragOver && 'browser-drop-active',
+          (selectedKeys.size > 0 || selectedPrefixes.size > 0) && 'browser-has-selection',
+        ]
+          .filter(Boolean)
+          .join(' ') || undefined
+      }
       data-testid="browser-drop"
       onDragEnter={handleTableDragEnter}
       onDragOver={(e) => {
