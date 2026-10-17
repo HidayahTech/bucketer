@@ -127,7 +127,8 @@ import { CONCURRENCY, sweepOrphanTemps } from '../lib/zip-prefetch.js';
 import { detectCapabilities, readStorageQuota } from '../lib/browser-capability.js';
 import { makeAssemblerWorker } from '../lib/assembler-worker-url.js';
 import { presignDownloadParams } from '../lib/presign-params.js';
-import { normalizeRoots, selectionLabel } from '../lib/download-roots.js';
+import { normalizeRoots, selectionLabel, isQuickZipSelection } from '../lib/download-roots.js';
+import { NAMING_MODES } from '../lib/download-naming.js';
 import { DOWNLOAD_PRESIGN_EXPIRES, DOWNLOAD_ISSUE_DELAY_MS } from '../lib/constants.js';
 import { CapabilityPanel } from './CapabilityPanel.jsx';
 import { SettingsPanel } from './SettingsPanel.jsx';
@@ -730,15 +731,51 @@ export function App() {
   function handleDownloadRequest(payload) {
     if (payload.kind === 'selection') {
       const count = payload.files.length + payload.prefixes.length;
-      setDownloadScope({
+      const scope = {
         kind: 'selection',
         roots: normalizeRoots(payload),
         label: selectionLabel(count, credentials.bucket, payload.capturedPrefix),
-      });
+      };
+      if (isQuickZipSelection(payload)) {
+        startQuickZip(scope, payload.files.length);
+        return;
+      }
+      setDownloadScope(scope);
     } else {
       setDownloadScope({ kind: 'folder', prefix: payload.prefix });
     }
     setDownloadOpen(true);
+  }
+
+  // Layout A (slice 4b): a small selection of files downloads as a ZIP at once — the panel's
+  // own steps (startJob, enumerate, zipGate, startZipJob) without its questions. Anything the
+  // panel would have to explain (archived files, not enough storage, a listing error) opens
+  // the panel instead, with the half-made job discarded so it never shows there as a leftover.
+  async function startQuickZip(scope, fileCount) {
+    let job = null;
+    let ready = null;
+    try {
+      job = await downloadApi.startJob({
+        bucket: credentials.bucket,
+        prefix: '',
+        roots: scope.roots,
+        mode: NAMING_MODES.LEAF,
+        label: scope.label,
+      });
+      const listed = await downloadApi.enumerate(job, {});
+      const gate = await downloadApi.zipGate({ sendableBytes: listed.bytes - (listed.archivedBytes ?? 0) });
+      if (!listed.cancelled && !listed.archived && gate.state === 'offered') ready = await downloadApi.startZipJob(job);
+    } catch {
+      ready = null;
+    }
+    if (!ready) {
+      if (job) await downloadApi.discard(job.id).catch(() => {});
+      setDownloadScope(scope);
+      setDownloadOpen(true);
+      return;
+    }
+    showToast(`Downloading ${fileCount} files as one ZIP — progress under Activity`);
+    await handleZipStart(ready);
   }
 
   async function handleDeleteConfirm() {
@@ -1679,6 +1716,8 @@ export function App() {
         <DeleteConfirmModal
           request={pendingDelete}
           provider={credentials.provider}
+          bucket={credentials.bucket}
+          endpoint={credentials.endpoint}
           onConfirm={handleDeleteConfirm}
           onCancel={() => setPendingDelete(null)}
         />

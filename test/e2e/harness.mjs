@@ -113,6 +113,14 @@ export async function openMoreOptions(page) {
   if (!(await d.evaluate((el) => el.open))) await d.locator('summary').click();
 }
 
+// Row actions other than Download sit in the row's ⋯ menu (slice 4b). Open it and pick the item
+// labelled `label` (exact text, e.g. 'Rename', 'Delete…', 'Delete folder…'). `row` is the row's
+// locator; `clickOpts` (e.g. { force: true }) apply to both clicks.
+export async function rowAction(row, label, clickOpts = {}) {
+  await row.locator('.row-menu-btn').click(clickOpts);
+  await row.locator('.row-menu').getByRole('button', { name: label, exact: true }).click(clickOpts);
+}
+
 export async function connectApp(page, endpoint, bucket = BUCKET) {
   await page.locator('input[type="url"]').fill(endpoint);
   await page.locator('input[placeholder="my-bucket"]').fill(bucket);
@@ -123,6 +131,63 @@ export async function connectApp(page, endpoint, bucket = BUCKET) {
   await region.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
   if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
   await page.locator('button[type="submit"]').click();
+  await page.locator('[data-testid="file-input"]').waitFor({ state: 'attached', timeout: scaleTimeout(15000) });
+}
+
+// After an upload, the list keeps moving for ~3 s while Activity is open (newE2EPage's
+// default): the upload log refreshes on a 500 ms debounce (+59 px on a phone), then
+// BatchSummary folds itself 3 s after a clean finish (−360 px), unmounting queue-complete.
+// A tick landing in that window can hit the row above, or Select all (MR !23 pipeline
+// 2959212957; the jump itself is tracked in GitLab). Call before ticking rows after an upload,
+// once queue-complete has been seen: it waits only for the fold, so a slow lane where the fold
+// already happened returns at once instead of waiting for a queue-complete that is gone.
+export async function waitForUploadsSettled(page) {
+  await page.locator('[data-testid="queue-complete"]').waitFor({ state: 'detached', timeout: scaleTimeout(10000) });
+}
+
+// Saved buckets on one key, written as storage holds them, then a reload so the splash lists
+// them. The splash has no save step since v1.68.1 (buckets are remembered on their first
+// answer), so a spec that needs a bucket saved without connecting to it seeds it here.
+// The credential matches what connectApp's fields fingerprint to (generic provider,
+// us-east-1), so a secret cached on connect serves every bucket seeded with it.
+export async function seedSavedBuckets(page, endpoint, buckets, { keyId = 'test-key-id' } = {}) {
+  await page.evaluate(
+    ({ endpoint, buckets, keyId }) => {
+      localStorage.setItem(
+        's3b_credentials',
+        JSON.stringify({
+          version: 1,
+          credentials: [
+            { id: 'credSeed', endpoint, keyId, provider: 'generic', regionOverride: 'us-east-1', label: 'Seeded' },
+          ],
+        }),
+      );
+      localStorage.setItem(
+        's3b_connections',
+        JSON.stringify({
+          version: 2,
+          connections: buckets.map((b, i) => ({
+            id: i + 1,
+            name: b.name || b.bucket,
+            credentialId: 'credSeed',
+            bucket: b.bucket,
+            basePrefix: b.basePrefix || '',
+            capabilities: null,
+          })),
+        }),
+      );
+      localStorage.setItem('s3b_connections_migrated', '1');
+    },
+    { endpoint, buckets, keyId },
+  );
+  await page.reload({ waitUntil: 'domcontentloaded' });
+}
+
+// Pick a saved bucket on the splash and connect with the seeded key's secret.
+export async function connectSaved(page, bucket, secret = 'test-secret-key') {
+  await page.locator('.bucket-row', { hasText: bucket }).first().click();
+  await page.locator('input[placeholder="Secret Access Key"]').fill(secret);
+  await page.locator('button[type="submit"]:has-text("Connect")').click();
   await page.locator('[data-testid="file-input"]').waitFor({ state: 'attached', timeout: scaleTimeout(15000) });
 }
 

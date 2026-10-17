@@ -105,10 +105,13 @@ describe('CredentialForm — field rendering', () => {
     }
   });
 
-  test('shows the sessionStorage security hint for the secret key field', () => {
+  // 4b step 9 (v1.66.0 ux-review finding 7): plain words, and about the secret only — the
+  // rest of the form is remembered on this device, so "cleared on tab close" read as a contradiction.
+  test('says in plain words that the secret lasts only until the tab closes and is never saved', () => {
     const { text, cleanup } = mount(h(CredentialForm, defaultProps()));
     try {
-      assert.ok(text().includes('sessionStorage'));
+      assert.ok(text().includes('Your secret is kept only until you close this tab. It is never saved.'));
+      assert.ok(!text().includes('sessionStorage'), 'no storage-API jargon');
     } finally {
       cleanup();
     }

@@ -14,6 +14,7 @@ import {
   newE2EContext,
   newE2EPage,
   e2eTest,
+  rowAction,
 } from '../harness.mjs';
 
 let ctx, app, browser;
@@ -54,7 +55,7 @@ describe('versioning — delete marker then undelete', () => {
       await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: scaleTimeout(20000) });
       await page.locator('[data-testid="file-row:v.txt"]').waitFor({ timeout: scaleTimeout(10000) });
 
-      await page.locator('[data-testid="file-row:v.txt"]').locator('button[title="Delete"]').click({ force: true });
+      await rowAction(page.locator('[data-testid="file-row:v.txt"]'), 'Delete…', { force: true });
       await page.locator('[data-testid="delete-confirm"]').click();
       await page.locator('[data-testid="file-row:v.txt"]').waitFor({ state: 'detached', timeout: scaleTimeout(10000) });
 

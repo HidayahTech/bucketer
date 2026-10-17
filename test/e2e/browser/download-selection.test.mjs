@@ -17,6 +17,8 @@ import {
   e2eTest,
   e2eEngineName,
 } from '../harness.mjs';
+import { readFileSync } from 'node:fs';
+import { readZip } from '../../helpers/zip-reader.js';
 
 let ctx, app, browser, context, page, downloads;
 
@@ -140,5 +142,61 @@ describe('browser e2e — selection download', () => {
       ![...paths].some((p) => p.includes('a.txt') || p.includes('b.txt') || p.includes('untouched')),
       'the loose files and the untouched file must never be requested',
     );
+  });
+});
+
+// Slice 4b (layout A): a small selection of files downloads at once — one file as itself, two
+// or more as one ZIP — with no download panel. Folders and big selections keep the panel.
+describe('browser e2e — one-click download of a small selection', () => {
+  async function tick(names) {
+    await page.goto(app.url, { waitUntil: 'domcontentloaded' });
+    await connectApp(page, ctx.httpsBrowserEndpoint);
+    await page.locator('[data-testid="folder-row:sel"]').click();
+    await page.locator('[data-testid="file-row:a.txt"]').waitFor({ timeout: scaleTimeout(10000) });
+    for (const n of names) await page.locator(`[data-testid="file-row:${n}"] .col-check input`).click();
+  }
+
+  e2eTest('one ticked file downloads directly, with no panel', async () => {
+    await tick(['a.txt']);
+    await page.getByRole('button', { name: /^Download 1$/ }).click();
+    if (isWebKit()) {
+      await downloads.settle(4000);
+    } else {
+      await downloads.waitForCount(1, 30000);
+      assert.deepEqual(downloads.names(), ['a.txt']);
+    }
+    const paths = [...navGetPaths()];
+    assert.equal(paths.length, 1, `exactly one file requested: ${paths}`);
+    assert.ok(paths[0].includes('sel/a.txt'));
+    assert.equal(await page.locator('[data-testid="scan"]').count(), 0, 'the download panel never opened');
+  });
+
+  e2eTest(
+    'two ticked files download as one ZIP, with no panel',
+    async () => {
+      await tick(['a.txt', 'b.txt']);
+      const zip = page.waitForEvent('download', { timeout: scaleTimeout(30000) });
+      await page.getByRole('button', { name: /^Download 2$/ }).click();
+      const d = await zip;
+      assert.match(d.suggestedFilename(), /\.zip$/);
+      const entries = readZip(new Uint8Array(readFileSync(await d.path())));
+      // Full keys, as the panel's selection ZIP names them (its job prefix is '').
+      assert.deepEqual(entries.map((e) => [e.name, Buffer.from(e.data).toString()]).sort(), [
+        ['sel/a.txt', 'aaa'],
+        ['sel/b.txt', 'bbb'],
+      ]);
+      assert.equal(await page.locator('[data-testid="scan"]').count(), 0, 'the download panel never opened');
+    },
+    { skipOn: { webkit: 'WebKit cannot stage a ZIP; see the WebKit arm' } },
+  );
+
+  e2eTest('on WebKit, which cannot stage a ZIP, two ticked files open the download panel', async (t) => {
+    if (!isWebKit()) {
+      t.skip('ZIP-capable engines download at once (arm above)');
+      return;
+    }
+    await tick(['a.txt', 'b.txt']);
+    await page.getByRole('button', { name: /^Download 2$/ }).click();
+    await page.locator('[data-testid="scan"]').waitFor({ timeout: scaleTimeout(10000) });
   });
 });

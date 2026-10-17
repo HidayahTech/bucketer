@@ -2,7 +2,7 @@
 // batch move, select-all, filter, sort, and the copy-link popover. Asserts DOM and real bucket state.
 import { describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { ListObjectsV2Command } from '@aws-sdk/client-s3';
+import { ListObjectsV2Command, PutObjectCommand } from '@aws-sdk/client-s3';
 import {
   startMock,
   startAppServer,
@@ -13,6 +13,8 @@ import {
   newE2EPage,
   e2eTest,
   scaleTimeout,
+  rowAction,
+  waitForUploadsSettled,
 } from '../harness.mjs';
 
 let ctx, app, browser;
@@ -45,6 +47,7 @@ async function uploadFiles(page, names) {
     .setInputFiles(names.map((n) => ({ name: n, mimeType: 'text/plain', buffer: Buffer.from(n) })));
   await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: scaleTimeout(20000) });
   for (const n of names) await page.locator(`[data-testid="file-row:${n}"]`).waitFor({ timeout: scaleTimeout(10000) });
+  await waitForUploadsSettled(page);
 }
 // force: the post-upload re-render (listing refetch + BatchSummary auto-collapse) keeps rows
 // briefly "unstable" for Playwright; the checkboxes are functional.
@@ -109,6 +112,43 @@ describe('batch bar on a phone (BUG-082)', () => {
   });
 });
 
+describe('batch bar on wider screens (slice 4b)', () => {
+  // Above 640 px the bar sits above the list; in a long folder, selecting a row and scrolling down
+  // left Copy/Move/Delete a scroll away. It now sticks to the top of the view.
+  e2eTest('the batch bar stays in view after scrolling a long list', async (t) => {
+    ctx.mock.reset();
+    const names = Array.from({ length: 40 }, (_, i) => `f${String(i).padStart(2, '0')}.txt`);
+    for (const n of names) await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: n, Body: n }));
+    const context = await newE2EContext(browser);
+    const page = await newE2EPage(context);
+    try {
+      await page.goto(app.url, { waitUntil: 'domcontentloaded' });
+      await connectApp(page, ctx.browserEndpoint);
+      if ((await page.evaluate(() => innerWidth)) <= 640) {
+        t.skip('phones fix the bar to the bottom of the screen (BUG-082)');
+        return;
+      }
+      const first = page.locator('[data-testid="file-row:f00.txt"]');
+      await first.waitFor({ timeout: scaleTimeout(10000) });
+      await selectRow(page, 'f00.txt');
+      const bar = page.locator('.batch-bar', { hasText: '1 file selected' });
+      await bar.waitFor({ timeout: scaleTimeout(5000) });
+      await page.locator('[data-testid="file-row:f39.txt"]').scrollIntoViewIfNeeded();
+      const firstTop = await first.evaluate((r) => r.getBoundingClientRect().top);
+      assert.ok(firstTop < 0, `the list scrolled: the first row is above the view (top ${firstTop})`);
+      const { top, bottom, vh } = await bar.evaluate((b) => {
+        const r = b.getBoundingClientRect();
+        return { top: r.top, bottom: r.bottom, vh: innerHeight };
+      });
+      assert.ok(top >= 0 && bottom <= vh, `the bar is on screen (top ${top}, bottom ${bottom}, view ${vh})`);
+      await bar.locator('button.btn-danger').click(); // reachable without scrolling back
+      await page.locator('.modal-overlay').waitFor({ timeout: scaleTimeout(5000) });
+    } finally {
+      await context.close();
+    }
+  });
+});
+
 describe('batch move', () => {
   e2eTest('selecting two files and moving them relocates both under the destination', async () => {
     const { context, page } = await freshSession();
@@ -157,7 +197,7 @@ describe('select-all, filter, sort', () => {
     try {
       await uploadFiles(page, ['apple.txt', 'banana.txt', 'apricot.txt']);
       // Starts-with match: the placeholder carries a "( / )" shortcut-hint suffix.
-      await page.locator('input[placeholder^="Filter by name"]').fill('ap');
+      await page.locator('input[placeholder^="Filter loaded items"]').fill('ap');
       // Only the two "ap…" files remain visible.
       await page
         .locator('[data-testid="file-row:banana.txt"]')
@@ -176,13 +216,14 @@ describe('select-all, filter, sort', () => {
       await uploadFiles(page, ['a.txt', 'b.txt', 'c.txt']);
       // Default is name ascending. Click Name once → toggles to descending.
       await page.locator('th:has-text("Name")').click();
-      // Scope to the listing table — the UploadLog also renders tr.file-row rows (no
-      // data-testid), which would inject nulls into the order assertion.
+      // Only listing rows: the UploadLog under Activity also renders tr.file-row rows (no
+      // data-testid) in its own .file-table, so a .file-table scope let them in once they
+      // rendered — three nulls on CI's webkit phone lanes, pipeline 2958991303.
       // Poll rather than read once: on a slow lane the re-render is mid-flight right
-      // after the click, and a snapshot taken then contains nulls (issue #55).
+      // after the click (issue #55).
       const readOrder = () =>
         page
-          .locator('.file-table tbody tr.file-row')
+          .locator('.file-table tbody tr[data-testid^="file-row:"]')
           .evaluateAll((rows) => rows.map((r) => r.getAttribute('data-testid')));
       const expected = ['file-row:c.txt', 'file-row:b.txt', 'file-row:a.txt'];
       // Scaled by lane: this exact 5 s poll blew on webkit-mobile (~7 s) in pipeline #308.
@@ -205,7 +246,7 @@ describe('copy-link popover', () => {
     try {
       await uploadFiles(page, ['link.txt']);
       const row = page.locator('[data-testid="file-row:link.txt"]');
-      await row.locator('button[title="Copy link"]').click({ force: true });
+      await rowAction(row, 'Copy share link…', { force: true });
       // The popover offers expiry presets; pick 1 hour and capture the generated URL via clipboard
       // is environment-dependent — instead assert the popover opened and a preset is clickable.
       const popover = page.locator('.copy-link-wrap .copy-link-popover, .copy-link-popover');

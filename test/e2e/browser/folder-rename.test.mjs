@@ -13,6 +13,7 @@ import {
   newE2EContext,
   newE2EPage,
   e2eTest,
+  rowAction,
 } from '../harness.mjs';
 
 let ctx, app, browser, context, page;
@@ -44,7 +45,7 @@ describe('browser e2e — folder rename', () => {
     await connectApp(page, ctx.browserEndpoint);
 
     // Open rename on the docs/ folder row and commit a new name.
-    await page.locator('[data-testid="folder-row:docs"] button[title="Rename folder"]').click();
+    await rowAction(page.locator('[data-testid="folder-row:docs"]'), 'Rename');
     await page.locator('.rename-input').fill('guides');
     await page.locator('.rename-inline button[aria-label="Save name"]').click();
 

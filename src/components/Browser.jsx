@@ -33,6 +33,7 @@ import { Breadcrumb } from './Breadcrumb.jsx';
 import { BucketIdentity } from './BucketIdentity.jsx';
 import { SortTh } from './SortTh.jsx';
 import { Icon, fileIconName } from './Icon.jsx';
+import { RowMenu } from './RowMenu.jsx';
 import { MovePickerModal } from './MovePickerModal.jsx';
 import { dragPayload, dropAccepted } from '../lib/move-drag.js';
 import { normalizeBasePrefix, withinFloor, clampToFloor, sanitizeNavPrefix } from '../lib/base-prefix.js';
@@ -834,6 +835,12 @@ export function Browser({
     ? sortedItems.filter((obj) => obj.Key.slice(prefix.length).toLowerCase().includes(filterQ))
     : sortedItems;
 
+  // ux-review 4b H2: a selection the filter hides is still what Delete/Move act on — say so.
+  const hiddenSelected = filterQ
+    ? [...selectedKeys].filter((k) => !visibleItems.some((o) => o.Key === k)).length +
+      [...selectedPrefixes].filter((p) => !visibleFolders.includes(p)).length
+    : 0;
+
   const isEmpty = !listing && visibleItems.length === 0 && visibleFolders.length === 0 && !listError;
   const allVisibleSelected =
     (visibleItems.length > 0 || visibleFolders.length > 0) &&
@@ -1245,13 +1252,16 @@ export function Browser({
               ref={filterInputRef}
               class="filter-input"
               type="search"
-              placeholder="Filter by name…  ( / )"
+              placeholder="Filter loaded items…  ( / )"
+              aria-label="Filter loaded items in this folder"
               value={filterQuery}
               onInput={(e) => setFilterQuery(e.target.value)}
             />
+            {/* Layout A (v1.68.0): the filter only sees what has been listed so far; say so. */}
             {filterQ && (
               <span class="filter-count">
-                {visibleItems.length + visibleFolders.length} of {sortedItems.length + sortedFolders.length}
+                {visibleItems.length + visibleFolders.length} of {sortedItems.length + sortedFolders.length} loaded
+                {isTruncated && ' · more available'}
               </span>
             )}
           </div>
@@ -1275,6 +1285,12 @@ export function Browser({
               .filter(Boolean)
               .join(', ')}{' '}
             selected
+            {hiddenSelected > 0 && (
+              <span class="batch-hidden" data-testid="batch-hidden">
+                {' '}
+                · {hiddenSelected} not shown by the filter
+              </span>
+            )}
           </span>
           <button
             class="btn btn-ghost btn-sm"
@@ -1312,14 +1328,21 @@ export function Browser({
           <button
             class="btn btn-ghost btn-sm"
             style={selectedKeys.size === 0 ? { marginLeft: 'auto' } : undefined}
-            onClick={() =>
+            onClick={() => {
+              // One file is a plain download (slice 4b); App starts small selections as a ZIP
+              // at once and opens the download panel for folders and big ones.
+              const files = selectedFileObjects();
+              if (files.length === 1 && selectedPrefixes.size === 0) {
+                handleDownload(files[0].Key);
+                return;
+              }
               onDownloadRequest?.({
                 kind: 'selection',
-                files: selectedFileObjects(),
+                files,
                 prefixes: [...selectedPrefixes],
                 capturedPrefix: prefix,
-              })
-            }
+              });
+            }}
             disabled={!canDownload}
             title={
               !canDownload
@@ -1380,7 +1403,10 @@ export function Browser({
       {isEmpty ? (
         <div class="empty-state">
           {filterQ
-            ? 'No files match the filter.'
+            ? `No loaded item matches “${filterQuery.trim()}”.` +
+              (isTruncated
+                ? ' This folder has more items than are loaded, and the filter only looks at loaded ones: load more to search further.'
+                : '')
             : !prefix
               ? 'This bucket is empty. Upload files to get started.'
               : 'This prefix is empty.'}
@@ -1429,6 +1455,7 @@ export function Browser({
           <tbody>
             {visibleFolders.map((cp) => {
               const isFolderSelected = selectedPrefixes.has(cp);
+              const folderName = cp.slice(prefix.length).replace(/\/$/, '');
               return (
                 <tr
                   key={cp}
@@ -1508,58 +1535,49 @@ export function Browser({
                     <span class="row-actions">
                       <button
                         class="btn btn-ghost btn-sm"
-                        style={{ marginRight: '.25rem' }}
                         data-testid={`download-folder:${cp}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           onDownloadRequest?.({ kind: 'folder', prefix: cp });
                         }}
+                        aria-label={`Download folder ${folderName}`}
                         title="Download this folder"
                       >
                         <Icon name="download" />
                       </button>
-                      <button
-                        class="btn btn-ghost btn-sm"
-                        style={{ marginRight: '.25rem' }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          startFolderRename(cp);
-                        }}
-                        disabled={!canMove}
-                        title={!canMove ? 'Rename not permitted with current credentials' : 'Rename folder'}
-                      >
-                        <Icon name="pencil" />
-                      </button>
-                      <button
-                        class="btn btn-ghost btn-sm"
-                        style={{ marginRight: '.25rem' }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setMoveSel({ files: [], prefixes: [cp] });
-                        }}
-                        disabled={!canMove}
-                        title={
-                          !canMove ? 'Move not permitted with current credentials' : 'Move folder to another folder'
-                        }
-                      >
-                        <Icon name="move" />
-                      </button>
-                      <button
-                        class="btn btn-ghost btn-sm"
-                        style={{ color: 'var(--text-danger)', borderColor: 'transparent' }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onDeleteRequest({ files: [], prefixes: [cp], capturedPrefix: prefix });
-                        }}
-                        disabled={!canDelete}
-                        title={
-                          !canDelete
-                            ? 'Delete not permitted with current credentials'
-                            : 'Delete folder and all contents'
-                        }
-                      >
-                        <Icon name="trash" />
-                      </button>
+                      <RowMenu
+                        name={folderName}
+                        items={[
+                          {
+                            label: 'Download as ZIP…',
+                            icon: 'archive',
+                            onSelect: () => onDownloadRequest?.({ kind: 'folder', prefix: cp }),
+                          },
+                          {
+                            label: 'Rename',
+                            icon: 'pencil',
+                            onSelect: () => startFolderRename(cp),
+                            disabled: !canMove,
+                            title: !canMove ? 'Rename not permitted with current credentials' : undefined,
+                          },
+                          {
+                            label: 'Move to…',
+                            icon: 'move',
+                            onSelect: () => setMoveSel({ files: [], prefixes: [cp] }),
+                            disabled: !canMove,
+                            title: !canMove ? 'Move not permitted with current credentials' : undefined,
+                          },
+                          {
+                            label: 'Delete folder…',
+                            icon: 'trash',
+                            onSelect: () => onDeleteRequest({ files: [], prefixes: [cp], capturedPrefix: prefix }),
+                            disabled: !canDelete,
+                            title: !canDelete ? 'Delete not permitted with current credentials' : undefined,
+                            danger: true,
+                            separator: true,
+                          },
+                        ]}
+                      />
                     </span>
                   </td>
                 </tr>
@@ -1665,44 +1683,48 @@ export function Browser({
                     <span class="row-actions">
                       <button
                         class="btn btn-ghost btn-sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleShowMeta(obj);
-                        }}
-                        title="Properties"
-                        style={{ marginRight: '.25rem' }}
-                      >
-                        <Icon name="info" />
-                      </button>
-                      <button
-                        class="btn btn-ghost btn-sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          startRename(obj.Key);
-                        }}
-                        title="Rename"
-                        style={{ marginRight: '.25rem' }}
-                      >
-                        <Icon name="pencil" />
-                      </button>
-                      <button
-                        class="btn btn-ghost btn-sm"
                         onClick={() => handleDownload(obj.Key)}
                         disabled={!canDownload || isDownloading}
+                        aria-label={`Download ${display}`}
                         title={!canDownload ? 'Download not permitted with current credentials' : 'Download'}
-                        style={{ marginRight: '.25rem' }}
                       >
                         {isDownloading ? <span class="spinner" /> : <Icon name="download" />}
                       </button>
                       <div class="copy-link-wrap" ref={tableCopyKey === obj.Key ? tableCopyWrapRef : undefined}>
-                        <button
-                          class="btn btn-ghost btn-sm"
-                          onClick={() => setTableCopyKey((k) => (k === obj.Key ? null : obj.Key))}
-                          disabled={!canDownload}
-                          title="Copy link"
-                        >
-                          {tableCopied === obj.Key ? <Icon name="check" /> : <Icon name="link" />}
-                        </button>
+                        <RowMenu
+                          name={display}
+                          done={tableCopied === obj.Key}
+                          doneLabel={`Link copied for ${display}`}
+                          items={[
+                            {
+                              label: 'Copy share link…',
+                              icon: 'link',
+                              onSelect: () => setTableCopyKey(obj.Key),
+                              disabled: !canDownload,
+                              title: !canDownload ? 'Download not permitted with current credentials' : undefined,
+                            },
+                            { label: 'Properties', icon: 'info', onSelect: () => handleShowMeta(obj) },
+                            { label: 'Rename', icon: 'pencil', onSelect: () => startRename(obj.Key) },
+                            {
+                              label: 'Move to…',
+                              icon: 'move',
+                              onSelect: () =>
+                                setMoveSel({ files: [{ key: obj.Key, size: obj.Size ?? 0 }], prefixes: [] }),
+                              disabled: !canMove,
+                              title: !canMove ? 'Move not permitted with current credentials' : undefined,
+                            },
+                            {
+                              label: 'Delete…',
+                              icon: 'trash',
+                              onSelect: () =>
+                                onDeleteRequest({ files: [obj.Key], prefixes: [], capturedPrefix: prefix }),
+                              disabled: !canDelete,
+                              title: !canDelete ? 'Delete not permitted with current credentials' : undefined,
+                              danger: true,
+                              separator: true,
+                            },
+                          ]}
+                        />
                         {tableCopyKey === obj.Key && (
                           <CopyLinkPopover
                             client={client}
@@ -1713,27 +1735,6 @@ export function Browser({
                           />
                         )}
                       </div>
-                      <button
-                        class="btn btn-ghost btn-sm"
-                        style={{ marginLeft: '.25rem' }}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setMoveSel({ files: [{ key: obj.Key, size: obj.Size ?? 0 }], prefixes: [] });
-                        }}
-                        disabled={!canMove}
-                        title={!canMove ? 'Move not permitted with current credentials' : 'Move to another folder'}
-                      >
-                        <Icon name="move" />
-                      </button>
-                      <button
-                        class="btn btn-ghost btn-sm"
-                        style={{ color: 'var(--text-danger)', borderColor: 'transparent', marginLeft: '.25rem' }}
-                        onClick={() => onDeleteRequest({ files: [obj.Key], prefixes: [], capturedPrefix: prefix })}
-                        disabled={!canDelete}
-                        title={!canDelete ? 'Delete not permitted with current credentials' : 'Delete'}
-                      >
-                        <Icon name="trash" />
-                      </button>
                     </span>
                   </td>
                 </tr>

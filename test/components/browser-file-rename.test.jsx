@@ -4,7 +4,7 @@ import '../helpers/with-dom.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { h } from 'preact';
-import { mount, fire, setInput } from '../helpers/render.js';
+import { mount, fire, setInput, rowMenuItem } from '../helpers/render.js';
 import { Browser } from '../../src/components/Browser.jsx';
 
 // `remote` lists keys that exist in the bucket but are NOT on the loaded listing page
@@ -68,10 +68,7 @@ describe('Browser — file rename', () => {
     const log = [];
     const { query, queryAll, text, cleanup } = mountBrowser(log);
     await tick();
-    fire(
-      queryAll('[data-testid="file-row:notes.txt"] button').find((b) => b.title === 'Rename'),
-      'click',
-    );
+    fire(rowMenuItem('[data-testid="file-row:notes.txt"]', 'Rename'), 'click');
     setInput(query('.rename-input'), 'renamed.txt');
     fire(
       queryAll('.rename-inline button').find((b) => b.getAttribute('aria-label') === 'Save name'),
@@ -97,10 +94,7 @@ describe('Browser — file rename', () => {
     const log = [];
     const { query, queryAll, cleanup } = mountBrowser(log, 'Anwar ｜ x.opus');
     await tick();
-    fire(
-      queryAll('button').find((b) => b.title === 'Rename'),
-      'click',
-    );
+    fire(rowMenuItem('.file-row', 'Rename'), 'click');
     setInput(query('.rename-input'), 'renamed.opus');
     fire(
       queryAll('.rename-inline button').find((b) => b.getAttribute('aria-label') === 'Save name'),
@@ -119,10 +113,7 @@ describe('Browser — file rename', () => {
     const log = [];
     const { query, queryAll, cleanup } = mountBrowser(log, 'notes.txt', ['z.txt']);
     await tick();
-    fire(
-      queryAll('[data-testid="file-row:notes.txt"] button').find((b) => b.title === 'Rename'),
-      'click',
-    );
+    fire(rowMenuItem('[data-testid="file-row:notes.txt"]', 'Rename'), 'click');
     setInput(query('.rename-input'), 'z.txt');
     fire(
       queryAll('.rename-inline button').find((b) => b.getAttribute('aria-label') === 'Save name'),
@@ -139,10 +130,7 @@ describe('Browser — file rename', () => {
     const log = [];
     const { query, queryAll, cleanup } = mountBrowser(log);
     await tick();
-    fire(
-      queryAll('[data-testid="file-row:notes.txt"] button').find((b) => b.title === 'Rename'),
-      'click',
-    );
+    fire(rowMenuItem('[data-testid="file-row:notes.txt"]', 'Rename'), 'click');
     setInput(query('.rename-input'), 'a/b');
     fire(
       queryAll('.rename-inline button').find((b) => b.getAttribute('aria-label') === 'Save name'),

@@ -14,6 +14,7 @@ import {
   newE2EPage,
   e2eTest,
   scaleTimeout,
+  rowAction,
 } from '../harness.mjs';
 
 let ctx, app, browser;
@@ -139,10 +140,7 @@ describe('B6 — move (picker + drag-and-drop)', () => {
       await page.locator('[data-testid="file-row:m.txt"]').waitFor({ timeout: scaleTimeout(10000) });
 
       // Open the move picker from the file row, drill into dest/, Move here.
-      await page
-        .locator('[data-testid="file-row:m.txt"]')
-        .locator('button[title="Move to another folder"]')
-        .click({ force: true });
+      await rowAction(page.locator('[data-testid="file-row:m.txt"]'), 'Move to…', { force: true });
       await page.locator('.move-picker-folder', { hasText: 'dest' }).click();
       await page.locator('.move-here').click();
 

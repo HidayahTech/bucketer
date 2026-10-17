@@ -58,3 +58,10 @@ export function setInput(element, value) {
   element.value = value;
   fire(element, 'input');
 }
+
+// Open a row's ⋯ menu (RowMenu, slice 4b) and return the item labelled `label`, or undefined.
+// `row` is the row's selector, e.g. '[data-testid="file-row:notes.txt"]'.
+export function rowMenuItem(row, label) {
+  fire(document.querySelector(`${row} .row-menu-btn`), 'click');
+  return Array.from(document.querySelectorAll(`${row} .row-menu-item`)).find((b) => b.textContent.trim() === label);
+}

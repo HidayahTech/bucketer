@@ -12,6 +12,7 @@ import {
   newE2EContext,
   newE2EPage,
   e2eTest,
+  rowAction,
 } from '../harness.mjs';
 
 let ctx, app, browser;
@@ -44,10 +45,7 @@ describe('properties modal — full metadata matrix', () => {
       await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: scaleTimeout(20000) });
       await page.locator('[data-testid="file-row:props.bin"]').waitFor({ timeout: scaleTimeout(10000) });
 
-      await page
-        .locator('[data-testid="file-row:props.bin"]')
-        .locator('button[title="Properties"]')
-        .click({ force: true });
+      await rowAction(page.locator('[data-testid="file-row:props.bin"]'), 'Properties', { force: true });
       await page.locator('[data-testid="properties-modal"]').waitFor({ timeout: scaleTimeout(5000) });
       // Wait for the async HeadObject to populate the metadata table (the modal opens on "Loading…").
       await page.locator('[data-testid="meta-file-modified"]').waitFor({ timeout: scaleTimeout(5000) });

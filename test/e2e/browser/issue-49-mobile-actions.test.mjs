@@ -21,6 +21,7 @@ import {
   e2eTest,
   applyEngineQuirks,
   e2eEngineName,
+  rowAction,
 } from '../harness.mjs';
 
 let ctx, app, browser;
@@ -101,7 +102,7 @@ describe('issue #49 — mobile (Pixel-5-emulated): per-row actions are reachable
       const row = page.locator('[data-testid="file-row:doomed.txt"]');
       await row.waitFor({ timeout: scaleTimeout(10000) });
 
-      await row.locator('button[title="Delete"]').click(); // actionability-checked: must be reachable
+      await rowAction(row, 'Delete…'); // actionability-checked: ⋯ and the item must be reachable
       const modal = page.locator('.modal-overlay');
       await modal.waitFor({ timeout: scaleTimeout(5000) });
       await page.locator('[data-testid="delete-confirm"]').click();
@@ -194,6 +195,45 @@ describe('issue #49 — mobile (Pixel-5-emulated): per-row actions are reachable
     }
   });
 
+  // Slice 4b: rows carried 4–6 icon buttons that wrapped to 2–3 lines below 1024 px (REPORT M2);
+  // now Download + ⋯ sit on one line, and the ⋯ menu (a bottom sheet on phones) fits on screen.
+  e2eTest('row actions fit on one line and the ⋯ menu opens inside the viewport (phone + tablet)', async () => {
+    ctx.mock.reset();
+    await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: LONG_NAME, Body: 'l' }));
+    await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'docs/inner.txt', Body: 'y' }));
+    for (const device of ['Pixel 5', 'iPad Mini']) {
+      const context = await browser.newContext(applyEngineQuirks(e2eEngineName(), devices[device]));
+      const page = await newE2EPage(context);
+      try {
+        await page.goto(app.url, { waitUntil: 'domcontentloaded' });
+        await connectApp(page, ctx.browserEndpoint);
+        for (const testid of [`file-row:${LONG_NAME}`, 'folder-row:docs']) {
+          const row = page.locator(`[data-testid="${testid}"]`);
+          await row.waitFor({ timeout: scaleTimeout(10000) });
+          const tops = await row
+            .locator('.row-actions > button, .row-actions .row-menu-btn')
+            .evaluateAll((els) => els.map((el) => Math.round(el.getBoundingClientRect().top)));
+          assert.equal(tops.length, 2, `${device} ${testid}: Download + ⋯`);
+          assert.equal(tops[0], tops[1], `${device} ${testid}: both on one line (tops ${tops})`);
+          await row.locator('.row-menu-btn').click(); // no force: must be hit-testable
+          const menu = row.locator('.row-menu');
+          await menu.waitFor({ timeout: scaleTimeout(5000) });
+          const vw = await page.evaluate(() => window.innerWidth);
+          const vh = await page.evaluate(() => window.innerHeight);
+          const box = await menu.boundingBox();
+          assert.ok(
+            box.x >= 0 && box.x + box.width <= vw + 1 && box.y >= 0 && box.y + box.height <= vh + 1,
+            `${device} ${testid}: menu (${box.x},${box.y} ${box.width}×${box.height}) inside ${vw}×${vh}`,
+          );
+          await page.keyboard.press('Escape');
+          await menu.waitFor({ state: 'detached', timeout: scaleTimeout(5000) });
+        }
+      } finally {
+        await context.close();
+      }
+    }
+  });
+
   e2eTest('copy-link popover opens fully inside the mobile viewport', async () => {
     ctx.mock.reset();
     await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'linked.txt', Body: 'l' }));
@@ -204,7 +244,7 @@ describe('issue #49 — mobile (Pixel-5-emulated): per-row actions are reachable
       const row = page.locator('[data-testid="file-row:linked.txt"]');
       await row.waitFor({ timeout: scaleTimeout(10000) });
 
-      await row.locator('button[title="Copy link"]').click();
+      await rowAction(row, 'Copy share link…');
       const popover = page.locator('.copy-link-popover');
       await popover.waitFor({ timeout: scaleTimeout(5000) });
       const vw = await page.evaluate(() => window.innerWidth);

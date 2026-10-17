@@ -11,6 +11,7 @@
 
 const PATHS = {
   menu: <path d="M4 6h16M4 12h16M4 18h16" />,
+  more: <path d="M5 12h.01M12 12h.01M19 12h.01" />,
   x: <path d="M18 6 6 18M6 6l12 12" />,
   check: <path d="M20 6 9 17l-5-5" />,
   'chevron-up': <path d="m18 15-6-6-6 6" />,

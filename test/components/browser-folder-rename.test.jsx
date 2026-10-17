@@ -2,7 +2,7 @@ import '../helpers/with-dom.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { h } from 'preact';
-import { mount, fire, setInput } from '../helpers/render.js';
+import { mount, fire, setInput, rowMenuItem } from '../helpers/render.js';
 import { Browser } from '../../src/components/Browser.jsx';
 
 // A client that lists exactly one folder ('photos/') plus one sibling folder ('archive/')
@@ -54,9 +54,7 @@ describe('Browser — folder rename', () => {
     });
     await tick();
     // Open the rename editor on the 'photos' folder row.
-    const renameBtn = Array.from(queryAll('[data-testid="folder-row:photos"] button')).find(
-      (b) => b.title === 'Rename folder',
-    );
+    const renameBtn = rowMenuItem('[data-testid="folder-row:photos"]', 'Rename');
     fire(renameBtn, 'click');
     const input = query('.rename-input');
     setInput(input, 'pictures');
@@ -72,9 +70,7 @@ describe('Browser — folder rename', () => {
       dispatched = true;
     });
     await tick();
-    const renameBtn = Array.from(queryAll('[data-testid="folder-row:photos"] button')).find(
-      (b) => b.title === 'Rename folder',
-    );
+    const renameBtn = rowMenuItem('[data-testid="folder-row:photos"]', 'Rename');
     fire(renameBtn, 'click');
     setInput(query('.rename-input'), 'archive'); // 'archive/' already exists
     const ok = Array.from(queryAll('.rename-inline button')).find((b) => b.getAttribute('aria-label') === 'Save name');
@@ -90,9 +86,7 @@ describe('Browser — folder rename', () => {
       dispatched = true;
     });
     await tick();
-    const renameBtn = Array.from(queryAll('[data-testid="folder-row:photos"] button')).find(
-      (b) => b.title === 'Rename folder',
-    );
+    const renameBtn = rowMenuItem('[data-testid="folder-row:photos"]', 'Rename');
     fire(renameBtn, 'click');
     setInput(query('.rename-input'), 'a/b');
     const ok = Array.from(queryAll('.rename-inline button')).find((b) => b.getAttribute('aria-label') === 'Save name');

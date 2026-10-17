@@ -14,6 +14,7 @@ import {
   newE2EContext,
   newE2EPage,
   e2eTest,
+  waitForUploadsSettled,
 } from '../harness.mjs';
 
 let ctx, app, browser;
@@ -134,6 +135,7 @@ describe('drag-and-drop matrix', () => {
       await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: scaleTimeout(20000) });
       for (const n of ['m1.txt', 'm2.txt', 'keep.txt'])
         await page.locator(`[data-testid="file-row:${n}"]`).waitFor({ timeout: scaleTimeout(10000) });
+      await waitForUploadsSettled(page);
 
       // Select m1 and m2, then drag m1 onto dest/ — the whole selection should move.
       await page.locator('[data-testid="file-row:m1.txt"]').locator('input[type=checkbox]').check({ force: true });

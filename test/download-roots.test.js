@@ -9,7 +9,9 @@ import {
   normalizeRoots,
   rootsOfJob,
   selectionLabel,
+  isQuickZipSelection,
 } from '../src/lib/download-roots.js';
+import { MEDIUM_MAX } from '../src/lib/zip-prefetch.js';
 
 const obj = (Key, Size = 10, StorageClass = null) => ({
   Key,
@@ -75,5 +77,23 @@ describe('selectionLabel', () => {
   test('pluralizes and names the capture location', () => {
     assert.equal(selectionLabel(3, 'bkt', 'photos/'), '3 selected items in bkt/photos/');
     assert.equal(selectionLabel(1, 'bkt', ''), '1 selected item in bkt');
+  });
+});
+
+// Slice 4b: a small selection of files downloads as a ZIP straight away, without the panel.
+describe('isQuickZipSelection', () => {
+  test('two or more files within the medium tier qualify', () => {
+    assert.equal(isQuickZipSelection({ files: [obj('a'), obj('b')], prefixes: [] }), true);
+    const half = MEDIUM_MAX / 2;
+    assert.equal(isQuickZipSelection({ files: [obj('a', half), obj('b', half)], prefixes: [] }), true);
+  });
+  test('one file does not: it downloads directly, not as a ZIP', () => {
+    assert.equal(isQuickZipSelection({ files: [obj('a')], prefixes: [] }), false);
+  });
+  test('any folder keeps the panel: its size is unknown until listed', () => {
+    assert.equal(isQuickZipSelection({ files: [obj('a'), obj('b')], prefixes: ['p/'] }), false);
+  });
+  test('a total above the medium tier keeps the panel', () => {
+    assert.equal(isQuickZipSelection({ files: [obj('a', MEDIUM_MAX), obj('b', 1)], prefixes: [] }), false);
   });
 });

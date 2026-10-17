@@ -16,6 +16,9 @@ import { byMostRecent } from '../lib/connections.js';
 import { endpointHost, lastUsedLabel } from '../lib/saved-bucket-labels.js';
 
 const KEY_TAIL = 4;
+// Up to this many buckets every account starts open (4b step 6, v1.66.0 ux-review): collapsing
+// all but the active account hid the buckets the drawer exists to switch to.
+const EXPAND_ALL_MAX = 8;
 
 // A stable, human label for an account (credential). Provider name plus the tail of
 // the key id — the tail disambiguates two accounts on the same provider without
@@ -69,9 +72,9 @@ export function AccountsManager({
   const splash = variant === 'splash';
   const groups = groupByAccount(splash ? byMostRecent(connections) : connections);
   const [confirmForgetAll, setConfirmForgetAll] = useState(false);
-  // Explicit per-account expand/collapse overrides. Default (no override) expands an
-  // account when nothing is selected or when it holds the active bucket, and collapses
-  // the rest — so a returning user lands with only their active account open.
+  // Explicit per-account expand/collapse overrides. Default (no override) expands every
+  // account in a small list; in a long one, an account opens when nothing is selected or
+  // when it holds the active bucket, and the rest collapse to a header with a count.
   const [overrides, setOverrides] = useState({});
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -79,7 +82,7 @@ export function AccountsManager({
 
   const isExpanded = (g) => {
     if (g.credentialId in overrides) return overrides[g.credentialId];
-    if (selectedId == null) return true;
+    if (selectedId == null || connections.length <= EXPAND_ALL_MAX) return true;
     return g.conns.some((c) => c.id === selectedId);
   };
   const toggle = (g) => setOverrides((prev) => ({ ...prev, [g.credentialId]: !isExpanded(g) }));
@@ -124,19 +127,22 @@ export function AccountsManager({
                 <span class="account-disclosure" aria-hidden="true">
                   {expanded ? '▾' : '▸'}
                 </span>
-                <span class="account-name">{accountLabel(g.conns[0])}</span>
+                <span class="account-name">
+                  {accountLabel(g.conns[0])}
+                  {!expanded && ` (${g.conns.length} bucket${g.conns.length === 1 ? '' : 's'})`}
+                </span>
                 {splash && <span class="account-host">{endpointHost(g.conns[0].endpoint)}</span>}
               </button>
               <button
                 class="account-add-bucket btn-ghost"
                 type="button"
-                title="Add a bucket to this account — you only enter the bucket name"
+                title="Add another bucket that uses this key — you only enter the bucket name"
                 onClick={(e) => {
                   e.stopPropagation();
                   onAddBucket(g.credentialId);
                 }}
               >
-                + bucket
+                Add bucket for this key
               </button>
             </div>
             {expanded && (
@@ -245,7 +251,10 @@ export function AccountsManager({
           )}
         </div>
       )}
-      {saving ? (
+      {/* Not on the splash (v1.68.1): every bucket is remembered on connect, so "Save current
+          as a bucket…" read as a required step and "Update this bucket…" as a riddle (v1.66.0
+          ux-review finding 1). Naming a bucket stays in the connected sidebar. */}
+      {splash ? null : saving ? (
         <form class="bucket-save-form" onSubmit={handleConfirmSave}>
           <input
             class="input"

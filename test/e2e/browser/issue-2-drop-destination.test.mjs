@@ -19,7 +19,8 @@ import {
   newE2EContext,
   newE2EPage,
   e2eTest,
-  openMoreOptions,
+  seedSavedBuckets,
+  connectSaved,
 } from '../harness.mjs';
 
 let ctx, app, browser;
@@ -104,36 +105,12 @@ describe('#72 — a drop after switching buckets uploads to the bucket on screen
     await seedTwoBuckets();
     const context = await newE2EContext(browser);
     const page = await newE2EPage(context);
-    async function saveCurrentAs(name, bucket) {
-      const trigger = page.locator('.bucket-save-trigger');
-      await trigger.waitFor({ timeout: scaleTimeout(5000) });
-      const deadline = Date.now() + scaleTimeout(5000);
-      while ((await trigger.isDisabled()) && Date.now() < deadline) await page.waitForTimeout(100);
-      await trigger.click();
-      const nameInput = page.locator('input[placeholder="Name"]');
-      await nameInput.waitFor({ timeout: scaleTimeout(5000) });
-      await nameInput.fill(name);
-      await page.locator('button[type="submit"]:has-text("Save")').click();
-      await page.locator('.bucket-row', { hasText: bucket }).waitFor({ timeout: scaleTimeout(5000) });
-    }
     try {
       await page.goto(app.url, { waitUntil: 'domcontentloaded' });
-      // Save B, then A on the same credential (the cached secret is keyed on the credential,
+      // B and A saved on the same credential (the cached secret is keyed on the credential,
       // region included), connect A, then quick-switch to B the way the viewport offers it.
-      await page.locator('input[type="url"]').fill(ctx.browserEndpoint);
-      await page.locator('input[placeholder="my-bucket"]').fill(B);
-      await page.locator('input[placeholder="Access Key ID"]').fill('test-key-id');
-      await page.locator('input[placeholder="Secret Access Key"]').fill('test-secret-key');
-      await openMoreOptions(page);
-      const region = page.locator('input[placeholder="us-east-1"]');
-      await region.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
-      if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
-      await saveCurrentAs('b', B);
-      await page.locator('.account-add-bucket').click();
-      await page.locator('input[placeholder="my-bucket"]').fill(A);
-      await page.locator('input[placeholder="Secret Access Key"]').fill('test-secret-key');
-      await saveCurrentAs('a', A);
-      await page.locator('button[type="submit"]:has-text("Connect")').click();
+      await seedSavedBuckets(page, ctx.browserEndpoint, [{ bucket: B }, { bucket: A }]);
+      await connectSaved(page, A);
       await page.locator('[data-testid="file-row:a-marker.txt"]').waitFor({ timeout: scaleTimeout(15000) });
 
       const tab = page.locator('.connection-tab', { hasText: B });

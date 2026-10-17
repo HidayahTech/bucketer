@@ -6,6 +6,7 @@
 // A job's scope is an ordered list of roots: prefixes to crawl, and files already fully
 // known from the listing row the user ticked — enumerating a file root costs no request.
 // Everything downstream of the manifest never sees roots at all.
+import { MEDIUM_MAX } from './zip-prefetch.js';
 
 export const ROOT_TYPES = { FILE: 'file', PREFIX: 'prefix' };
 
@@ -50,4 +51,14 @@ export function rootsOfJob(job) {
 export function selectionLabel(count, bucket, capturedPrefix = '') {
   const where = capturedPrefix ? `${bucket}/${capturedPrefix}` : bucket;
   return `${count} selected item${count === 1 ? '' : 's'} in ${where}`;
+}
+
+// Layout A (slice 4b): a selection of two or more files whose sizes the listing already
+// gives, small enough for the ZIP engine's in-memory/temp tiers together (MEDIUM_MAX),
+// downloads as a ZIP straight away; folders and bigger selections keep the panel, which
+// lists and sizes them first. One file is a plain download, not a ZIP. Archived objects
+// and storage limits are checked after listing (App falls back to the panel).
+export function isQuickZipSelection({ files = [], prefixes = [] }) {
+  if (prefixes.length > 0 || files.length < 2) return false;
+  return files.reduce((n, o) => n + (o.Size ?? 0), 0) <= MEDIUM_MAX;
 }

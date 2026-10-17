@@ -169,55 +169,81 @@ describe('#70 — a link that changes the connection does not auto-connect', () 
   });
 });
 
-// ── BUG-018: "Save as profile…" stays disabled until the form has valid required fields ──
-describe('BUG-018 — Save-as-profile enablement', () => {
-  e2eTest('disabled on an empty form, enabled once endpoint/bucket/keyId are valid', async () => {
+// Connect to the mock with the typed fields; the bucket is remembered on its first answer (v1.66.0).
+async function connectTyped(page, bucket = 'test-bucket') {
+  await fillCreds(page, { endpoint: ctx.browserEndpoint, bucket, keyId: 'k', secret: 's' });
+  await openMoreOptions(page);
+  const region = page.locator('input[placeholder="us-east-1"]');
+  if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
+  await page.locator('button[type="submit"]:has-text("Connect")').click();
+  await page.locator('[data-testid="file-input"]').waitFor({ state: 'attached', timeout: scaleTimeout(15000) });
+}
+
+// ── v1.68.1 (4b step 7): no save step on the splash ─────────────────────────────
+// Every bucket is remembered on connect, so the splash's "Save current as a bucket…" read
+// as a required step and "Update this bucket…" as a riddle (v1.66.0 ux-review finding 1).
+// Observable: the splash has no save trigger (absence) and a connected bucket is in
+// "Your buckets" after Sign out without one (presence). Replaces BUG-018's enablement
+// check: that trigger no longer exists on the splash.
+describe('v1.68.1 — the splash has no save step', () => {
+  e2eTest('no save trigger before or after a connect, and the bucket is remembered anyway', async () => {
+    ctx.mock.reset();
     const { context, page } = await freshPage();
     try {
-      const trigger = page.locator('.bucket-save-trigger');
-      await trigger.waitFor({ timeout: scaleTimeout(5000) });
-      assert.ok(await trigger.isDisabled(), 'disabled with an empty form');
       await fillCreds(page, { endpoint: 'https://s3.example.com', bucket: 'my-bucket', keyId: 'AKIAEXAMPLE' });
-      await assert.doesNotReject(trigger.waitFor({ state: 'visible' }));
-      // poll for enablement (onFormChange propagates through App → AccountsManager)
-      const deadline = Date.now() + scaleTimeout(5000);
-      while ((await trigger.isDisabled()) && Date.now() < deadline) await page.waitForTimeout(100);
-      assert.ok(!(await trigger.isDisabled()), 'enabled once required fields are valid (BUG-018)');
+      assert.equal(await page.locator('.bucket-save-trigger').count(), 0, 'no save trigger on a filled splash');
+      await connectTyped(page);
+      await page.locator('button:has-text("Sign out")').click();
+      await page.locator('h2:has-text("Connect to a bucket")').waitFor({ timeout: scaleTimeout(5000) });
+      await page.locator('.bucket-row', { hasText: 'test-bucket' }).waitFor({ timeout: scaleTimeout(5000) });
+      assert.equal(await page.locator('.bucket-save-trigger').count(), 0, 'none after a pick either');
     } finally {
       await context.close();
     }
   });
 });
 
-// ── BUG-020: saving a profile before connecting stores the values and does NOT clear the form ──
-describe('BUG-020 — save profile pre-connect', () => {
-  e2eTest('the saved profile holds the typed values and the form keeps them', async () => {
+// ── BUG-020: naming a bucket stores the name and does NOT clear the form ──
+// BUG-020 was the splash's pre-connect save; since v1.68.1 naming happens in the connected
+// sidebar, so the same two observables are checked there.
+describe('BUG-020 — naming a bucket keeps the form', () => {
+  e2eTest('the sidebar save names the bucket and the form keeps its values', async () => {
+    ctx.mock.reset();
     const { context, page } = await freshPage();
     try {
-      await fillCreds(page, {
-        endpoint: 'https://s3.example.com',
-        bucket: 'realbucket',
-        keyId: 'AKIAREAL',
-        secret: 'sekret',
-      });
-      const trigger = page.locator('.bucket-save-trigger');
-      const deadline = Date.now() + scaleTimeout(5000);
-      while ((await trigger.isDisabled()) && Date.now() < deadline) await page.waitForTimeout(100);
+      await connectTyped(page, 'test-bucket');
+      await page.locator('button[aria-label="Open menu"]').click();
+      const trigger = page.locator('aside.sidebar .bucket-save-trigger');
+      await trigger.waitFor({ timeout: scaleTimeout(5000) });
       await trigger.click();
-      const nameInput = page.locator('input[placeholder="Name"]');
+      const nameInput = page.locator('aside.sidebar input[placeholder="Name"]');
       await nameInput.waitFor({ timeout: scaleTimeout(5000) });
       await nameInput.fill('My Profile');
-      await page.locator('button[type="submit"]:has-text("Save")').click();
+      await page.locator('aside.sidebar .bucket-save-form button[type="submit"]').click();
 
-      // A profile row now exists…
-      await page.locator('.bucket-row', { hasText: 'realbucket' }).waitFor({ timeout: scaleTimeout(5000) });
+      // The remembered record now carries the name, updated in place (rows are labelled by
+      // bucket, so the name is read from storage)…
+      const deadline = Date.now() + scaleTimeout(5000);
+      let conns = [];
+      while (Date.now() < deadline) {
+        conns = await page.evaluate(
+          () => JSON.parse(localStorage.getItem('s3b_connections') || '{}').connections || [],
+        );
+        if (conns.some((c) => c.name === 'My Profile')) break;
+        await page.waitForTimeout(100);
+      }
+      assert.deepEqual(
+        conns.map((c) => [c.bucket, c.name]),
+        [['test-bucket', 'My Profile']],
+        'one record, renamed in place',
+      );
       // …and the form was NOT cleared (BUG-020 cleared it and stored empties).
       assert.equal(
-        await page.locator('input[placeholder="my-bucket"]').inputValue(),
-        'realbucket',
+        await page.locator('aside.sidebar input[placeholder="my-bucket"]').inputValue(),
+        'test-bucket',
         'form retained its values',
       );
-      assert.equal(await page.locator('input[type="url"]').inputValue(), 'https://s3.example.com');
+      assert.equal(await page.locator('aside.sidebar input[type="url"]').inputValue(), ctx.browserEndpoint);
     } finally {
       await context.close();
     }
@@ -230,23 +256,8 @@ describe('BUG-027 — post-disconnect form is populated', () => {
     ctx.mock.reset();
     const { context, page } = await freshPage();
     try {
-      // Save a profile pointing at the mock, then connect with it.
-      await fillCreds(page, { endpoint: ctx.browserEndpoint, bucket: 'test-bucket', keyId: 'k', secret: 's' });
-      await openMoreOptions(page);
-      const region = page.locator('input[placeholder="us-east-1"]');
-      if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
-      const trigger = page.locator('.bucket-save-trigger');
-      const deadline = Date.now() + scaleTimeout(5000);
-      while ((await trigger.isDisabled()) && Date.now() < deadline) await page.waitForTimeout(100);
-      await trigger.click();
-      const nameInput = page.locator('input[placeholder="Name"]');
-      await nameInput.waitFor({ timeout: scaleTimeout(5000) });
-      await nameInput.fill('Mock');
-      await page.locator('button[type="submit"]:has-text("Save")').click();
-      await page.locator('.bucket-row', { hasText: 'test-bucket' }).waitFor({ timeout: scaleTimeout(5000) });
-
-      await page.locator('button[type="submit"]:has-text("Connect")').click();
-      await page.locator('[data-testid="file-input"]').waitFor({ state: 'attached', timeout: scaleTimeout(15000) });
+      // Connect to the mock; the bucket is remembered on connect (v1.66.0), so no save step.
+      await connectTyped(page, 'test-bucket');
 
       // Disconnect → the splash returns with the profile's fields pre-filled (minus secret).
       await page.locator('button:has-text("Sign out")').click();
@@ -273,17 +284,35 @@ describe('BUG-026 — region re-inference after profile load', () => {
   e2eTest('a saved B2 profile, reloaded, updates its region when the endpoint changes', async () => {
     const { context, page } = await freshPage();
     try {
-      // Save a B2 profile (region auto-inferred from the endpoint).
-      await fillCreds(page, { endpoint: 'https://s3.us-west-004.backblazeb2.com', bucket: 'b2bucket', keyId: 'b2key' });
-      const trigger = page.locator('.bucket-save-trigger');
-      const deadline = Date.now() + scaleTimeout(5000);
-      while ((await trigger.isDisabled()) && Date.now() < deadline) await page.waitForTimeout(100);
-      await trigger.click();
-      const nameInput = page.locator('input[placeholder="Name"]');
-      await nameInput.waitFor({ timeout: scaleTimeout(5000) });
-      await nameInput.fill('B2');
-      await page.locator('button[type="submit"]:has-text("Save")').click();
-      await page.locator('.bucket-row', { hasText: 'b2bucket' }).waitFor({ timeout: scaleTimeout(5000) });
+      // A saved B2 bucket (region inferred from the endpoint), seeded as storage holds it: the
+      // splash has no save step since v1.68.1, and a real B2 endpoint cannot answer a connect here.
+      await page.evaluate(() => {
+        localStorage.setItem(
+          's3b_credentials',
+          JSON.stringify({
+            version: 1,
+            credentials: [
+              {
+                id: 'credB2',
+                endpoint: 'https://s3.us-west-004.backblazeb2.com',
+                keyId: 'b2key',
+                provider: 'b2',
+                regionOverride: 'us-west-004',
+                label: 'B2',
+              },
+            ],
+          }),
+        );
+        localStorage.setItem(
+          's3b_connections',
+          JSON.stringify({
+            version: 2,
+            connections: [{ id: 1, name: 'B2', credentialId: 'credB2', bucket: 'b2bucket', capabilities: null }],
+          }),
+        );
+        localStorage.setItem('s3b_last_profile_id', '1');
+        localStorage.setItem('s3b_connections_migrated', '1');
+      });
 
       // Reload — the app pre-fills the form from the saved profile (regionOverride set). This is the
       // exact state BUG-026 broke: the region stayed stuck after a profile load.
@@ -346,16 +375,8 @@ describe('#76 — Sign out forgets cached secrets', () => {
         if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
       }
       try {
-        // A saves and connects to their bucket, then signs out.
+        // A connects to their bucket (remembered on connect), then signs out.
         await fill('person-a-bucket', KEY_A, 'example-secret-not-real-A');
-        const trigger = page.locator('.bucket-save-trigger');
-        await trigger.waitFor({ timeout: scaleTimeout(5000) });
-        const deadline = Date.now() + scaleTimeout(5000);
-        while ((await trigger.isDisabled()) && Date.now() < deadline) await page.waitForTimeout(100);
-        await trigger.click();
-        await page.locator('input[placeholder="Name"]').fill('Person A');
-        await page.locator('button[type="submit"]:has-text("Save")').click();
-        await page.locator('.bucket-row', { hasText: 'person-a-bucket' }).waitFor({ timeout: scaleTimeout(5000) });
         await page.locator('button[type="submit"]:has-text("Connect")').click();
         await page.locator('[data-testid="file-input"]').waitFor({ state: 'attached', timeout: scaleTimeout(15000) });
         await page.locator('button:has-text("Sign out")').click();
@@ -377,7 +398,8 @@ describe('#76 — Sign out forgets cached secrets', () => {
         if (await tab.isVisible().catch(() => false)) await tab.click();
         else {
           await page.locator('button[aria-label="Open menu"]').click();
-          // B's connect is remembered (v1.66.0) and selected, so A's account starts collapsed.
+          // B's connect is remembered (v1.66.0) and selected; A's account opens by default in a
+          // list this short (4b), but expand it if a longer list ever collapses it.
           const rowA = page.locator('.bucket-row', { hasText: 'person-a-bucket' });
           if (!(await rowA.isVisible().catch(() => false)))
             await page.locator('.account-header', { hasText: `key …${KEY_A.slice(-4)}` }).click();
