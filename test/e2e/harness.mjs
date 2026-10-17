@@ -134,6 +134,17 @@ export async function connectApp(page, endpoint, bucket = BUCKET) {
   await page.locator('[data-testid="file-input"]').waitFor({ state: 'attached', timeout: scaleTimeout(15000) });
 }
 
+// After an upload, the list keeps moving for ~3 s while Activity is open (newE2EPage's
+// default): the upload log refreshes on a 500 ms debounce (+59 px on a phone), then
+// BatchSummary folds itself 3 s after a clean finish (−360 px), unmounting queue-complete.
+// A tick landing in that window can hit the row above, or Select all (MR !23 pipeline
+// 2959212957; the jump itself is tracked in GitLab). Call before ticking rows after an upload,
+// once queue-complete has been seen: it waits only for the fold, so a slow lane where the fold
+// already happened returns at once instead of waiting for a queue-complete that is gone.
+export async function waitForUploadsSettled(page) {
+  await page.locator('[data-testid="queue-complete"]').waitFor({ state: 'detached', timeout: scaleTimeout(10000) });
+}
+
 // Saved buckets on one key, written as storage holds them, then a reload so the splash lists
 // them. The splash has no save step since v1.68.1 (buckets are remembered on their first
 // answer), so a spec that needs a bucket saved without connecting to it seeds it here.

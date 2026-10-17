@@ -14,6 +14,7 @@ import {
   e2eTest,
   scaleTimeout,
   rowAction,
+  waitForUploadsSettled,
 } from '../harness.mjs';
 
 let ctx, app, browser;
@@ -46,6 +47,7 @@ async function uploadFiles(page, names) {
     .setInputFiles(names.map((n) => ({ name: n, mimeType: 'text/plain', buffer: Buffer.from(n) })));
   await page.locator('[data-testid="queue-complete"]').waitFor({ timeout: scaleTimeout(20000) });
   for (const n of names) await page.locator(`[data-testid="file-row:${n}"]`).waitFor({ timeout: scaleTimeout(10000) });
+  await waitForUploadsSettled(page);
 }
 // force: the post-upload re-render (listing refetch + BatchSummary auto-collapse) keeps rows
 // briefly "unstable" for Playwright; the checkboxes are functional.
