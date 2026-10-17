@@ -1502,7 +1502,8 @@ export function App() {
       regionOverride: cred.regionOverride,
       bucket: '',
       basePrefix: '',
-      secretKey: '',
+      // Reuse the account's secret if this session already holds it, so only the bucket is typed.
+      secretKey: getCachedSecret(credentialFingerprint(cred)) || '',
     };
     setSelectedConnectionId(null);
     saveLastProfileId(null);
@@ -1510,6 +1511,13 @@ export function App() {
     setCredentials(prefill);
     setLiveFormData(prefill);
     setFormResetKey((k) => k + 1); // remount CredentialForm so it re-reads the prefilled `initial`
+    // BUG-076: from the connected sidebar, leave the connected view for the new-bucket form —
+    // the same move as switching to a bucket whose secret is not cached. Staying 'connected'
+    // with the bucket cleared left the listing erroring against an empty bucket name.
+    if (session === 'connected') {
+      setSidebarOpen(false);
+      setSession('disconnected');
+    }
   }
 
   function handleDeleteProfile(id) {
@@ -1787,7 +1795,8 @@ export function App() {
       ) : (
         <div class="app-body">
           {sidebarOpen && <div class="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
-          <aside class={`sidebar${sidebarOpen ? ' sidebar-open' : ''}`}>
+          {/* inert while closed: it is only slid off-screen, so its controls would stay in the Tab order (K3). */}
+          <aside class={`sidebar${sidebarOpen ? ' sidebar-open' : ''}`} inert={!sidebarOpen}>
             {connections.length > 0 && (
               <>
                 <div class="sidebar-heading">Accounts &amp; buckets</div>

@@ -34,7 +34,7 @@ function badgeStyle(verified) {
     fontWeight: 700,
     marginRight: '.5rem',
     background: verified ? 'var(--accent)' : 'var(--border)',
-    color: verified ? '#fff' : 'var(--text-muted)',
+    color: verified ? 'var(--on-accent)' : 'var(--text-muted)',
   };
 }
 

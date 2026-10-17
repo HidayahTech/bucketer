@@ -89,6 +89,20 @@ describe('Breadcrumb — nested prefix', () => {
     cleanup();
   });
 
+  // K1: going up a level must work from the keyboard.
+  test('navigable crumbs are buttons; the current segment is marked aria-current', () => {
+    const { queryAll, query, cleanup } = mount(h(Breadcrumb, { prefix: 'photos/2024/', onNavigate: () => {} }));
+    const crumbs = queryAll('.crumb');
+    assert.ok(crumbs.length >= 2);
+    assert.ok(
+      crumbs.every((c) => c.tagName === 'BUTTON' && c.getAttribute('type') === 'button'),
+      'crumbs must be type=button',
+    );
+    assert.equal(query('.current').getAttribute('aria-current'), 'location');
+    assert.equal(query('.breadcrumb').tagName, 'NAV', 'breadcrumb is a nav landmark');
+    cleanup();
+  });
+
   test('last segment is rendered as .current (not a .crumb)', () => {
     const { query, cleanup } = mount(h(Breadcrumb, { prefix: 'photos/2024/', onNavigate: () => {} }));
     const current = query('.current');
@@ -376,6 +390,37 @@ describe('SortTh — active column', () => {
     );
     fire(query('th'), 'click');
     assert.equal(sortedCol, 'modified', 'onSort must be called with the column name');
+    cleanup();
+  });
+
+  // K1: sorting must work from the keyboard and state be announced.
+  test('the header holds a button and the active column carries aria-sort', () => {
+    let sortedCol = null;
+    const { query, cleanup } = mount(
+      h(SortTh, {
+        col: 'name',
+        sortCol: 'name',
+        sortDir: 'desc',
+        onSort: (col) => {
+          sortedCol = col;
+        },
+        children: 'Name',
+      }),
+    );
+    const btn = query('th button');
+    assert.ok(btn, 'sortable header must contain a button');
+    assert.equal(btn.getAttribute('type'), 'button');
+    fire(btn, 'click');
+    assert.equal(sortedCol, 'name', 'activating the button sorts exactly once');
+    assert.equal(query('th').getAttribute('aria-sort'), 'descending');
+    cleanup();
+  });
+
+  test('an inactive column has no aria-sort', () => {
+    const { query, cleanup } = mount(
+      h(SortTh, { col: 'size', sortCol: 'name', sortDir: 'asc', onSort: () => {}, children: 'Size' }),
+    );
+    assert.equal(query('th').getAttribute('aria-sort'), null);
     cleanup();
   });
 

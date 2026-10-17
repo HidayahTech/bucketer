@@ -122,7 +122,14 @@ export function AccountsManager({ connections, selectedId, onSelect, onDelete, o
                       onSelect(c.id);
                     }}
                   >
-                    <span class="bucket-name">{c.bucket}</span>
+                    {/* Button for keyboard access (K1); its click bubbles to the row's onClick. */}
+                    <button
+                      type="button"
+                      class="link-btn bucket-name"
+                      aria-current={c.id === selectedId ? 'true' : undefined}
+                    >
+                      {c.bucket}
+                    </button>
                     {confirmDeleteId === c.id ? (
                       <span class="bucket-delete-confirm" onClick={(e) => e.stopPropagation()}>
                         Delete?

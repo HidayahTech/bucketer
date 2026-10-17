@@ -144,6 +144,32 @@ describe('AccountsManager — bucket selection', () => {
     assert.ok(selected[0].textContent.includes('photos'));
     cleanup();
   });
+
+  // K1: a saved bucket must be pickable from the keyboard — a native button gets Tab + Enter/Space.
+  test('each bucket name is a button that selects the bucket', () => {
+    let picked = null;
+    const { queryAll, cleanup } = mount(
+      h(
+        AccountsManager,
+        defaultProps({
+          connections: [B2_PHOTOS, B2_BACKUPS],
+          selectedId: 1,
+          onSelect: (id) => {
+            picked = id;
+          },
+        }),
+      ),
+    );
+    const names = queryAll('.bucket-row .bucket-name');
+    assert.ok(
+      names.every((n) => n.tagName === 'BUTTON'),
+      'bucket names must be <button>s',
+    );
+    fire(names[1], 'click');
+    assert.equal(picked, 2);
+    assert.equal(names[0].getAttribute('aria-current'), 'true', 'the active bucket is marked current');
+    cleanup();
+  });
 });
 
 describe('AccountsManager — expansion', () => {

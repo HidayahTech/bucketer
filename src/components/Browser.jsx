@@ -35,6 +35,16 @@ import { MovePickerModal } from './MovePickerModal.jsx';
 import { dragPayload, dropAccepted } from '../lib/move-drag.js';
 import { normalizeBasePrefix, withinFloor, clampToFloor, sanitizeNavPrefix } from '../lib/base-prefix.js';
 
+// Enter/Space handler for role="button" spans (K1). Row names stay spans, not <button>s,
+// because the rows are draggable and Firefox will not start a drag from a <button>.
+function keyActivate(fn) {
+  return (e) => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    fn();
+  };
+}
+
 function formatDate(dateStr) {
   if (!dateStr) return '';
   try {
@@ -893,7 +903,6 @@ export function Browser({
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleCreateFolder();
-                if (e.key === 'Escape') closeNewFolder();
               }}
               autoFocus
             />
@@ -1437,7 +1446,9 @@ export function Browser({
                         </button>
                       </span>
                     ) : (
-                      <span class="file-dir">{cp.slice(prefix.length).replace(/\/$/, '')}</span>
+                      <span class="file-dir" role="button" tabIndex={0} onKeyDown={keyActivate(() => navigateTo(cp))}>
+                        {cp.slice(prefix.length).replace(/\/$/, '')}
+                      </span>
                     )}
                   </td>
                   <td class="col-size">—</td>
@@ -1567,7 +1578,14 @@ export function Browser({
                         </button>
                       </span>
                     ) : (
-                      <span class="file-name file-name-previewable" title={obj.Key} onClick={() => handlePreview(obj)}>
+                      <span
+                        class="file-name file-name-previewable"
+                        title={obj.Key}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handlePreview(obj)}
+                        onKeyDown={keyActivate(() => handlePreview(obj))}
+                      >
                         {display}
                       </span>
                     )}

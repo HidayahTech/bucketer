@@ -71,7 +71,7 @@ function Step({ n, title, children }) {
           height: '1.5rem',
           borderRadius: '50%',
           background: 'var(--accent)',
-          color: '#fff',
+          color: 'var(--on-accent)',
           fontSize: '.75rem',
           fontWeight: 700,
           display: 'flex',

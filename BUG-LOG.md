@@ -4,6 +4,104 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+> **Container evidence for BUG-076…079 (v1.64.0).** Image `mcr.microsoft.com/playwright:v1.60.0-noble`
+> (chromium-1223, firefox-1522, webkit-2287), desktop lanes; `E2E_FILES` = `keyboard.test.mjs`,
+> `contrast.test.mjs`, `issue-49-mobile-actions.test.mjs` (the mobile cases pin their own Pixel 5 /
+> 800 px contexts, so the device axis is fixed by the spec). **Pre-fix** (3ab347e + the new specs):
+> every engine 12 tests, 3 pass, 9 fail — exactly the 9 new cases. **Fix:** every engine 12/12.
+> Component pair (`npm run test:ui`): pre-fix 580 pass / 10 fail (exactly the 10 new cases), fix 590/590.
+
+## BUG-076 — "+ bucket" from the connected sidebar left the view broken
+
+**Date:** 2026-10-16 · REPORT C7 (BUCKET-1 lane 07 F8) · v1.64.0
+
+**Symptom.** While connected, ☰ → "+ bucket" cleared the bucket and secret but stayed
+connected: the file list showed a red listing error and the sidebar form still showed the
+old bucket. The splash variant of the same control worked.
+
+**Root cause.** `handleAddBucket` (App.jsx) reset `credentials` for a new bucket without
+leaving the `connected` session, so the Browser re-listed against an empty bucket.
+
+**Fix (v1.64.0).** From the connected view, "+ bucket" now does what switching to a bucket
+without a cached secret does: closes the sidebar and returns to the connect form, pre-filled
+with the account and with the account's secret if this tab holds it. Scope: App.jsx only.
+
+**Why it wasn't caught earlier.** The Slice 3 tests exercised "+ bucket" on the splash only.
+
+**Test case.** `test/components/app.test.jsx` '"+ bucket" while connected opens the
+new-bucket form for that account' (pre-fix: fails on "the connected view is left").
+
+## BUG-077 — Phone selection bar ran off-screen and froze the page; mid-width rows lost their actions
+
+**Date:** 2026-10-16 · REPORT M1, M2, P1 (lanes 02, 08) · v1.64.0
+
+**Symptom.** On a ~390 px phone, after selecting a file the batch bar's Copy/Delete sat at
+x≈371–500 — reachable only by an unmarked sideways pan — and the next interaction took
+7.8–12.7 s (lane 08, 1,000 rows, throttled). Between 641 and ~975 px a long filename pushed
+every row action off-screen.
+
+**Root cause.** `.batch-bar` was `display:flex` without `flex-wrap`; BUG-042's name-wrap rule
+applied only at ≤640 px.
+
+**Fix (v1.64.0).** `flex-wrap: wrap` on `.batch-bar`; the name-wrap/actions-wrap rules now
+apply at ≤1024 px. Not re-measured: the selection-freeze timing (the overflow that caused it
+is gone; lane 08's in-container check showed the same rule bringing it to 0.57 s).
+
+**Why it wasn't caught earlier.** The #49 spec measured row actions only, never the batch bar,
+and only at Pixel 5 width.
+
+**Test case.** `test/e2e/browser/issue-49-mobile-actions.test.mjs` "batch bar actions are
+reachable after selecting a row" (pre-fix: "Copy 1" at x=371 on 393 px) and "row actions sit
+inside an 800 px viewport next to a long filename" (pre-fix: a button at x≈1090).
+
+## BUG-078 — Keyboard users could not browse; dialogs were not dialogs
+
+**Date:** 2026-10-16 · REPORT K1–K3, Codex R07 · v1.64.0
+
+**Symptom.** Opening a folder, going up a level, previewing a file, sorting and picking a
+saved bucket were click-only; a 70-stop Tab walk reached none of them. Modals took no focus,
+had no role, did not trap Tab or return focus, and only 4 of 13 closed on Escape. The closed
+sidebar kept 22 invisible Tab stops (the very first Tab landed in it).
+
+**Root cause.** `<span onClick>` / `<tr onClick>` / `<th onClick>` everywhere; `Modal.jsx` was a
+bare overlay; the sidebar was only `translateX(-100%)`.
+
+**Fix (v1.64.0).** Crumbs, sort headers (button inside the `th`, `aria-sort`) and saved-bucket
+names are `<button>`s; folder and file names in the draggable rows are `role="button"`
+spans with Enter/Space (Firefox will not start a drag from a `<button>`). `Modal` gets
+`role="dialog"`, `aria-modal`, `aria-labelledby` its `.modal-title`, initial focus, a Tab
+trap, Escape (stopped so it does not also close the sidebar) and focus return — one change
+covering all 12 modals. The closed sidebar is `inert`.
+
+**Why it wasn't caught earlier.** No spec ever drove the app without a mouse.
+
+**Test case.** `test/e2e/browser/keyboard.test.mjs` (4 cases: folder/crumb, preview + focus
+return, sort, sidebar Tab stops); `test/components/modal.test.jsx`, `browser-internals.test.jsx`,
+`accounts-manager.test.jsx`, `app.test.jsx` (inert).
+
+## BUG-079 — Accent text and primary buttons failed contrast (2.98:1 light, 2.38:1 dark)
+
+**Date:** 2026-10-16 · REPORT A1, A2 (lanes 01, 03) · v1.64.0
+
+**Symptom.** White text on Connect and every primary button, and every file/folder name,
+crumb and active sort header, used `#1aa3c0` (2.98:1; dark `#22b8cf` 2.38:1; AA is 4.5:1).
+Warn and success text also failed. In dark mode a selected row became a near-white band.
+
+**Root cause.** The palette predates any contrast check; selected rows and on-accent text
+were literals (`#e8f4fd`, `#fff`).
+
+**Fix (v1.64.0).** `--accent` is look B's primary (`#0b6e85` light, `#4fc3e0` dark), with a new
+`--on-accent` (white / `#0e0f12`); success/warn text darkened; selected rows tint from the
+accent; `color-scheme` set per theme. All pairs ≥ 4.95:1 (scratch calculation, then measured
+rendered in the spec).
+
+**Why it wasn't caught earlier.** No review measured contrast until BUCKET-1.
+
+**Test case.** `test/e2e/browser/contrast.test.mjs` (rendered text vs effective background,
+light and dark; pre-fix: 2.98:1 / 2.38:1 on Connect).
+
+---
+
 ## BUG-075 — Distinct object keys could share one path inside a downloaded ZIP
 
 **Date:** 2026-10-16 · GitLab #79 · v1.63.5

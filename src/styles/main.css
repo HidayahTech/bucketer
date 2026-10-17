@@ -6,14 +6,18 @@
   --surface: #ffffff;
   --surface-raised: #f1f3f5;
   --border: #dee2e6;
-  --border-focus: #35c4e0;
+  /* AA (REPORT A1): #1aa3c0 gave 2.98:1 for white-on-accent and accent text; these are
+     look B's primary values (5.86:1 both ways). --on-accent is text drawn on an accent fill. */
+  --border-focus: #0b6e85;
   --text: #212529;
   --text-muted: #6c757d;
   --text-danger: #c92a2a;
-  --text-success: #2f9e44;
-  --text-warn: #e67700;
-  --accent: #1aa3c0;
-  --accent-hover: #158fa8;
+  --text-success: #19703f;
+  --text-warn: #9a5b00;
+  --accent: #0b6e85;
+  --accent-hover: #095a6d;
+  --on-accent: #ffffff;
+  color-scheme: light;
   --danger: #e03131;
   --danger-hover: #c92a2a;
   --success-bg: #ebfbee;
@@ -47,8 +51,10 @@ html { font-size: 15px; }
     --text-danger: #ff6b6b;
     --text-success: #69db7c;
     --text-warn: #fcc419;
-    --accent: #22b8cf;
-    --accent-hover: #15aabf;
+    --accent: #4fc3e0;
+    --accent-hover: #7ad3ea;
+    --on-accent: #0e0f12;
+    color-scheme: dark;
     --danger: #fa5252;
     --danger-hover: #f03e3e;
     --success-bg: #0d2b14;
@@ -69,8 +75,10 @@ html { font-size: 15px; }
   --text-danger: #ff6b6b;
   --text-success: #69db7c;
   --text-warn: #fcc419;
-  --accent: #22b8cf;
-  --accent-hover: #15aabf;
+  --accent: #4fc3e0;
+  --accent-hover: #7ad3ea;
+  --on-accent: #0e0f12;
+  color-scheme: dark;
   --danger: #fa5252;
   --danger-hover: #f03e3e;
   --success-bg: #0d2b14;
@@ -215,7 +223,7 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
   user-select: none;
 }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
-.btn-primary   { background: var(--accent);   color: #fff; }
+.btn-primary   { background: var(--accent);   color: var(--on-accent); }
 .btn-primary:not(:disabled):hover  { background: var(--accent-hover); }
 .btn-danger    { background: var(--danger);   color: #fff; }
 .btn-danger:not(:disabled):hover   { background: var(--danger-hover); }
@@ -253,6 +261,9 @@ body { font-family: var(--font); background: var(--bg); color: var(--text); line
 
 /* ── File browser ─────────────────────────────────────────────────────────── */
 .breadcrumb { display: flex; align-items: center; gap: .3rem; flex-wrap: wrap; font-size: .85rem; margin-bottom: .75rem; }
+/* Text-looking buttons (K1): keyboard-operable without changing the look. */
+.link-btn, .breadcrumb .crumb { background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; text-align: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; }
+.link-btn:focus-visible, .breadcrumb .crumb:focus-visible, [role="button"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
 .breadcrumb .crumb { color: var(--accent); cursor: pointer; }
 .breadcrumb .crumb:hover { text-decoration: underline; }
 .breadcrumb .sep { color: var(--text-muted); }
@@ -789,15 +800,17 @@ details[open] .upload-log-summary::before { transform: rotate(90deg); }
 .rename-error { font-size: .75rem; color: var(--text-danger); white-space: nowrap; }
 
 /* ── Multi-select batch bar ──────────────────────────────────────────────── */
+/* flex-wrap (M1/P1): unwrapped, the bar ran past a phone's edge (Copy/Delete off-screen),
+   and that overflow also froze the page for seconds after selecting a row. */
 .batch-bar {
-  display: flex; align-items: center; gap: .5rem;
+  display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
   padding: .4rem .6rem; margin-bottom: .5rem;
   background: var(--info-bg); border: 1px solid #74c0fc;
   border-radius: var(--radius); font-size: .85rem;
 }
 .batch-count { font-weight: 600; }
 .col-check { width: 2rem; text-align: center; padding: .4rem .25rem; }
-.file-row-selected { background: #e8f4fd; }
+.file-row-selected { background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
 
 /* ── Filter bar ──────────────────────────────────────────────────────────── */
 .filter-bar { display: flex; align-items: center; gap: .5rem; }
@@ -902,7 +915,7 @@ details[open] .upload-log-summary::before { transform: rotate(90deg); }
 details[open] .sv-summary::before { transform: rotate(90deg); }
 .sv-summary-title { font-size: .8rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-muted); flex: 1; }
 .sv-badge {
-  font-size: .7rem; font-weight: 700; background: var(--accent); color: #fff;
+  font-size: .7rem; font-weight: 700; background: var(--accent); color: var(--on-accent);
   padding: .1rem .4rem; border-radius: 999px; min-width: 1.4rem; text-align: center;
 }
 .sv-section-body {
@@ -978,7 +991,7 @@ details[open] .sv-summary::before { transform: rotate(90deg); }
 .changelog-version-row { display: flex; align-items: baseline; gap: .5rem; }
 .changelog-version-num { font-family: var(--mono); font-size: .9rem; font-weight: 700; }
 .changelog-version-date { font-size: .75rem; color: var(--text-muted); }
-.changelog-current-badge { font-size: .7rem; font-weight: 600; background: var(--accent); color: #fff; padding: .1rem .4rem; border-radius: 999px; }
+.changelog-current-badge { font-size: .7rem; font-weight: 600; background: var(--accent); color: var(--on-accent); padding: .1rem .4rem; border-radius: 999px; }
 .changelog-entry-title { font-weight: 600; }
 .changelog-changes { padding-left: 1.25rem; display: flex; flex-direction: column; gap: .2rem; color: var(--text-muted); line-height: 1.5; }
 .changelog-group { list-style: none; margin-left: -1.25rem; margin-top: .35rem; }
@@ -1195,6 +1208,34 @@ details[open] .sv-summary::before { transform: rotate(90deg); }
    by a tap. Slice 1 (responsive shell): wrap the header so nothing runs off the
    edge, and size modals to the viewport. (The file-table actions-column reflow is
    a separate slice.) */
+/* Long names must WRAP below desktop width (BUG-042; widened from ≤640 to ≤1024 px for
+   REPORT M2, where 641–975 px pushed every row action off-screen): the desktop
+   nowrap+ellipsis treatment cannot shrink — max-width:100% on an inline-block is
+   circular during table intrinsic sizing, so the name column's min-content is the full
+   name width and a long filename pushes the actions column past the screen edge. Flex
+   is required for the actions wrap: JSX emits the buttons with no whitespace between
+   them, so inline-blocks have no soft-wrap points. */
+@media (max-width: 1024px) {
+  .file-table .col-name { overflow-wrap: anywhere; }
+  .file-table .col-name .file-name { white-space: normal; }
+  .file-table .col-actions { min-width: 9.5rem; }
+  .file-table .col-actions .row-actions {
+    display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center;
+  }
+}
+
+/* Touch targets ≥ 44 × 44 px (REPORT M3; WCAG 2.5.5, Apple HIG) on phones and any
+   touch-first device. The row checkbox's target is its whole cell (the cell toggles). */
+@media (max-width: 640px), (pointer: coarse) {
+  .btn, .btn-version, .hamburger, .connection-tab, .breadcrumb .crumb, .breadcrumb .crumb-link {
+    min-height: 44px; min-width: 44px;
+  }
+  .breadcrumb .crumb { padding: 0 .5rem; }
+  .file-table td.col-check, .file-table th.col-check { width: 44px; min-width: 44px; height: 44px; }
+  .file-table input[type="checkbox"] { width: 22px; height: 22px; }
+  .file-table .col-actions .row-actions { gap: .25rem; }
+}
+
 @media (max-width: 640px) {
   /* Header controls wrap onto additional rows instead of running off the edge.
      The flex:1 spacer would consume a whole row and break wrapping — drop it. */
@@ -1214,16 +1255,6 @@ details[open] .sv-summary::before { transform: rotate(90deg); }
      no whitespace between them, so inline-blocks have no soft-wrap points. */
   .file-table .col-modified,
   .file-table .col-file-modified { display: none; }
-  /* Long names must WRAP on mobile (BUG-042): the desktop nowrap+ellipsis treatment
-     cannot shrink — max-width:100% on an inline-block is circular during table
-     intrinsic sizing, so the name column's min-content is the full name width and a
-     long filename pushes the actions column past the screen edge on every engine. */
-  .file-table .col-name { overflow-wrap: anywhere; }
-  .file-table .col-name .file-name { white-space: normal; }
-  .file-table .col-actions { min-width: 9.5rem; }
-  .file-table .col-actions .row-actions {
-    display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center;
-  }
   .file-table .btn-sm { padding: .5rem .55rem; }
 
   /* The copy-link/share popover is right-anchored inside the row and wider than

@@ -72,40 +72,46 @@ export function Breadcrumb({
   const rootLabel = floorParts.length ? floorParts[floorParts.length - 1] : 'root';
   const rootTitle = effectiveFloor ? `Your access starts here — ${effectiveFloor}` : undefined;
 
+  // Crumbs are type=button so going up a level works from the keyboard (K1).
   if (!prefix || prefix === effectiveFloor)
     return (
-      <div class="breadcrumb">
-        <span class="current" title={rootTitle}>
+      <nav class="breadcrumb" aria-label="Folder path">
+        <span class="current" aria-current="location" title={rootTitle}>
           {effectiveFloor ? rootLabel : '/ (root)'}
         </span>
         {copyLinkButton}
-      </div>
+      </nav>
     );
   const parts = prefix.split('/').filter(Boolean).slice(floorParts.length);
   return (
-    <div class="breadcrumb">
-      <span {...crumbProps(effectiveFloor)} title={rootTitle} onClick={() => onNavigate(effectiveFloor)}>
+    <nav class="breadcrumb" aria-label="Folder path">
+      <button
+        type="button"
+        {...crumbProps(effectiveFloor)}
+        title={rootTitle}
+        onClick={() => onNavigate(effectiveFloor)}
+      >
         {rootLabel}
-      </span>
+      </button>
       {parts.map((part, i) => {
         const target = effectiveFloor + parts.slice(0, i + 1).join('/') + '/';
         const isLast = i === parts.length - 1;
         return [
-          <span key={`sep-${i}`} class="sep">
+          <span key={`sep-${i}`} class="sep" aria-hidden="true">
             /
           </span>,
           isLast ? (
-            <span key={part} class="current">
+            <span key={part} class="current" aria-current="location">
               {part}
             </span>
           ) : (
-            <span key={part} {...crumbProps(target)} onClick={() => onNavigate(target)}>
+            <button key={part} type="button" {...crumbProps(target)} onClick={() => onNavigate(target)}>
               {part}
-            </span>
+            </button>
           ),
         ];
       })}
       {copyLinkButton}
-    </div>
+    </nav>
   );
 }
