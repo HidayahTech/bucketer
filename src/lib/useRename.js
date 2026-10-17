@@ -7,11 +7,22 @@
 // characterization tests (browser-file-rename, browser-folder-rename) pin it.
 //
 import { useState } from 'preact/hooks';
-import { CopyObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { CopyObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { showToast } from './toast.js';
 import { validateObjectName } from './validate-object-name.js';
 import { leafName } from './format.js';
 import { copySource } from './move-key.js';
+
+// true if the key exists, false only on a definite 404; other errors propagate.
+async function keyExists(client, bucket, key) {
+  try {
+    await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+    return true;
+  } catch (err) {
+    if (err?.$metadata?.httpStatusCode === 404 || err?.name === 'NotFound') return false;
+    throw err;
+  }
+}
 
 export function useRename({ client, bucket, prefix, items, setItems, commonPrefixes, invalidateCache, onMoveRequest }) {
   const [renamingKey, setRenamingKey] = useState(null);
@@ -51,6 +62,15 @@ export function useRename({ client, bucket, prefix, items, setItems, commonPrefi
     setRenameSaving(true);
     setRenameError(null);
     try {
+      // `items` holds only the LOADED listing pages, so the check above cannot see a target
+      // on a later page or one created since listing; the unconditional copy then overwrote
+      // it and deleted the source (GitLab #73 / R03). Ask the bucket. Only a definite 404
+      // proceeds — any other HEAD failure refuses rather than risk an overwrite. (A writer
+      // racing between this HEAD and the copy is not closed here; see #75 / #35.)
+      if (await keyExists(client, bucket, newKey)) {
+        setRenameError('A file with that name already exists.');
+        return;
+      }
       await client.send(
         new CopyObjectCommand({
           Bucket: bucket,

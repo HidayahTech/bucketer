@@ -68,6 +68,20 @@ describe('DownloadPage', () => {
     assert.equal(video.getAttribute('src'), VIDEO_URL);
   });
 
+  test('a .pdf link is offered for download only, never framed (#77, S2)', () => {
+    // The #dl= URL is chosen by whoever built the link. Framing it with allow-scripts let an
+    // attacker serve HTML named *.pdf and run a phishing form inside Bucketer's own page.
+    const PDF_URL =
+      'https://attacker.example.test/statement.pdf?X-Amz-Date=20990601T000000Z&X-Amz-Expires=604800&X-Amz-Signature=00';
+    const { query, cleanup } = mount(<DownloadPage presignedUrl={PDF_URL} />);
+    try {
+      assert.equal(query('iframe'), null, 'no frame of the link URL');
+      assert.equal(query('a[href]')?.getAttribute('href'), PDF_URL, 'the Download link is still offered');
+    } finally {
+      cleanup();
+    }
+  });
+
   test('does not render a media preview for non-previewable files', () => {
     const { query } = mount(<DownloadPage presignedUrl={FRESH_URL} />); // .braw — not previewable
     assert.equal(query('img'), null, 'no img for non-previewable file');

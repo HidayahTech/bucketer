@@ -59,7 +59,7 @@ import {
   loadCredentialRecords,
   credentialFingerprint,
 } from '../lib/connections.js';
-import { cacheSecret, getCachedSecret } from '../lib/secret-cache.js';
+import { cacheSecret, getCachedSecret, clearSecretCache, forgetCachedSecret } from '../lib/secret-cache.js';
 import {
   readUrlParams,
   hasUrlParams,
@@ -516,6 +516,10 @@ export function App() {
     setClient(null);
     setConnectionError(null);
     clearCredentials();
+    // "Sign out" must end credential use for every connection touched this tab, not only the
+    // active one: the quick-switch cache otherwise let the next person on a shared machine
+    // click the previous person's saved bucket and connect as them (GitLab #76 / S1).
+    clearSecretCache();
     setCapabilities(defaultCapabilities());
     // Repopulate form from the selected connection (minus secret key) so the user
     // only has to re-enter their secret key to reconnect.
@@ -1509,8 +1513,16 @@ export function App() {
   }
 
   function handleDeleteProfile(id) {
+    const deleted = resolveConnection(id);
     deleteConnectionRecord(id);
-    setConnections(listResolvedConnections());
+    const remaining = listResolvedConnections();
+    setConnections(remaining);
+    // Forget the deleted connection's cached secret unless another saved connection still
+    // uses the same credential (#76).
+    if (deleted) {
+      const fp = credentialFingerprint(deleted);
+      if (!remaining.some((c) => credentialFingerprint(c) === fp)) forgetCachedSecret(fp);
+    }
     if (selectedConnectionId === id) {
       setSelectedConnectionId(null);
       saveLastProfileId(null);

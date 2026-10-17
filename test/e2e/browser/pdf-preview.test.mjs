@@ -86,3 +86,39 @@ describe(`browser e2e — PDF preview renders (BUG #46) [${e2eEngineName()}]`, (
     // definitive visual confirmation is a manual open in real Firefox.
   });
 });
+
+// #77 (S2): the #dl= download page takes its URL from whoever built the link. Framing a
+// *.pdf link with allow-scripts let an attacker serve HTML under that name and run a
+// phishing form inside Bucketer's own page. Observable: the attacker URL is never loaded
+// as a frame (absence: no request for it from a frame, no frame), next to the Download
+// link pointing at it (presence).
+describe(`browser e2e — #dl= page does not frame the link's PDF (#77) [${e2eEngineName()}]`, () => {
+  e2eTest('a #dl= link to an HTML-serving .pdf URL renders a Download link and no frame', async () => {
+    const target =
+      'https://attacker.example.test/statement.pdf?X-Amz-Date=20990601T000000Z&X-Amz-Expires=604800&X-Amz-Signature=00';
+    const ctx2 = await newE2EContext(browser);
+    const frameHits = [];
+    await ctx2.route('https://attacker.example.test/**', (route) => {
+      if (route.request().resourceType() === 'document') frameHits.push(route.request().url());
+      return route.fulfill({
+        status: 200,
+        contentType: 'text/html; charset=utf-8',
+        headers: { 'Access-Control-Allow-Origin': '*' },
+        body: '<!doctype html><h3 id="phish">Session expired</h3>',
+      });
+    });
+    const p = await newE2EPage(ctx2);
+    try {
+      const b64 = Buffer.from(target).toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+      await p.goto(`${app.url}/#dl=${b64}`, { waitUntil: 'domcontentloaded' });
+      const link = p.locator('a.btn-primary', { hasText: 'Download' });
+      await link.waitFor({ timeout: scaleTimeout(10000) });
+      assert.equal(await link.getAttribute('href'), target, 'the Download link points at the shared URL');
+      await p.waitForTimeout(1500);
+      assert.equal(await p.locator('iframe').count(), 0, 'no frame on the download page');
+      assert.deepEqual(frameHits, [], 'the attacker URL is never loaded as a document');
+    } finally {
+      await ctx2.close();
+    }
+  });
+});

@@ -104,7 +104,7 @@ export async function copyObjectMultipart(
       PART_CONCURRENCY,
     );
 
-    await client.send(
+    const done = await client.send(
       new CompleteMultipartUploadCommand({
         Bucket: bucket,
         Key: destKey,
@@ -112,6 +112,8 @@ export async function copyObjectMultipart(
         MultipartUpload: { Parts: parts },
       }),
     );
+    // The new object's ETag: move-queue records it as proof of which copy it wrote (#74).
+    return done?.ETag;
   } catch (err) {
     // A fresh copy aborts its orphaned session (best-effort; swallow abort errors so the
     // original failure propagates). A resume leaves the upload intact so it stays resumable

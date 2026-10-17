@@ -16,7 +16,7 @@
 // movedPrefixes are source folders whose every key moved cleanly (caller removes the row).
 // Collision/skip errors carry `skipped: true` so the UI can show them apart from failures.
 // shouldCancel() is polled between objects; in-flight copies complete.
-import { ListObjectsV2Command, CopyObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { ListObjectsV2Command, CopyObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { COPY_MULTIPART_THRESHOLD } from './constants.js';
 import {
   destKeyForFile,
@@ -49,6 +49,72 @@ async function listAllObjectsForPrefix(client, bucket, pfx) {
     token = resp.IsTruncated ? resp.NextContinuationToken : undefined;
   } while (token);
   return objs;
+}
+
+// Object identity across a move (GitLab #74 / R02, #75 / R04). A source is deleted only when
+// it is still the object that was copied: its ETag is read before the copy and again just
+// before the delete. Resume finishes a "destination already exists" item only when the job
+// record says THIS move wrote it (the destination ETag returned by its own copy) and that
+// object is still there; anything less is reported and the source is kept. This works on
+// every provider but is not atomic: a writer between the final HEAD and the DELETE is not
+// caught (conditional copy/delete headers — #35 — would close that, where supported).
+const SOURCE_CHANGED =
+  'The source changed while it was being moved, so it was kept — the destination holds the earlier version.';
+const DEST_UNVERIFIED =
+  "An object already exists at the destination that this move can't confirm it wrote, so the source was kept.";
+
+// The key's ETag ('' if the provider sends none), or null if the key does not exist.
+async function headEtag(client, bucket, key) {
+  try {
+    const head = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+    return head.ETag ?? '';
+  } catch (err) {
+    if (err?.$metadata?.httpStatusCode === 404 || err?.name === 'NotFound') return null;
+    throw err;
+  }
+}
+
+// Delete the source only if it is unchanged since srcEtag. Returns SOURCE_CHANGED when it was
+// kept; null when deleted (or already gone). Delete/HEAD failures throw to the caller.
+async function deleteSourceIfUnchanged(client, bucket, sourceKey, srcEtag) {
+  const now = await headEtag(client, bucket, sourceKey);
+  if (now === null) return null;
+  if (now !== srcEtag) return SOURCE_CHANGED;
+  await sendWithRetry(client, () => new DeleteObjectCommand({ Bucket: bucket, Key: sourceKey }));
+  return null;
+}
+
+// Copy one item; returns the destination ETag the copy produced. For a move/rename (deletes
+// the source afterwards) the source ETag is captured first and returned too.
+async function copyItem(client, bucket, item, captureSource, multipartOpts) {
+  let srcEtag = null;
+  if (captureSource) {
+    srcEtag = await headEtag(client, bucket, item.sourceKey);
+    if (srcEtag === null) throw new Error('The source no longer exists.');
+  }
+  let destEtag;
+  if (item.size > COPY_MULTIPART_THRESHOLD) {
+    destEtag = await copyObjectMultipart(client, {
+      bucket,
+      sourceKey: item.sourceKey,
+      destKey: item.destKey,
+      size: item.size,
+      ...multipartOpts,
+    });
+  } else {
+    const resp = await sendWithRetry(
+      client,
+      () =>
+        new CopyObjectCommand({
+          Bucket: bucket,
+          CopySource: copySource(bucket, item.sourceKey),
+          Key: item.destKey,
+          MetadataDirective: 'COPY',
+        }),
+    );
+    destEtag = resp?.CopyObjectResult?.ETag;
+  }
+  return { srcEtag, destEtag: destEtag ?? '' };
 }
 
 async function discoverPrefixObjects(client, bucket, prefixes, shouldCancel = () => false) {
@@ -254,6 +320,7 @@ async function runTransfer(client, bucket, op, onProgress, mode, shouldCancel) {
         createdAt: op.createdAt ?? Date.now(),
         items: movable.map((m) => ({ sourceKey: m.sourceKey, destKey: m.destKey, size: m.size })),
         inflightUploads: {},
+        copied: {},
       }),
     );
   }
@@ -262,6 +329,7 @@ async function runTransfer(client, bucket, op, onProgress, mode, shouldCancel) {
   let mi = 0;
   let cancelled = false;
   const movedKeySet = new Set();
+  const copied = {}; // sourceKey → { srcEtag, destEtag }: proof for resume that this move wrote the dest
   async function worker() {
     while (mi < movable.length) {
       if (shouldCancel()) {
@@ -269,40 +337,27 @@ async function runTransfer(client, bucket, op, onProgress, mode, shouldCancel) {
         return;
       }
       const item = movable[mi++];
+      let identity;
       try {
+        identity = await copyItem(client, bucket, item, mode !== 'copy', {
+          onUploadIdCreated: persisting
+            ? (uploadId, partSize) => {
+                inflightUploads[item.sourceKey] = { uploadId, partSize };
+                persist(() => updateMoveJob(op.jobId, { inflightUploads: { ...inflightUploads } }));
+              }
+            : undefined,
+          onPartCopied: (bytes) => {
+            bytesDone += bytes;
+            onProgress({ moved, errors: [...errors], movedKeys: [], bytesDone, bytesTotal });
+          },
+        });
         if (item.size > COPY_MULTIPART_THRESHOLD) {
-          await copyObjectMultipart(client, {
-            bucket,
-            sourceKey: item.sourceKey,
-            destKey: item.destKey,
-            size: item.size,
-            onUploadIdCreated: persisting
-              ? (uploadId, partSize) => {
-                  inflightUploads[item.sourceKey] = { uploadId, partSize };
-                  persist(() => updateMoveJob(op.jobId, { inflightUploads: { ...inflightUploads } }));
-                }
-              : undefined,
-            onPartCopied: (bytes) => {
-              bytesDone += bytes;
-              onProgress({ moved, errors: [...errors], movedKeys: [], bytesDone, bytesTotal });
-            },
-          });
           if (persisting) {
             // Complete succeeded — this upload is no longer in flight.
             delete inflightUploads[item.sourceKey];
             persist(() => updateMoveJob(op.jobId, { inflightUploads: { ...inflightUploads } }));
           }
         } else {
-          await sendWithRetry(
-            client,
-            () =>
-              new CopyObjectCommand({
-                Bucket: bucket,
-                CopySource: copySource(bucket, item.sourceKey),
-                Key: item.destKey,
-                MetadataDirective: 'COPY',
-              }),
-          );
           bytesDone += item.size || 0;
         }
       } catch (err) {
@@ -319,8 +374,17 @@ async function runTransfer(client, bucket, op, onProgress, mode, shouldCancel) {
       // Move only: copy confirmed — delete the source. A failure here means the object
       // now exists in both places (a duplicate, not a move): report it and leave both.
       if (mode !== 'copy') {
+        if (persisting) {
+          copied[item.sourceKey] = identity;
+          await persist(() => updateMoveJob(op.jobId, { copied: { ...copied } }));
+        }
         try {
-          await sendWithRetry(client, () => new DeleteObjectCommand({ Bucket: bucket, Key: item.sourceKey }));
+          const kept = await deleteSourceIfUnchanged(client, bucket, item.sourceKey, identity.srcEtag);
+          if (kept) {
+            errors.push({ key: item.sourceKey, message: kept });
+            onProgress({ moved, errors: [...errors], movedKeys: [] });
+            continue;
+          }
         } catch (err) {
           errors.push({
             key: item.sourceKey,
@@ -374,6 +438,9 @@ async function runTransfer(client, bucket, op, onProgress, mode, shouldCancel) {
 // parts not yet done. A clean finish deletes the record.
 export async function resumeMoveOperation(client, bucket, jobRecord, onProgress, shouldCancel = () => false) {
   const { id, dest, items, inflightUploads = {} } = jobRecord;
+  // Records written before #74 carry no copy proof: their existing destinations are reported
+  // as unverified and their sources kept.
+  const copied = { ...jobRecord.copied };
 
   let existing;
   try {
@@ -390,7 +457,7 @@ export async function resumeMoveOperation(client, bucket, jobRecord, onProgress,
     return;
   }
 
-  const already = items.filter((it) => existing.has(it.destKey)); // copied last time — just delete source
+  const already = items.filter((it) => existing.has(it.destKey)); // destination exists — verify before deleting
   const pending = items.filter((it) => !existing.has(it.destKey)); // still to copy
 
   const bytesTotal = pending.reduce((sum, it) => sum + (it.size || 0), 0);
@@ -414,7 +481,17 @@ export async function resumeMoveOperation(client, bucket, jobRecord, onProgress,
       break;
     }
     try {
-      await sendWithRetry(client, () => new DeleteObjectCommand({ Bucket: bucket, Key: it.sourceKey }));
+      const proof = copied[it.sourceKey];
+      const destNow = proof ? await headEtag(client, bucket, it.destKey) : null;
+      const kept =
+        !proof || destNow !== proof.destEtag
+          ? DEST_UNVERIFIED
+          : await deleteSourceIfUnchanged(client, bucket, it.sourceKey, proof.srcEtag);
+      if (kept) {
+        errors.push({ key: it.sourceKey, message: kept });
+        onProgress({ moved, errors: [...errors], movedKeys: [] });
+        continue;
+      }
       moved++;
       onProgress({ moved, errors: [...errors], movedKeys: [it.sourceKey], bytesDone, bytesTotal });
     } catch (err) {
@@ -432,39 +509,26 @@ export async function resumeMoveOperation(client, bucket, jobRecord, onProgress,
       }
       const it = pending[pi++];
       const resumeUploadId = liveInflight[it.sourceKey]?.uploadId;
+      let identity;
       try {
+        identity = await copyItem(client, bucket, it, true, {
+          preferredPartBytes: liveInflight[it.sourceKey]?.partSize,
+          resumeUploadId,
+          onUploadIdCreated: resumeUploadId
+            ? undefined
+            : (uploadId, partSize) => {
+                liveInflight[it.sourceKey] = { uploadId, partSize };
+                persist(() => updateMoveJob(id, { inflightUploads: { ...liveInflight } }));
+              },
+          onPartCopied: (bytes) => {
+            bytesDone += bytes;
+            onProgress({ moved, errors: [...errors], movedKeys: [], bytesDone, bytesTotal });
+          },
+        });
         if (it.size > COPY_MULTIPART_THRESHOLD) {
-          await copyObjectMultipart(client, {
-            bucket,
-            sourceKey: it.sourceKey,
-            destKey: it.destKey,
-            size: it.size,
-            preferredPartBytes: liveInflight[it.sourceKey]?.partSize,
-            resumeUploadId,
-            onUploadIdCreated: resumeUploadId
-              ? undefined
-              : (uploadId, partSize) => {
-                  liveInflight[it.sourceKey] = { uploadId, partSize };
-                  persist(() => updateMoveJob(id, { inflightUploads: { ...liveInflight } }));
-                },
-            onPartCopied: (bytes) => {
-              bytesDone += bytes;
-              onProgress({ moved, errors: [...errors], movedKeys: [], bytesDone, bytesTotal });
-            },
-          });
           delete liveInflight[it.sourceKey];
           persist(() => updateMoveJob(id, { inflightUploads: { ...liveInflight } }));
         } else {
-          await sendWithRetry(
-            client,
-            () =>
-              new CopyObjectCommand({
-                Bucket: bucket,
-                CopySource: copySource(bucket, it.sourceKey),
-                Key: it.destKey,
-                MetadataDirective: 'COPY',
-              }),
-          );
           bytesDone += it.size || 0;
         }
       } catch (err) {
@@ -472,8 +536,15 @@ export async function resumeMoveOperation(client, bucket, jobRecord, onProgress,
         onProgress({ moved, errors: [...errors], movedKeys: [] });
         continue;
       }
+      copied[it.sourceKey] = identity;
+      await persist(() => updateMoveJob(id, { copied: { ...copied } }));
       try {
-        await sendWithRetry(client, () => new DeleteObjectCommand({ Bucket: bucket, Key: it.sourceKey }));
+        const kept = await deleteSourceIfUnchanged(client, bucket, it.sourceKey, identity.srcEtag);
+        if (kept) {
+          errors.push({ key: it.sourceKey, message: kept });
+          onProgress({ moved, errors: [...errors], movedKeys: [] });
+          continue;
+        }
       } catch (err) {
         errors.push({
           key: it.sourceKey,
