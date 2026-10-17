@@ -19,6 +19,7 @@ import {
   newE2EContext,
   newE2EPage,
   e2eTest,
+  openMoreOptions,
 } from '../harness.mjs';
 
 let ctx, app, browser;
@@ -123,6 +124,7 @@ describe('#72 — a drop after switching buckets uploads to the bucket on screen
       await page.locator('input[placeholder="my-bucket"]').fill(B);
       await page.locator('input[placeholder="Access Key ID"]').fill('test-key-id');
       await page.locator('input[placeholder="Secret Access Key"]').fill('test-secret-key');
+      await openMoreOptions(page);
       const region = page.locator('input[placeholder="us-east-1"]');
       await region.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
       if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
@@ -139,7 +141,7 @@ describe('#72 — a drop after switching buckets uploads to the bucket on screen
         await tab.click();
         await showsBucketB(page);
       } else {
-        await page.locator('button:has-text("☰")').click();
+        await page.locator('button[aria-label="Open menu"]').click();
         await page.locator('.bucket-row', { hasText: B }).click();
         await showsBucketB(page);
         if (
@@ -148,7 +150,7 @@ describe('#72 — a drop after switching buckets uploads to the bucket on screen
             .isVisible()
             .catch(() => false)
         )
-          await page.locator('button:has-text("☰")').click();
+          await page.locator('button[aria-label="Open menu"]').click();
       }
       await dropAndSettle(page);
     } finally {
@@ -177,8 +179,8 @@ describe('issue #2 — drag-dropped uploads target the current folder, not root'
       // Wait for the upload destination to reflect the folder (a real user takes far longer than this
       // to start a drag). The bug is the STALE CLOSURE: even fully settled, the captured addFiles read
       // the mount-time root prefix — waiting proves the fix, not the unrelated propagation lag.
-      const dest = page.locator('input[placeholder="(root of bucket)"]');
-      for (let i = 0; i < 50 && (await dest.inputValue().catch(() => '')) !== 'sub/'; i++)
+      const dest = page.locator('.upload-target');
+      for (let i = 0; i < 50 && (await dest.getAttribute('data-upload-target').catch(() => null)) !== 'sub/'; i++)
         await page.waitForTimeout(100);
 
       // Drag-drop a file onto the browser (the path that used the stale closure).

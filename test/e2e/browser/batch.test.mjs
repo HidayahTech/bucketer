@@ -84,6 +84,31 @@ describe('batch delete', () => {
   });
 });
 
+describe('batch bar on a phone (BUG-082)', () => {
+  // The first selection used to insert the batch bar above the list, so every row jumped down
+  // ~122 px under the user's finger (and Playwright's: firefox × Pixel 5 checked a row that had
+  // just moved off-screen). On phones the bar is fixed to the bottom of the screen instead.
+  e2eTest('selecting the first row does not move the rows below it', async (t) => {
+    const { context, page } = await freshSession();
+    try {
+      if ((await page.evaluate(() => innerWidth)) > 640) {
+        t.skip('desktop keeps the in-flow batch bar (layout A mockup: sticky at the top of the list)');
+        return;
+      }
+      await uploadFiles(page, ['a.txt', 'b.txt', 'c.txt']);
+      const row = page.locator('[data-testid="file-row:c.txt"]');
+      const docY = () => row.evaluate((r) => r.getBoundingClientRect().y + window.scrollY);
+      const before = await docY();
+      await selectRow(page, 'a.txt');
+      await page.locator('.batch-bar', { hasText: '1 file selected' }).waitFor({ timeout: scaleTimeout(5000) });
+      const after = await docY();
+      assert.ok(Math.abs(after - before) <= 1, `c.txt stayed put on the page: y ${before} → ${after}`);
+    } finally {
+      await context.close();
+    }
+  });
+});
+
 describe('batch move', () => {
   e2eTest('selecting two files and moving them relocates both under the destination', async () => {
     const { context, page } = await freshSession();

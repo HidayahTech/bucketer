@@ -57,8 +57,8 @@ describe('issue #3 — mobile (Android-emulated): upload does not teleport to ro
       await page.locator('[data-testid="folder-row:mob"]').click();
       await page.locator('.breadcrumb .current', { hasText: 'mob' }).waitFor({ timeout: scaleTimeout(5000) });
       // Let the upload target propagate to the folder.
-      const dest = page.locator('input[placeholder="(root of bucket)"]');
-      for (let i = 0; i < 50 && (await dest.inputValue().catch(() => '')) !== 'mob/'; i++)
+      const dest = page.locator('.upload-target');
+      for (let i = 0; i < 50 && (await dest.getAttribute('data-upload-target').catch(() => null)) !== 'mob/'; i++)
         await page.waitForTimeout(100);
 
       // Upload via the file input (the path mobile uses — "Choose files" / share-sheet).

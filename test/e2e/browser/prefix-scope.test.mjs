@@ -19,6 +19,7 @@ import {
   e2eTest,
   applyEngineQuirks,
   e2eEngineName,
+  openMoreOptions,
 } from '../harness.mjs';
 
 const BUCKET = 'test-bucket';
@@ -60,9 +61,11 @@ async function freshPage(hash = '') {
 async function fillConnect(page, { baseFolder = null } = {}) {
   await page.locator('input[type="url"]').fill(ctx.browserEndpoint);
   await page.locator('input[placeholder="my-bucket"]').fill(BUCKET);
+  await openMoreOptions(page);
   if (baseFolder != null) await page.locator('#cred-baseprefix').fill(baseFolder);
   await page.locator('input[placeholder="Access Key ID"]').fill('scoped-key');
   await page.locator('input[placeholder="Secret Access Key"]').fill('s');
+  await openMoreOptions(page);
   const region = page.locator('input[placeholder="us-east-1"]');
   await region.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
   if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
@@ -210,6 +213,7 @@ describe('prefix-scoped keys — normal connect screen', () => {
       ctx.mock.configure({ corsOnErrors: false });
       const { context, page } = await freshPage();
       try {
+        await openMoreOptions(page);
         await page.locator('#cred-provider').selectOption('minio');
         await fillConnect(page);
         const block = page.locator('.error-block');
@@ -264,7 +268,7 @@ describe('prefix-scoped keys — quick-switch failure', () => {
       await tab.click();
       return;
     }
-    await page.locator('button:has-text("☰")').click();
+    await page.locator('button[aria-label="Open menu"]').click();
     await page.locator('.bucket-row', { hasText: bucket }).click();
   }
 
@@ -282,6 +286,7 @@ describe('prefix-scoped keys — quick-switch failure', () => {
       // Region is part of the credential fingerprint the secret cache is keyed on, so it
       // must be in the saved record too, or the quick-switch finds no cached secret and
       // drops to the form instead of connecting.
+      await openMoreOptions(page);
       const region0 = page.locator('input[placeholder="us-east-1"]');
       await region0.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
       if (await region0.isVisible().catch(() => false)) await region0.fill('us-east-1');
@@ -290,9 +295,11 @@ describe('prefix-scoped keys — quick-switch failure', () => {
       // the second bucket through the account's "+ bucket" path (deselects, keeps the key).
       await page.locator('.account-add-bucket').click();
       await page.locator('input[placeholder="my-bucket"]').fill(BUCKET);
+      await openMoreOptions(page);
       await page.locator('#cred-baseprefix').fill(SCOPE);
       await page.locator('input[placeholder="Secret Access Key"]').fill('s');
       await saveCurrentAs(page, 'acme', BUCKET);
+      await openMoreOptions(page);
       const region = page.locator('input[placeholder="us-east-1"]');
       if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
       await page.locator('button[type="submit"]:has-text("Connect")').click();
@@ -327,6 +334,7 @@ describe('prefix-scoped keys — quick-switch failure', () => {
       await page.locator('input[placeholder="my-bucket"]').fill(BUCKET);
       await page.locator('input[placeholder="Access Key ID"]').fill('scoped-key');
       await page.locator('input[placeholder="Secret Access Key"]').fill('s');
+      await openMoreOptions(page);
       const region0 = page.locator('input[placeholder="us-east-1"]');
       await region0.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
       if (await region0.isVisible().catch(() => false)) await region0.fill('us-east-1');
@@ -337,6 +345,7 @@ describe('prefix-scoped keys — quick-switch failure', () => {
 
       // Recover on the failed screen.
       ctx.mock.requestLog.reset();
+      await openMoreOptions(page);
       await page.locator('#cred-baseprefix').fill(SCOPE);
       await page.locator('button[type="submit"]:has-text("Connect")').click();
       await page.locator('[data-testid="file-row:report.pdf"]').waitFor({ timeout: scaleTimeout(15000) });
@@ -378,6 +387,7 @@ describe('prefix-scoped keys — shared link screen', () => {
         'basePrefix from the link must pre-fill the Base folder field',
       );
       await page.locator('input[placeholder="Secret Access Key"]').fill('s');
+      await openMoreOptions(page);
       const region = page.locator('input[placeholder="us-east-1"]');
       if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
       await page.locator('button[type="submit"]:has-text("Connect")').click();
@@ -406,6 +416,7 @@ describe('prefix-scoped keys — shared link screen', () => {
     const { context, page } = await freshPage(hash);
     try {
       await page.locator('input[placeholder="Secret Access Key"]').fill('s');
+      await openMoreOptions(page);
       const region = page.locator('input[placeholder="us-east-1"]');
       if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
       await page.locator('button[type="submit"]:has-text("Connect")').click();
@@ -431,6 +442,7 @@ describe('prefix-scoped keys — shared link screen', () => {
     const { context, page } = await freshPage(hash);
     try {
       await page.locator('input[placeholder="Secret Access Key"]').fill('s');
+      await openMoreOptions(page);
       const region = page.locator('input[placeholder="us-east-1"]');
       if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
       await page.locator('button[type="submit"]:has-text("Connect")').click();
@@ -469,6 +481,7 @@ describe('prefix-scoped keys — shared link screen', () => {
     const { context, page } = await freshPage(hash);
     try {
       await page.locator('input[placeholder="Secret Access Key"]').fill('s');
+      await openMoreOptions(page);
       const region = page.locator('input[placeholder="us-east-1"]');
       if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
       await page.locator('button[type="submit"]:has-text("Connect")').click();
@@ -533,6 +546,7 @@ describe('folder links (#69)', () => {
     // The link supplies everything but the key: the recipient brings their own.
     await page.locator('input[placeholder="Access Key ID"]').fill('scoped-key');
     await page.locator('input[placeholder="Secret Access Key"]').fill('s');
+    await openMoreOptions(page);
     const region = page.locator('input[placeholder="us-east-1"]');
     if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
     await page.locator('button[type="submit"]:has-text("Connect")').click();

@@ -27,6 +27,13 @@ export function withinFloor(prefix, floor) {
   return !floor || (prefix || '').startsWith(floor);
 }
 
+// The upload destination is free text ("photos/2026" with no slash is fine), so it is compared
+// as a folder. While scoped, an empty destination (the bucket root) is outside the floor.
+export function destinationOutsideFloor(destination, floor) {
+  const dest = destination && !destination.endsWith('/') ? destination + '/' : destination || '';
+  return !!floor && !withinFloor(dest, floor);
+}
+
 // The single enforcement primitive: any prefix arriving from outside a
 // guaranteed-descendant source (URL hash, history state, breadcrumb) routes
 // through here before becoming navigation state.

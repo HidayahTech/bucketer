@@ -30,7 +30,7 @@ import { showToast } from '../lib/toast.js';
 import { createS3Client } from '../lib/s3-client.js';
 import { diagnosticsProps } from '../lib/connection-diagnostics.js';
 import { isPermissionError } from '../lib/format.js';
-import { detectProvider, PROVIDER_LABELS } from '../lib/provider.js';
+import { detectProvider } from '../lib/provider.js';
 import {
   loadCredentials,
   saveCredentials,
@@ -43,6 +43,7 @@ import {
   saveLastProfileId,
   repairStorageInvariants,
   migrateProfilesFromLegacy,
+  deleteAllProfiles,
 } from '../lib/storage.js';
 import {
   listResolvedConnections,
@@ -58,6 +59,8 @@ import {
   hasMigratedConnections,
   loadCredentialRecords,
   credentialFingerprint,
+  rememberConnection,
+  recallForKeyId,
 } from '../lib/connections.js';
 import { cacheSecret, getCachedSecret, clearSecretCache, forgetCachedSecret } from '../lib/secret-cache.js';
 import {
@@ -67,15 +70,20 @@ import {
   urlChangesConnection,
   describeUrlParams,
 } from '../lib/url-params.js';
-import { normalizeBasePrefix, discoveredFloor } from '../lib/base-prefix.js';
+import { normalizeBasePrefix, discoveredFloor, destinationOutsideFloor } from '../lib/base-prefix.js';
 import { isForegroundTask } from '../lib/task-routing.js';
 import { vaultExists, isUnlocked, recallSecret, rememberSecret, createVault, VAULT_ENABLED } from '../lib/vault.js';
 import { FileBanner } from './FileBanner.jsx';
 import { CredentialForm } from './CredentialForm.jsx';
 import { VaultUnlock, VAULT_USERNAME } from './VaultUnlock.jsx';
 import { ShareLinkMenu } from './ShareLinkMenu.jsx';
+import { BucketToolsMenu } from './BucketToolsMenu.jsx';
 import { Browser } from './Browser.jsx';
 import { UploadQueue } from './UploadQueue.jsx';
+import { UploadMenu } from './UploadMenu.jsx';
+import { UploadTarget } from './UploadTarget.jsx';
+import { ActivityPanel } from './ActivityPanel.jsx';
+import { Portal } from './Portal.jsx';
 import { DeleteConfirmModal } from './DeleteConfirmModal.jsx';
 import { MasterQueue } from './MasterQueue.jsx';
 import { runDeleteOperation } from '../lib/delete-queue.js';
@@ -134,6 +142,7 @@ import { useConnectionTabs } from '../hooks/useConnectionTabs.js';
 import { StorageModal } from './StorageModal.jsx';
 import { TransferHandoff } from './TransferHandoff.jsx';
 import { DuplicatesModal } from './DuplicatesModal.jsx';
+import { Icon } from './Icon.jsx';
 import { CURRENT_VERSION } from '../lib/changelog.js';
 import { useWindowDragDrop } from '../hooks/useWindowDragDrop.js';
 import { useModalStates } from '../hooks/useModalStates.js';
@@ -200,6 +209,23 @@ export function App() {
     return lastId ? loadConnectionCapabilities(lastId) : defaultCapabilities();
   });
   const [currentPrefix, setCurrentPrefix] = useState('');
+  // Upload destination (layout A, v1.67.0; was UploadQueue's): follows the folder in view, and the
+  // upload-target line's "Change" can override it until the next navigation.
+  const [destinationPrefix, setDestinationPrefix] = useState('');
+  useEffect(() => {
+    setDestinationPrefix(currentPrefix || '');
+  }, [currentPrefix]);
+  const [uploadActivity, setUploadActivity] = useState(undefined);
+  // Prefix-scoped keys (#60): a typed destination outside the floor is refused visibly (the
+  // upload-target error + a disabled Upload ▾), never silently corrected; drops are refused too.
+  const connectionFloor = normalizeBasePrefix(credentials?.basePrefix);
+  const destOutsideFloor = destinationOutsideFloor(destinationPrefix, connectionFloor);
+  // The Activity tree's DOM home: created once, attached by Browser under its toolbar (Portal.jsx).
+  const belowToolbarHostRef = useRef(null);
+  if (belowToolbarHostRef.current === null && typeof document !== 'undefined') {
+    belowToolbarHostRef.current = document.createElement('div');
+    belowToolbarHostRef.current.className = 'below-toolbar-host';
+  }
   const [browserKey, setBrowserKey] = useState(0); // force re-mount on reconnect
   // True until the first Browser mount of this page session. Browser's hash-prefix
   // restore ("only the very first mount restores the URL-specified path", v1.14.4)
@@ -288,10 +314,27 @@ export function App() {
           showToast(`Base folder saved to ${rec.name}`);
         }
       }
+      // Accounts A (v1.66.0, REPORT C1): the first request this connect gets through proves the
+      // values work, so remember them as a saved bucket — no Save click. Not on connect itself:
+      // handleConnect reports "connected" before any request is made. After the #67 floor save above,
+      // so a folder discovered on recovery matches its record instead of minting a second card.
+      let targetId = selectedConnectionId;
+      if (state === 'permitted' && !rememberedThisConnectRef.current) {
+        rememberedThisConnectRef.current = true;
+        const c = credentialsRef.current;
+        if (c?.endpoint && c.bucket && c.keyId) {
+          targetId = rememberConnection(c);
+          setConnections(listResolvedConnections());
+          if (targetId !== selectedConnectionId) {
+            setSelectedConnectionId(targetId);
+            saveLastProfileId(targetId);
+          }
+        }
+      }
       setCapabilities((prev) => {
         if (prev[op] === state) return prev;
         const next = { ...prev, [op]: state };
-        if (selectedConnectionId) saveConnectionCapabilities(selectedConnectionId, next);
+        if (targetId) saveConnectionCapabilities(targetId, next);
         return next;
       });
     },
@@ -339,6 +382,8 @@ export function App() {
   // True while the in-flight connect came from a quick-switch (tab strip / sidebar), so a
   // failure can name the bucket it tried to open (#65). Every other connect clears it.
   const connectViaSwitchRef = useRef(false);
+  // Whether this connect has already been remembered as a saved bucket (see handleCapabilityChange).
+  const rememberedThisConnectRef = useRef(false);
   const [failedViaSwitch, setFailedViaSwitch] = useState(false);
 
   async function handleConnect(creds, { reconnect = false } = {}) {
@@ -348,6 +393,7 @@ export function App() {
     setConnectionError(null);
     setFailedViaSwitch(connectViaSwitchRef.current);
     connectViaSwitchRef.current = false;
+    rememberedThisConnectRef.current = false;
 
     const provider = creds.provider || detectProvider(creds.endpoint);
     const fullCreds = { ...creds, provider };
@@ -1349,6 +1395,9 @@ export function App() {
   function focusBaseFolderField() {
     const field = document.getElementById('cred-baseprefix');
     if (!field) return;
+    // The field lives in the form's "More options" disclosure (v1.66.0); open it first.
+    const details = field.closest('details');
+    if (details) details.open = true;
     field.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
     field.focus({ preventScroll: true });
   }
@@ -1502,7 +1551,8 @@ export function App() {
       regionOverride: cred.regionOverride,
       bucket: '',
       basePrefix: '',
-      secretKey: '',
+      // Reuse the account's secret if this session already holds it, so only the bucket is typed.
+      secretKey: getCachedSecret(credentialFingerprint(cred)) || '',
     };
     setSelectedConnectionId(null);
     saveLastProfileId(null);
@@ -1510,6 +1560,37 @@ export function App() {
     setCredentials(prefill);
     setLiveFormData(prefill);
     setFormResetKey((k) => k + 1); // remount CredentialForm so it re-reads the prefilled `initial`
+    // BUG-076: from the connected sidebar, leave the connected view for the new-bucket form —
+    // the same move as switching to a bucket whose secret is not cached. Staying 'connected'
+    // with the bucket cleared left the listing erroring against an empty bucket name.
+    if (session === 'connected') {
+      setSidebarOpen(false);
+      setSession('disconnected');
+    }
+  }
+
+  // "Forget all on this device" (accounts A): every saved bucket and account, the last-used
+  // values and any secret held in this tab. clearCredentials matters: with the connection model's
+  // marker gone, leftover flat keys would be re-migrated into a phantom bucket on the next load.
+  function handleForgetAll() {
+    deleteAllProfiles();
+    clearCredentials();
+    clearSecretCache();
+    setConnections([]);
+    setSelectedConnectionId(null);
+    const blank = {
+      endpoint: '',
+      bucket: '',
+      keyId: '',
+      secretKey: '',
+      provider: null,
+      regionOverride: '',
+      basePrefix: '',
+    };
+    setCredentials(blank);
+    setLiveFormData(blank);
+    setFormResetKey((k) => k + 1);
+    showToast('Forgot every saved bucket on this device');
   }
 
   function handleDeleteProfile(id) {
@@ -1529,7 +1610,12 @@ export function App() {
     }
   }
 
-  const providerLabel = credentials.provider ? PROVIDER_LABELS[credentials.provider] : null;
+  // A picked saved bucket names itself on the button (accounts A key-recognised state).
+  const selectedForForm = selectedConnectionId != null ? connections.find((c) => c.id === selectedConnectionId) : null;
+  const splashSubmitLabel =
+    selectedForForm && (liveFormData.bucket || '').trim() === selectedForForm.bucket
+      ? `Connect to ${selectedForForm.bucket}`
+      : 'Connect';
 
   return (
     <div id="app">
@@ -1604,48 +1690,34 @@ export function App() {
             onClick={() => setSidebarOpen((o) => !o)}
             aria-label={sidebarOpen ? 'Close menu' : 'Open menu'}
           >
-            {sidebarOpen ? '✕' : '☰'}
+            <Icon name={sidebarOpen ? 'x' : 'menu'} size={20} />
           </button>
         )}
         <BucketerLogo />
+        <span class="wordmark" aria-hidden="true">
+          Bucketer
+        </span>
         {session === 'connected' && (
           <ConnectionTabs tabs={connectionTabs} selectedId={selectedConnectionId} onSelect={switchToConnection} />
         )}
         <span class="spacer" />
-        {providerLabel && session === 'connected' && <span class="header-status">{providerLabel}</span>}
         <StatusBadge session={session} />
         {session === 'connected' && buildShareUrl(credentials) && (
           <ShareLinkMenu credentials={credentials} prefix={currentPrefix} />
         )}
         {session === 'connected' && capabilities.list !== 'denied' && (
-          <button
-            type="button"
-            class="btn btn-ghost btn-sm"
-            style={{ color: '#fff', borderColor: 'rgba(255,255,255,.4)' }}
-            onClick={() => setDuplicatesOpen(true)}
-            title="Scan this bucket or folder for duplicate files"
-          >
-            Find duplicates
-          </button>
-        )}
-        {session === 'connected' && capabilities.list !== 'denied' && (
-          <button
-            type="button"
-            class="btn btn-ghost btn-sm"
-            style={{ color: '#fff', borderColor: 'rgba(255,255,255,.4)' }}
-            data-testid="open-incomplete-uploads"
-            onClick={() => setIncompleteOpen(true)}
-            title="Find and clean up unfinished multipart uploads still using storage"
-          >
-            Incomplete uploads
-          </button>
+          <BucketToolsMenu
+            onFindDuplicates={() => setDuplicatesOpen(true)}
+            onIncompleteUploads={() => setIncompleteOpen(true)}
+            onHiddenVersions={() => browserActionsRef.current?.showHiddenVersions?.()}
+          />
         )}
         {session === 'connected' && (
           <button
             type="button"
-            class="btn btn-ghost btn-sm"
-            style={{ color: '#fff', borderColor: 'rgba(255,255,255,.4)' }}
+            class="btn btn-sm hdr-btn"
             onClick={handleDisconnect}
+            title="Sign out: forgets the secret in this tab; your saved buckets stay on this device"
           >
             Sign out
           </button>
@@ -1676,12 +1748,14 @@ export function App() {
             ) : (
               <>
                 <AccountsManager
+                  variant="splash"
                   connections={connections}
                   selectedId={selectedConnectionId}
                   onSelect={handleSelectProfile}
                   onDelete={handleDeleteProfile}
                   onSave={handleSaveProfile}
                   onAddBucket={handleAddBucket}
+                  onForgetAll={handleForgetAll}
                   currentFormData={liveFormData}
                 />
                 {urlParamsPresent && (
@@ -1700,7 +1774,10 @@ export function App() {
                   onSave={handleConnect}
                   onFormChange={setLiveFormData}
                   loading={session === 'connecting'}
-                  autoFocusSecret={urlHadKeyId && !credentials.secretKey}
+                  autoFocusSecret={(urlHadKeyId || selectedConnectionId != null) && !credentials.secretKey}
+                  savedConnections={connections}
+                  recall={recallForKeyId}
+                  submitLabel={splashSubmitLabel}
                 />
                 {session === 'failed' && connectionError && (
                   <div style={{ marginTop: '1rem' }}>
@@ -1787,7 +1864,8 @@ export function App() {
       ) : (
         <div class="app-body">
           {sidebarOpen && <div class="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
-          <aside class={`sidebar${sidebarOpen ? ' sidebar-open' : ''}`}>
+          {/* inert while closed: it is only slid off-screen, so its controls would stay in the Tab order (K3). */}
+          <aside class={`sidebar${sidebarOpen ? ' sidebar-open' : ''}`} inert={!sidebarOpen}>
             {connections.length > 0 && (
               <>
                 <div class="sidebar-heading">Accounts &amp; buckets</div>
@@ -1807,6 +1885,8 @@ export function App() {
               initial={credentials}
               onSave={(creds) => handleConnect(creds, { reconnect: true })}
               loading={false}
+              savedConnections={connections}
+              recall={recallForKeyId}
             />
             <hr style={{ border: 'none', borderTop: '1px solid var(--border)' }} />
             <CapabilityPanel capabilities={capabilities} onRefresh={handleRefreshPermissions} />
@@ -1851,41 +1931,61 @@ export function App() {
           </aside>
 
           <main class="main-content" data-testid="app-connected">
-            {/* Upload zone above the browser */}
-            <UploadQueue
-              client={client}
-              bucket={credentials.bucket}
-              provider={credentials.provider}
-              currentPrefix={currentPrefix}
-              credentials={credentials}
-              onCapabilityChange={handleCapabilityChange}
-              capabilities={capabilities}
-              onUploadsComplete={(prefixSet) => browserActionsRef.current?.onUploadsDrained?.(prefixSet)}
-              onLogEntry={() => {
-                if (logKeyDebounceRef.current) return;
-                logKeyDebounceRef.current = setTimeout(() => {
-                  setLogKey((k) => k + 1);
-                  logKeyDebounceRef.current = null;
-                }, 500);
-              }}
-              onMount={({ addFiles }) => {
-                addFilesRef.current = addFiles;
-              }}
-            />
-
-            <MasterQueue
-              readZipDetail={(jobId) =>
-                loadZipDetail(jobId).catch(() => ({ done: [], failed: [], doneCount: 0, failedCount: 0 }))
-              }
-              onResumeMove={handleResumeMove}
-              onDiscardMove={handleDiscardMove}
-            />
-
-            <UploadLog refreshKey={logKey} />
-
-            <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '1rem 0' }} />
-
+            {/* Layout A (v1.67.0): shown under Browser's toolbar, but owned here so a Browser
+                remount (key={browserKey}) never resets uploads or tasks. See Portal.jsx. */}
+            <Portal container={belowToolbarHostRef.current}>
+              {capabilities.upload !== 'denied' && (
+                <UploadTarget
+                  bucket={credentials.bucket}
+                  destinationPrefix={destinationPrefix}
+                  onChange={setDestinationPrefix}
+                  outsideFloor={destOutsideFloor}
+                  basePrefix={connectionFloor}
+                />
+              )}
+              <ActivityPanel uploads={uploadActivity}>
+                <UploadQueue
+                  client={client}
+                  bucket={credentials.bucket}
+                  provider={credentials.provider}
+                  destinationPrefix={destinationPrefix}
+                  destOutsideFloor={destOutsideFloor}
+                  credentials={credentials}
+                  onCapabilityChange={handleCapabilityChange}
+                  onUploadsComplete={(prefixSet) => browserActionsRef.current?.onUploadsDrained?.(prefixSet)}
+                  onLogEntry={() => {
+                    if (logKeyDebounceRef.current) return;
+                    logKeyDebounceRef.current = setTimeout(() => {
+                      setLogKey((k) => k + 1);
+                      logKeyDebounceRef.current = null;
+                    }, 500);
+                  }}
+                  onMount={({ addFiles }) => {
+                    addFilesRef.current = addFiles;
+                  }}
+                  onActivityChange={setUploadActivity}
+                />
+                <MasterQueue
+                  readZipDetail={(jobId) =>
+                    loadZipDetail(jobId).catch(() => ({ done: [], failed: [], doneCount: 0, failedCount: 0 }))
+                  }
+                  onResumeMove={handleResumeMove}
+                  onDiscardMove={handleDiscardMove}
+                />
+                <UploadLog refreshKey={logKey} />
+              </ActivityPanel>
+            </Portal>
             <Browser
+              uploadMenu={
+                capabilities.upload !== 'denied' && (
+                  <UploadMenu
+                    onFiles={(entries) => addFilesRef.current?.(entries)}
+                    disabled={destOutsideFloor}
+                    disabledTitle="The upload folder is outside this connection's base folder"
+                  />
+                )
+              }
+              belowToolbarHost={belowToolbarHostRef.current}
               key={browserKey}
               isFirstMount={firstBrowserMountRef.current}
               client={client}
@@ -2026,7 +2126,7 @@ function VaultOfferBanner({ busy, error, onCreate, onDismiss }) {
         </form>
       </div>
       <button class="banner-close" onClick={onDismiss} aria-label="Dismiss">
-        ✕
+        <Icon name="x" />
       </button>
     </div>
   );

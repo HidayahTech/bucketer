@@ -42,6 +42,7 @@ describe('incomplete uploads — discover and discard', () => {
       await page.goto(app.url, { waitUntil: 'domcontentloaded' });
       await connectApp(page, ctx.browserEndpoint);
 
+      await page.locator('.bucket-tools-btn').click(); // layout A, v1.67.0: inside Bucket tools ▾
       await page.locator('[data-testid="open-incomplete-uploads"]').click();
 
       // The orphan is discovered and listed.

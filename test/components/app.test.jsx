@@ -1708,6 +1708,88 @@ describe('App — connected sidebar switcher (quick-switch)', () => {
       clearAppStorage();
     }
   });
+
+  // BUG-076 (REPORT C7): "+ bucket" in the connected sidebar cleared the bucket and secret
+  // while the session stayed 'connected', so the main pane showed a red listing error and
+  // the sidebar form still showed the old bucket. It must open the new-bucket form instead:
+  // account pre-filled, bucket empty, and the account's cached secret reused.
+  test('"+ bucket" while connected opens the new-bucket form for that account', () => {
+    clearAppStorage();
+    localStorage.setItem(
+      's3b_credentials',
+      JSON.stringify({
+        version: 1,
+        credentials: [
+          { id: 'credA', endpoint: 'http://127.0.0.1:1', keyId: 'K1', provider: 'b2', regionOverride: '', label: 'L' },
+        ],
+      }),
+    );
+    localStorage.setItem(
+      's3b_connections',
+      JSON.stringify({
+        version: 2,
+        connections: [{ id: 1, name: 'B2 — photos', credentialId: 'credA', bucket: 'photos', capabilities: null }],
+      }),
+    );
+    localStorage.setItem('s3b_last_profile_id', '1');
+    localStorage.setItem('s3b_connections_migrated', '1');
+    const { query, cleanup } = mount(h(App, {}));
+    try {
+      setInput(query('#cred-secretkey'), 'sekret');
+      fire(query('button[type="submit"]'), 'click');
+      const signOut = () => [...document.querySelectorAll('button')].some((b) => b.textContent.trim() === 'Sign out');
+      assert.ok(signOut(), 'connected');
+      fire(query('[aria-label="Open menu"]'), 'click');
+      fire(query('aside.sidebar .account-add-bucket'), 'click');
+
+      assert.ok(!signOut(), 'the connected view is left, not left half-broken');
+      const buckets = document.querySelectorAll('#cred-bucket');
+      assert.equal(buckets.length, 1, 'exactly one credential form is on screen');
+      assert.equal(buckets[0].value, '', 'bucket is blank for the new bucket');
+      assert.equal(query('#cred-keyid').value, 'K1', 'the account is pre-filled');
+      assert.equal(query('#cred-secretkey').value, 'sekret', "the account's cached secret is reused");
+    } finally {
+      cleanup();
+      clearAppStorage();
+    }
+  });
+
+  // K3: the closed sidebar is only slid off-screen; without inert its controls (a second
+  // credential form, "Reset to defaults") stay in the Tab order, invisible.
+  test('the closed sidebar is inert; opening it removes inert', () => {
+    clearAppStorage();
+    localStorage.setItem(
+      's3b_credentials',
+      JSON.stringify({
+        version: 1,
+        credentials: [
+          { id: 'credA', endpoint: 'http://127.0.0.1:1', keyId: 'K1', provider: 'b2', regionOverride: '', label: 'L' },
+        ],
+      }),
+    );
+    localStorage.setItem(
+      's3b_connections',
+      JSON.stringify({
+        version: 2,
+        connections: [{ id: 1, name: 'B2 — photos', credentialId: 'credA', bucket: 'photos', capabilities: null }],
+      }),
+    );
+    localStorage.setItem('s3b_last_profile_id', '1');
+    localStorage.setItem('s3b_connections_migrated', '1');
+    const { query, cleanup } = mount(h(App, {}));
+    try {
+      setInput(query('#cred-secretkey'), 'sekret');
+      fire(query('button[type="submit"]'), 'click');
+      const aside = query('aside.sidebar');
+      assert.ok(aside, 'sidebar exists');
+      assert.ok(aside.hasAttribute('inert'), 'closed sidebar must be inert');
+      fire(query('[aria-label="Open menu"]'), 'click');
+      assert.ok(!query('aside.sidebar').hasAttribute('inert'), 'open sidebar must not be inert');
+    } finally {
+      cleanup();
+      clearAppStorage();
+    }
+  });
 });
 
 // Slice 4B (B6b): the header carries a quick-switch strip of recently-used buckets once
@@ -1816,6 +1898,43 @@ describe('App — deleting a saved connection forgets its cached secret (#76)', 
       cleanup();
       clearAppStorage();
       clearSecretCache();
+    }
+  });
+});
+
+// Accounts A (v1.66.0): "Forget all on this device" removes every saved bucket and the last-used
+// values, and nothing comes back on the next load (the legacy flat-key migration must not
+// resurrect a phantom bucket from leftovers).
+describe('App — Forget all on this device', () => {
+  test('clears saved buckets and last-used values, and a reload brings nothing back', () => {
+    clearAppStorage();
+    const cred = findOrCreateCredential({
+      endpoint: 'https://s3.us-east-1.amazonaws.com',
+      keyId: 'AKIDFORGET1',
+      provider: 'aws',
+    });
+    saveConnectionRecord({ id: 1, name: 'one', credentialId: cred.id, bucket: 'one', capabilities: null });
+    localStorage.setItem('s3b_endpoint', 'https://s3.us-east-1.amazonaws.com');
+    localStorage.setItem('s3b_bucket', 'one');
+    localStorage.setItem('s3b_key_id', 'AKIDFORGET1');
+    const first = mount(h(App, {}));
+    try {
+      assert.ok(first.text().includes('Your buckets'));
+      fire(first.query('.forget-all-trigger'), 'click');
+      fire(first.query('.forget-all-confirm'), 'click');
+      assert.ok(!first.text().includes('Your buckets'), 'the list is gone');
+      assert.equal(localStorage.getItem('s3b_endpoint'), null);
+      assert.equal(JSON.parse(localStorage.getItem('s3b_connections') || '{"connections":[]}').connections.length, 0);
+    } finally {
+      first.cleanup();
+    }
+    const second = mount(h(App, {}));
+    try {
+      assert.ok(!second.text().includes('Your buckets'), 'no bucket resurrected on the next load');
+      assert.equal(second.query('#cred-endpoint').value, '');
+    } finally {
+      second.cleanup();
+      clearAppStorage();
     }
   });
 });

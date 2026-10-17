@@ -11,6 +11,9 @@
 import { useState } from 'preact/hooks';
 import { PROVIDER_LABELS, detectProvider } from '../lib/provider.js';
 import { canSaveProfile } from '../lib/credential-validation.js';
+import { Icon } from './Icon.jsx';
+import { byMostRecent } from '../lib/connections.js';
+import { endpointHost, lastUsedLabel } from '../lib/saved-bucket-labels.js';
 
 const KEY_TAIL = 4;
 
@@ -49,8 +52,23 @@ function defaultName(formData) {
   return bucket || '';
 }
 
-export function AccountsManager({ connections, selectedId, onSelect, onDelete, onSave, onAddBucket, currentFormData }) {
-  const groups = groupByAccount(connections);
+// variant="splash" (accounts A, v1.66.0) is "Your buckets": every remembered bucket, most recent
+// first (accounts ordered by their most recent bucket), each naming its storage address and last
+// use, with a note on what is kept and Forget all. The sidebar keeps the compact tree.
+export function AccountsManager({
+  connections,
+  selectedId,
+  onSelect,
+  onDelete,
+  onSave,
+  onAddBucket,
+  onForgetAll,
+  currentFormData,
+  variant,
+}) {
+  const splash = variant === 'splash';
+  const groups = groupByAccount(splash ? byMostRecent(connections) : connections);
+  const [confirmForgetAll, setConfirmForgetAll] = useState(false);
   // Explicit per-account expand/collapse overrides. Default (no override) expands an
   // account when nothing is selected or when it holds the active bucket, and collapses
   // the rest — so a returning user lands with only their active account open.
@@ -89,16 +107,26 @@ export function AccountsManager({ connections, selectedId, onSelect, onDelete, o
   }
 
   return (
-    <div class="accounts-manager">
+    <div class={splash ? 'accounts-manager accounts-manager-splash' : 'accounts-manager'}>
+      {splash && connections.length > 0 && (
+        <div class="your-buckets-head">
+          <h3 class="your-buckets-title">Your buckets</h3>
+          <span class="your-buckets-sub">{connections.length} on this device · most recent first</span>
+        </div>
+      )}
       {groups.map((g) => {
         const expanded = isExpanded(g);
         return (
           <div class="account-group" key={g.credentialId}>
             <div class="account-header" onClick={() => toggle(g)}>
-              <span class="account-disclosure" aria-hidden="true">
-                {expanded ? '▾' : '▸'}
-              </span>
-              <span class="account-name">{accountLabel(g.conns[0])}</span>
+              {/* Button for keyboard access and expanded state; its click bubbles to the header's onClick. */}
+              <button type="button" class="link-btn account-toggle" aria-expanded={expanded ? 'true' : 'false'}>
+                <span class="account-disclosure" aria-hidden="true">
+                  {expanded ? '▾' : '▸'}
+                </span>
+                <span class="account-name">{accountLabel(g.conns[0])}</span>
+                {splash && <span class="account-host">{endpointHost(g.conns[0].endpoint)}</span>}
+              </button>
               <button
                 class="account-add-bucket btn-ghost"
                 type="button"
@@ -122,10 +150,23 @@ export function AccountsManager({ connections, selectedId, onSelect, onDelete, o
                       onSelect(c.id);
                     }}
                   >
-                    <span class="bucket-name">{c.bucket}</span>
+                    {/* Button for keyboard access (K1); its click bubbles to the row's onClick. */}
+                    <button
+                      type="button"
+                      class="link-btn bucket-name"
+                      aria-current={c.id === selectedId ? 'true' : undefined}
+                    >
+                      {c.bucket}
+                    </button>
+                    {splash && (
+                      <span class="bucket-meta">
+                        {endpointHost(c.endpoint)}
+                        {c.basePrefix ? ` · ${c.basePrefix}` : ''} · {lastUsedLabel(c.lastUsedAt)}
+                      </span>
+                    )}
                     {confirmDeleteId === c.id ? (
                       <span class="bucket-delete-confirm" onClick={(e) => e.stopPropagation()}>
-                        Delete?
+                        {splash ? 'Forget? Your files are not touched.' : 'Delete?'}
                         <button
                           class="btn btn-sm bucket-delete-confirm-yes"
                           type="button"
@@ -151,13 +192,15 @@ export function AccountsManager({ connections, selectedId, onSelect, onDelete, o
                     ) : (
                       <button
                         class="bucket-row-delete btn-ghost"
+                        type="button"
                         title="Forget this bucket"
+                        aria-label={`Forget ${c.bucket}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           setConfirmDeleteId(c.id);
                         }}
                       >
-                        ✕
+                        {splash ? 'Forget' : <Icon name="x" />}
                       </button>
                     )}
                   </li>
@@ -168,6 +211,40 @@ export function AccountsManager({ connections, selectedId, onSelect, onDelete, o
         );
       })}
 
+      {splash && connections.length > 0 && (
+        <div class="your-buckets-foot">
+          <p class="hint">
+            Saved on this device only: storage address, bucket, key ID and folder. Never the secret. Bucketer remembers
+            each bucket you connect to; Sign out keeps this list.
+          </p>
+          {confirmForgetAll ? (
+            <span class="forget-all-confirm-row">
+              Forget all {connections.length} on this device?
+              <button
+                type="button"
+                class="btn btn-sm btn-danger forget-all-confirm"
+                onClick={() => {
+                  setConfirmForgetAll(false);
+                  onForgetAll?.();
+                }}
+              >
+                Forget all
+              </button>
+              <button type="button" class="btn btn-ghost btn-sm" onClick={() => setConfirmForgetAll(false)}>
+                Cancel
+              </button>
+            </span>
+          ) : (
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm forget-all-trigger"
+              onClick={() => setConfirmForgetAll(true)}
+            >
+              Forget all on this device
+            </button>
+          )}
+        </div>
+      )}
       {saving ? (
         <form class="bucket-save-form" onSubmit={handleConfirmSave}>
           <input

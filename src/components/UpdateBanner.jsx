@@ -12,6 +12,7 @@
 //
 // RANGE_BYTES must match UPDATE_CHECK_RANGE_BYTES in build.mjs.
 import { useState, useEffect } from 'preact/hooks';
+import { Icon } from './Icon.jsx';
 
 const BASE_MS = 60_000;
 const MAX_MS = 1_800_000;
@@ -128,7 +129,7 @@ export function UpdateBanner({ enabled = true }) {
         </button>
       </div>
       <button class="banner-close" onClick={() => setDismissed(true)} aria-label="Dismiss">
-        ✕
+        <Icon name="x" />
       </button>
     </div>
   );

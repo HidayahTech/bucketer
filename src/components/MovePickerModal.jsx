@@ -12,6 +12,7 @@ import { Breadcrumb } from './Breadcrumb.jsx';
 import { leafName } from '../lib/format.js';
 import { validateMove, validateCopy } from '../lib/move-guards.js';
 import { clampToFloor } from '../lib/base-prefix.js';
+import { Icon } from './Icon.jsx';
 
 export function MovePickerModal({ client, bucket, selection, initialPrefix = '', onCancel, onMove, mode = 'move' }) {
   const [prefix, setPrefix] = useState(initialPrefix);
@@ -84,7 +85,9 @@ export function MovePickerModal({ client, bucket, selection, initialPrefix = '',
           !error &&
           folders.map((f) => (
             <button key={f} type="button" class="move-picker-folder" onClick={() => setPrefix(f)}>
-              <span class="file-icon">📁</span>
+              <span class="file-icon file-icon-folder">
+                <Icon name="folder" />
+              </span>
               {leafName(f.replace(/\/$/, ''))}/
             </button>
           ))}

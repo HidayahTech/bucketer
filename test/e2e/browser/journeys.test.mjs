@@ -57,12 +57,13 @@ function fileInput(page) {
   return page.locator('[data-testid="file-input"]');
 }
 // The upload target prefix propagates Browser→App→UploadQueue across a few async renders; wait for
-// the Destination folder input to reflect it before uploading, so the object lands in the folder.
+// the upload-target line (layout A, v1.67.0) to reflect it before uploading, so the object lands in
+// the folder.
 async function waitForUploadTarget(page, prefix) {
-  const input = page.locator('input[placeholder="(root of bucket)"]');
+  const target = page.locator('.upload-target');
   const deadline = Date.now() + scaleTimeout(5000);
   while (Date.now() < deadline) {
-    if ((await input.inputValue().catch(() => '')) === prefix) return;
+    if ((await target.getAttribute('data-upload-target').catch(() => null)) === prefix) return;
     await page.waitForTimeout(100);
   }
   throw new Error(`upload target never became ${prefix}`);

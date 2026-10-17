@@ -44,9 +44,9 @@ describe('browser e2e — folder rename', () => {
     await connectApp(page, ctx.browserEndpoint);
 
     // Open rename on the docs/ folder row and commit a new name.
-    await page.locator('[data-testid="folder-row:docs"] button', { hasText: '✎' }).click();
+    await page.locator('[data-testid="folder-row:docs"] button[title="Rename folder"]').click();
     await page.locator('.rename-input').fill('guides');
-    await page.locator('.rename-inline button', { hasText: '✓' }).click();
+    await page.locator('.rename-inline button[aria-label="Save name"]').click();
 
     // Poll the real bucket until the rename has fully applied.
     const deadline = Date.now() + scaleTimeout(15000);

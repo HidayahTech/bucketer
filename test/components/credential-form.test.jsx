@@ -533,3 +533,122 @@ describe('CredentialForm — autofocus secret', () => {
     }
   });
 });
+
+// Accounts A (v1.66.0): suggestions from this device + catalog (C2), key-ID recall (C3), and the
+// rarely-needed fields behind "More options".
+describe('CredentialForm — accounts A', () => {
+  const SAVED = [
+    {
+      id: 1,
+      endpoint: 'https://s3.us-west-004.backblazeb2.com',
+      bucket: 'family-photos',
+      provider: 'b2',
+      lastUsedAt: 20,
+    },
+    {
+      id: 2,
+      endpoint: 'https://s3.us-west-004.backblazeb2.com',
+      bucket: 'household-docs',
+      provider: 'b2',
+      lastUsedAt: 10,
+    },
+  ];
+  const RECALL = (keyId) =>
+    keyId === 'K004abc'
+      ? {
+          endpoint: 'https://s3.us-west-004.backblazeb2.com',
+          provider: 'b2',
+          regionOverride: 'us-west-004',
+          bucket: 'family-photos',
+          basePrefix: '',
+          buckets: ['family-photos', 'household-docs'],
+        }
+      : null;
+
+  test('the endpoint suggests this device first, then the catalog; browser autocomplete is not switched off', () => {
+    const { query, queryAll, cleanup } = mount(h(CredentialForm, defaultProps({ savedConnections: SAVED })));
+    try {
+      const input = query('#cred-endpoint');
+      assert.equal(input.getAttribute('list'), 'cred-endpoint-options');
+      assert.notEqual(input.getAttribute('autocomplete'), 'off');
+      const values = queryAll('#cred-endpoint-options option').map((o) => o.value);
+      assert.equal(values[0], 'https://s3.us-west-004.backblazeb2.com');
+      assert.ok(values.includes('https://s3.eu-central-2.wasabisys.com'), 'catalog rows follow');
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('the bucket suggests buckets used on the typed endpoint', () => {
+    const { query, queryAll, cleanup } = mount(h(CredentialForm, defaultProps({ savedConnections: SAVED })));
+    try {
+      setInput(query('#cred-endpoint'), 'https://s3.us-west-004.backblazeb2.com');
+      assert.deepEqual(
+        queryAll('#cred-bucket-options option').map((o) => o.value),
+        ['family-photos', 'household-docs'],
+      );
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('a known key ID fills an empty endpoint and bucket and says so', () => {
+    let last;
+    const { query, text, cleanup } = mount(
+      h(CredentialForm, defaultProps({ recall: RECALL, onFormChange: (f) => (last = f) })),
+    );
+    try {
+      setInput(query('#cred-keyid'), 'K004abc');
+      assert.equal(query('#cred-endpoint').value, 'https://s3.us-west-004.backblazeb2.com');
+      assert.equal(query('#cred-bucket').value, 'family-photos');
+      assert.equal(query('#cred-region').value, 'us-west-004');
+      assert.equal(last.bucket, 'family-photos', 'the parent sees the recalled values');
+      assert.ok(text().includes("You've used this key before"));
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('recall never overwrites what the user already typed', () => {
+    const { query, cleanup } = mount(h(CredentialForm, defaultProps({ recall: RECALL })));
+    try {
+      setInput(query('#cred-endpoint'), 'https://minio.home.test:9000');
+      setInput(query('#cred-bucket'), 'mine');
+      setInput(query('#cred-keyid'), 'K004abc');
+      assert.equal(query('#cred-endpoint').value, 'https://minio.home.test:9000');
+      assert.equal(query('#cred-bucket').value, 'mine');
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('base folder, provider and region sit in "More options", closed when all are default', () => {
+    const { query, cleanup } = mount(h(CredentialForm, defaultProps()));
+    try {
+      const d = query('details.more-options');
+      assert.ok(d, 'a More options disclosure exists');
+      assert.equal(d.open, false);
+      for (const id of ['#cred-baseprefix', '#cred-provider', '#cred-region']) assert.ok(d.querySelector(id), id);
+      assert.ok(d.querySelector('summary').textContent.includes('folder: none'));
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('"More options" starts open when a base folder or a provider override is set', () => {
+    const a = mount(h(CredentialForm, defaultProps({ initial: { ...EMPTY_INITIAL, basePrefix: 'videos/' } })));
+    const b = mount(
+      h(
+        CredentialForm,
+        defaultProps({ initial: { ...EMPTY_INITIAL, endpoint: 'https://nas.test', provider: 'minio' } }),
+      ),
+    );
+    try {
+      assert.equal(a.query('details.more-options').open, true);
+      assert.equal(b.query('details.more-options').open, true);
+    } finally {
+      a.cleanup();
+      b.cleanup();
+    }
+  });
+});

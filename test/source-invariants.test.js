@@ -909,16 +909,19 @@ describe('UploadQueue.jsx — no "Upload not permitted" warning banner (v1.15.3)
   });
 });
 
-describe('UploadQueue.jsx — empty-state drag-anywhere hint (v1.15.3)', () => {
-  const source = src('components/UploadQueue.jsx');
-
-  test('empty queue state shows instruction to drag anywhere in window', () => {
+// v1.15.3 put the cue in the empty upload queue; layout A (v1.67.0) moved the queue into the
+// Activity panel, so the cue moved to the Upload ▾ menu and the always-visible upload-target line.
+describe('drag-anywhere cue (v1.15.3; layout A v1.67.0)', () => {
+  test('the Upload ▾ menu says files can be dragged anywhere onto the window', () => {
     assert.ok(
-      /drag.*anywhere|anywhere.*drag/i.test(source),
-      'UploadQueue.jsx must include an empty-state hint explaining that files can be ' +
-        'dragged anywhere in the window — without it users have no cue that drag-and-drop ' +
-        'is available now that the dedicated drop zone is removed',
+      /drag.*anywhere|anywhere.*drag/i.test(src('components/UploadMenu.jsx')),
+      'UploadMenu.jsx must say files can be dragged anywhere — without it users have no cue that ' +
+        'drag-and-drop is available now that the dedicated drop zone is removed',
     );
+  });
+
+  test('the always-visible upload-target line names drops', () => {
+    assert.ok(/Uploads and drops go to/.test(src('components/UploadTarget.jsx')));
   });
 });
 
@@ -1680,6 +1683,31 @@ describe('package-lock.json tracks package.json', () => {
 
   test('the lock self-entry version matches package.json', () => {
     assert.equal(lock.packages?.['']?.version, pkg.version, `package-lock.json packages[""].version is stale — ${fix}`);
+  });
+});
+
+// BUG-080: the pre-push hook auto-tags the version commit, and CI's `format` job blocks — a
+// failing `format` skips `reproducibility`, which `release` needs, so the tag gets NO GitLab
+// Release (v1.62.2 and v1.64.0 both shipped tagless this way). The hook's format check was
+// advisory (`|| echo`), so it let the doomed commit through and tagged it. It must abort.
+describe('pre-push hook: formatting blocks the push (BUG-080)', () => {
+  const hook = readFileSync(resolve(ROOT, '.githooks/pre-push'), 'utf8');
+  const line = hook.split('\n').find((l) => /npm run format:check/.test(l) && !l.trim().startsWith('#'));
+
+  test('the hook runs format:check', () => {
+    assert.ok(line, '.githooks/pre-push must run `npm run format:check`');
+  });
+
+  test('a format:check failure is not swallowed', () => {
+    assert.ok(!/\|\|\s*echo/.test(line), `format:check failure must abort the push, got: ${line.trim()}`);
+    assert.ok(/exit 1/.test(line) || !/\|\|/.test(line), `format:check must exit non-zero on failure: ${line.trim()}`);
+  });
+
+  test('format:check runs before the hook creates the version tag', () => {
+    assert.ok(
+      hook.indexOf('npm run format:check') < hook.indexOf('git tag'),
+      'format:check must run before the tag is created',
+    );
   });
 });
 

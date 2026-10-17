@@ -1,9 +1,51 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.63.5';
+export const CURRENT_VERSION = '1.67.2';
 
 export const CHANGELOG = [
+  {
+    "version": "1.67.2",
+    "date": "2026-10-17",
+    "title": "Release pages carry their release notes again",
+    "changes": []
+  },
+  {
+    "version": "1.67.1",
+    "date": "2026-10-17",
+    "title": "Ticking a file on a phone no longer moves the list",
+    "changes": []
+  },
+  {
+    "version": "1.67.0",
+    "date": "2026-10-17",
+    "title": "The bucket is the page: one Upload button, one Activity line",
+    "changes": []
+  },
+  {
+    "version": "1.66.0",
+    "date": "2026-10-16",
+    "title": "Bucketer remembers your buckets",
+    "changes": []
+  },
+  {
+    "version": "1.65.0",
+    "date": "2026-10-16",
+    "title": "A new look: one typeface, a deeper teal, real icons",
+    "changes": []
+  },
+  {
+    "version": "1.64.1",
+    "date": "2026-10-16",
+    "title": "Release of the v1.64.0 design floor",
+    "changes": []
+  },
+  {
+    "version": "1.64.0",
+    "date": "2026-10-16",
+    "title": "Readable, keyboard-usable and reachable on every screen",
+    "changes": []
+  },
   {
     "version": "1.63.5",
     "date": "2026-10-16",

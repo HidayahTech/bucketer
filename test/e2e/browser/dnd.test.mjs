@@ -50,10 +50,11 @@ async function newFolder(page, name) {
   await page.locator(`[data-testid="folder-row:${name}"]`).waitFor({ timeout: scaleTimeout(5000) });
 }
 async function waitForUploadTarget(page, prefix) {
-  const input = page.locator('input[placeholder="(root of bucket)"]');
+  // Layout A (v1.67.0): the upload-target line carries the destination.
+  const target = page.locator('.upload-target');
   const deadline = Date.now() + scaleTimeout(5000);
   while (Date.now() < deadline) {
-    if ((await input.inputValue().catch(() => '')) === prefix) return;
+    if ((await target.getAttribute('data-upload-target').catch(() => null)) === prefix) return;
     await page.waitForTimeout(100);
   }
   throw new Error(`upload target never became ${prefix}`);
@@ -161,7 +162,7 @@ describe('BUG-004 — folder picker requests directory mode', () => {
   e2eTest('the folder-picker input has webkitdirectory=true; the file input does not', async () => {
     const { context, page } = await freshSession();
     try {
-      // Two hidden file inputs: [0] = Choose files (multiple), [1] = Choose folder (webkitdirectory).
+      // Two hidden file inputs under Upload ▾: [0] = Files… (multiple), [1] = A folder… (webkitdirectory).
       const flags = await page.locator('input[type=file]').evaluateAll((els) => els.map((e) => !!e.webkitdirectory));
       assert.equal(flags.length, 2, 'both the file and folder inputs are present');
       assert.equal(flags[0], false, 'the Choose files input is not a directory picker');

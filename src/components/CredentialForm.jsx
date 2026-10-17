@@ -4,6 +4,7 @@ import { detectProvider, extractRegion, buildEndpoint, PROVIDERS, PROVIDER_LABEL
 import { credentialErrors } from '../lib/credential-validation.js';
 import { normalizeBasePrefix } from '../lib/base-prefix.js';
 import { SetupGuide } from './SetupGuide.jsx';
+import { endpointOptions, bucketOptions } from '../lib/endpoint-catalog.js';
 
 // Credential entry form (REQ-1, §4.5, §4.8).
 //
@@ -27,7 +28,20 @@ const PROVIDER_OPTIONS = [
   ...Object.entries(PROVIDER_LABELS).map(([v, l]) => ({ value: v, label: l })),
 ];
 
-export function CredentialForm({ initial, onSave, onFormChange, loading, autoFocusSecret }) {
+// Accounts A (v1.66.0): `savedConnections` feeds the endpoint and bucket suggestions (this device
+// first, then the catalog — REPORT C2); `recall(keyId)` returns what a known key ID was last used
+// with, so a password manager filling the key ID fills the rest (C3). Base folder, provider and
+// region sit behind "More options", open when any of them is set.
+export function CredentialForm({
+  initial,
+  onSave,
+  onFormChange,
+  loading,
+  autoFocusSecret,
+  savedConnections = [],
+  recall,
+  submitLabel = 'Connect',
+}) {
   // Only treat stored provider as an explicit override if it differs from what
   // auto-detection returns for the stored endpoint. Auto-detected providers should
   // leave the dropdown at "Auto-detect from endpoint".
@@ -73,6 +87,8 @@ export function CredentialForm({ initial, onSave, onFormChange, loading, autoFoc
   // When a shared link pre-filled the key ID, focus the Secret Key field on mount so
   // the recipient can type the one remaining value and connect.
   const secretRef = useRef(null);
+  const [recalled, setRecalled] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(!!(initial.basePrefix || _initProviderOverride));
   useEffect(() => {
     if (autoFocusSecret) secretRef.current?.focus();
   }, []);
@@ -172,12 +188,41 @@ export function CredentialForm({ initial, onSave, onFormChange, loading, autoFoc
   const set = (k) => (e) => {
     if (k === 'endpoint') userEditedRef.current.endpoint = true;
     if (k === 'regionOverride') userEditedRef.current.region = true;
+    const hit = k === 'keyId' && recall ? recall(e.target.value) : null;
     setForm((prev) => {
-      const next = applyChange(prev, k, e.target.value);
+      const next = hit ? applyRecall(applyChange(prev, k, e.target.value), hit) : applyChange(prev, k, e.target.value);
       onFormChange?.(next);
       return next;
     });
+    if (k === 'keyId') setRecalled(!!hit);
   };
+
+  // Fills only what is still empty: recall must never overwrite a value the user typed. The
+  // recalled endpoint and region count as the user's own, so later inference leaves them alone.
+  function applyRecall(prev, hit) {
+    const next = { ...prev };
+    if (!prev.endpoint.trim()) {
+      next.endpoint = hit.endpoint;
+      next._infEndpoint = false;
+      userEditedRef.current.endpoint = true;
+      const detected = detectProvider(hit.endpoint);
+      next.providerOverride = hit.provider && hit.provider !== detected ? hit.provider : '';
+      if (hit.regionOverride) {
+        next.regionOverride = hit.regionOverride;
+        next._infRegion = false;
+        userEditedRef.current.region = true;
+      }
+      if (next.providerOverride) setMoreOpen(true);
+    }
+    if (!prev.bucket.trim() && hit.bucket) {
+      next.bucket = hit.bucket;
+      if (!prev.basePrefix.trim() && hit.basePrefix) {
+        next.basePrefix = hit.basePrefix;
+        setMoreOpen(true);
+      }
+    }
+    return next;
+  }
 
   // onPaste: intercepts only when pasted text has surrounding whitespace (common
   // copy/paste artifact). Uses applyChange so inference fires on trimmed pastes too.
@@ -235,9 +280,14 @@ export function CredentialForm({ initial, onSave, onFormChange, loading, autoFoc
           onPaste={onPaste('endpoint')}
           placeholder="https://s3.us-west-004.backblazeb2.com"
           required
-          autocomplete="off"
+          list="cred-endpoint-options"
           spellcheck={false}
         />
+        <datalist id="cred-endpoint-options">
+          {endpointOptions(savedConnections).map((o) => (
+            <option key={o.endpoint} value={o.endpoint} label={o.label} />
+          ))}
+        </datalist>
         {form._infEndpoint && <span class="hint">Auto-filled from provider and region</span>}
         {detectedLabel && !form.providerOverride && <span class="hint">Detected: {detectedLabel}</span>}
       </div>
@@ -253,29 +303,15 @@ export function CredentialForm({ initial, onSave, onFormChange, loading, autoFoc
           onPaste={onPaste('bucket')}
           placeholder="my-bucket"
           required
-          autocomplete="off"
+          list="cred-bucket-options"
           spellcheck={false}
         />
+        <datalist id="cred-bucket-options">
+          {bucketOptions(savedConnections, form.endpoint).map((b) => (
+            <option key={b} value={b} />
+          ))}
+        </datalist>
         {errors.bucket && <span class="field-error">{errors.bucket}</span>}
-      </div>
-
-      <div class="form-group">
-        <label htmlFor="cred-baseprefix">Base folder</label>
-        <input
-          id="cred-baseprefix"
-          name="cred-baseprefix"
-          type="text"
-          value={form.basePrefix}
-          onInput={set('basePrefix')}
-          onPaste={onPaste('basePrefix')}
-          placeholder="photos/2024/"
-          autocomplete="off"
-          spellcheck={false}
-        />
-        <span class="hint">
-          Only if your access key is limited to a folder inside the bucket — leave blank for full bucket access.
-        </span>
-        {errors.basePrefix && <span class="field-error">{errors.basePrefix}</span>}
       </div>
 
       <div class="form-group">
@@ -293,6 +329,11 @@ export function CredentialForm({ initial, onSave, onFormChange, loading, autoFoc
           spellcheck={false}
         />
         {errors.keyId && <span class="field-error">{errors.keyId}</span>}
+        {recalled && (
+          <span class="hint hint-recall">
+            You've used this key before: filled its storage address and the bucket you used last.
+          </span>
+        )}
       </div>
 
       <div class="form-group">
@@ -313,45 +354,75 @@ export function CredentialForm({ initial, onSave, onFormChange, loading, autoFoc
         <span class="hint">Stored in sessionStorage — cleared on tab close.</span>
       </div>
 
-      <div class="form-group">
-        <label htmlFor="cred-provider">Provider Override</label>
-        <select id="cred-provider" value={form.providerOverride} onChange={set('providerOverride')}>
-          {PROVIDER_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-        {form.providerOverride === PROVIDERS.MINIO && (
-          <span class="hint">MinIO typically requires path-style — this is applied automatically.</span>
-        )}
-      </div>
-
-      <div class="form-group">
-        <label htmlFor="cred-region">Region</label>
-        <input
-          id="cred-region"
-          name="cred-region"
-          type="text"
-          value={form.regionOverride}
-          onInput={set('regionOverride')}
-          onPaste={onPaste('regionOverride')}
-          placeholder="us-east-1"
-          autocomplete="off"
-          spellcheck={false}
-        />
-        {form._infRegion && (
-          <span class="hint">
-            {form.regionOverride === 'auto'
-              ? 'R2 always uses "auto" as the SigV4 region'
-              : 'Auto-filled from endpoint URL'}
+      <details class="more-options" open={moreOpen} onToggle={(e) => setMoreOpen(e.currentTarget.open)}>
+        <summary>
+          More options
+          <span class="more-options-state">
+            {' '}
+            folder: {form.basePrefix.trim() || 'none'} · provider:{' '}
+            {form.providerOverride ? PROVIDER_LABELS[form.providerOverride] : 'automatic'} · region:{' '}
+            {form.regionOverride.trim() || 'automatic'}
           </span>
-        )}
-        {!form._infRegion && !form.regionOverride && (
-          <span class="hint">Enter the region for this endpoint (e.g. us-east-1).</span>
-        )}
-        {errors.regionOverride && <span class="field-error">{errors.regionOverride}</span>}
-      </div>
+        </summary>
+        <div class="form-group">
+          <label htmlFor="cred-baseprefix">Base folder</label>
+          <input
+            id="cred-baseprefix"
+            name="cred-baseprefix"
+            type="text"
+            value={form.basePrefix}
+            onInput={set('basePrefix')}
+            onPaste={onPaste('basePrefix')}
+            placeholder="photos/2024/"
+            autocomplete="off"
+            spellcheck={false}
+          />
+          <span class="hint">
+            Only if your access key is limited to a folder inside the bucket — leave blank for full bucket access.
+          </span>
+          {errors.basePrefix && <span class="field-error">{errors.basePrefix}</span>}
+        </div>
+
+        <div class="form-group">
+          <label htmlFor="cred-provider">Storage provider</label>
+          <select id="cred-provider" value={form.providerOverride} onChange={set('providerOverride')}>
+            {PROVIDER_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          {form.providerOverride === PROVIDERS.MINIO && (
+            <span class="hint">MinIO typically requires path-style — this is applied automatically.</span>
+          )}
+        </div>
+
+        <div class="form-group">
+          <label htmlFor="cred-region">Region</label>
+          <input
+            id="cred-region"
+            name="cred-region"
+            type="text"
+            value={form.regionOverride}
+            onInput={set('regionOverride')}
+            onPaste={onPaste('regionOverride')}
+            placeholder="us-east-1"
+            autocomplete="off"
+            spellcheck={false}
+          />
+          {form._infRegion && (
+            <span class="hint">
+              {form.regionOverride === 'auto'
+                ? 'R2 always uses "auto" as the SigV4 region'
+                : 'Auto-filled from endpoint URL'}
+            </span>
+          )}
+          {!form._infRegion && !form.regionOverride && (
+            <span class="hint">Enter the region for this endpoint (e.g. us-east-1).</span>
+          )}
+          {errors.regionOverride && <span class="field-error">{errors.regionOverride}</span>}
+        </div>
+      </details>
 
       <div class="form-group">
         <span class="hint" style={{ color: 'var(--text-warn)' }}>
@@ -375,7 +446,7 @@ export function CredentialForm({ initial, onSave, onFormChange, loading, autoFoc
               <span class="spinner" /> Connecting…
             </>
           ) : (
-            'Connect'
+            submitLabel
           )}
         </button>
       </div>

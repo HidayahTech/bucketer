@@ -122,6 +122,78 @@ describe('issue #49 — mobile (Pixel-5-emulated): per-row actions are reachable
     }
   });
 
+  // REPORT M1/P1: the batch bar did not wrap, so "Copy N"/"Delete N" sat at x 371–500 on a
+  // ~390 px phone — reachable only by an unmarked sideways pan — and the overflow also froze
+  // the page for seconds after selecting a row. Select a row by tapping (no force), then the
+  // batch actions must be inside the viewport and Delete must open its confirmation.
+  e2eTest('batch bar actions are reachable after selecting a row', async () => {
+    ctx.mock.reset();
+    await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'pick-a.txt', Body: 'a' }));
+    await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'pick-b.txt', Body: 'b' }));
+    const { context, page } = await newMobilePage();
+    try {
+      await page.goto(app.url, { waitUntil: 'domcontentloaded' });
+      await connectApp(page, ctx.browserEndpoint);
+      const row = page.locator('[data-testid="file-row:pick-a.txt"]');
+      await row.waitFor({ timeout: scaleTimeout(10000) });
+      await row.locator('input[type="checkbox"]').check();
+      const bar = page.locator('.batch-bar');
+      await bar.waitFor({ timeout: scaleTimeout(5000) });
+      const vw = await page.evaluate(() => window.innerWidth);
+      const buttons = await bar.locator('button').all();
+      assert.ok(buttons.length >= 2, 'batch bar must offer actions');
+      for (const btn of buttons) {
+        const box = await btn.boundingBox();
+        const label = (await btn.textContent()).trim();
+        assert.ok(box, `batch button "${label}" must be visible`);
+        assert.ok(
+          box.x >= 0 && box.x + box.width <= vw + 1,
+          `batch button "${label}" at x=${box.x} w=${box.width} must fit ${vw}`,
+        );
+      }
+      await bar.locator('button', { hasText: 'Delete' }).click(); // no force: must be hit-testable
+      await page.locator('.modal-overlay').waitFor({ timeout: scaleTimeout(5000) });
+    } finally {
+      await context.close();
+    }
+  });
+
+  // REPORT M3: every control was under 44 px in at least one dimension (WCAG 2.5.5 / Apple HIG).
+  e2eTest('header, row, breadcrumb and batch controls are at least 44 × 44 px on a phone', async () => {
+    ctx.mock.reset();
+    await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'sub/t.txt', Body: 't' }));
+    await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'target.txt', Body: 't' }));
+    const { context, page } = await newMobilePage();
+    try {
+      await page.goto(app.url, { waitUntil: 'domcontentloaded' });
+      await connectApp(page, ctx.browserEndpoint);
+      const row = page.locator('[data-testid="file-row:target.txt"]');
+      await row.waitFor({ timeout: scaleTimeout(10000) });
+      await row.locator('input[type="checkbox"]').check();
+      await page.locator('.batch-bar').waitFor({ timeout: scaleTimeout(5000) });
+      const small = await page.evaluate(() => {
+        const sel = [
+          '.app-header button',
+          '.file-table .col-actions button',
+          '.file-table td.col-check',
+          '.batch-bar button',
+          '.breadcrumb button',
+        ].join(',');
+        return [...document.querySelectorAll(sel)]
+          .map((el) => ({ el, r: el.getBoundingClientRect() }))
+          .filter(({ r }) => r.width > 0 && r.height > 0)
+          .filter(({ r }) => r.width < 43.5 || r.height < 43.5)
+          .map(
+            ({ el, r }) =>
+              `${el.className || el.tagName} "${(el.textContent || el.title || '').trim().slice(0, 20)}" ${Math.round(r.width)}×${Math.round(r.height)}`,
+          );
+      });
+      assert.deepEqual(small, [], `controls under 44 px:\n${small.join('\n')}`);
+    } finally {
+      await context.close();
+    }
+  });
+
   e2eTest('copy-link popover opens fully inside the mobile viewport', async () => {
     ctx.mock.reset();
     await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: 'linked.txt', Body: 'l' }));
@@ -142,6 +214,26 @@ describe('issue #49 — mobile (Pixel-5-emulated): per-row actions are reachable
         box.x >= 0 && box.x + box.width <= vw + 1,
         `popover (x=${box.x}, w=${box.width}) must fit inside viewport width ${vw}`,
       );
+    } finally {
+      await context.close();
+    }
+  });
+});
+
+// REPORT M2: between 641 and ~975 px (phone landscape, iPad Mini portrait) the BUG-042
+// name-wrap did not apply, so a long filename pushed every row action off-screen.
+describe('issue #49 — mid-width band (800 px): long names do not push actions off-screen', () => {
+  e2eTest('row actions sit inside an 800 px viewport next to a long filename', async () => {
+    ctx.mock.reset();
+    await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: LONG_NAME + '-' + LONG_NAME, Body: 'l' }));
+    const context = await browser.newContext({ viewport: { width: 800, height: 1000 } });
+    const page = await newE2EPage(context);
+    try {
+      await page.goto(app.url, { waitUntil: 'domcontentloaded' });
+      await connectApp(page, ctx.browserEndpoint);
+      const row = page.locator(`[data-testid="file-row:${LONG_NAME}-${LONG_NAME}"]`);
+      await row.waitFor({ timeout: scaleTimeout(10000) });
+      await assertButtonsInViewport(page, row, 'long-name row at 800 px');
     } finally {
       await context.close();
     }

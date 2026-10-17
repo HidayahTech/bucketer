@@ -39,11 +39,12 @@ if [ "$branch_refs" -gt 0 ]; then
   echo "Linting for correctness (advisory during bake-in)..."
   npm run lint || echo "  correctness-lint findings above (advisory — not blocking yet)"
 
-  # Formatting — ADVISORY here (prints unformatted files, never aborts). Blocking enforcement is
-  # the CI `format` job. Fast (prettier --check, seconds).
+  # Formatting — BLOCKING (BUG-080). It was advisory, but this hook tags the version commit and
+  # CI's `format` job blocks: a red `format` skips `reproducibility`, which `release` needs, so
+  # the tag got no GitLab Release (v1.62.2, v1.64.0). Fast (prettier --check, seconds).
   # See docs/superpowers/plans/formatter-execution-plan-2026-09-15.md.
-  echo "Checking formatting (advisory)..."
-  npm run format:check || echo "  formatting issues above (advisory — CI format job blocks)"
+  echo "Checking formatting..."
+  npm run format:check || { echo "  Formatting is not clean: run 'npm run format', commit, then push again (BUG-080)."; exit 1; }
 
   echo "Building..."
   npm run build

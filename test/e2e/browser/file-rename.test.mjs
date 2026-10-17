@@ -50,7 +50,7 @@ describe('browser e2e — file rename', () => {
     // Open rename on the file row (its Rename button), fill the new name, commit.
     await page.locator(`[data-testid="file-row:${oldKey}"] button[title="Rename"]`).click();
     await page.locator('.rename-input').fill(newKey);
-    await page.locator('.rename-inline button', { hasText: '✓' }).click();
+    await page.locator('.rename-inline button[aria-label="Save name"]').click();
 
     // Poll the real bucket until the rename has fully applied (copy + delete).
     const deadline = Date.now() + scaleTimeout(15000);
@@ -85,7 +85,7 @@ describe('browser e2e — file rename', () => {
 
       await p.locator('[data-testid="file-row:a.txt"] button[title="Rename"]').click();
       await p.locator('.rename-input').fill('z.txt');
-      await p.locator('.rename-inline button', { hasText: '✓' }).click();
+      await p.locator('.rename-inline button[aria-label="Save name"]').click();
       const body = async (Key) => {
         const r = await ctx.client.send(new GetObjectCommand({ Bucket: BUCKET, Key })).catch(() => null);
         return r ? r.Body.transformToString() : null;

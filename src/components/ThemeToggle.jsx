@@ -6,11 +6,12 @@
 import { useState } from 'preact/hooks';
 import { loadThemePref, saveThemePref } from '../lib/storage.js';
 import { nextThemePref, applyThemeToRoot } from '../lib/theme.js';
+import { Icon } from './Icon.jsx';
 
 const META = {
-  system: { icon: '🖥', title: 'Theme: System (click for Light)' },
-  light: { icon: '☀', title: 'Theme: Light (click for Dark)' },
-  dark: { icon: '🌙', title: 'Theme: Dark (click for System)' },
+  system: { icon: 'monitor', title: 'Theme: System (click for Light)' },
+  light: { icon: 'sun', title: 'Theme: Light (click for Dark)' },
+  dark: { icon: 'moon', title: 'Theme: Dark (click for System)' },
 };
 
 export function ThemeToggle() {
@@ -27,13 +28,12 @@ export function ThemeToggle() {
   return (
     <button
       type="button"
-      class="btn btn-ghost btn-sm theme-toggle"
-      style={{ color: '#fff', borderColor: 'rgba(255,255,255,.4)' }}
+      class="btn btn-sm hdr-btn theme-toggle"
       onClick={cycle}
       title={meta.title}
       aria-label={meta.title}
     >
-      <span aria-hidden="true">{meta.icon}</span>
+      <Icon name={meta.icon} />
     </button>
   );
 }

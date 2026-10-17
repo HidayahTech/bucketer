@@ -7,6 +7,7 @@
 import { readFileSync } from 'fs';
 import { request } from 'https';
 import { URL } from 'url';
+import { releaseNotes } from './changelog-release.mjs';
 
 const TAG = process.env.CI_COMMIT_TAG;
 const TOKEN = process.env.CI_JOB_TOKEN;
@@ -52,22 +53,10 @@ function httpRequest(method, url, body, headers) {
   });
 }
 
-// Parse CHANGELOG for this version's title and bullet points
-const changelog = readFileSync('CHANGELOG.md', 'utf8');
-let releaseName = TAG;
-let description = '';
-for (const section of changelog.split(/^## /m).slice(1)) {
-  const lines = section.split('\n');
-  const m = lines[0].trim().match(/^\[([^\]]+)\]\s+—\s+\S+\s+—\s+(.+)$/);
-  if (m && m[1] === VERSION) {
-    releaseName = `${TAG} — ${m[2].trim()}`;
-    description = lines
-      .filter((l) => l.trimStart().startsWith('- '))
-      .map((l) => l.trim())
-      .join('\n');
-    break;
-  }
-}
+// This version's CHANGELOG title and body
+const notes = releaseNotes(readFileSync('CHANGELOG.md', 'utf8'), VERSION);
+const releaseName = notes ? `${TAG} — ${notes.title}` : TAG;
+const description = notes?.description ?? '';
 
 // Upload dist/index.html to the Generic Package Registry
 console.log(`Uploading ${FILENAME}...`);

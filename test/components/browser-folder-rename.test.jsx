@@ -54,13 +54,13 @@ describe('Browser — folder rename', () => {
     });
     await tick();
     // Open the rename editor on the 'photos' folder row.
-    const renameBtn = Array.from(queryAll('[data-testid="folder-row:photos"] button')).find((b) =>
-      b.textContent.includes('✎'),
+    const renameBtn = Array.from(queryAll('[data-testid="folder-row:photos"] button')).find(
+      (b) => b.title === 'Rename folder',
     );
     fire(renameBtn, 'click');
     const input = query('.rename-input');
     setInput(input, 'pictures');
-    const ok = Array.from(queryAll('.rename-inline button')).find((b) => b.textContent.includes('✓'));
+    const ok = Array.from(queryAll('.rename-inline button')).find((b) => b.getAttribute('aria-label') === 'Save name');
     fire(ok, 'click');
     assert.deepEqual(payload, { prefixes: ['photos/'], renameTo: 'pictures', mode: 'rename', capturedPrefix: '' });
     cleanup();
@@ -72,12 +72,12 @@ describe('Browser — folder rename', () => {
       dispatched = true;
     });
     await tick();
-    const renameBtn = Array.from(queryAll('[data-testid="folder-row:photos"] button')).find((b) =>
-      b.textContent.includes('✎'),
+    const renameBtn = Array.from(queryAll('[data-testid="folder-row:photos"] button')).find(
+      (b) => b.title === 'Rename folder',
     );
     fire(renameBtn, 'click');
     setInput(query('.rename-input'), 'archive'); // 'archive/' already exists
-    const ok = Array.from(queryAll('.rename-inline button')).find((b) => b.textContent.includes('✓'));
+    const ok = Array.from(queryAll('.rename-inline button')).find((b) => b.getAttribute('aria-label') === 'Save name');
     fire(ok, 'click');
     assert.equal(dispatched, false);
     assert.ok(query('.rename-error'));
@@ -90,12 +90,12 @@ describe('Browser — folder rename', () => {
       dispatched = true;
     });
     await tick();
-    const renameBtn = Array.from(queryAll('[data-testid="folder-row:photos"] button')).find((b) =>
-      b.textContent.includes('✎'),
+    const renameBtn = Array.from(queryAll('[data-testid="folder-row:photos"] button')).find(
+      (b) => b.title === 'Rename folder',
     );
     fire(renameBtn, 'click');
     setInput(query('.rename-input'), 'a/b');
-    const ok = Array.from(queryAll('.rename-inline button')).find((b) => b.textContent.includes('✓'));
+    const ok = Array.from(queryAll('.rename-inline button')).find((b) => b.getAttribute('aria-label') === 'Save name');
     fire(ok, 'click');
     assert.equal(dispatched, false);
     assert.ok(query('.rename-error'));

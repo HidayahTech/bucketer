@@ -80,7 +80,6 @@ import { abortMultipartSession } from '../lib/upload-cleanup.js';
 import { useDoubleClickSafety } from '../hooks/useDoubleClickSafety.js';
 import { BatchSummary } from './BatchSummary.jsx';
 import { createUpdateBatcher } from '../lib/update-batcher.js';
-import { normalizeBasePrefix, withinFloor } from '../lib/base-prefix.js';
 
 // Status: queued | uploading | paused | resuming | done | error | aborted
 let _idCounter = 0;
@@ -102,13 +101,14 @@ export function UploadQueue({
   client,
   bucket,
   provider,
-  currentPrefix,
+  destinationPrefix = '',
+  destOutsideFloor = false,
   credentials,
   onCapabilityChange,
-  capabilities,
   onUploadsComplete,
   onLogEntry,
   onMount,
+  onActivityChange,
 }) {
   const [items, setItems] = useState([]);
   const [collapsedBatches, setCollapsedBatches] = useState({});
@@ -120,8 +120,6 @@ export function UploadQueue({
   }
   const activeUploadsRef = useRef({}); // id → { abort, uploadInstance }
   const cancelledBatchesRef = useRef(new Set());
-  const fileInputRef = useRef(null);
-  const folderInputRef = useRef(null);
   const notifAskedRef = useRef(false);
   const [notifSuppressed, setNotifSuppressed] = useState(false);
   const { primed: cancelAllPrimed, handleClick: handleCancelAllClick } = useDoubleClickSafety(cancelAll);
@@ -130,7 +128,6 @@ export function UploadQueue({
     setNotifSuppressed((prev) => !prev);
   }
 
-  const canUpload = capabilities.upload !== 'denied';
   const hadActiveRef = useRef(false);
   const lastLoggedPartsPerFileRef = useRef(null);
   // Parent prefixes of files that have completed (status='done') since the last
@@ -139,11 +136,8 @@ export function UploadQueue({
   // an affected folder. See BUG-029.
   const drainedPrefixesRef = useRef(new Set());
 
-  const [destinationPrefix, setDestinationPrefix] = useState(currentPrefix || '');
-  // Keep in sync with browser navigation, but let the user override by typing
-  useEffect(() => {
-    setDestinationPrefix(currentPrefix || '');
-  }, [currentPrefix]);
+  // The destination (current folder, or what the user typed) and its floor check live in App since
+  // layout A (v1.67.0): the line naming it sits above the Activity panel this queue renders into.
   // Live mirror of destinationPrefix. addFiles is exposed once via onMount ([] deps), so its closure
   // is captured at mount; reading destinationPrefix directly there would forever see the mount-time
   // value ('' = root) and send every drag-dropped upload to the root (GitLab #2 / BUG-031). The ref
@@ -159,14 +153,8 @@ export function UploadQueue({
   const originRef = useRef(null);
   originRef.current = { client, bucket, provider, credentials };
 
-  // Prefix-scoped keys (#60): the free-text destination is the one upload surface
-  // that can name an arbitrary path. While scoped, refuse anything outside the
-  // floor visibly (inline error + disabled pickers) — no silent autocorrect.
-  // The ref mirrors it for addFiles, whose closure is captured once at mount.
-  const basePrefix = normalizeBasePrefix(credentials?.basePrefix);
-  const destWithSlash =
-    destinationPrefix && !destinationPrefix.endsWith('/') ? destinationPrefix + '/' : destinationPrefix;
-  const destOutsideFloor = !!basePrefix && !withinFloor(destWithSlash || '', basePrefix);
+  // Prefix-scoped keys (#60): App computes destOutsideFloor; the ref mirrors it for addFiles,
+  // whose closure is captured once at mount.
   const destOutsideFloorRef = useRef(destOutsideFloor);
   destOutsideFloorRef.current = destOutsideFloor;
 
@@ -182,6 +170,20 @@ export function UploadQueue({
     }
     hadActiveRef.current = hasActive;
   }, [items, onUploadsComplete]);
+
+  // Layout A (v1.67.0): the Activity line summarises uploads without opening this panel.
+  useEffect(() => {
+    if (!onActivityChange) return;
+    const count = (s) => items.filter((i) => i.status === s).length;
+    const current = items.find((i) => i.status === 'uploading' || i.status === 'resuming');
+    onActivityChange({
+      running: count('uploading') + count('resuming'),
+      queued: count('queued'),
+      failed: count('error'),
+      done: count('done'),
+      current: current ? { name: current.name, progress: current.progress } : null,
+    });
+  }, [items, onActivityChange]);
 
   const batcherRef = useRef(null);
   if (batcherRef.current === null) {
@@ -1034,84 +1036,6 @@ export function UploadQueue({
 
   return (
     <div>
-      {canUpload && (
-        <>
-          <div class="form-group" style={{ marginBottom: '.75rem' }}>
-            <label>Destination folder</label>
-            <input
-              type="text"
-              value={destinationPrefix}
-              onInput={(e) => setDestinationPrefix(e.target.value)}
-              placeholder="(root of bucket)"
-            />
-            <span class="hint">
-              Where uploaded files will be placed. Navigating the browser updates this automatically. You can also type
-              any path here — it doesn't need to exist yet.
-            </span>
-            {destOutsideFloor && (
-              <span class="field-error">
-                Destination must stay under {basePrefix} — this connection's key only reaches that folder.
-              </span>
-            )}
-          </div>
-
-          <div style={{ display: 'flex', gap: '.5rem', marginBottom: '.5rem' }}>
-            <button
-              type="button"
-              class="btn btn-ghost btn-sm"
-              disabled={destOutsideFloor}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              Choose files
-            </button>
-            <button
-              type="button"
-              class="btn btn-ghost btn-sm"
-              disabled={destOutsideFloor}
-              onClick={() => folderInputRef.current?.click()}
-            >
-              Choose folder
-            </button>
-          </div>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            data-testid="file-input"
-            style={{ display: 'none' }}
-            onChange={(e) => {
-              addFiles(Array.from(e.target.files).map((f) => ({ file: f, relativePath: f.name })));
-              e.target.value = '';
-            }}
-          />
-          <input
-            ref={(el) => {
-              folderInputRef.current = el;
-              if (el) el.webkitdirectory = true;
-            }}
-            type="file"
-            multiple
-            style={{ display: 'none' }}
-            onChange={(e) => {
-              addFiles(
-                Array.from(e.target.files).map((f) => ({
-                  file: f,
-                  relativePath: f.webkitRelativePath || f.name,
-                })),
-              );
-              e.target.value = '';
-            }}
-          />
-        </>
-      )}
-
-      {canUpload && batches.length === 0 && (
-        <p class="upload-empty-hint">
-          Drag files or folders anywhere in this window to upload, or use the buttons above.
-        </p>
-      )}
-
       {showGlobalActions && (
         <div class="queue-global-actions">
           <span class="queue-global-actions-label">All queues:</span>

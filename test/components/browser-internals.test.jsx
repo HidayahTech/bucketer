@@ -26,6 +26,59 @@ describe('Breadcrumb — root prefix', () => {
   });
 });
 
+// Layout A (v1.67.0): in the file pane the breadcrumb is the page title, led by the bucket.
+describe('Breadcrumb — bucket title (rootName + heading)', () => {
+  test('at the root, the h1 names the bucket instead of "/ (root)"', () => {
+    const { query, cleanup } = mount(
+      h(Breadcrumb, { prefix: '', onNavigate: () => {}, rootName: 'family-photos', heading: true }),
+    );
+    const title = query('nav.breadcrumb > h1.breadcrumb-title');
+    assert.ok(title, 'the crumbs sit in an h1 inside the nav landmark');
+    assert.equal(title.textContent.trim(), 'family-photos');
+    assert.ok(!title.textContent.includes('root'));
+    assert.ok(title.querySelector('[data-icon="bucket"]'), 'led by the bucket icon');
+    cleanup();
+  });
+
+  test('in a folder, the bucket is the first crumb and navigates to the root', () => {
+    let navigatedTo = null;
+    const { query, queryAll, cleanup } = mount(
+      h(Breadcrumb, {
+        prefix: '2026/trip/',
+        onNavigate: (p) => (navigatedTo = p),
+        rootName: 'family-photos',
+        heading: true,
+      }),
+    );
+    assert.equal(query('h1.breadcrumb-title').textContent.replace(/\s+/g, ''), 'family-photos/2026/trip');
+    fire(queryAll('.crumb')[0], 'click');
+    assert.equal(navigatedTo, '', 'the bucket crumb goes to the root');
+    cleanup();
+  });
+
+  test('with a floor, the bucket leads as plain text and the floor leaf is the first crumb', () => {
+    const { query, queryAll, cleanup } = mount(
+      h(Breadcrumb, {
+        prefix: 'team/alice/2026/',
+        floor: 'team/alice/',
+        onNavigate: () => {},
+        rootName: 'shared',
+        heading: true,
+      }),
+    );
+    assert.equal(query('.crumb-bucket').textContent, 'shared');
+    assert.equal(query('.crumb-bucket').tagName, 'SPAN', 'nothing above the floor is clickable');
+    assert.equal(queryAll('.crumb')[0].textContent, 'alice');
+    cleanup();
+  });
+
+  test('without heading, no h1 is rendered (the move picker)', () => {
+    const { query, cleanup } = mount(h(Breadcrumb, { prefix: 'a/', onNavigate: () => {} }));
+    assert.equal(query('h1'), null);
+    cleanup();
+  });
+});
+
 // #69: the copy-link control is a real, labelled button that appears only when the caller
 // supplies the action (Browser does so below the floor), never as a bare span.
 describe('Breadcrumb — copy-link button (#69)', () => {
@@ -86,6 +139,20 @@ describe('Breadcrumb — nested prefix', () => {
     const crumbs = queryAll('.crumb');
     // 'root' + 'photos' are clickable; '2024' is current (not clickable)
     assert.ok(crumbs.length >= 2, 'at least 2 clickable crumb elements for nested prefix');
+    cleanup();
+  });
+
+  // K1: going up a level must work from the keyboard.
+  test('navigable crumbs are buttons; the current segment is marked aria-current', () => {
+    const { queryAll, query, cleanup } = mount(h(Breadcrumb, { prefix: 'photos/2024/', onNavigate: () => {} }));
+    const crumbs = queryAll('.crumb');
+    assert.ok(crumbs.length >= 2);
+    assert.ok(
+      crumbs.every((c) => c.tagName === 'BUTTON' && c.getAttribute('type') === 'button'),
+      'crumbs must be type=button',
+    );
+    assert.equal(query('.current').getAttribute('aria-current'), 'location');
+    assert.equal(query('.breadcrumb').tagName, 'NAV', 'breadcrumb is a nav landmark');
     cleanup();
   });
 
@@ -316,11 +383,12 @@ describe('Breadcrumb — move drop targets (drag-and-drop move)', () => {
 // ─── SortTh ───────────────────────────────────────────────────────────────────
 
 describe('SortTh — inactive column', () => {
-  test('shows the ⇅ neutral sort indicator when not active', () => {
-    const { text, cleanup } = mount(
+  test('shows the neutral sort indicator when not active', () => {
+    const { query, cleanup } = mount(
       h(SortTh, { col: 'name', sortCol: 'size', sortDir: 'asc', onSort: () => {}, children: 'Name' }),
     );
-    assert.ok(text().includes('⇅'), '⇅ neutral indicator must show for non-active column');
+    assert.equal(query('.sort-indicator').dataset.sort, 'none');
+    assert.equal(query('.sort-indicator svg').dataset.icon, 'sort', 'neutral indicator for a non-active column');
     cleanup();
   });
 
@@ -337,19 +405,19 @@ describe('SortTh — inactive column', () => {
 });
 
 describe('SortTh — active column', () => {
-  test('shows ▲ for ascending sort on active column', () => {
-    const { text, cleanup } = mount(
+  test('shows the up chevron for ascending sort on active column', () => {
+    const { query, cleanup } = mount(
       h(SortTh, { col: 'name', sortCol: 'name', sortDir: 'asc', onSort: () => {}, children: 'Name' }),
     );
-    assert.ok(text().includes('▲'), '▲ must appear for ascending active column');
+    assert.equal(query('.sort-indicator svg').dataset.icon, 'chevron-up', 'ascending shows the up chevron');
     cleanup();
   });
 
-  test('shows ▼ for descending sort on active column', () => {
-    const { text, cleanup } = mount(
+  test('shows the down chevron for descending sort on active column', () => {
+    const { query, cleanup } = mount(
       h(SortTh, { col: 'name', sortCol: 'name', sortDir: 'desc', onSort: () => {}, children: 'Name' }),
     );
-    assert.ok(text().includes('▼'), '▼ must appear for descending active column');
+    assert.equal(query('.sort-indicator svg').dataset.icon, 'chevron-down', 'descending shows the down chevron');
     cleanup();
   });
 
@@ -376,6 +444,37 @@ describe('SortTh — active column', () => {
     );
     fire(query('th'), 'click');
     assert.equal(sortedCol, 'modified', 'onSort must be called with the column name');
+    cleanup();
+  });
+
+  // K1: sorting must work from the keyboard and state be announced.
+  test('the header holds a button and the active column carries aria-sort', () => {
+    let sortedCol = null;
+    const { query, cleanup } = mount(
+      h(SortTh, {
+        col: 'name',
+        sortCol: 'name',
+        sortDir: 'desc',
+        onSort: (col) => {
+          sortedCol = col;
+        },
+        children: 'Name',
+      }),
+    );
+    const btn = query('th button');
+    assert.ok(btn, 'sortable header must contain a button');
+    assert.equal(btn.getAttribute('type'), 'button');
+    fire(btn, 'click');
+    assert.equal(sortedCol, 'name', 'activating the button sorts exactly once');
+    assert.equal(query('th').getAttribute('aria-sort'), 'descending');
+    cleanup();
+  });
+
+  test('an inactive column has no aria-sort', () => {
+    const { query, cleanup } = mount(
+      h(SortTh, { col: 'size', sortCol: 'name', sortDir: 'asc', onSort: () => {}, children: 'Size' }),
+    );
+    assert.equal(query('th').getAttribute('aria-sort'), null);
     cleanup();
   });
 

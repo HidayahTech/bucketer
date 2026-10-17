@@ -105,11 +105,20 @@ export async function startAppServer() {
 // Fill the credential form and connect, then wait for the connected browser UI. Reusable across
 // browser specs. Robust connected-state signal: the upload file input (the old .upload-zone
 // selector was removed from the connected UI in v1.15.3).
+// Base folder, provider and region sit in the form's "More options" disclosure (v1.66.0), closed
+// while all three are default. Open it before touching those fields; a no-op when already open.
+export async function openMoreOptions(page) {
+  const d = page.locator('details.more-options').first();
+  if ((await d.count()) === 0) return;
+  if (!(await d.evaluate((el) => el.open))) await d.locator('summary').click();
+}
+
 export async function connectApp(page, endpoint, bucket = BUCKET) {
   await page.locator('input[type="url"]').fill(endpoint);
   await page.locator('input[placeholder="my-bucket"]').fill(bucket);
   await page.locator('input[placeholder="Access Key ID"]').fill('test-key-id');
   await page.locator('input[placeholder="Secret Access Key"]').fill('test-secret-key');
+  await openMoreOptions(page);
   const region = page.locator('input[placeholder="us-east-1"]');
   await region.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
   if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
@@ -197,8 +206,20 @@ let _activePage = null;
 let _activeLogs = [];
 
 // Create the page, register it as active for failure capture, and buffer console/page errors.
-export async function newE2EPage(context) {
+// activityOpen (layout A, v1.67.0): the Activity panel starts closed for real users; specs that
+// drive the upload queue or task panel inside it get it remembered open, unless a spec asks for
+// the real default ({ activityOpen: false }). Only fills an unset key, so a spec's own toggle
+// survives a reload.
+export async function newE2EPage(context, { activityOpen = true } = {}) {
   const page = await context.newPage();
+  if (activityOpen)
+    await page.addInitScript(() => {
+      try {
+        if (localStorage.getItem('s3b_activity_open') === null) localStorage.setItem('s3b_activity_open', 'true');
+      } catch {
+        /* about:blank and opaque origins have no localStorage */
+      }
+    });
   // Scale implicit-wait deadlines by the lane factor: slow lanes (webkit, mobile) get
   // proportionally longer before a wait with no explicit timeout gives up.
   page.setDefaultTimeout(scaleTimeout(DEFAULT_ACTION_TIMEOUT_MS));

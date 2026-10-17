@@ -4,6 +4,244 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-083 — Every GitLab Release since v1.45.0 published with an empty description
+
+**Date:** 2026-10-17 · present through v1.67.1 · fixed in v1.67.2
+
+**Symptom.** The Releases page showed a title and assets but no notes for every Release from v1.45.0
+to v1.67.1; anyone reading a Release, or comparing what a version changed, saw nothing. The six
+from v1.63.4 to v1.67.1 were filled in by hand on 2026-10-17; the 22 from v1.45.0 to v1.63.3 are
+still empty.
+
+**Root cause (verified).** `scripts/release.mjs` built the description from the version's CHANGELOG
+section by keeping only lines whose trimmed text starts with `- `. CHANGELOG entries moved from
+bullet lists to paragraphs; from v1.45.0 on, no line matched and the description was `''`. The
+release job still exited 0, so CI stayed green. Evidence: the Releases API reports description
+length 0 for v1.45.0–v1.63.3 and v1.67.1 and non-zero for bullet-style v1.36.0–v1.44.3.
+
+**Fix.** The CHANGELOG lookup moved to `scripts/changelog-release.mjs` (`releaseNotes`), which
+returns the title and the section's whole body, trimmed; `release.mjs` uses it. Bullet entries come
+out as before. Older empty Releases were not backfilled.
+
+**Test.** New `test/changelog-release.test.js`: prose body kept, bullets kept, empty body → `''`,
+unknown version → `null`, and the real CHANGELOG's top entry has a non-empty description.
+**PRE** (old bullet-only logic): 3/5, the prose and real-CHANGELOG cases fail with description `''`.
+**POST:** 5/5. The CI release job itself is exercised only by the v1.67.2 tag pipeline: its Release
+must show this version's text.
+
+**Why it wasn't caught earlier.** The release script had no test, and an empty description is not an
+error to the API or to CI. Nobody read the Releases page between v1.45.0 and the MR !22 write-up.
+Rule: generated public text needs a test that asserts it is non-empty for the real input.
+
+## BUG-082 — On a phone, selecting the first row made every row jump 122 px down the page
+
+**Date:** 2026-10-17 · present through v1.67.0 · fixed in v1.67.1
+
+**Symptom.** One red local lane: firefox × Pixel 5, `batch.test.mjs` "selecting two of three files
+and batch-deleting removes only those two", failed with `locator.check: Element is outside of the
+viewport` on c.txt's checkbox. It failed 3/3 on v1.66.0 (dc75008) and 2/3 on v1.67.0's tree. For a
+user on a phone, ticking one row shifts every row below it ~122 px down, so a quick second tap can
+land on a different row than the one aimed at, ahead of a batch delete or move.
+
+**Root cause (verified).** The batch bar renders in the document flow above the file list and only
+exists while something is selected. The first selection inserts it (114 px tall at 393 px wide, plus
+margin), and every row below moves down by its height. No engine compensates: probing chromium and
+firefox on Pixel 5 (`.claude-scratch/repro-batch.mjs` in the BUCKET-8 worktree) shows c.txt's
+checkbox going from viewport y≈650 to 772 with `scrollY` unchanged, past a 727 px viewport. In the
+spec, Playwright scrolls c.txt into view, then the bar lands, so the click point is off-screen.
+Chromium and webkit passed only because their render timing put the bar in place before the scroll.
+
+**Fix.** At ≤640 px the batch bar is fixed to the bottom of the screen, as in the layout A mockup
+(`mockups/ia/_src/components.css` `.batchbar`), so it moves nothing when it appears. While a
+selection exists, Browser's root gets `browser-has-selection`, which adds 10rem of bottom padding so
+the last rows can scroll clear of the bar, and `html:has(.browser-has-selection)` sets the same
+`scroll-padding-bottom`, so a row brought into view by focus or scrolling is not left under the bar.
+Without the scroll padding, the spec's next click landed on the bar instead of the row. Desktop
+keeps the in-flow bar (the mockup's desktop bar is sticky at the top of the list), so a smaller
+shift remains there by design. Firefox before 121 lacks `:has()`; there the scroll padding is absent
+and a row can sit under the bar until scrolled.
+
+**Test.** New: `batch.test.mjs` "selecting the first row does not move the rows below it" asserts
+c.txt's document y is unchanged after the first selection, next to the bar showing "1 file
+selected" (skips above 640 px). Matched pair, image `mcr.microsoft.com/playwright:v1.60.0-noble`
+(chromium-1223, firefox-1522, webkit-2287), `E2E_FILES=batch.test.mjs`, desktop + Pixel 5 + iPhone 13:
+**PRE v1.67.0 (0dde1e0) + new spec:** fails on all 6 phone lanes (y 1285.6 → 1407.6, a 121–122 px
+shift), skipped on the 3 desktop lanes. **POST:** passes on all 6 phone lanes. Sideways, POST,
+12 specs (batch, issue-49-mobile-actions, dnd, move-resume, move-unicode-key, download-selection,
+layout-a, smoke, keyboard, contrast, look-b, issue-3-mobile): 38/38 on each phone lane, 37 + 1 skip on
+each desktop lane. The original red lane, firefox × Pixel 5 `batch.test.mjs`: 3/3 runs green.
+
+**Why it wasn't caught earlier.** The spec forced its clicks (`check({ force: true })`) because rows
+re-render after uploads, which hid the moving target on chromium; the batch bar's mobile work
+(v1.64.0, M1/P1) checked that it fits on screen, not that its arrival leaves the list still. The
+browser matrix runs in CI only, and CI's timing had kept this lane green. Rule: a UI element that
+appears in response to a tap must not move what is under the next tap; assert document position,
+not just visibility.
+
+## BUG-081 — On mobile WebKit in dark mode, v1.64.x lost its page background; file names read at 2.06:1
+
+**Date:** 2026-10-16 · v1.64.0 and v1.64.1 affected (never on `main`) · absent in v1.65.0
+
+**Symptom.** v1.64.1's tag pipeline (https://gitlab.com/hidayahtech/bucketer/-/pipelines/2957730289)
+failed both WebKit mobile lanes (iPhone 13, Pixel 5): `contrast.test.mjs` dark,
+".file-name-previewable: 2.06:1 is below 4.5:1". Auto-retry queued both lanes; that red blocks
+v1.64.1's `release` job, so v1.64.1, like v1.64.0, has no GitLab Release. Nobody was affected:
+MR !22 was never merged and production stayed on v1.63.5.
+
+**Root cause (partly verified).** Verified: on WebKit with a mobile device profile and v1.64.1's CSS,
+`<body>` resolves as if it had no parent. Its computed `--bg`/`--text` are empty, `color-scheme` is
+`normal`, colour is initial black and font-size is 16 px rather than the inherited 15 px. So
+`background: var(--bg)` falls back to transparent, every ancestor of the file name is transparent, and
+the spec measures the light accent against its white fallback. `<html>` itself is correct (`--bg`
+`#1a1b1e`). The same build on desktop WebKit, and v1.65.0 on the same mobile lane, resolve `<body>`
+normally (probe output in the BUCKET-6 handoff). Hypothesis, not isolated: a WebKit style-resolution
+quirk triggered by something in v1.64.x's stylesheet that look B's rewrite removed. Adding
+`-webkit-text-size-adjust: 100%` to v1.64.1 did not change it.
+
+**Fix.** None in code: v1.65.0 (look B) does not show it. Evidence, image
+`mcr.microsoft.com/playwright:v1.60.0-noble` (webkit-2287), lane webkit × iPhone 13,
+`E2E_FILES=contrast.test.mjs`. **v1.64.1 (261d624):** 1 pass / 1 fail, "2.06:1 (dark)", reproducing
+CI exactly. **v1.65.0 (5d48253):** 2/2. v1.65.0 on every mobile lane (chromium, firefox and webkit ×
+iPhone 13 and Pixel 5) with `contrast` + `look-b`: 3/3 on each of 6 lanes.
+
+**Why it wasn't caught earlier.** The pre-push hook runs no browser layer: the browser matrix
+is CI-only by design (since v1.62.3). This session's and BUCKET-5's local container pairs were scoped to
+`E2E_DEVICES=desktop`. A dark-mode contrast spec is device-sensitive, so desktop-only pairs could not
+see it. Rule going forward: a spec that measures rendering (contrast, layout, fonts) runs its pair on
+the mobile devices too.
+
+**Test case.** The existing `test/e2e/browser/contrast.test.mjs` (dark) on webkit × iPhone 13 / Pixel 5
+is the regression test; it now runs in each local pair for rendering specs. Not covered: real iOS
+Safari. The harness cannot represent it, so whether the quirk occurs on a real device is unknown.
+
+## BUG-080 — The pre-push hook tagged commits that CI's format gate rejects, so the version got no Release
+
+**Date:** 2026-10-16 · v1.62.2 and v1.64.0 affected · fix in the next release
+
+**Symptom.** v1.64.0's tag pipeline failed `format`; `reproducibility` was skipped and
+`release` (which needs it) never ran, so v1.64.0 has a tag but no GitLab Release. v1.62.2
+went the same way (2026-09-15, a codemod's unformatted output).
+
+**Root cause (verified).** `.githooks/pre-push` ran `npm run format:check || echo …` — advisory —
+then built, tested and created + pushed the version tag. CI's `format` job is blocking and
+`release` needs `reproducibility`, which a red test stage skips. The v1.64.0 push log shows the
+warning followed by "Tests passed — push proceeding. Tag v1.64.0 created." Contributing (the
+agent's own step, not repo code): the "fix" before that push was
+`npx --prefix <worktree> prettier --write <abs path>` run from the main checkout. Prettier resolves
+`.prettierignore` from the working directory, and the main checkout's ignores `.claude-scratch/`
+(line 8), where agent worktrees live, so the file was skipped with "All matched files use Prettier
+code style!" and exit 0 (reproduced; with `--ignore-path` the same call reports the file, exit 1).
+
+**Fix.** The hook's format step blocks: `npm run format:check || { echo …; exit 1; }`, before the
+build and before the tag. Formatting runs from the package root (`npm run format`), which is
+correct in any worktree.
+
+**Why it wasn't caught earlier.** The step was deliberately advisory during the formatter's
+bake-in; nothing linked "CI format red" to "no Release" until it happened twice.
+
+**Test case.** `test/source-invariants.test.js` "pre-push hook: formatting blocks the push
+(BUG-080)" (fails on the `|| echo` line). Manual repro: an unformatted `test/zz-*.mjs` + a
+branch push line on stdin → pre-fix: warning, build, tests, tag (the v1.64.0 push log); fix:
+"Formatting is not clean …", exit 1, no build, no tag.
+
+> **Container evidence for BUG-076…079 (v1.64.0).** Image `mcr.microsoft.com/playwright:v1.60.0-noble`
+> (chromium-1223, firefox-1522, webkit-2287), desktop lanes; `E2E_FILES` = `keyboard.test.mjs`,
+> `contrast.test.mjs`, `issue-49-mobile-actions.test.mjs` (the mobile cases pin their own Pixel 5 /
+> 800 px contexts, so the device axis is fixed by the spec). **Pre-fix** (3ab347e + the new specs):
+> every engine 12 tests, 3 pass, 9 fail — exactly the 9 new cases. **Fix:** every engine 12/12.
+> Component pair (`npm run test:ui`): pre-fix 580 pass / 10 fail (exactly the 10 new cases), fix 590/590.
+
+## BUG-076 — "+ bucket" from the connected sidebar left the view broken
+
+**Date:** 2026-10-16 · REPORT C7 (BUCKET-1 lane 07 F8) · v1.64.0
+
+**Symptom.** While connected, ☰ → "+ bucket" cleared the bucket and secret but stayed
+connected: the file list showed a red listing error and the sidebar form still showed the
+old bucket. The splash variant of the same control worked.
+
+**Root cause.** `handleAddBucket` (App.jsx) reset `credentials` for a new bucket without
+leaving the `connected` session, so the Browser re-listed against an empty bucket.
+
+**Fix (v1.64.0).** From the connected view, "+ bucket" now does what switching to a bucket
+without a cached secret does: closes the sidebar and returns to the connect form, pre-filled
+with the account and with the account's secret if this tab holds it. Scope: App.jsx only.
+
+**Why it wasn't caught earlier.** The Slice 3 tests exercised "+ bucket" on the splash only.
+
+**Test case.** `test/components/app.test.jsx` '"+ bucket" while connected opens the
+new-bucket form for that account' (pre-fix: fails on "the connected view is left").
+
+## BUG-077 — Phone selection bar ran off-screen and froze the page; mid-width rows lost their actions
+
+**Date:** 2026-10-16 · REPORT M1, M2, P1 (lanes 02, 08) · v1.64.0
+
+**Symptom.** On a ~390 px phone, after selecting a file the batch bar's Copy/Delete sat at
+x≈371–500 — reachable only by an unmarked sideways pan — and the next interaction took
+7.8–12.7 s (lane 08, 1,000 rows, throttled). Between 641 and ~975 px a long filename pushed
+every row action off-screen.
+
+**Root cause.** `.batch-bar` was `display:flex` without `flex-wrap`; BUG-042's name-wrap rule
+applied only at ≤640 px.
+
+**Fix (v1.64.0).** `flex-wrap: wrap` on `.batch-bar`; the name-wrap/actions-wrap rules now
+apply at ≤1024 px. Not re-measured: the selection-freeze timing (the overflow that caused it
+is gone; lane 08's in-container check showed the same rule bringing it to 0.57 s).
+
+**Why it wasn't caught earlier.** The #49 spec measured row actions only, never the batch bar,
+and only at Pixel 5 width.
+
+**Test case.** `test/e2e/browser/issue-49-mobile-actions.test.mjs` "batch bar actions are
+reachable after selecting a row" (pre-fix: "Copy 1" at x=371 on 393 px) and "row actions sit
+inside an 800 px viewport next to a long filename" (pre-fix: a button at x≈1090).
+
+## BUG-078 — Keyboard users could not browse; dialogs were not dialogs
+
+**Date:** 2026-10-16 · REPORT K1–K3, Codex R07 · v1.64.0
+
+**Symptom.** Opening a folder, going up a level, previewing a file, sorting and picking a
+saved bucket were click-only; a 70-stop Tab walk reached none of them. Modals took no focus,
+had no role, did not trap Tab or return focus, and only 4 of 13 closed on Escape. The closed
+sidebar kept 22 invisible Tab stops (the very first Tab landed in it).
+
+**Root cause.** `<span onClick>` / `<tr onClick>` / `<th onClick>` everywhere; `Modal.jsx` was a
+bare overlay; the sidebar was only `translateX(-100%)`.
+
+**Fix (v1.64.0).** Crumbs, sort headers (button inside the `th`, `aria-sort`) and saved-bucket
+names are `<button>`s; folder and file names in the draggable rows are `role="button"`
+spans with Enter/Space (Firefox will not start a drag from a `<button>`). `Modal` gets
+`role="dialog"`, `aria-modal`, `aria-labelledby` its `.modal-title`, initial focus, a Tab
+trap, Escape (stopped so it does not also close the sidebar) and focus return — one change
+covering all 12 modals. The closed sidebar is `inert`.
+
+**Why it wasn't caught earlier.** No spec ever drove the app without a mouse.
+
+**Test case.** `test/e2e/browser/keyboard.test.mjs` (4 cases: folder/crumb, preview + focus
+return, sort, sidebar Tab stops); `test/components/modal.test.jsx`, `browser-internals.test.jsx`,
+`accounts-manager.test.jsx`, `app.test.jsx` (inert).
+
+## BUG-079 — Accent text and primary buttons failed contrast (2.98:1 light, 2.38:1 dark)
+
+**Date:** 2026-10-16 · REPORT A1, A2 (lanes 01, 03) · v1.64.0
+
+**Symptom.** White text on Connect and every primary button, and every file/folder name,
+crumb and active sort header, used `#1aa3c0` (2.98:1; dark `#22b8cf` 2.38:1; AA is 4.5:1).
+Warn and success text also failed. In dark mode a selected row became a near-white band.
+
+**Root cause.** The palette predates any contrast check; selected rows and on-accent text
+were literals (`#e8f4fd`, `#fff`).
+
+**Fix (v1.64.0).** `--accent` is look B's primary (`#0b6e85` light, `#4fc3e0` dark), with a new
+`--on-accent` (white / `#0e0f12`); success/warn text darkened; selected rows tint from the
+accent; `color-scheme` set per theme. All pairs ≥ 4.95:1 (scratch calculation, then measured
+rendered in the spec).
+
+**Why it wasn't caught earlier.** No review measured contrast until BUCKET-1.
+
+**Test case.** `test/e2e/browser/contrast.test.mjs` (rendered text vs effective background,
+light and dark; pre-fix: 2.98:1 / 2.38:1 on Connect).
+
+---
+
 ## BUG-075 — Distinct object keys could share one path inside a downloaded ZIP
 
 **Date:** 2026-10-16 · GitLab #79 · v1.63.5
