@@ -251,7 +251,10 @@ export function AccountsManager({
           )}
         </div>
       )}
-      {saving ? (
+      {/* Not on the splash (v1.68.1): every bucket is remembered on connect, so "Save current
+          as a bucket…" read as a required step and "Update this bucket…" as a riddle (v1.66.0
+          ux-review finding 1). Naming a bucket stays in the connected sidebar. */}
+      {splash ? null : saving ? (
         <form class="bucket-save-form" onSubmit={handleConfirmSave}>
           <input
             class="input"

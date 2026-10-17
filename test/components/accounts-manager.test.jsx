@@ -407,3 +407,23 @@ describe('AccountsManager — splash "Your buckets"', () => {
     cleanup();
   });
 });
+// 4b step 7 (v1.66.0 ux-review finding 1): the splash remembers every bucket on connect, so its
+// "Save current as a bucket…" read as a required step and "Update this bucket…" as a riddle.
+// Neither renders on the splash; naming a bucket stays in the connected sidebar.
+describe('AccountsManager — no save step on the splash', () => {
+  test('the splash offers no save or update trigger, before or after a pick', () => {
+    for (const selectedId of [null, 1]) {
+      const { query, cleanup } = mount(
+        h(AccountsManager, defaultProps({ variant: 'splash', connections: [B2_PHOTOS], selectedId })),
+      );
+      assert.equal(query('.bucket-save-trigger'), null, `no trigger (selectedId ${selectedId})`);
+      cleanup();
+    }
+  });
+
+  test('the sidebar keeps the trigger, so a bucket can still be named', () => {
+    const { query, cleanup } = mount(h(AccountsManager, defaultProps({ connections: [B2_PHOTOS], selectedId: 1 })));
+    assert.ok(query('.bucket-save-trigger'));
+    cleanup();
+  });
+});

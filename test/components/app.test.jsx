@@ -139,22 +139,62 @@ describe('App — shared-link pre-fill banner', () => {
   });
 });
 
+// v1.68.1 (4b step 7): the splash has no save trigger (every bucket is remembered on
+// connect), so the save path is reached as a user reaches it: connect, open the sidebar,
+// save there. The sidebar tree renders only with a saved connection, and jsdom never
+// auto-remembers (no listing succeeds), so seedOtherBucket() supplies an unrelated one.
+function seedOtherBucket() {
+  localStorage.setItem(
+    's3b_credentials',
+    JSON.stringify({
+      version: 1,
+      credentials: [
+        { id: 'credZ', endpoint: 'http://127.0.0.1:9', keyId: 'KZ', provider: null, regionOverride: '', label: 'Z' },
+      ],
+    }),
+  );
+  localStorage.setItem(
+    's3b_connections',
+    JSON.stringify({
+      version: 2,
+      connections: [{ id: 77, name: 'Other', credentialId: 'credZ', bucket: 'other', capabilities: null }],
+    }),
+  );
+  localStorage.setItem('s3b_connections_migrated', '1');
+}
+function connectAndOpenSidebar(query) {
+  if (!query('#cred-secretkey').value) setInput(query('#cred-secretkey'), 'sekret');
+  fire(query('button[type="submit"]'), 'click');
+  fire(query('[aria-label="Open menu"]'), 'click');
+}
+function saveFromSidebar(query, name) {
+  fire(query('aside.sidebar .bucket-save-trigger'), 'click');
+  if (name != null) setInput(query('.bucket-save-form input[type="text"]'), name);
+  fire(query('.bucket-save-form button[type="submit"]'), 'click');
+}
+
 // Task 5 code review finding: handleSaveProfile read liveFormData.bucket/keyId raw
 // instead of trimming them (as the old saveProfile path did), so a bucket or key ID
 // picked up via ProfilePicker's inline "Save as profile…" — which writes straight
 // from CredentialForm's onFormChange, bypassing credentialErrors()/handleSubmit's
 // trim — could persist with stray whitespace and silently fail to reconnect later.
+// Since v1.68.1 a save follows a connect: a padded bucket or key ID fails
+// credentialErrors() before Connect, and Connect hands App trimmed values, so
+// handleSaveProfile's own trim is now a backstop this UI path cannot reach (removing it
+// leaves this test green). What stays pinned is the user-level result: nothing padded is stored.
 describe('App — saving a profile trims whitespace-padded fields', () => {
-  test('bucket and key ID are trimmed before being persisted to s3b_connections/s3b_credentials', () => {
+  test('a padded endpoint is stored trimmed after connect + sidebar save', () => {
     clearAppStorage();
+    seedOtherBucket();
     const { query, cleanup } = mount(h(App, {}));
     try {
-      setInput(query('#cred-endpoint'), 'https://s3.us-east-1.amazonaws.com');
-      setInput(query('#cred-bucket'), '  test-bucket  ');
-      setInput(query('#cred-keyid'), '  AKIDEXAMPLE1234  ');
+      setInput(query('#cred-endpoint'), '  http://127.0.0.1:1/  ');
+      setInput(query('#cred-bucket'), 'test-bucket');
+      setInput(query('#cred-keyid'), 'AKIDEXAMPLE1234');
+      connectAndOpenSidebar(query);
 
-      const saveTrigger = query('.bucket-save-trigger');
-      assert.ok(saveTrigger, '"Save as profile…" trigger must be present');
+      const saveTrigger = query('aside.sidebar .bucket-save-trigger');
+      assert.ok(saveTrigger, '"Save current as a bucket…" trigger must be present in the sidebar');
       assert.ok(!saveTrigger.disabled, 'trigger must be enabled once endpoint/bucket/keyId are valid (trimmed)');
       fire(saveTrigger, 'click');
 
@@ -164,10 +204,13 @@ describe('App — saving a profile trims whitespace-padded fields', () => {
 
       const { connections } = JSON.parse(localStorage.getItem('s3b_connections') || '{}');
       const { credentials } = JSON.parse(localStorage.getItem('s3b_credentials') || '{}');
-      assert.equal(connections?.length, 1, 'exactly one connection must be persisted');
-      assert.equal(credentials?.length, 1, 'exactly one credential must be persisted');
-      assert.equal(connections[0].bucket, 'test-bucket', 'bucket must be trimmed before persisting');
-      assert.equal(credentials[0].keyId, 'AKIDEXAMPLE1234', 'key ID must be trimmed before persisting');
+      const saved = connections?.filter((c) => c.id !== 77) ?? [];
+      const cred = credentials?.find((c) => c.id !== 'credZ');
+      assert.equal(saved.length, 1, 'exactly one connection must be persisted');
+      assert.equal(credentials?.length, 2, 'exactly one credential must be persisted');
+      assert.equal(saved[0].bucket, 'test-bucket');
+      assert.equal(cred.keyId, 'AKIDEXAMPLE1234');
+      assert.equal(cred.endpoint, 'http://127.0.0.1:1', 'endpoint must be trimmed before persisting');
     } finally {
       cleanup();
       clearAppStorage();
@@ -184,16 +227,17 @@ describe('App — saving a profile trims whitespace-padded fields', () => {
 describe('App — saving a profile does not clobber capabilities written directly to storage', () => {
   test('renaming an existing connection preserves capabilities saved via saveConnectionCapabilities', () => {
     clearAppStorage();
+    seedOtherBucket();
     const { query, cleanup } = mount(h(App, {}));
     try {
       // Create one connection first, exactly as in the trim regression test above.
-      setInput(query('#cred-endpoint'), 'https://s3.us-east-1.amazonaws.com');
+      setInput(query('#cred-endpoint'), 'http://127.0.0.1:1');
       setInput(query('#cred-bucket'), 'test-bucket');
       setInput(query('#cred-keyid'), 'AKIDEXAMPLE1234');
-      fire(query('.bucket-save-trigger'), 'click');
-      fire(query('.bucket-save-form button[type="submit"]'), 'click');
+      connectAndOpenSidebar(query);
+      saveFromSidebar(query);
 
-      const beforeId = JSON.parse(localStorage.getItem('s3b_connections')).connections[0].id;
+      const beforeId = JSON.parse(localStorage.getItem('s3b_connections')).connections.find((c) => c.id !== 77).id;
 
       // Simulate a capability learned during a session (e.g. a failed delete flips
       // 'delete' to 'denied'). In the real app this is written by handleCapabilityChange
@@ -204,14 +248,12 @@ describe('App — saving a profile does not clobber capabilities written directl
       saveConnectionCapabilities(beforeId, learned);
 
       // Now save again against the same still-selected connection (e.g. a rename).
-      // The button now reads "Update profile…" because a connection is selected.
-      fire(query('.bucket-save-trigger'), 'click');
-      setInput(query('.bucket-save-form input[type="text"]'), 'Renamed connection');
-      fire(query('.bucket-save-form button[type="submit"]'), 'click');
+      // The button now reads "Update this bucket…" because a connection is selected.
+      saveFromSidebar(query, 'Renamed connection');
 
       const after = JSON.parse(localStorage.getItem('s3b_connections'));
       const conn = after.connections.find((c) => c.id === beforeId);
-      assert.equal(after.connections.length, 1, 'the rename must update in place, not create a second connection');
+      assert.equal(after.connections.length, 2, 'the rename must update in place, not create a second connection');
       assert.equal(conn.name, 'Renamed connection', 'the rename must still take effect');
       assert.deepEqual(
         conn.capabilities,
@@ -805,6 +847,7 @@ describe('App — post-wipe resurrection from surviving flat keys is preserved (
 describe('App — a storage write that silently fails does not blank the form (BUG-046)', () => {
   test('endpoint/bucket/key ID survive "Save as profile" when localStorage.setItem throws', () => {
     clearAppStorage();
+    seedOtherBucket();
     const { query, cleanup } = mount(h(App, {}));
     // jsdom's Storage is a legacy platform object: instance-level assignment
     // (`localStorage.setItem = fn`) does NOT override the method — it silently
@@ -814,9 +857,10 @@ describe('App — a storage write that silently fails does not blank the form (B
     const proto = Object.getPrototypeOf(localStorage);
     const originalSetItem = proto.setItem;
     try {
-      setInput(query('#cred-endpoint'), 'https://s3.us-east-1.amazonaws.com');
+      setInput(query('#cred-endpoint'), 'http://127.0.0.1:1');
       setInput(query('#cred-bucket'), 'my-bucket');
       setInput(query('#cred-keyid'), 'AKIDEXAMPLE1234');
+      connectAndOpenSidebar(query);
 
       // Simulate Safari private browsing / blocked site data / quota exhaustion —
       // every localStorage write handleSaveProfile makes goes through safeSetRaw,
@@ -825,12 +869,11 @@ describe('App — a storage write that silently fails does not blank the form (B
         throw new Error('simulated storage failure');
       };
 
-      fire(query('.bucket-save-trigger'), 'click');
-      fire(query('.bucket-save-form button[type="submit"]'), 'click');
+      saveFromSidebar(query);
 
       assert.equal(
         query('#cred-endpoint')?.value,
-        'https://s3.us-east-1.amazonaws.com',
+        'http://127.0.0.1:1',
         'endpoint must survive a save attempt that silently failed to persist',
       );
       assert.equal(
@@ -1494,15 +1537,14 @@ describe('App — re-wrap on credential change while the vault is unlocked (Task
         'precondition: form pre-filled from the saved connection',
       );
 
-      setInput(query('#cred-endpoint'), 'https://s3.new.example.com');
+      setInput(query('#cred-endpoint'), 'http://127.0.0.1:2');
       setInput(query('#cred-keyid'), 'kNew');
       setInput(query('#cred-secretkey'), 'new-secret');
-
-      fire(query('.bucket-save-trigger'), 'click');
-      fire(query('.bucket-save-form button[type="submit"]'), 'click');
+      connectAndOpenSidebar(query);
+      saveFromSidebar(query);
 
       const { credentials } = JSON.parse(localStorage.getItem('s3b_credentials'));
-      const newCred = credentials.find((c) => c.endpoint === 'https://s3.new.example.com');
+      const newCred = credentials.find((c) => c.endpoint === 'http://127.0.0.1:2');
       assert.ok(newCred, 'a new credential must be created for the new endpoint/key');
 
       let recalled = null;
@@ -1679,8 +1721,8 @@ describe('App — re-adding a saved bucket does not duplicate it', () => {
       fire(query('.account-add-bucket'), 'click');
       setInput(query('#cred-bucket'), 'photos');
       setInput(query('#cred-secretkey'), 'sekret');
-      fire(query('.bucket-save-trigger'), 'click');
-      fire(query('.bucket-save-form button[type="submit"]'), 'click');
+      connectAndOpenSidebar(query);
+      saveFromSidebar(query);
 
       const { connections } = JSON.parse(localStorage.getItem('s3b_connections'));
       assert.equal(connections.length, 1, 're-adding the same bucket must not create a duplicate connection');

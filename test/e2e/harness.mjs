@@ -134,6 +134,52 @@ export async function connectApp(page, endpoint, bucket = BUCKET) {
   await page.locator('[data-testid="file-input"]').waitFor({ state: 'attached', timeout: scaleTimeout(15000) });
 }
 
+// Saved buckets on one key, written as storage holds them, then a reload so the splash lists
+// them. The splash has no save step since v1.68.1 (buckets are remembered on their first
+// answer), so a spec that needs a bucket saved without connecting to it seeds it here.
+// The credential matches what connectApp's fields fingerprint to (generic provider,
+// us-east-1), so a secret cached on connect serves every bucket seeded with it.
+export async function seedSavedBuckets(page, endpoint, buckets, { keyId = 'test-key-id' } = {}) {
+  await page.evaluate(
+    ({ endpoint, buckets, keyId }) => {
+      localStorage.setItem(
+        's3b_credentials',
+        JSON.stringify({
+          version: 1,
+          credentials: [
+            { id: 'credSeed', endpoint, keyId, provider: 'generic', regionOverride: 'us-east-1', label: 'Seeded' },
+          ],
+        }),
+      );
+      localStorage.setItem(
+        's3b_connections',
+        JSON.stringify({
+          version: 2,
+          connections: buckets.map((b, i) => ({
+            id: i + 1,
+            name: b.name || b.bucket,
+            credentialId: 'credSeed',
+            bucket: b.bucket,
+            basePrefix: b.basePrefix || '',
+            capabilities: null,
+          })),
+        }),
+      );
+      localStorage.setItem('s3b_connections_migrated', '1');
+    },
+    { endpoint, buckets, keyId },
+  );
+  await page.reload({ waitUntil: 'domcontentloaded' });
+}
+
+// Pick a saved bucket on the splash and connect with the seeded key's secret.
+export async function connectSaved(page, bucket, secret = 'test-secret-key') {
+  await page.locator('.bucket-row', { hasText: bucket }).first().click();
+  await page.locator('input[placeholder="Secret Access Key"]').fill(secret);
+  await page.locator('button[type="submit"]:has-text("Connect")').click();
+  await page.locator('[data-testid="file-input"]').waitFor({ state: 'attached', timeout: scaleTimeout(15000) });
+}
+
 // Download observation. Playwright fires 'download' when a navigation is taken over by
 // the download manager — including navigations of hidden iframes (verified in the
 // 2026-08-01 postmortem's discriminator experiment). WebKit does not fire it; specs fall

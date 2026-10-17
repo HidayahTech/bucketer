@@ -20,6 +20,8 @@ import {
   applyEngineQuirks,
   e2eEngineName,
   openMoreOptions,
+  seedSavedBuckets,
+  connectSaved,
 } from '../harness.mjs';
 
 const BUCKET = 'test-bucket';
@@ -245,20 +247,6 @@ describe('prefix-scoped keys — normal connect screen', () => {
 // #65: a failed quick-switch names the bucket it tried to open, so a tab click that fails
 // reads as "couldn't open that bucket", not as a sign-out.
 describe('prefix-scoped keys — quick-switch failure', () => {
-  // Rows are labelled by bucket (see profiles.test.mjs), so wait on the bucket name.
-  async function saveCurrentAs(page, name, bucket) {
-    const trigger = page.locator('.bucket-save-trigger');
-    await trigger.waitFor({ timeout: scaleTimeout(5000) });
-    const deadline = Date.now() + scaleTimeout(5000);
-    while ((await trigger.isDisabled()) && Date.now() < deadline) await page.waitForTimeout(100);
-    await trigger.click();
-    const nameInput = page.locator('input[placeholder="Name"]');
-    await nameInput.waitFor({ timeout: scaleTimeout(5000) });
-    await nameInput.fill(name);
-    await page.locator('button[type="submit"]:has-text("Save")').click();
-    await page.locator('.bucket-row', { hasText: bucket }).waitFor({ timeout: scaleTimeout(5000) });
-  }
-
   // Quick-switch to a saved bucket the way the current viewport offers it: the header tab
   // strip on desktop, the sidebar's bucket row below 640px (the strip is display:none there).
   // Both drive App's switchToConnection.
@@ -278,31 +266,15 @@ describe('prefix-scoped keys — quick-switch failure', () => {
     try {
       // Two saved connections on the same credential: "other" (no floor, will be denied)
       // and "acme" (floored, works). Connect through "acme" so the secret is cached for
-      // the credential, then quick-switch to "other".
-      await page.locator('input[type="url"]').fill(ctx.browserEndpoint);
-      await page.locator('input[placeholder="my-bucket"]').fill('other-bucket');
-      await page.locator('input[placeholder="Access Key ID"]').fill('scoped-key');
-      await page.locator('input[placeholder="Secret Access Key"]').fill('s');
-      // Region is part of the credential fingerprint the secret cache is keyed on, so it
-      // must be in the saved record too, or the quick-switch finds no cached secret and
-      // drops to the form instead of connecting.
-      await openMoreOptions(page);
-      const region0 = page.locator('input[placeholder="us-east-1"]');
-      await region0.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
-      if (await region0.isVisible().catch(() => false)) await region0.fill('us-east-1');
-      await saveCurrentAs(page, 'other', 'other-bucket');
-      // Saving selects the new record and a second Save would update it in place, so add
-      // the second bucket through the account's "+ bucket" path (deselects, keeps the key).
-      await page.locator('.account-add-bucket').click();
-      await page.locator('input[placeholder="my-bucket"]').fill(BUCKET);
-      await openMoreOptions(page);
-      await page.locator('#cred-baseprefix').fill(SCOPE);
-      await page.locator('input[placeholder="Secret Access Key"]').fill('s');
-      await saveCurrentAs(page, 'acme', BUCKET);
-      await openMoreOptions(page);
-      const region = page.locator('input[placeholder="us-east-1"]');
-      if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
-      await page.locator('button[type="submit"]:has-text("Connect")').click();
+      // the credential, then quick-switch to "other". "other" never answers, so it would not
+      // be remembered on connect; both are seeded as saved (the splash has no save step).
+      await seedSavedBuckets(
+        page,
+        ctx.browserEndpoint,
+        [{ bucket: 'other-bucket' }, { bucket: BUCKET, basePrefix: SCOPE }],
+        { keyId: 'scoped-key' },
+      );
+      await connectSaved(page, BUCKET, 's');
       await page.locator('[data-testid="file-row:report.pdf"]').waitFor({ timeout: scaleTimeout(15000) });
 
       ctx.mock.requestLog.reset();
@@ -330,15 +302,12 @@ describe('prefix-scoped keys — quick-switch failure', () => {
     await seedScoped();
     const { context, page } = await freshPage();
     try {
-      await page.locator('input[type="url"]').fill(ctx.browserEndpoint);
-      await page.locator('input[placeholder="my-bucket"]').fill(BUCKET);
-      await page.locator('input[placeholder="Access Key ID"]').fill('scoped-key');
+      // A record saved with an EMPTY floor (seeded: the splash has no save step since v1.68.1).
+      await seedSavedBuckets(page, ctx.browserEndpoint, [{ bucket: BUCKET, name: 'ScopedConn' }], {
+        keyId: 'scoped-key',
+      });
+      await page.locator('.bucket-row', { hasText: BUCKET }).first().click();
       await page.locator('input[placeholder="Secret Access Key"]').fill('s');
-      await openMoreOptions(page);
-      const region0 = page.locator('input[placeholder="us-east-1"]');
-      await region0.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
-      if (await region0.isVisible().catch(() => false)) await region0.fill('us-east-1');
-      await saveCurrentAs(page, 'ScopedConn', BUCKET); // record saved with an EMPTY floor
       await page.locator('button[type="submit"]:has-text("Connect")').click();
       await page.locator('.error-block').waitFor({ timeout: scaleTimeout(15000) });
       assert.ok(rootLists().length >= 1, 'precondition: the empty-floor connect was denied at the root');

@@ -1,9 +1,15 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.68.0';
+export const CURRENT_VERSION = '1.68.1';
 
 export const CHANGELOG = [
+  {
+    "version": "1.68.1",
+    "date": "2026-10-17",
+    "title": "The connect screen has no save step",
+    "changes": []
+  },
   {
     "version": "1.68.0",
     "date": "2026-10-17",
