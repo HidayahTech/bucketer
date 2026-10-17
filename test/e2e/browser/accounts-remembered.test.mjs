@@ -41,10 +41,11 @@ describe('accounts A — remembered buckets', () => {
       await page.goto(app.url, { waitUntil: 'domcontentloaded' });
       await connectApp(page, ctx.browserEndpoint);
 
-      // The connected header names the bucket and the storage address.
-      await page.locator('.header-bucket').waitFor({ timeout: scaleTimeout(10000) });
-      assert.equal(await page.locator('.header-bucket').textContent(), BUCKET);
-      assert.equal(await page.locator('.header-host').textContent(), host);
+      // The page title names the bucket, and the line under it the storage address (layout A, v1.67.0).
+      const title = page.locator('h1.breadcrumb-title');
+      await title.waitFor({ timeout: scaleTimeout(10000) });
+      assert.equal((await title.textContent()).trim(), BUCKET);
+      assert.equal(await page.locator('.bucket-identity-host').textContent(), host);
 
       // Remembered once a request succeeds (the first listing), with no Save click.
       await page.waitForFunction(
@@ -73,7 +74,7 @@ describe('accounts A — remembered buckets', () => {
       await page.locator('#cred-secretkey').fill('test-secret-key');
       await page.locator('button[type="submit"]').click();
       await page.locator('[data-testid="file-input"]').waitFor({ state: 'attached', timeout: scaleTimeout(15000) });
-      assert.equal(await page.locator('.header-bucket').textContent(), BUCKET);
+      assert.equal((await page.locator('h1.breadcrumb-title').textContent()).trim(), BUCKET);
       // Presence, not just "no error": after the reload, the reconnect listed the bucket on the mock.
       const deadline = Date.now() + scaleTimeout(10000);
       while (!ctx.mock.requestLog.list().some((r) => r.isList) && Date.now() < deadline) {

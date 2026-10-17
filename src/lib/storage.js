@@ -44,6 +44,7 @@ const SETTINGS_KEYS = {
   uploadExpandThreshold: 's3b_upload_expand_threshold',
   adaptiveMode: 's3b_adaptive_mode',
   fileMtimeAutoLoad: 's3b_file_mtime_auto_load',
+  activityOpen: 's3b_activity_open', // layout A (v1.67.0): the Activity panel left open
 };
 
 // Convenience: all keyed storage keys. Capability state now lives on the
@@ -176,6 +177,10 @@ const _fileMtimeAutoLoad = makeSettingAccessors(
   LS_KEYS.fileMtimeAutoLoad,
   (v) => (v === '' ? false : v === 'true'), // default false
 );
+const _activityOpen = makeSettingAccessors(
+  LS_KEYS.activityOpen,
+  (v) => v === 'true', // default closed: finishing work must not push the file list down
+);
 const _multiOriginUpload = makeSettingAccessors(
   LS_KEYS.multiOriginUpload,
   (v) => (v === '' ? true : v === 'true'), // default ON (only acts on capable providers, e.g. B2)
@@ -203,6 +208,8 @@ export const loadAdaptiveMode = _adaptiveMode.load;
 export const saveAdaptiveMode = _adaptiveMode.save;
 export const loadFileMtimeAutoLoad = _fileMtimeAutoLoad.load;
 export const saveFileMtimeAutoLoad = _fileMtimeAutoLoad.save;
+export const loadActivityOpen = _activityOpen.load;
+export const saveActivityOpen = _activityOpen.save;
 export const loadMultiOriginUpload = _multiOriginUpload.load;
 export const saveMultiOriginUpload = _multiOriginUpload.save;
 

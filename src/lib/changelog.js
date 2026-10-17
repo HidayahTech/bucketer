@@ -1,9 +1,15 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.66.0';
+export const CURRENT_VERSION = '1.67.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.67.0",
+    "date": "2026-10-17",
+    "title": "The bucket is the page: one Upload button, one Activity line",
+    "changes": []
+  },
   {
     "version": "1.66.0",
     "date": "2026-10-16",

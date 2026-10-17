@@ -9,7 +9,25 @@ import {
   clampToFloor,
   discoveredFloor,
   sanitizeNavPrefix,
+  destinationOutsideFloor,
 } from '../src/lib/base-prefix.js';
+
+// The upload destination's floor check (#60), moved out of UploadQueue in layout A (v1.67.0).
+test('destinationOutsideFloor: a destination outside the floor is refused', () => {
+  assert.equal(destinationOutsideFloor('team/bob/', 'team/alice/'), true);
+});
+test('destinationOutsideFloor: under the floor, with or without a trailing slash, is accepted', () => {
+  assert.equal(destinationOutsideFloor('team/alice/2026/', 'team/alice/'), false);
+  assert.equal(destinationOutsideFloor('team/alice/2026', 'team/alice/'), false);
+  assert.equal(destinationOutsideFloor('team/alice', 'team/alice/'), false);
+});
+test('destinationOutsideFloor: while scoped, the bucket root (empty) is outside', () => {
+  assert.equal(destinationOutsideFloor('', 'team/alice/'), true);
+});
+test('destinationOutsideFloor: unscoped connections accept any destination (regression anchor)', () => {
+  assert.equal(destinationOutsideFloor('anywhere/at/all/', ''), false);
+  assert.equal(destinationOutsideFloor('', ''), false);
+});
 
 test('normalizeBasePrefix appends a trailing slash', () => {
   assert.equal(normalizeBasePrefix('team/alice'), 'team/alice/');

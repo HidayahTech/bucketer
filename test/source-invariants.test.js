@@ -909,16 +909,19 @@ describe('UploadQueue.jsx — no "Upload not permitted" warning banner (v1.15.3)
   });
 });
 
-describe('UploadQueue.jsx — empty-state drag-anywhere hint (v1.15.3)', () => {
-  const source = src('components/UploadQueue.jsx');
-
-  test('empty queue state shows instruction to drag anywhere in window', () => {
+// v1.15.3 put the cue in the empty upload queue; layout A (v1.67.0) moved the queue into the
+// Activity panel, so the cue moved to the Upload ▾ menu and the always-visible upload-target line.
+describe('drag-anywhere cue (v1.15.3; layout A v1.67.0)', () => {
+  test('the Upload ▾ menu says files can be dragged anywhere onto the window', () => {
     assert.ok(
-      /drag.*anywhere|anywhere.*drag/i.test(source),
-      'UploadQueue.jsx must include an empty-state hint explaining that files can be ' +
-        'dragged anywhere in the window — without it users have no cue that drag-and-drop ' +
-        'is available now that the dedicated drop zone is removed',
+      /drag.*anywhere|anywhere.*drag/i.test(src('components/UploadMenu.jsx')),
+      'UploadMenu.jsx must say files can be dragged anywhere — without it users have no cue that ' +
+        'drag-and-drop is available now that the dedicated drop zone is removed',
     );
+  });
+
+  test('the always-visible upload-target line names drops', () => {
+    assert.ok(/Uploads and drops go to/.test(src('components/UploadTarget.jsx')));
   });
 });
 

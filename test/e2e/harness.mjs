@@ -206,8 +206,20 @@ let _activePage = null;
 let _activeLogs = [];
 
 // Create the page, register it as active for failure capture, and buffer console/page errors.
-export async function newE2EPage(context) {
+// activityOpen (layout A, v1.67.0): the Activity panel starts closed for real users; specs that
+// drive the upload queue or task panel inside it get it remembered open, unless a spec asks for
+// the real default ({ activityOpen: false }). Only fills an unset key, so a spec's own toggle
+// survives a reload.
+export async function newE2EPage(context, { activityOpen = true } = {}) {
   const page = await context.newPage();
+  if (activityOpen)
+    await page.addInitScript(() => {
+      try {
+        if (localStorage.getItem('s3b_activity_open') === null) localStorage.setItem('s3b_activity_open', 'true');
+      } catch {
+        /* about:blank and opaque origins have no localStorage */
+      }
+    });
   // Scale implicit-wait deadlines by the lane factor: slow lanes (webkit, mobile) get
   // proportionally longer before a wait with no explicit timeout gives up.
   page.setDefaultTimeout(scaleTimeout(DEFAULT_ACTION_TIMEOUT_MS));

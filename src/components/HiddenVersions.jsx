@@ -12,7 +12,7 @@
 // Purge-all exhausts all pagination before deleting. Partial purge (deleting only the
 // loaded page) would leave orphaned versions and show a misleading "done" message.
 // Batched in 1000-object chunks — the S3 DeleteObjects API maximum.
-import { useState } from 'preact/hooks';
+import { useState, useRef, useEffect } from 'preact/hooks';
 import { ListObjectVersionsCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { formatBytes } from '../lib/format.js';
 import { ErrorBlock } from './ErrorBlock.jsx';
@@ -34,7 +34,15 @@ function shortVersionId(id) {
   return id.length > 18 ? id.slice(0, 18) + '…' : id;
 }
 
-export function HiddenVersions({ client, bucket, prefix, provider, diagnostics }) {
+// requestKey (layout A, v1.67.0): Bucket tools ▾ → "Hidden versions" bumps it; each new value
+// loads the panel and scrolls it into view. 0 = not requested (the panel's own button still works).
+export function HiddenVersions({ client, bucket, prefix, provider, diagnostics, requestKey = 0 }) {
+  const panelRef = useRef(null);
+  useEffect(() => {
+    if (!requestKey) return;
+    if (provider !== 'r2') load();
+    panelRef.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
+  }, [requestKey]);
   const [rows, setRows] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -49,7 +57,7 @@ export function HiddenVersions({ client, bucket, prefix, provider, diagnostics }
   // Cloudflare R2 does not support versioning — gate early to avoid a confusing empty panel.
   if (provider === 'r2') {
     return (
-      <div class="hidden-versions">
+      <div class="hidden-versions" ref={panelRef}>
         <div class="hidden-versions-bar">
           <span style={{ color: 'var(--text-muted)' }}>
             R2 does not support versioning — the hidden versions panel is not available for Cloudflare R2 buckets.
@@ -151,7 +159,7 @@ export function HiddenVersions({ client, bucket, prefix, provider, diagnostics }
   const n = rows ? rows.length : 0;
 
   return (
-    <div class="hidden-versions">
+    <div class="hidden-versions" ref={panelRef}>
       {pendingDelete && (
         <Modal onClose={handleCancel}>
           <div class="modal-title">

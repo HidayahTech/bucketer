@@ -27,7 +27,13 @@ export function Breadcrumb({
   moveHoverTarget,
   onCopyLink,
   copyLinkIncludesKeyId = false,
+  rootName,
+  heading = false,
 }) {
+  // Layout A (v1.67.0): the file pane's breadcrumb is the page title. rootName (the bucket)
+  // replaces "/ (root)", and heading wraps the crumbs in an <h1> inside the nav landmark.
+  // The move picker passes neither and renders as before.
+  const wrap = (crumbs) => (heading ? <h1 class="breadcrumb-title">{crumbs}</h1> : crumbs);
   // Props for a droppable crumb. The class is always `crumb` (+ highlight when hovered);
   // drag handlers attach only when move handlers are supplied.
   function crumbProps(target) {
@@ -71,48 +77,69 @@ export function Breadcrumb({
   // but must not crash — fall back to unscoped rendering.
   const effectiveFloor = floor && (prefix || '').startsWith(floor) ? floor : '';
   const floorParts = effectiveFloor.split('/').filter(Boolean);
-  const rootLabel = floorParts.length ? floorParts[floorParts.length - 1] : 'root';
+  const rootLabel = floorParts.length ? floorParts[floorParts.length - 1] : rootName || 'root';
   const rootTitle = effectiveFloor ? `Your access starts here — ${effectiveFloor}` : undefined;
+  // With a floor, the bucket still leads the title, as plain text: nothing above the floor is reachable.
+  const lead = rootName
+    ? [
+        <Icon key="mark" name="bucket" class="crumb-bucket-mark" />,
+        effectiveFloor && [
+          <span key="bucket" class="crumb-bucket">
+            {rootName}
+          </span>,
+          <span key="sep-b" class="sep" aria-hidden="true">
+            /
+          </span>,
+        ],
+      ]
+    : null;
 
   // Crumbs are type=button so going up a level works from the keyboard (K1).
   if (!prefix || prefix === effectiveFloor)
     return (
       <nav class="breadcrumb" aria-label="Folder path">
-        <span class="current" aria-current="location" title={rootTitle}>
-          {effectiveFloor ? rootLabel : '/ (root)'}
-        </span>
+        {wrap([
+          lead,
+          <span key="current" class="current" aria-current="location" title={rootTitle}>
+            {effectiveFloor || rootName ? rootLabel : '/ (root)'}
+          </span>,
+        ])}
         {copyLinkButton}
       </nav>
     );
   const parts = prefix.split('/').filter(Boolean).slice(floorParts.length);
   return (
     <nav class="breadcrumb" aria-label="Folder path">
-      <button
-        type="button"
-        {...crumbProps(effectiveFloor)}
-        title={rootTitle}
-        onClick={() => onNavigate(effectiveFloor)}
-      >
-        {rootLabel}
-      </button>
-      {parts.map((part, i) => {
-        const target = effectiveFloor + parts.slice(0, i + 1).join('/') + '/';
-        const isLast = i === parts.length - 1;
-        return [
-          <span key={`sep-${i}`} class="sep" aria-hidden="true">
-            /
-          </span>,
-          isLast ? (
-            <span key={part} class="current" aria-current="location">
-              {part}
-            </span>
-          ) : (
-            <button key={part} type="button" {...crumbProps(target)} onClick={() => onNavigate(target)}>
-              {part}
-            </button>
-          ),
-        ];
-      })}
+      {wrap([
+        lead,
+        <button
+          key="root"
+          type="button"
+          {...crumbProps(effectiveFloor)}
+          title={rootTitle}
+          onClick={() => onNavigate(effectiveFloor)}
+        >
+          {rootLabel}
+        </button>,
+        parts.map((part, i) => {
+          const target = effectiveFloor + parts.slice(0, i + 1).join('/') + '/';
+          const isLast = i === parts.length - 1;
+          return [
+            <span key={`sep-${i}`} class="sep" aria-hidden="true">
+              /
+            </span>,
+            isLast ? (
+              <span key={part} class="current" aria-current="location">
+                {part}
+              </span>
+            ) : (
+              <button key={part} type="button" {...crumbProps(target)} onClick={() => onNavigate(target)}>
+                {part}
+              </button>
+            ),
+          ];
+        }),
+      ])}
       {copyLinkButton}
     </nav>
   );

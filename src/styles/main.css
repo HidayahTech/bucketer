@@ -153,14 +153,6 @@ h1, h2, h3 { color: var(--ink); line-height: 1.25; }
 .app-header .app-logo .bk-body { stroke: var(--brand-sky); stroke-width: 3; }
 .wordmark { font-size: 1.125rem; font-weight: 800; letter-spacing: -0.01em; color: var(--header-fg); white-space: nowrap; }
 .app-header .spacer { flex: 1; }
-/* Connected bucket + storage address (accounts A, v1.66.0). Truncates rather than pushing the
-   header's buttons off-screen; the host hides on phones. */
-.header-identity { display: flex; flex-direction: column; min-width: 0; max-width: 22rem; line-height: 1.2; color: var(--header-fg); }
-.header-bucket { font-weight: 700; font-size: .9375rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.header-host { font-size: .75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); }
-@media (max-width: 640px) {
-  .header-host { display: none; }
-}
 .connection-tabs { display: flex; align-items: center; gap: .3rem; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
 .connection-tab {
   flex-shrink: 0; max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -328,6 +320,15 @@ h1, h2, h3 { color: var(--ink); line-height: 1.25; }
 .breadcrumb .crumb:hover { text-decoration: underline; }
 .breadcrumb .sep { color: var(--text-muted); }
 .breadcrumb .current { color: var(--ink); font-weight: 700; }
+/* Layout A (v1.67.0): the file pane's breadcrumb is the page title, led by the bucket. */
+.breadcrumb-title { display: flex; align-items: center; gap: .35rem; flex-wrap: wrap; margin: 0; font-size: 1.5rem; font-weight: 600; line-height: 1.25; min-width: 0; overflow-wrap: anywhere; }
+.breadcrumb .crumb-bucket-mark { color: var(--accent); width: 1.1em; height: 1.1em; flex-shrink: 0; }
+.breadcrumb .crumb-bucket { color: var(--text-muted); }
+.bucket-identity { margin: -.4rem 0 .9rem; font-size: .8125rem; color: var(--text-muted); overflow-wrap: anywhere; }
+.bucket-identity-host { font-family: var(--mono); }
+@media (max-width: 640px) {
+  .breadcrumb-title { font-size: 1.2rem; }
+}
 /* #69: breadcrumb copy-link button — a real button, ≥32px target, visible focus ring. */
 .breadcrumb .crumb-link { background: none; border: 1px solid transparent; border-radius: 4px; color: var(--accent); cursor: pointer; font: inherit; line-height: 1; min-width: 32px; min-height: 32px; padding: .25rem .4rem; margin-left: .15rem; }
 .breadcrumb .crumb-link:hover { border-color: var(--border); }
@@ -402,7 +403,6 @@ h1, h2, h3 { color: var(--ink); line-height: 1.25; }
 }
 .upload-zone:hover,
 .upload-zone.drag-over { border-color: var(--accent); background: var(--info-bg); color: var(--accent); }
-.upload-empty-hint { font-size: .85rem; color: var(--text-muted); margin: .5rem 0 0; }
 
 /* ── Upload queue ─────────────────────────────────────────────────────────── */
 .queue-global-actions {
@@ -827,8 +827,33 @@ details[open] .upload-log-summary::before { transform: rotate(90deg); }
 }
 
 /* ── Browser toolbar (filter + actions) ──────────────────────────────────── */
-.browser-toolbar { display: flex; align-items: center; gap: .5rem; margin: .5rem 0 .75rem; }
-.browser-toolbar-actions { margin-left: auto; }
+.browser-toolbar { display: flex; align-items: center; gap: .5rem; margin: .5rem 0 .5rem; flex-wrap: wrap; }
+/* Layout A (v1.67.0): actions lead (Upload ▾ first), the filter sits at the right. */
+.browser-toolbar-actions { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
+.browser-toolbar .filter-bar { margin-left: auto; }
+/* Phone: the filter wraps to its own row; fill it instead of floating at the right. */
+@media (max-width: 640px) {
+  .browser-toolbar .filter-bar { margin-left: 0; flex: 1 1 100%; }
+  .browser-toolbar .filter-input { max-width: none; }
+}
+.upload-menu-wrap { position: relative; display: inline-block; }
+.upload-menu-btn { display: inline-flex; align-items: center; gap: .35rem; }
+.upload-menu { left: 0; right: auto; }
+.upload-menu .btn { width: 100%; justify-content: flex-start; text-align: left; }
+.upload-target { margin: 0 0 .75rem; }
+.upload-target-line { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; margin: 0; font-size: .8125rem; color: var(--text-muted); }
+.upload-target-line strong { color: var(--ink); font-weight: 600; overflow-wrap: anywhere; }
+.upload-target-change { color: var(--accent); text-decoration: underline; min-height: 24px; }
+.upload-target-edit { margin-top: .5rem; max-width: 32rem; }
+.activity { border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--surface); margin: 0 0 .75rem; }
+.activity-summary { display: flex; align-items: center; gap: .6rem; padding: .6rem .9rem; min-height: 44px; cursor: pointer; list-style: none; flex-wrap: wrap; }
+.activity-summary::-webkit-details-marker { display: none; }
+.activity-title { font-weight: 700; }
+.activity-badge { font-size: .75rem; font-weight: 700; padding: .1rem .5rem; border-radius: 999px; background: var(--surface-raised); color: var(--accent); border: 1px solid var(--border); }
+.activity-badge-attention { color: var(--text-danger); }
+.activity-line { flex: 1; min-width: 0; font-size: .875rem; color: var(--text-muted); overflow-wrap: anywhere; }
+.activity-chevron { flex-shrink: 0; color: var(--text-muted); }
+.activity-body { padding: 0 .9rem .75rem; border-top: 1px solid var(--border); }
 /* ── Browser drag-and-drop overlay ──────────────────────────────────────── */
 .browser-drop-active { outline: 2px dashed var(--accent); outline-offset: -4px; border-radius: var(--radius); }
 .browser-drop-overlay {
@@ -1100,6 +1125,10 @@ details[open] .sv-summary::before { transform: rotate(90deg); }
 }
 .copy-link-popover--up { top: auto; bottom: calc(100% + 4px); }
 .share-link-menu .btn { width: 100%; justify-content: flex-start; text-align: left; }
+/* Bucket tools ▾ (layout A, v1.67.0): same popover as Copy link. */
+.bucket-tools-wrap { position: relative; display: inline-block; }
+.bucket-tools-btn { display: inline-flex; align-items: center; gap: .35rem; }
+.bucket-tools-menu .btn { width: 100%; justify-content: flex-start; text-align: left; }
 .copy-link-presets { display: flex; gap: .3rem; flex-wrap: wrap; }
 .copy-link-custom { display: flex; gap: .3rem; align-items: center; }
 .copy-link-num {

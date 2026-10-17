@@ -30,6 +30,7 @@ import { diagnosticsProps } from '../lib/connection-diagnostics.js';
 import { CopyLinkPopover } from './CopyLinkPopover.jsx';
 import { resolveShortcut, isEditableTarget } from '../lib/keyboard-shortcuts.js';
 import { Breadcrumb } from './Breadcrumb.jsx';
+import { BucketIdentity } from './BucketIdentity.jsx';
 import { SortTh } from './SortTh.jsx';
 import { Icon, fileIconName } from './Icon.jsx';
 import { MovePickerModal } from './MovePickerModal.jsx';
@@ -75,6 +76,12 @@ export function Browser({
   onMount,
   prefetchSizeLimit,
   isFirstMount,
+  // Layout A (v1.67.0): App's Upload ▾ leads the toolbar; the upload-target line and the
+  // Activity panel sit between the toolbar and the file list. They are App's live tree in
+  // belowToolbarHost (see Portal.jsx), only attached here, so a remount of this component
+  // (key={browserKey}) never resets them.
+  uploadMenu,
+  belowToolbarHost,
 }) {
   // The connection's floor (#60): every navigation entry point clamps to it, so a
   // prefix-scoped key never sees a request above its base prefix. '' = unscoped.
@@ -204,8 +211,15 @@ export function Browser({
     }
   }
 
+  // Bucket tools ▾ → Hidden versions (layout A): a request for the folder in view; navigating
+  // away leaves the new folder's panel unrequested, as before.
+  const [hiddenVersionsRequest, setHiddenVersionsRequest] = useState({ prefix: null, n: 0 });
+  function showHiddenVersions() {
+    setHiddenVersionsRequest((r) => ({ prefix: prefixRef.current, n: r.n + 1 }));
+  }
+
   useEffect(() => {
-    onMount?.({ removeItems, invalidateCache, onUploadsDrained });
+    onMount?.({ removeItems, invalidateCache, onUploadsDrained, showHiddenVersions });
   }, []);
 
   // Called by App when an upload batch fully drains. prefixSet is the set of
@@ -1181,9 +1195,43 @@ export function Browser({
             : undefined
         }
         copyLinkIncludesKeyId={getIncludeKeyId()}
+        rootName={bucket}
+        heading
       />
+      {credentials?.bucket && (
+        <BucketIdentity
+          bucket={credentials.bucket}
+          endpoint={credentials.endpoint}
+          provider={credentials.provider}
+          keyId={credentials.keyId}
+          basePrefix={basePrefix}
+        />
+      )}
 
       <div class="browser-toolbar">
+        <div class="browser-toolbar-actions">
+          {uploadMenu}
+          <button class="btn btn-ghost btn-sm" onClick={openNewFolder} title="Create a new folder">
+            <Icon name="folder-plus" /> New folder
+          </button>
+          <button
+            class="btn btn-ghost btn-sm"
+            data-testid="open-download-job"
+            onClick={() => onDownloadRequest?.({ kind: 'folder', prefix })}
+            title="Download this folder"
+          >
+            <Icon name="download" /> Download
+          </button>
+          <button
+            class="btn btn-ghost btn-sm"
+            data-testid="refresh-listing"
+            onClick={handleRefresh}
+            title="Refresh listing (pull changes uploaded from other devices)"
+            aria-label="Refresh"
+          >
+            <Icon name="refresh" />
+          </button>
+        </div>
         {(sortedItems.length > 0 || sortedFolders.length > 0 || filterQ) && (
           <div class="filter-bar">
             <input
@@ -1201,30 +1249,14 @@ export function Browser({
             )}
           </div>
         )}
-        <div class="browser-toolbar-actions">
-          <button
-            class="btn btn-ghost btn-sm"
-            data-testid="refresh-listing"
-            onClick={handleRefresh}
-            title="Refresh listing (pull changes uploaded from other devices)"
-            style={{ marginRight: '.25rem' }}
-          >
-            <Icon name="refresh" /> Refresh
-          </button>
-          <button
-            class="btn btn-ghost btn-sm"
-            data-testid="open-download-job"
-            style={{ marginRight: '.25rem' }}
-            onClick={() => onDownloadRequest?.({ kind: 'folder', prefix })}
-            title="Download this folder"
-          >
-            <Icon name="download" /> Download
-          </button>
-          <button class="btn btn-ghost btn-sm" onClick={openNewFolder} title="Create a new folder">
-            <Icon name="folder-plus" /> New folder
-          </button>
-        </div>
       </div>
+
+      <div
+        class="below-toolbar"
+        ref={(el) => {
+          if (el && belowToolbarHost && belowToolbarHost.parentNode !== el) el.appendChild(belowToolbarHost);
+        }}
+      />
 
       {(selectedKeys.size > 0 || selectedPrefixes.size > 0) && (
         <div class="batch-bar">
@@ -1726,6 +1758,7 @@ export function Browser({
         prefix={prefix}
         provider={provider}
         diagnostics={diagnosticsProps(credentials, true)}
+        requestKey={hiddenVersionsRequest.prefix === prefix ? hiddenVersionsRequest.n : 0}
       />
     </div>
   );

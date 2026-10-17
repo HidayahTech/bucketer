@@ -65,7 +65,9 @@ describe('versioning — delete marker then undelete', () => {
       assert.equal(await markerCount(), 1, 'a delete marker exists');
 
       // Open the Hidden Versions panel and undelete (remove the delete marker).
-      await page.locator('button:has-text("Show hidden versions")').click();
+      // Layout A (v1.67.0): from the header's Bucket tools menu.
+      await page.locator('.bucket-tools-btn').click();
+      await page.locator('.bucket-tools-menu button:has-text("Hidden versions")').click();
       const undeleteBtn = page.locator('.hidden-versions button[title*="Undelete"]');
       await undeleteBtn.first().waitFor({ timeout: scaleTimeout(10000) });
       await undeleteBtn.first().click();

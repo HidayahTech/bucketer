@@ -79,7 +79,7 @@ describe('keyboard-only browsing', () => {
       await tabTo(page, '.breadcrumb button.crumb');
       await page.keyboard.press('Enter');
       await page.locator('[data-testid="file-row:alpha.txt"]').waitFor({ timeout: scaleTimeout(10000) });
-      assert.equal(await currentCrumb(page), '/ (root)', 'Enter on the root crumb goes back up');
+      assert.equal(await currentCrumb(page), BUCKET, 'Enter on the root crumb (the bucket) goes back up');
     } finally {
       await context.close();
     }

@@ -1,79 +1,140 @@
-// UploadQueue destination-folder floor validation for prefix-scoped keys (#60).
-// The free-text destination field is the one upload surface that can name an
-// arbitrary path; while scoped it must refuse (visibly, no silent autocorrect)
-// anything outside the connection's base prefix. Unscoped behavior unchanged.
+// The upload destination since layout A (v1.67.0): UploadTarget names it and edits it, App decides
+// whether it crosses a prefix-scoped key's floor (destinationOutsideFloor, unit-tested in
+// base-prefix.test.js), UploadMenu is disabled while it does, and UploadQueue still refuses files
+// (drops included) while it does (#60: visibly, never a silent autocorrect).
 import '../helpers/with-dom.js';
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { h } from 'preact';
-import { mount, setInput } from '../helpers/render.js';
+import { mount, fire, setInput } from '../helpers/render.js';
+import { UploadTarget } from '../../src/components/UploadTarget.jsx';
+import { UploadMenu } from '../../src/components/UploadMenu.jsx';
 import { UploadQueue } from '../../src/components/UploadQueue.jsx';
 
-const caps = { list: 'permitted', download: 'permitted', upload: 'permitted', delete: 'permitted' };
-
-function mountQueue({ basePrefix = '', currentPrefix = '' } = {}) {
-  return mount(
-    h(UploadQueue, {
-      client: { send: () => Promise.resolve({}) },
-      bucket: 'b',
-      provider: 'generic',
-      currentPrefix,
-      credentials: { bucket: 'b', endpoint: 'https://e', basePrefix },
-      capabilities: caps,
-      onCapabilityChange: () => {},
-      onUploadsComplete: () => {},
-      onLogEntry: () => {},
-    }),
-  );
-}
-
-function destInput(query) {
-  return query('input[placeholder="(root of bucket)"]') || query('.form-group input[type="text"]');
-}
-
-function chooseButtons(queryAll) {
-  return Array.from(queryAll('button')).filter((b) => /Choose (files|folder)/.test(b.textContent));
-}
-
-describe('UploadQueue — destination floor (#60)', () => {
-  test('an out-of-floor destination shows an inline error and disables the pickers', () => {
-    const { query, queryAll, cleanup } = mountQueue({ basePrefix: 'team/alice/', currentPrefix: 'team/alice/' });
+describe('UploadTarget', () => {
+  test('names the bucket and folder uploads go to, and exposes the destination for tests', () => {
+    const { query, cleanup } = mount(
+      h(UploadTarget, { bucket: 'family-photos', destinationPrefix: '2026/trip/', onChange: () => {} }),
+    );
     try {
-      setInput(destInput(query), 'team/bob/');
-      assert.ok(query('.field-error'), 'an inline error must render for an out-of-floor destination');
-      for (const b of chooseButtons(queryAll)) assert.equal(b.disabled, true, `${b.textContent} must be disabled`);
+      assert.equal(query('.upload-target-line strong').textContent, 'family-photos / 2026 / trip /');
+      assert.equal(query('.upload-target').getAttribute('data-upload-target'), '2026/trip/');
+      assert.equal(query('#upload-destination'), null, 'the free-text field is closed by default');
     } finally {
       cleanup();
     }
   });
 
-  test('an in-floor destination is accepted', () => {
-    const { query, queryAll, cleanup } = mountQueue({ basePrefix: 'team/alice/', currentPrefix: 'team/alice/' });
+  test('"Change" opens the free-text destination, and typing reports the new value', () => {
+    const typed = [];
+    const { query, cleanup } = mount(
+      h(UploadTarget, { bucket: 'b', destinationPrefix: '', onChange: (v) => typed.push(v) }),
+    );
     try {
-      setInput(destInput(query), 'team/alice/2026/');
-      assert.ok(!query('.field-error'), 'no error for a destination under the floor');
-      for (const b of chooseButtons(queryAll)) assert.equal(b.disabled, false);
+      fire(query('.upload-target-change'), 'click');
+      assert.equal(query('.upload-target-change').getAttribute('aria-expanded'), 'true');
+      setInput(query('#upload-destination'), 'new/place/');
+      assert.deepEqual(typed, ['new/place/']);
     } finally {
       cleanup();
     }
   });
 
-  test('clearing the destination while scoped is out-of-floor (root is above the floor)', () => {
-    const { query, cleanup } = mountQueue({ basePrefix: 'team/alice/', currentPrefix: 'team/alice/' });
+  test('outside the floor, the inline error names the base folder', () => {
+    const { query, cleanup } = mount(
+      h(UploadTarget, {
+        bucket: 'b',
+        destinationPrefix: 'team/bob/',
+        onChange: () => {},
+        outsideFloor: true,
+        basePrefix: 'team/alice/',
+      }),
+    );
     try {
-      setInput(destInput(query), '');
-      assert.ok(query('.field-error'), 'the bucket root is outside the floor while scoped');
+      assert.ok(query('.field-error').textContent.includes('team/alice/'));
     } finally {
       cleanup();
     }
   });
 
-  test('unscoped connections keep free-text destinations (regression anchor)', () => {
-    const { query, queryAll, cleanup } = mountQueue();
+  test('inside the floor (or unscoped), no error', () => {
+    const { query, cleanup } = mount(h(UploadTarget, { bucket: 'b', destinationPrefix: 'x/', onChange: () => {} }));
     try {
-      setInput(destInput(query), 'anywhere/at/all/');
-      assert.ok(!query('.field-error'), 'no floor, no error');
-      for (const b of chooseButtons(queryAll)) assert.equal(b.disabled, false);
+      assert.equal(query('.field-error'), null);
+    } finally {
+      cleanup();
+    }
+  });
+});
+
+describe('UploadMenu', () => {
+  test('disabled while the destination is outside the floor', () => {
+    const { query, cleanup } = mount(h(UploadMenu, { onFiles: () => {}, disabled: true, disabledTitle: 'why' }));
+    try {
+      assert.equal(query('.upload-menu-btn').disabled, true);
+      assert.equal(query('.upload-menu-btn').getAttribute('title'), 'why');
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('opens Upload files… and Upload a folder…, and keeps the file input the specs drive', () => {
+    const { query, queryAll, cleanup } = mount(h(UploadMenu, { onFiles: () => {} }));
+    try {
+      assert.ok(query('input[data-testid="file-input"]'), 'the hidden file input is always present');
+      fire(query('.upload-menu-btn'), 'click');
+      const labels = queryAll('.upload-menu button').map((b) => b.textContent);
+      assert.deepEqual(labels, ['Upload files…', 'Upload a folder…']);
+    } finally {
+      cleanup();
+    }
+  });
+
+  test('chosen files go to onFiles with their names as relative paths', () => {
+    const got = [];
+    const { query, cleanup } = mount(h(UploadMenu, { onFiles: (entries) => got.push(...entries) }));
+    try {
+      const input = query('input[data-testid="file-input"]');
+      const file = new File(['x'], 'a.txt');
+      Object.defineProperty(input, 'files', { value: [file], configurable: true });
+      fire(input, 'change');
+      assert.equal(got.length, 1);
+      assert.equal(got[0].relativePath, 'a.txt');
+    } finally {
+      cleanup();
+    }
+  });
+});
+
+describe('UploadQueue — floor guard (#60)', () => {
+  function mountQueue(destOutsideFloor) {
+    let addFiles = null;
+    const activity = [];
+    const m = mount(
+      h(UploadQueue, {
+        client: { send: () => new Promise(() => {}) },
+        bucket: 'b',
+        provider: 'generic',
+        destinationPrefix: 'team/bob/',
+        destOutsideFloor,
+        credentials: { bucket: 'b', endpoint: 'https://e', basePrefix: 'team/alice/' },
+        onCapabilityChange: () => {},
+        onUploadsComplete: () => {},
+        onLogEntry: () => {},
+        onMount: (a) => (addFiles = a.addFiles),
+        onActivityChange: (s) => activity.push(s),
+      }),
+    );
+    return { ...m, addFiles: () => addFiles, activity };
+  }
+
+  test('outside the floor, added files (drops included) are refused', () => {
+    const { addFiles, activity, query, cleanup } = mountQueue(true);
+    try {
+      addFiles()([{ file: new File(['x'], 'a.txt'), relativePath: 'a.txt' }]);
+      assert.equal(query('.upload-queue'), null, 'nothing was queued');
+      const last = activity[activity.length - 1];
+      assert.equal(last.queued + last.running, 0);
     } finally {
       cleanup();
     }

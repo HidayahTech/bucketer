@@ -58,7 +58,8 @@ function downloadSummary(t) {
   return `Sending to your browser — ${t.current}${ofText}${errText}`;
 }
 
-function taskSummary(t) {
+// Exported for the Activity line (layout A, v1.67.0), so both say the same thing.
+export function taskSummary(t) {
   if (t.kind === 'download') return downloadSummary(t);
   const verbs = VERBS[t.kind];
   const skipped = t.errors.filter((e) => e.skipped).length;

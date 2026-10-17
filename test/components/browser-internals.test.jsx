@@ -26,6 +26,59 @@ describe('Breadcrumb — root prefix', () => {
   });
 });
 
+// Layout A (v1.67.0): in the file pane the breadcrumb is the page title, led by the bucket.
+describe('Breadcrumb — bucket title (rootName + heading)', () => {
+  test('at the root, the h1 names the bucket instead of "/ (root)"', () => {
+    const { query, cleanup } = mount(
+      h(Breadcrumb, { prefix: '', onNavigate: () => {}, rootName: 'family-photos', heading: true }),
+    );
+    const title = query('nav.breadcrumb > h1.breadcrumb-title');
+    assert.ok(title, 'the crumbs sit in an h1 inside the nav landmark');
+    assert.equal(title.textContent.trim(), 'family-photos');
+    assert.ok(!title.textContent.includes('root'));
+    assert.ok(title.querySelector('[data-icon="bucket"]'), 'led by the bucket icon');
+    cleanup();
+  });
+
+  test('in a folder, the bucket is the first crumb and navigates to the root', () => {
+    let navigatedTo = null;
+    const { query, queryAll, cleanup } = mount(
+      h(Breadcrumb, {
+        prefix: '2026/trip/',
+        onNavigate: (p) => (navigatedTo = p),
+        rootName: 'family-photos',
+        heading: true,
+      }),
+    );
+    assert.equal(query('h1.breadcrumb-title').textContent.replace(/\s+/g, ''), 'family-photos/2026/trip');
+    fire(queryAll('.crumb')[0], 'click');
+    assert.equal(navigatedTo, '', 'the bucket crumb goes to the root');
+    cleanup();
+  });
+
+  test('with a floor, the bucket leads as plain text and the floor leaf is the first crumb', () => {
+    const { query, queryAll, cleanup } = mount(
+      h(Breadcrumb, {
+        prefix: 'team/alice/2026/',
+        floor: 'team/alice/',
+        onNavigate: () => {},
+        rootName: 'shared',
+        heading: true,
+      }),
+    );
+    assert.equal(query('.crumb-bucket').textContent, 'shared');
+    assert.equal(query('.crumb-bucket').tagName, 'SPAN', 'nothing above the floor is clickable');
+    assert.equal(queryAll('.crumb')[0].textContent, 'alice');
+    cleanup();
+  });
+
+  test('without heading, no h1 is rendered (the move picker)', () => {
+    const { query, cleanup } = mount(h(Breadcrumb, { prefix: 'a/', onNavigate: () => {} }));
+    assert.equal(query('h1'), null);
+    cleanup();
+  });
+});
+
 // #69: the copy-link control is a real, labelled button that appears only when the caller
 // supplies the action (Browser does so below the floor), never as a bare span.
 describe('Breadcrumb — copy-link button (#69)', () => {

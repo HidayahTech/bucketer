@@ -70,15 +70,20 @@ import {
   urlChangesConnection,
   describeUrlParams,
 } from '../lib/url-params.js';
-import { normalizeBasePrefix, discoveredFloor } from '../lib/base-prefix.js';
+import { normalizeBasePrefix, discoveredFloor, destinationOutsideFloor } from '../lib/base-prefix.js';
 import { isForegroundTask } from '../lib/task-routing.js';
 import { vaultExists, isUnlocked, recallSecret, rememberSecret, createVault, VAULT_ENABLED } from '../lib/vault.js';
 import { FileBanner } from './FileBanner.jsx';
 import { CredentialForm } from './CredentialForm.jsx';
 import { VaultUnlock, VAULT_USERNAME } from './VaultUnlock.jsx';
 import { ShareLinkMenu } from './ShareLinkMenu.jsx';
+import { BucketToolsMenu } from './BucketToolsMenu.jsx';
 import { Browser } from './Browser.jsx';
 import { UploadQueue } from './UploadQueue.jsx';
+import { UploadMenu } from './UploadMenu.jsx';
+import { UploadTarget } from './UploadTarget.jsx';
+import { ActivityPanel } from './ActivityPanel.jsx';
+import { Portal } from './Portal.jsx';
 import { DeleteConfirmModal } from './DeleteConfirmModal.jsx';
 import { MasterQueue } from './MasterQueue.jsx';
 import { runDeleteOperation } from '../lib/delete-queue.js';
@@ -138,7 +143,6 @@ import { StorageModal } from './StorageModal.jsx';
 import { TransferHandoff } from './TransferHandoff.jsx';
 import { DuplicatesModal } from './DuplicatesModal.jsx';
 import { Icon } from './Icon.jsx';
-import { HeaderIdentity } from './HeaderIdentity.jsx';
 import { CURRENT_VERSION } from '../lib/changelog.js';
 import { useWindowDragDrop } from '../hooks/useWindowDragDrop.js';
 import { useModalStates } from '../hooks/useModalStates.js';
@@ -205,6 +209,23 @@ export function App() {
     return lastId ? loadConnectionCapabilities(lastId) : defaultCapabilities();
   });
   const [currentPrefix, setCurrentPrefix] = useState('');
+  // Upload destination (layout A, v1.67.0; was UploadQueue's): follows the folder in view, and the
+  // upload-target line's "Change" can override it until the next navigation.
+  const [destinationPrefix, setDestinationPrefix] = useState('');
+  useEffect(() => {
+    setDestinationPrefix(currentPrefix || '');
+  }, [currentPrefix]);
+  const [uploadActivity, setUploadActivity] = useState(undefined);
+  // Prefix-scoped keys (#60): a typed destination outside the floor is refused visibly (the
+  // upload-target error + a disabled Upload ▾), never silently corrected; drops are refused too.
+  const connectionFloor = normalizeBasePrefix(credentials?.basePrefix);
+  const destOutsideFloor = destinationOutsideFloor(destinationPrefix, connectionFloor);
+  // The Activity tree's DOM home: created once, attached by Browser under its toolbar (Portal.jsx).
+  const belowToolbarHostRef = useRef(null);
+  if (belowToolbarHostRef.current === null && typeof document !== 'undefined') {
+    belowToolbarHostRef.current = document.createElement('div');
+    belowToolbarHostRef.current.className = 'below-toolbar-host';
+  }
   const [browserKey, setBrowserKey] = useState(0); // force re-mount on reconnect
   // True until the first Browser mount of this page session. Browser's hash-prefix
   // restore ("only the very first mount restores the URL-specified path", v1.14.4)
@@ -1680,33 +1701,16 @@ export function App() {
           <ConnectionTabs tabs={connectionTabs} selectedId={selectedConnectionId} onSelect={switchToConnection} />
         )}
         <span class="spacer" />
-        {session === 'connected' && credentials.bucket && (
-          <HeaderIdentity bucket={credentials.bucket} endpoint={credentials.endpoint} provider={credentials.provider} />
-        )}
         <StatusBadge session={session} />
         {session === 'connected' && buildShareUrl(credentials) && (
           <ShareLinkMenu credentials={credentials} prefix={currentPrefix} />
         )}
         {session === 'connected' && capabilities.list !== 'denied' && (
-          <button
-            type="button"
-            class="btn btn-sm hdr-btn"
-            onClick={() => setDuplicatesOpen(true)}
-            title="Scan this bucket or folder for duplicate files"
-          >
-            Find duplicates
-          </button>
-        )}
-        {session === 'connected' && capabilities.list !== 'denied' && (
-          <button
-            type="button"
-            class="btn btn-sm hdr-btn"
-            data-testid="open-incomplete-uploads"
-            onClick={() => setIncompleteOpen(true)}
-            title="Find and clean up unfinished multipart uploads still using storage"
-          >
-            Incomplete uploads
-          </button>
+          <BucketToolsMenu
+            onFindDuplicates={() => setDuplicatesOpen(true)}
+            onIncompleteUploads={() => setIncompleteOpen(true)}
+            onHiddenVersions={() => browserActionsRef.current?.showHiddenVersions?.()}
+          />
         )}
         {session === 'connected' && (
           <button
@@ -1927,41 +1931,61 @@ export function App() {
           </aside>
 
           <main class="main-content" data-testid="app-connected">
-            {/* Upload zone above the browser */}
-            <UploadQueue
-              client={client}
-              bucket={credentials.bucket}
-              provider={credentials.provider}
-              currentPrefix={currentPrefix}
-              credentials={credentials}
-              onCapabilityChange={handleCapabilityChange}
-              capabilities={capabilities}
-              onUploadsComplete={(prefixSet) => browserActionsRef.current?.onUploadsDrained?.(prefixSet)}
-              onLogEntry={() => {
-                if (logKeyDebounceRef.current) return;
-                logKeyDebounceRef.current = setTimeout(() => {
-                  setLogKey((k) => k + 1);
-                  logKeyDebounceRef.current = null;
-                }, 500);
-              }}
-              onMount={({ addFiles }) => {
-                addFilesRef.current = addFiles;
-              }}
-            />
-
-            <MasterQueue
-              readZipDetail={(jobId) =>
-                loadZipDetail(jobId).catch(() => ({ done: [], failed: [], doneCount: 0, failedCount: 0 }))
-              }
-              onResumeMove={handleResumeMove}
-              onDiscardMove={handleDiscardMove}
-            />
-
-            <UploadLog refreshKey={logKey} />
-
-            <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '1rem 0' }} />
-
+            {/* Layout A (v1.67.0): shown under Browser's toolbar, but owned here so a Browser
+                remount (key={browserKey}) never resets uploads or tasks. See Portal.jsx. */}
+            <Portal container={belowToolbarHostRef.current}>
+              {capabilities.upload !== 'denied' && (
+                <UploadTarget
+                  bucket={credentials.bucket}
+                  destinationPrefix={destinationPrefix}
+                  onChange={setDestinationPrefix}
+                  outsideFloor={destOutsideFloor}
+                  basePrefix={connectionFloor}
+                />
+              )}
+              <ActivityPanel uploads={uploadActivity}>
+                <UploadQueue
+                  client={client}
+                  bucket={credentials.bucket}
+                  provider={credentials.provider}
+                  destinationPrefix={destinationPrefix}
+                  destOutsideFloor={destOutsideFloor}
+                  credentials={credentials}
+                  onCapabilityChange={handleCapabilityChange}
+                  onUploadsComplete={(prefixSet) => browserActionsRef.current?.onUploadsDrained?.(prefixSet)}
+                  onLogEntry={() => {
+                    if (logKeyDebounceRef.current) return;
+                    logKeyDebounceRef.current = setTimeout(() => {
+                      setLogKey((k) => k + 1);
+                      logKeyDebounceRef.current = null;
+                    }, 500);
+                  }}
+                  onMount={({ addFiles }) => {
+                    addFilesRef.current = addFiles;
+                  }}
+                  onActivityChange={setUploadActivity}
+                />
+                <MasterQueue
+                  readZipDetail={(jobId) =>
+                    loadZipDetail(jobId).catch(() => ({ done: [], failed: [], doneCount: 0, failedCount: 0 }))
+                  }
+                  onResumeMove={handleResumeMove}
+                  onDiscardMove={handleDiscardMove}
+                />
+                <UploadLog refreshKey={logKey} />
+              </ActivityPanel>
+            </Portal>
             <Browser
+              uploadMenu={
+                capabilities.upload !== 'denied' && (
+                  <UploadMenu
+                    onFiles={(entries) => addFilesRef.current?.(entries)}
+                    disabled={destOutsideFloor}
+                    disabledTitle="The upload folder is outside this connection's base folder"
+                  />
+                )
+              }
+              belowToolbarHost={belowToolbarHostRef.current}
               key={browserKey}
               isFirstMount={firstBrowserMountRef.current}
               client={client}

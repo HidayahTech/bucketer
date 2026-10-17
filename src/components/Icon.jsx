@@ -116,6 +116,10 @@ const PATHS = {
   trash: (
     <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6" />
   ),
+  // Layout A (v1.67.0): the bucket title, Upload ▾ and Bucket tools ▾.
+  bucket: <path d="M4 7h16l-2 13a2 2 0 0 1-2 1.7H8A2 2 0 0 1 6 20L4 7ZM3 7h18M8 7l4-4 4 4" />,
+  upload: <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />,
+  sliders: <path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6" />,
 };
 
 export function Icon({ name, size = 16, class: extraClass }) {

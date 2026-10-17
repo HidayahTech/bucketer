@@ -179,8 +179,8 @@ describe('issue #2 — drag-dropped uploads target the current folder, not root'
       // Wait for the upload destination to reflect the folder (a real user takes far longer than this
       // to start a drag). The bug is the STALE CLOSURE: even fully settled, the captured addFiles read
       // the mount-time root prefix — waiting proves the fix, not the unrelated propagation lag.
-      const dest = page.locator('input[placeholder="(root of bucket)"]');
-      for (let i = 0; i < 50 && (await dest.inputValue().catch(() => '')) !== 'sub/'; i++)
+      const dest = page.locator('.upload-target');
+      for (let i = 0; i < 50 && (await dest.getAttribute('data-upload-target').catch(() => null)) !== 'sub/'; i++)
         await page.waitForTimeout(100);
 
       // Drag-drop a file onto the browser (the path that used the stale closure).

@@ -84,3 +84,35 @@ describe('HiddenVersions — non-R2 providers initial state', () => {
     }
   });
 });
+
+// Layout A (v1.67.0): Bucket tools ▾ → Hidden versions loads the panel without its own button.
+describe('HiddenVersions — requestKey', () => {
+  test('a non-zero requestKey loads the versions; 0 does not', async () => {
+    let sends = 0;
+    const client = {
+      send: async () => {
+        sends++;
+        return { Versions: [], DeleteMarkers: [], IsTruncated: false };
+      },
+    };
+    const idle = mount(h(HiddenVersions, { ...BASE_PROPS, provider: 'b2', client, requestKey: 0 }));
+    await new Promise((r) => setTimeout(r, 0));
+    assert.equal(sends, 0, 'requestKey 0 makes no request');
+    idle.cleanup();
+
+    const { text, cleanup } = mount(h(HiddenVersions, { ...BASE_PROPS, provider: 'b2', client, requestKey: 1 }));
+    await new Promise((r) => setTimeout(r, 0));
+    assert.equal(sends, 1, 'requestKey 1 lists the versions once');
+    assert.ok(text().includes('Hidden versions'), 'the panel is open');
+    cleanup();
+  });
+
+  test('for R2 a request still makes no S3 call', async () => {
+    const { text, cleanup } = mount(
+      h(HiddenVersions, { ...BASE_PROPS, provider: 'r2', client: strictMockClient(), requestKey: 1 }),
+    );
+    await new Promise((r) => setTimeout(r, 0));
+    assert.ok(text().includes('R2 does not support'));
+    cleanup();
+  });
+});
