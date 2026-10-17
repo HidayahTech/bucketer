@@ -74,7 +74,7 @@ async function dragDrop(page, srcSel, tgtSel) {
     { srcSel, tgtSel },
   );
 }
-async function waitUntil(pred, timeout = 10000) {
+async function waitUntil(pred, timeout = scaleTimeout(10000)) {
   const deadline = Date.now() + timeout;
   while (!(await pred()) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 150));
 }
@@ -94,7 +94,12 @@ describe('drag-and-drop matrix', () => {
 
       // Drag the file onto the "root" crumb → it moves to the bucket root.
       await dragDrop(page, '[data-testid="file-row:up.txt"]', '.breadcrumb .crumb');
-      await waitUntil(async () => (await bucketKeys()).includes('up.txt'));
+      // Wait for the move's end state, not just the copy: the source is deleted after a
+      // re-check of its ETag (#75), so on a slow lane it is briefly still present.
+      await waitUntil(async () => {
+        const k = await bucketKeys();
+        return k.includes('up.txt') && !k.includes('sub/up.txt');
+      });
       const keys = await bucketKeys();
       assert.ok(keys.includes('up.txt'), 'moved to root');
       assert.ok(!keys.includes('sub/up.txt'), 'no longer under sub/');
@@ -135,7 +140,11 @@ describe('drag-and-drop matrix', () => {
       await page.locator('.batch-bar', { hasText: '2 files' }).waitFor({ timeout: scaleTimeout(5000) });
       await dragDrop(page, '[data-testid="file-row:m1.txt"]', '[data-testid="folder-row:dest"]');
 
-      await waitUntil(async () => (await bucketKeys()).includes('dest/m1.txt'));
+      // End state, not just the first copy (see the root-crumb case above).
+      await waitUntil(async () => {
+        const k = await bucketKeys();
+        return k.includes('dest/m1.txt') && k.includes('dest/m2.txt') && !k.includes('m1.txt') && !k.includes('m2.txt');
+      });
       const keys = await bucketKeys();
       assert.ok(keys.includes('dest/m1.txt') && keys.includes('dest/m2.txt'), 'both selected files moved');
       assert.ok(

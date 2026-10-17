@@ -413,3 +413,27 @@ export async function sweepOrphanTemps(root, { now = () => Date.now(), maxAgeMs 
     /* best effort — OPFS unsupported, keys() unavailable, etc. */
   }
 }
+
+// "Clear all app data" (GitLab #78 / R05): remove every OPFS file this app owns — ZIP staging
+// (`bucketer-zip-*`, real object bytes, which also outlive a completed download) and prefetch
+// temps (`bucketer-tmp-*`) — regardless of age. Unlike the startup sweep this is an explicit
+// user wipe followed by a reload, so live work is being discarded on purpose. Files of other
+// origins' features are never touched. Names are collected before removal (no mutation
+// while iterating). Best-effort per entry; never throws.
+export async function wipeAppOpfsFiles(root) {
+  const names = [];
+  try {
+    for await (const name of root.keys()) {
+      if (name.startsWith('bucketer-zip-') || name.startsWith('bucketer-tmp-')) names.push(name);
+    }
+  } catch {
+    return;
+  }
+  for (const name of names) {
+    try {
+      await root.removeEntry(name);
+    } catch {
+      /* best effort — this entry only */
+    }
+  }
+}

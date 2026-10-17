@@ -13,7 +13,7 @@ import { runPrefetch, CONCURRENCY, MEDIUM_MAX } from './zip-prefetch.js';
 import { PROBE_KIND } from './download-preflight.js';
 import { updateItem, eachItemByStatus, countItemsByStatus, ITEM_STATUS } from './download-records.js';
 import { runInPlaceJob } from './zip-inplace.js';
-import { zipEntryPath, zipFileName, stagingName } from './zip-naming.js';
+import { zipEntryPath, zipFileName, stagingName, allocateZipPaths } from './zip-naming.js';
 
 // Re-exported for existing importers (App.jsx, test/zip-job.test.js, test/zip-job-run.test.js)
 // — the definitions now live in zip-naming.js, see its header comment for why.
@@ -134,6 +134,16 @@ async function runSerialZipJob(
 ) {
   const prefix = job.prefix ?? '';
   await promoteIssuedToDone(job.id);
+  // Unique entry paths over the whole job — every non-SKIPPED item, the same set the in-place
+  // engine lays out — so a resumed or fallen-back run names entries identically (#79).
+  const allKeys = [];
+  for (const st of [ITEM_STATUS.PENDING, ITEM_STATUS.ISSUED, ITEM_STATUS.DONE, ITEM_STATUS.FAILED]) {
+    await eachItemByStatus(job.id, st, (it) => {
+      allKeys.push(it.key);
+    });
+  }
+  const paths = allocateZipPaths(allKeys, prefix);
+  const entryPath = (key) => paths.get(key);
 
   // 1. Reload completed entries; decide the resume point.
   const done = [];
@@ -193,7 +203,7 @@ async function runSerialZipJob(
     const item = entry.item;
     const entryStart = writer.offset;
     try {
-      await writer.beginEntry(zipEntryPath(item.key, prefix), {
+      await writer.beginEntry(entryPath(item.key), {
         mtime: item.lastModified,
         declaredSize: item.size ?? 0,
       });
@@ -299,7 +309,7 @@ async function runSerialZipJob(
     const entries = [];
     await eachItemByStatus(job.id, ITEM_STATUS.DONE, (it) => {
       entries.push({
-        path: zipEntryPath(it.key, prefix),
+        path: entryPath(it.key),
         zipOffset: it.zipOffset,
         zipEnd: it.zipEnd,
         size: it.size,

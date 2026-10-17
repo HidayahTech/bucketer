@@ -321,6 +321,19 @@ export function saveLastProfileId(id) {
   }
 }
 
+function removeKeysWithPrefix(store, prefix) {
+  try {
+    const keys = [];
+    for (let i = 0; i < store.length; i++) {
+      const k = store.key(i);
+      if (k?.startsWith(prefix)) keys.push(k);
+    }
+    keys.forEach((k) => safeRemove(store, k));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
 // Removes every localStorage and sessionStorage key the app has ever written.
 // Does NOT touch IndexedDB — call deleteDatabase() from indexeddb.js separately.
 // After calling this, window.location.reload() is required to reset in-memory state.
@@ -335,6 +348,9 @@ export function wipeAllAppData() {
     's3b_active_uploads',
   ];
   allLSKeys.forEach((k) => safeRemove(localStorage, k));
+  // The file-mtime cache (Browser.jsx) keys hold bucket and object names outside the s3b_
+  // namespace, so they are cleared by prefix (GitLab #78 / R05).
+  removeKeysWithPrefix(localStorage, 'bucketer:mtime:');
   safeRemove(sessionStorage, SS_KEY_SECRET);
   safeRemove(sessionStorage, 's3b_file_banner_dismissed');
 }

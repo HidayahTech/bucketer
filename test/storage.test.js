@@ -17,6 +17,11 @@ function makeStore(backing) {
     removeItem: (k) => {
       delete backing[k];
     },
+    // Enumeration, as the real Storage API offers it (wipeAllAppData clears key prefixes).
+    get length() {
+      return Object.keys(backing).length;
+    },
+    key: (i) => Object.keys(backing)[i] ?? null,
   };
 }
 
@@ -719,6 +724,23 @@ describe('wipeAllAppData covers the connection model keys', () => {
     });
     wipeAllAppData();
     assert.equal(ls['s3b_vault'], undefined);
+  });
+});
+
+// #78 (R05): the file-mtime cache (Browser.jsx) writes `bucketer:mtime:<bucket>:<key>:<ts>`
+// — bucket and object names — outside the s3b_ namespace, so the enumerated key list missed
+// it and "Clear all app data" left object names on disk. Keys of other apps on the origin
+// must survive.
+describe('wipeAllAppData clears the file-mtime cache (#78)', () => {
+  test('removes every bucketer:mtime: key and leaves unrelated keys alone', () => {
+    ls['bucketer:mtime:bucket-b:private-name.txt:1'] = '2026-01-01';
+    ls['bucketer:mtime:other:dir/x.bin:2'] = '';
+    ls['someone-elses-key'] = 'keep me';
+    wipeAllAppData();
+    assert.equal(ls['bucketer:mtime:bucket-b:private-name.txt:1'], undefined);
+    assert.equal(ls['bucketer:mtime:other:dir/x.bin:2'], undefined);
+    assert.equal(ls['someone-elses-key'], 'keep me');
+    delete ls['someone-elses-key'];
   });
 });
 

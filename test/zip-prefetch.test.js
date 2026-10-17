@@ -9,6 +9,7 @@ import {
   createTempStore,
   TEMP_CHUNK,
   sweepOrphanTemps,
+  wipeAppOpfsFiles,
   SWEEP_MIN_AGE_MS,
 } from '../src/lib/zip-prefetch.js';
 
@@ -270,5 +271,31 @@ describe('sweepOrphanTemps', () => {
   test('best-effort: a root with no keys() (OPFS directory enumeration unsupported) does not throw', async () => {
     const root = { async removeEntry() {} }; // no keys() at all
     await assert.doesNotReject(sweepOrphanTemps(root, { now: () => FIXED_NOW }));
+  });
+});
+
+describe('wipeAppOpfsFiles (#78)', () => {
+  test('removes every bucketer-zip-* and bucketer-tmp-* entry regardless of age, and nothing else', async () => {
+    const root = fakeOpfsRoot();
+    root.files.set('bucketer-zip-job1.zip', new Uint8Array([1, 2, 3]));
+    root.files.set('bucketer-tmp-p0', new Uint8Array(0));
+    root.lastModified.set('bucketer-tmp-p0', Date.now()); // recent: the sweep would spare it
+    root.files.set('unrelated-file.txt', new Uint8Array(0));
+    await wipeAppOpfsFiles(root);
+    assert.deepEqual([...root.files.keys()], ['unrelated-file.txt']);
+  });
+
+  test('best-effort: a failing removeEntry or a root without keys() never throws', async () => {
+    const root = fakeOpfsRoot();
+    root.files.set('bucketer-zip-a.zip', new Uint8Array(0));
+    root.files.set('bucketer-zip-b.zip', new Uint8Array(0));
+    const realRemove = root.removeEntry.bind(root);
+    root.removeEntry = async (name) => {
+      if (name === 'bucketer-zip-a.zip') throw new Error('locked');
+      return realRemove(name);
+    };
+    await assert.doesNotReject(wipeAppOpfsFiles(root));
+    assert.deepEqual([...root.files.keys()], ['bucketer-zip-a.zip'], 'the other entry is still removed');
+    await assert.doesNotReject(wipeAppOpfsFiles({ async removeEntry() {} }));
   });
 });

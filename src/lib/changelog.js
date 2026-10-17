@@ -1,9 +1,15 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.63.4';
+export const CURRENT_VERSION = '1.63.5';
 
 export const CHANGELOG = [
+  {
+    "version": "1.63.5",
+    "date": "2026-10-16",
+    "title": "Clear-all clears everything; every ZIP entry gets its own name",
+    "changes": []
+  },
   {
     "version": "1.63.4",
     "date": "2026-10-16",

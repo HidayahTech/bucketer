@@ -103,6 +103,19 @@ const ZMANY = Object.fromEntries([
   ]),
 ]);
 
+// #79 (R06): distinct keys that sanitize to the same archive path (illegal chars, trailing
+// dot, NFC vs NFD, case-only difference). Each body is unique so a dropped entry shows.
+const ZCOL = {
+  'zcol/a:b.txt': Buffer.from('colon variant\n'),
+  'zcol/a?b.txt': Buffer.from('question-mark variant\n'),
+  'zcol/trail.txt': Buffer.from('no trailing dot\n'),
+  'zcol/trail.txt.': Buffer.from('trailing dot variant\n'),
+  ['zcol/caf\u00e9.txt']: Buffer.from('NFC cafe\n'),
+  ['zcol/cafe\u0301.txt']: Buffer.from('NFD cafe variant\n'),
+  'zcol/Case.txt': Buffer.from('upper-case C\n'),
+  'zcol/case.txt': Buffer.from('lower-case c variant\n'),
+};
+
 // Arm 4: WebKit absence — one file is enough to reach the ready phase.
 const ZWK = { 'zwk/only.txt': Buffer.from('webkit must not offer a zip button\n') };
 
@@ -115,6 +128,7 @@ before(async () => {
     ...Object.entries(ZINT),
     ...Object.entries(ZMANY),
     ...Object.entries(ZWK),
+    ...Object.entries(ZCOL),
   ]) {
     await ctx.client.send(new PutObjectCommand({ Bucket: BUCKET, Key: key, Body: body }));
   }
@@ -182,6 +196,33 @@ function assertZipMatches(entries, expected) {
 }
 
 describe('browser e2e — zip download', () => {
+  e2eTest(
+    'distinct keys that sanitize to one name still get distinct entries (#79)',
+    async () => {
+      await page.goto(app.url, { waitUntil: 'domcontentloaded' });
+      await connectApp(page, ctx.httpsBrowserEndpoint);
+      await page.locator('[data-testid="folder-row:zcol"]').click();
+      await page.locator('[data-testid="file-row:trail.txt"]').waitFor({ timeout: scaleTimeout(10000) });
+      await openPanel(page);
+      await page.locator('[data-testid="scan"]').click();
+      await page.locator('[data-testid="start-zip"]').waitFor({ timeout: scaleTimeout(15000) });
+      await page.locator('[data-testid="start-zip"]').click();
+      await downloads.waitForCount(1, 30000);
+      const entries = readZip(new Uint8Array(readFileSync(await downloads.list()[0].path())));
+
+      const names = entries.map((e) => e.name);
+      const folded = new Set(names.map((n) => n.normalize('NFC').toLowerCase()));
+      assert.equal(entries.length, 8, `one entry per object; got ${JSON.stringify(names)}`);
+      assert.equal(folded.size, 8, `names must be distinct even case-insensitively; got ${JSON.stringify(names)}`);
+      const gotBodies = entries.map((e) => Buffer.from(e.data).toString()).sort();
+      const wantBodies = Object.values(ZCOL)
+        .map((b) => b.toString())
+        .sort();
+      assert.deepEqual(gotBodies, wantBodies, 'every object’s bytes are in the archive');
+    },
+    { skipOn: { webkit: 'start-zip does not render on WebKit' } },
+  );
+
   e2eTest(
     'one zip download contains exactly the selected files, byte-for-byte, folder structure intact',
     async () => {
