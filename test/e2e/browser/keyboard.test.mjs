@@ -66,7 +66,7 @@ describe('keyboard-only browsing', () => {
   e2eTest('open a folder and go back up with Tab + Enter', async () => {
     const { context, page } = await freshConnectedPage();
     try {
-      await page.locator(".hamburger").focus();
+      await page.locator('.hamburger').focus();
       await tabTo(page, '[data-testid="folder-row:docs"] .file-dir');
       await page.keyboard.press('Enter');
       await page
@@ -75,7 +75,7 @@ describe('keyboard-only browsing', () => {
         .waitFor({ timeout: scaleTimeout(10000) });
       assert.equal(await currentCrumb(page), 'docs', 'Enter on the folder name opens the folder');
 
-      await page.locator(".hamburger").focus();
+      await page.locator('.hamburger').focus();
       await tabTo(page, '.breadcrumb button.crumb');
       await page.keyboard.press('Enter');
       await page.locator('[data-testid="file-row:alpha.txt"]').waitFor({ timeout: scaleTimeout(10000) });
@@ -88,7 +88,7 @@ describe('keyboard-only browsing', () => {
   e2eTest('preview a file with Enter; the dialog takes focus and Escape returns it', async () => {
     const { context, page } = await freshConnectedPage();
     try {
-      await page.locator(".hamburger").focus();
+      await page.locator('.hamburger').focus();
       const nameSel = '[data-testid="file-row:alpha.txt"] .file-name-previewable';
       await tabTo(page, nameSel);
       await page.keyboard.press('Enter');
@@ -114,7 +114,7 @@ describe('keyboard-only browsing', () => {
     try {
       const sizeTh = page.locator('th.col-sortable', { hasText: 'Size' });
       assert.equal(await sizeTh.getAttribute('aria-sort'), null, 'size is not the sort column yet');
-      await page.locator(".hamburger").focus();
+      await page.locator('.hamburger').focus();
       await tabTo(page, 'th.col-sortable[title="Sort by Size"] button.sort-btn');
       await page.keyboard.press('Enter');
       await page.waitForFunction(
