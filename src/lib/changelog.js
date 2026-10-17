@@ -1,9 +1,15 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.65.0';
+export const CURRENT_VERSION = '1.66.0';
 
 export const CHANGELOG = [
+  {
+    "version": "1.66.0",
+    "date": "2026-10-16",
+    "title": "Bucketer remembers your buckets",
+    "changes": []
+  },
   {
     "version": "1.65.0",
     "date": "2026-10-16",

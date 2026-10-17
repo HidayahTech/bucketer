@@ -105,11 +105,20 @@ export async function startAppServer() {
 // Fill the credential form and connect, then wait for the connected browser UI. Reusable across
 // browser specs. Robust connected-state signal: the upload file input (the old .upload-zone
 // selector was removed from the connected UI in v1.15.3).
+// Base folder, provider and region sit in the form's "More options" disclosure (v1.66.0), closed
+// while all three are default. Open it before touching those fields; a no-op when already open.
+export async function openMoreOptions(page) {
+  const d = page.locator('details.more-options').first();
+  if ((await d.count()) === 0) return;
+  if (!(await d.evaluate((el) => el.open))) await d.locator('summary').click();
+}
+
 export async function connectApp(page, endpoint, bucket = BUCKET) {
   await page.locator('input[type="url"]').fill(endpoint);
   await page.locator('input[placeholder="my-bucket"]').fill(bucket);
   await page.locator('input[placeholder="Access Key ID"]').fill('test-key-id');
   await page.locator('input[placeholder="Secret Access Key"]').fill('test-secret-key');
+  await openMoreOptions(page);
   const region = page.locator('input[placeholder="us-east-1"]');
   await region.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
   if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');

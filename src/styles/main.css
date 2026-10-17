@@ -153,7 +153,14 @@ h1, h2, h3 { color: var(--ink); line-height: 1.25; }
 .app-header .app-logo .bk-body { stroke: var(--brand-sky); stroke-width: 3; }
 .wordmark { font-size: 1.125rem; font-weight: 800; letter-spacing: -0.01em; color: var(--header-fg); white-space: nowrap; }
 .app-header .spacer { flex: 1; }
-.app-header .header-status { font-size: .8rem; opacity: .85; }
+/* Connected bucket + storage address (accounts A, v1.66.0). Truncates rather than pushing the
+   header's buttons off-screen; the host hides on phones. */
+.header-identity { display: flex; flex-direction: column; min-width: 0; max-width: 22rem; line-height: 1.2; color: var(--header-fg); }
+.header-bucket { font-weight: 700; font-size: .9375rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.header-host { font-size: .75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--mono); }
+@media (max-width: 640px) {
+  .header-host { display: none; }
+}
 .connection-tabs { display: flex; align-items: center; gap: .3rem; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
 .connection-tab {
   flex-shrink: 0; max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -1213,6 +1220,7 @@ details[open] .sv-summary::before { transform: rotate(90deg); }
   color: var(--text-muted); transition: color var(--transition);
 }
 .account-header:hover { color: var(--text); }
+.account-toggle { display: flex; align-items: center; gap: .4rem; flex: 1; min-width: 0; }
 .account-disclosure { width: .9em; flex-shrink: 0; text-align: center; }
 .account-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .account-add-bucket {
@@ -1242,6 +1250,34 @@ details[open] .sv-summary::before { transform: rotate(90deg); }
 .bucket-save-trigger { font-size: .8rem; color: var(--text-muted); }
 .bucket-save-form { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 .bucket-save-form .input { flex: 1; min-width: 140px; font-size: .85rem; padding: .3rem .5rem; }
+
+/* Splash "Your buckets" (accounts A, v1.66.0): cards naming the storage address and last use. */
+.your-buckets-head { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; margin-bottom: .6rem; }
+.your-buckets-title { font-size: 1.05rem; font-weight: 700; color: var(--ink); }
+.your-buckets-sub { font-size: .8125rem; color: var(--text-muted); }
+.account-host { font-size: .75rem; font-weight: 400; text-transform: none; letter-spacing: 0; font-family: var(--mono); color: var(--text-muted); }
+.accounts-manager-splash .bucket-row {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: .75rem; row-gap: .1rem;
+  padding: .6rem .75rem; background: var(--surface); box-shadow: var(--shadow); border-radius: var(--radius-card);
+}
+.accounts-manager-splash .bucket-name { grid-column: 1; text-align: left; font-size: 1rem; font-weight: 700; color: var(--ink); }
+.accounts-manager-splash .bucket-meta { grid-column: 1; font-size: .8125rem; color: var(--text-muted); overflow-wrap: anywhere; }
+.accounts-manager-splash .bucket-row-delete,
+.accounts-manager-splash .bucket-delete-confirm { grid-column: 2; grid-row: 1 / span 2; align-self: center; font-size: .8125rem; color: var(--text-muted); }
+.your-buckets-foot { margin-top: .75rem; display: flex; flex-direction: column; align-items: flex-start; gap: .4rem; }
+.forget-all-confirm-row { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; font-size: .875rem; }
+
+/* Connect form: rarely-needed fields behind "More options" (accounts A). */
+.more-options { margin: .25rem 0 1rem; border: 1px solid var(--border); border-radius: var(--radius); padding: .5rem .75rem; }
+.more-options > summary { cursor: pointer; font-weight: 600; min-height: 32px; display: flex; align-items: center; flex-wrap: wrap; gap: .25rem; }
+.more-options-state { font-weight: 400; font-size: .8125rem; color: var(--text-muted); }
+.more-options[open] > summary { margin-bottom: .5rem; }
+/* display:flex drops the native marker; draw one so the box reads as openable. */
+.more-options > summary::before { content: '▸'; width: .9em; color: var(--text-muted); }
+.more-options[open] > summary::before { content: '▾'; }
+/* Same rhythm as the form's own .75rem gap between fields. */
+.more-options > .form-group + .form-group { margin-top: .75rem; }
+.hint-recall { color: var(--text-success); }
 
 /* ── Toasts (#15) ─────────────────────────────────────────────────────────── */
 .toast-host {

@@ -30,7 +30,7 @@ import { showToast } from '../lib/toast.js';
 import { createS3Client } from '../lib/s3-client.js';
 import { diagnosticsProps } from '../lib/connection-diagnostics.js';
 import { isPermissionError } from '../lib/format.js';
-import { detectProvider, PROVIDER_LABELS } from '../lib/provider.js';
+import { detectProvider } from '../lib/provider.js';
 import {
   loadCredentials,
   saveCredentials,
@@ -43,6 +43,7 @@ import {
   saveLastProfileId,
   repairStorageInvariants,
   migrateProfilesFromLegacy,
+  deleteAllProfiles,
 } from '../lib/storage.js';
 import {
   listResolvedConnections,
@@ -58,6 +59,8 @@ import {
   hasMigratedConnections,
   loadCredentialRecords,
   credentialFingerprint,
+  rememberConnection,
+  recallForKeyId,
 } from '../lib/connections.js';
 import { cacheSecret, getCachedSecret, clearSecretCache, forgetCachedSecret } from '../lib/secret-cache.js';
 import {
@@ -135,6 +138,7 @@ import { StorageModal } from './StorageModal.jsx';
 import { TransferHandoff } from './TransferHandoff.jsx';
 import { DuplicatesModal } from './DuplicatesModal.jsx';
 import { Icon } from './Icon.jsx';
+import { HeaderIdentity } from './HeaderIdentity.jsx';
 import { CURRENT_VERSION } from '../lib/changelog.js';
 import { useWindowDragDrop } from '../hooks/useWindowDragDrop.js';
 import { useModalStates } from '../hooks/useModalStates.js';
@@ -289,10 +293,27 @@ export function App() {
           showToast(`Base folder saved to ${rec.name}`);
         }
       }
+      // Accounts A (v1.66.0, REPORT C1): the first request this connect gets through proves the
+      // values work, so remember them as a saved bucket — no Save click. Not on connect itself:
+      // handleConnect reports "connected" before any request is made. After the #67 floor save above,
+      // so a folder discovered on recovery matches its record instead of minting a second card.
+      let targetId = selectedConnectionId;
+      if (state === 'permitted' && !rememberedThisConnectRef.current) {
+        rememberedThisConnectRef.current = true;
+        const c = credentialsRef.current;
+        if (c?.endpoint && c.bucket && c.keyId) {
+          targetId = rememberConnection(c);
+          setConnections(listResolvedConnections());
+          if (targetId !== selectedConnectionId) {
+            setSelectedConnectionId(targetId);
+            saveLastProfileId(targetId);
+          }
+        }
+      }
       setCapabilities((prev) => {
         if (prev[op] === state) return prev;
         const next = { ...prev, [op]: state };
-        if (selectedConnectionId) saveConnectionCapabilities(selectedConnectionId, next);
+        if (targetId) saveConnectionCapabilities(targetId, next);
         return next;
       });
     },
@@ -340,6 +361,8 @@ export function App() {
   // True while the in-flight connect came from a quick-switch (tab strip / sidebar), so a
   // failure can name the bucket it tried to open (#65). Every other connect clears it.
   const connectViaSwitchRef = useRef(false);
+  // Whether this connect has already been remembered as a saved bucket (see handleCapabilityChange).
+  const rememberedThisConnectRef = useRef(false);
   const [failedViaSwitch, setFailedViaSwitch] = useState(false);
 
   async function handleConnect(creds, { reconnect = false } = {}) {
@@ -349,6 +372,7 @@ export function App() {
     setConnectionError(null);
     setFailedViaSwitch(connectViaSwitchRef.current);
     connectViaSwitchRef.current = false;
+    rememberedThisConnectRef.current = false;
 
     const provider = creds.provider || detectProvider(creds.endpoint);
     const fullCreds = { ...creds, provider };
@@ -1350,6 +1374,9 @@ export function App() {
   function focusBaseFolderField() {
     const field = document.getElementById('cred-baseprefix');
     if (!field) return;
+    // The field lives in the form's "More options" disclosure (v1.66.0); open it first.
+    const details = field.closest('details');
+    if (details) details.open = true;
     field.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
     field.focus({ preventScroll: true });
   }
@@ -1521,6 +1548,30 @@ export function App() {
     }
   }
 
+  // "Forget all on this device" (accounts A): every saved bucket and account, the last-used
+  // values and any secret held in this tab. clearCredentials matters: with the connection model's
+  // marker gone, leftover flat keys would be re-migrated into a phantom bucket on the next load.
+  function handleForgetAll() {
+    deleteAllProfiles();
+    clearCredentials();
+    clearSecretCache();
+    setConnections([]);
+    setSelectedConnectionId(null);
+    const blank = {
+      endpoint: '',
+      bucket: '',
+      keyId: '',
+      secretKey: '',
+      provider: null,
+      regionOverride: '',
+      basePrefix: '',
+    };
+    setCredentials(blank);
+    setLiveFormData(blank);
+    setFormResetKey((k) => k + 1);
+    showToast('Forgot every saved bucket on this device');
+  }
+
   function handleDeleteProfile(id) {
     const deleted = resolveConnection(id);
     deleteConnectionRecord(id);
@@ -1538,7 +1589,12 @@ export function App() {
     }
   }
 
-  const providerLabel = credentials.provider ? PROVIDER_LABELS[credentials.provider] : null;
+  // A picked saved bucket names itself on the button (accounts A key-recognised state).
+  const selectedForForm = selectedConnectionId != null ? connections.find((c) => c.id === selectedConnectionId) : null;
+  const splashSubmitLabel =
+    selectedForForm && (liveFormData.bucket || '').trim() === selectedForForm.bucket
+      ? `Connect to ${selectedForForm.bucket}`
+      : 'Connect';
 
   return (
     <div id="app">
@@ -1624,7 +1680,9 @@ export function App() {
           <ConnectionTabs tabs={connectionTabs} selectedId={selectedConnectionId} onSelect={switchToConnection} />
         )}
         <span class="spacer" />
-        {providerLabel && session === 'connected' && <span class="header-status">{providerLabel}</span>}
+        {session === 'connected' && credentials.bucket && (
+          <HeaderIdentity bucket={credentials.bucket} endpoint={credentials.endpoint} provider={credentials.provider} />
+        )}
         <StatusBadge session={session} />
         {session === 'connected' && buildShareUrl(credentials) && (
           <ShareLinkMenu credentials={credentials} prefix={currentPrefix} />
@@ -1651,7 +1709,12 @@ export function App() {
           </button>
         )}
         {session === 'connected' && (
-          <button type="button" class="btn btn-sm hdr-btn" onClick={handleDisconnect}>
+          <button
+            type="button"
+            class="btn btn-sm hdr-btn"
+            onClick={handleDisconnect}
+            title="Sign out: forgets the secret in this tab; your saved buckets stay on this device"
+          >
             Sign out
           </button>
         )}
@@ -1681,12 +1744,14 @@ export function App() {
             ) : (
               <>
                 <AccountsManager
+                  variant="splash"
                   connections={connections}
                   selectedId={selectedConnectionId}
                   onSelect={handleSelectProfile}
                   onDelete={handleDeleteProfile}
                   onSave={handleSaveProfile}
                   onAddBucket={handleAddBucket}
+                  onForgetAll={handleForgetAll}
                   currentFormData={liveFormData}
                 />
                 {urlParamsPresent && (
@@ -1705,7 +1770,10 @@ export function App() {
                   onSave={handleConnect}
                   onFormChange={setLiveFormData}
                   loading={session === 'connecting'}
-                  autoFocusSecret={urlHadKeyId && !credentials.secretKey}
+                  autoFocusSecret={(urlHadKeyId || selectedConnectionId != null) && !credentials.secretKey}
+                  savedConnections={connections}
+                  recall={recallForKeyId}
+                  submitLabel={splashSubmitLabel}
                 />
                 {session === 'failed' && connectionError && (
                   <div style={{ marginTop: '1rem' }}>
@@ -1813,6 +1881,8 @@ export function App() {
               initial={credentials}
               onSave={(creds) => handleConnect(creds, { reconnect: true })}
               loading={false}
+              savedConnections={connections}
+              recall={recallForKeyId}
             />
             <hr style={{ border: 'none', borderTop: '1px solid var(--border)' }} />
             <CapabilityPanel capabilities={capabilities} onRefresh={handleRefreshPermissions} />

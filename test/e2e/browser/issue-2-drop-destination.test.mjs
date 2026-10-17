@@ -19,6 +19,7 @@ import {
   newE2EContext,
   newE2EPage,
   e2eTest,
+  openMoreOptions,
 } from '../harness.mjs';
 
 let ctx, app, browser;
@@ -123,6 +124,7 @@ describe('#72 — a drop after switching buckets uploads to the bucket on screen
       await page.locator('input[placeholder="my-bucket"]').fill(B);
       await page.locator('input[placeholder="Access Key ID"]').fill('test-key-id');
       await page.locator('input[placeholder="Secret Access Key"]').fill('test-secret-key');
+      await openMoreOptions(page);
       const region = page.locator('input[placeholder="us-east-1"]');
       await region.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
       if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');

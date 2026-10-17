@@ -12,6 +12,7 @@ import {
   newE2EContext,
   newE2EPage,
   e2eTest,
+  openMoreOptions,
 } from '../harness.mjs';
 
 let ctx, app, browser;
@@ -55,6 +56,7 @@ describe('BUG-047 — a share link survives disconnect', () => {
 
       // The link supplies everything but the secret, which is the whole point of it.
       await page.locator('input[placeholder="Secret Access Key"]').fill('s');
+      await openMoreOptions(page);
       const region = page.locator('input[placeholder="us-east-1"]');
       if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
       await page.locator('button[type="submit"]:has-text("Connect")').click();
@@ -126,6 +128,7 @@ describe('#70 — a link that changes the connection does not auto-connect', () 
     const { context, page } = await freshPage();
     try {
       await fillCreds(page, { endpoint: ctx.browserEndpoint, bucket: 'test-bucket', keyId: 'k', secret: 'sekret' });
+      await openMoreOptions(page);
       const region = page.locator('input[placeholder="us-east-1"]');
       if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
       await page.locator('button[type="submit"]:has-text("Connect")').click();
@@ -229,6 +232,7 @@ describe('BUG-027 — post-disconnect form is populated', () => {
     try {
       // Save a profile pointing at the mock, then connect with it.
       await fillCreds(page, { endpoint: ctx.browserEndpoint, bucket: 'test-bucket', keyId: 'k', secret: 's' });
+      await openMoreOptions(page);
       const region = page.locator('input[placeholder="us-east-1"]');
       if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
       const trigger = page.locator('.bucket-save-trigger');
@@ -284,6 +288,7 @@ describe('BUG-026 — region re-inference after profile load', () => {
       // Reload — the app pre-fills the form from the saved profile (regionOverride set). This is the
       // exact state BUG-026 broke: the region stayed stuck after a profile load.
       await page.reload({ waitUntil: 'domcontentloaded' });
+      await openMoreOptions(page);
       const regionInput = page.locator('input[placeholder="us-east-1"]');
       await regionInput.waitFor({ timeout: scaleTimeout(5000) });
 
@@ -335,6 +340,7 @@ describe('#76 — Sign out forgets cached secrets', () => {
       });
       async function fill(bucket, keyId, secret) {
         await fillCreds(page, { endpoint: ctx.browserEndpoint, bucket, keyId, secret });
+        await openMoreOptions(page);
         const region = page.locator('input[placeholder="us-east-1"]');
         await region.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
         if (await region.isVisible().catch(() => false)) await region.fill('us-east-1');
@@ -371,7 +377,11 @@ describe('#76 — Sign out forgets cached secrets', () => {
         if (await tab.isVisible().catch(() => false)) await tab.click();
         else {
           await page.locator('button[aria-label="Open menu"]').click();
-          await page.locator('.bucket-row', { hasText: 'person-a-bucket' }).click();
+          // B's connect is remembered (v1.66.0) and selected, so A's account starts collapsed.
+          const rowA = page.locator('.bucket-row', { hasText: 'person-a-bucket' });
+          if (!(await rowA.isVisible().catch(() => false)))
+            await page.locator('.account-header', { hasText: `key …${KEY_A.slice(-4)}` }).click();
+          await rowA.click();
         }
         // Settle on either outcome: the prompt, or (pre-fix) a request signed as A.
         const prompt = page.locator('h2:has-text("Connect to a bucket")');

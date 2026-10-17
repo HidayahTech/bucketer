@@ -291,11 +291,70 @@ export function resolveConnection(id) {
     bucket: conn.bucket,
     basePrefix: conn.basePrefix || '',
     capabilities: conn.capabilities || null,
+    lastUsedAt: conn.lastUsedAt || null,
     credentialId: cred.id,
     endpoint: cred.endpoint,
     keyId: cred.keyId,
     provider: cred.provider,
     regionOverride: cred.regionOverride,
+  };
+}
+
+// Accounts A (v1.66.0, REPORT C1): a successful connect is remembered without a Save click.
+// The card is non-secret — endpoint, key ID, provider, region, bucket, folder — and is matched
+// on (credential, bucket, folder), the same identity handleSaveProfile's re-add path uses, so
+// reconnecting updates lastUsedAt rather than adding a row. Name and capabilities of an existing
+// connection are left alone. Returns the connection id (numeric: see the note above newId).
+let _lastRememberId = 0;
+export function rememberConnection(creds, now = Date.now()) {
+  const cred = findOrCreateCredential(creds);
+  const bucket = (creds.bucket || '').trim();
+  const basePrefix = creds.basePrefix || '';
+  const existing = loadConnectionRecords().connections.find(
+    (c) => c.credentialId === cred.id && c.bucket === bucket && (c.basePrefix || '') === basePrefix,
+  );
+  if (existing) {
+    saveConnectionRecord({ id: existing.id, lastUsedAt: now });
+    return existing.id;
+  }
+  // Date.now()-based like every other new connection id, bumped past the last one minted here
+  // so two connects in one millisecond cannot share an id.
+  const id = Math.max(now, _lastRememberId + 1);
+  _lastRememberId = id;
+  saveConnectionRecord({
+    id,
+    name: defaultConnectionName({ provider: cred.provider, bucket }),
+    credentialId: cred.id,
+    bucket,
+    basePrefix,
+    capabilities: null,
+    lastUsedAt: now,
+  });
+  return id;
+}
+
+// Most recently used first (C8). Records saved before v1.66.0 have no lastUsedAt; their id is
+// their creation time, so they sort after every used card, newest first.
+export function byMostRecent(conns) {
+  return [...conns].sort((a, b) => (b.lastUsedAt || 0) - (a.lastUsedAt || 0) || b.id - a.id);
+}
+
+// A key ID the user has connected with before recalls its endpoint, provider, region and the
+// bucket last used with it (C3), so a password manager filling the key ID fills the rest.
+// When one key ID has been used on several endpoints, the most recent use wins.
+export function recallForKeyId(keyId) {
+  const k = (keyId || '').trim();
+  if (!k) return null;
+  const mine = byMostRecent(listResolvedConnections().filter((c) => c.keyId === k));
+  if (!mine.length) return null;
+  const last = mine[0];
+  return {
+    endpoint: last.endpoint,
+    provider: last.provider,
+    regionOverride: last.regionOverride,
+    bucket: last.bucket,
+    basePrefix: last.basePrefix,
+    buckets: [...new Set(mine.filter((c) => c.credentialId === last.credentialId).map((c) => c.bucket))],
   };
 }
 

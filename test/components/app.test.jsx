@@ -1901,3 +1901,40 @@ describe('App — deleting a saved connection forgets its cached secret (#76)', 
     }
   });
 });
+
+// Accounts A (v1.66.0): "Forget all on this device" removes every saved bucket and the last-used
+// values, and nothing comes back on the next load (the legacy flat-key migration must not
+// resurrect a phantom bucket from leftovers).
+describe('App — Forget all on this device', () => {
+  test('clears saved buckets and last-used values, and a reload brings nothing back', () => {
+    clearAppStorage();
+    const cred = findOrCreateCredential({
+      endpoint: 'https://s3.us-east-1.amazonaws.com',
+      keyId: 'AKIDFORGET1',
+      provider: 'aws',
+    });
+    saveConnectionRecord({ id: 1, name: 'one', credentialId: cred.id, bucket: 'one', capabilities: null });
+    localStorage.setItem('s3b_endpoint', 'https://s3.us-east-1.amazonaws.com');
+    localStorage.setItem('s3b_bucket', 'one');
+    localStorage.setItem('s3b_key_id', 'AKIDFORGET1');
+    const first = mount(h(App, {}));
+    try {
+      assert.ok(first.text().includes('Your buckets'));
+      fire(first.query('.forget-all-trigger'), 'click');
+      fire(first.query('.forget-all-confirm'), 'click');
+      assert.ok(!first.text().includes('Your buckets'), 'the list is gone');
+      assert.equal(localStorage.getItem('s3b_endpoint'), null);
+      assert.equal(JSON.parse(localStorage.getItem('s3b_connections') || '{"connections":[]}').connections.length, 0);
+    } finally {
+      first.cleanup();
+    }
+    const second = mount(h(App, {}));
+    try {
+      assert.ok(!second.text().includes('Your buckets'), 'no bucket resurrected on the next load');
+      assert.equal(second.query('#cred-endpoint').value, '');
+    } finally {
+      second.cleanup();
+      clearAppStorage();
+    }
+  });
+});

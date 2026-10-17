@@ -208,6 +208,28 @@ describe('AccountsManager — expansion', () => {
     assert.equal(awsAfter.querySelectorAll('.bucket-row').length, 1, 'expanded after header click');
     cleanup();
   });
+
+  test('the account toggle is a button carrying aria-expanded, and activating it expands the account', () => {
+    const { queryAll, cleanup } = mount(
+      h(
+        AccountsManager,
+        defaultProps({
+          connections: [B2_PHOTOS, AWS_ASSETS],
+          selectedId: 1,
+        }),
+      ),
+    );
+    const awsToggle = () =>
+      queryAll('.account-group')
+        .find((g) => g.textContent.includes('AWS S3'))
+        .querySelector('button.account-toggle');
+    assert.equal(awsToggle().getAttribute('aria-expanded'), 'false', 'collapsed account reports aria-expanded=false');
+    fire(awsToggle(), 'click');
+    assert.equal(awsToggle().getAttribute('aria-expanded'), 'true', 'expanded after the toggle button is activated');
+    const awsGroup = queryAll('.account-group').find((g) => g.textContent.includes('AWS S3'));
+    assert.equal(awsGroup.querySelectorAll('.bucket-row').length, 1, 'its bucket is now listed');
+    cleanup();
+  });
 });
 
 describe('AccountsManager — delete flow', () => {
@@ -223,6 +245,18 @@ describe('AccountsManager — delete flow', () => {
     );
     fire(queryAll('.bucket-row-delete')[0], 'click');
     assert.ok(query('.bucket-delete-confirm'), 'inline confirm should appear');
+    cleanup();
+  });
+
+  test('on the splash the confirm says Forget and that files are not touched, never Delete', () => {
+    const { queryAll, query, cleanup } = mount(
+      h(AccountsManager, defaultProps({ connections: [B2_PHOTOS, B2_BACKUPS], variant: 'splash' })),
+    );
+    fire(queryAll('.bucket-row-delete')[0], 'click');
+    const text = query('.bucket-delete-confirm').textContent;
+    assert.ok(text.includes('Forget?'), `confirm asks to forget; got "${text}"`);
+    assert.ok(text.includes('Your files are not touched.'), 'confirm says the files are safe');
+    assert.ok(!text.includes('Delete'), 'confirm never says Delete');
     cleanup();
   });
 
@@ -319,6 +353,63 @@ describe('AccountsManager — empty state', () => {
     const { query, queryAll, cleanup } = mount(h(AccountsManager, defaultProps({ connections: [] })));
     assert.ok(query('.bucket-save-trigger'), 'save trigger present so a first bucket can be saved');
     assert.equal(queryAll('.account-group').length, 0, 'no account groups when there are no connections');
+    cleanup();
+  });
+});
+
+// Accounts A (v1.66.0): on the splash the tree is "Your buckets" — every remembered bucket,
+// most recent first, each naming its storage address and last use, with Forget all (REPORT C1/C6/C8).
+describe('AccountsManager — splash "Your buckets"', () => {
+  const now = Date.now();
+  const used = (c, lastUsedAt) => ({ ...c, lastUsedAt });
+
+  test('heads the list "Your buckets" with the count on this device', () => {
+    const { text, cleanup } = mount(
+      h(AccountsManager, defaultProps({ variant: 'splash', connections: [B2_PHOTOS, B2_BACKUPS, AWS_ASSETS] })),
+    );
+    assert.ok(text().includes('Your buckets'));
+    assert.ok(text().includes('3 on this device'));
+    cleanup();
+  });
+
+  test('orders accounts and buckets by last use, most recent first', () => {
+    const conns = [used(B2_PHOTOS, now - 5 * 86400000), used(B2_BACKUPS, now - 60000), used(AWS_ASSETS, now - 3600000)];
+    const { queryAll, cleanup } = mount(h(AccountsManager, defaultProps({ variant: 'splash', connections: conns })));
+    assert.deepEqual(
+      queryAll('.bucket-name').map((b) => b.textContent),
+      ['backups', 'photos', 'client-assets'],
+      'the B2 account (backups used a minute ago) comes first; inside it backups before photos',
+    );
+    cleanup();
+  });
+
+  test('each bucket shows its storage address and when it was last used', () => {
+    const { query, cleanup } = mount(
+      h(AccountsManager, defaultProps({ variant: 'splash', connections: [used(B2_PHOTOS, now - 3 * 86400000)] })),
+    );
+    const row = query('.bucket-row');
+    assert.ok(row.textContent.includes('s3.us-west-002.backblazeb2.com'));
+    assert.ok(row.textContent.includes('Last used 3 days ago'));
+    cleanup();
+  });
+
+  test('says what is and is not kept, and offers Forget all behind a confirmation', () => {
+    let forgot = 0;
+    const { text, query, cleanup } = mount(
+      h(AccountsManager, defaultProps({ variant: 'splash', connections: [B2_PHOTOS], onForgetAll: () => forgot++ })),
+    );
+    assert.ok(text().includes('Never the secret'));
+    fire(query('.forget-all-trigger'), 'click');
+    assert.equal(forgot, 0, 'the first click only asks');
+    fire(query('.forget-all-confirm'), 'click');
+    assert.equal(forgot, 1);
+    cleanup();
+  });
+
+  test('the sidebar variant keeps its compact rows and has no Forget all', () => {
+    const { text, query, cleanup } = mount(h(AccountsManager, defaultProps({ connections: [B2_PHOTOS] })));
+    assert.ok(!text().includes('Your buckets'));
+    assert.equal(query('.forget-all-trigger'), null);
     cleanup();
   });
 });

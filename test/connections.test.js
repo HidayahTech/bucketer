@@ -44,6 +44,9 @@ import {
   saveConnectionCapabilities,
   clearAllConnectionCapabilities,
   repairCredentialProviders,
+  rememberConnection,
+  byMostRecent,
+  recallForKeyId,
 } from '../src/lib/connections.js';
 import { saveVaultRecord, setVaultEntry, getVaultEntry, VAULT_VERSION, PBKDF2_ITERATIONS } from '../src/lib/vault.js';
 
@@ -901,5 +904,126 @@ describe('deleting a credential cascades to its vault entry', () => {
     deleteConnectionRecord(1);
     assert.equal(loadCredentialRecords().credentials.length, 0);
     assert.equal(getVaultEntry(c.id), null);
+  });
+});
+
+// Accounts A (v1.66.0): every successful connect is remembered without a Save click (REPORT C1),
+// ordered by last use (C8), and a key ID the user has used before recalls its endpoint and bucket (C3).
+describe('rememberConnection', () => {
+  const creds = {
+    endpoint: 'https://s3.us-west-004.backblazeb2.com/',
+    keyId: 'K004abc',
+    provider: 'b2',
+    regionOverride: 'us-west-004',
+    bucket: 'family-photos',
+    basePrefix: '',
+    secretKey: 'never-stored',
+  };
+
+  test('creates a connection and credential for a first connect, stamped with lastUsedAt', () => {
+    const id = rememberConnection(creds, 1000);
+    const [conn] = listResolvedConnections();
+    assert.equal(conn.id, id);
+    assert.equal(typeof id, 'number', 'connection ids stay numeric (loadLastProfileId coerces)');
+    assert.equal(conn.bucket, 'family-photos');
+    assert.equal(conn.endpoint, 'https://s3.us-west-004.backblazeb2.com');
+    assert.equal(conn.lastUsedAt, 1000);
+  });
+
+  test('never writes the secret anywhere in localStorage', () => {
+    rememberConnection(creds, 1000);
+    assert.ok(!JSON.stringify(ls).includes('never-stored'));
+  });
+
+  test('a repeat connect updates lastUsedAt instead of adding a duplicate', () => {
+    const a = rememberConnection(creds, 1000);
+    const b = rememberConnection({ ...creds, endpoint: 'https://s3.us-west-004.backblazeb2.com' }, 2000);
+    assert.equal(a, b);
+    assert.equal(loadConnectionRecords().connections.length, 1);
+    assert.equal(listResolvedConnections()[0].lastUsedAt, 2000);
+  });
+
+  test('a different bucket or base folder on the same key is a separate card under one credential', () => {
+    rememberConnection(creds, 1000);
+    rememberConnection({ ...creds, bucket: 'household-docs' }, 2000);
+    rememberConnection({ ...creds, basePrefix: 'videos/' }, 3000);
+    assert.equal(loadConnectionRecords().connections.length, 3);
+    assert.equal(loadCredentialRecords().credentials.length, 1);
+  });
+
+  test('keeps the name and capabilities of an existing connection', () => {
+    const id = rememberConnection(creds, 1000);
+    saveConnectionRecord({ id, name: 'Photos', capabilities: { list: 'permitted' } });
+    rememberConnection(creds, 2000);
+    const conn = resolveConnection(id);
+    assert.equal(conn.name, 'Photos');
+    assert.equal(conn.capabilities.list, 'permitted');
+  });
+
+  test('two connects in the same millisecond still get distinct ids', () => {
+    const a = rememberConnection(creds, 1000);
+    const b = rememberConnection({ ...creds, bucket: 'other' }, 1000);
+    assert.notEqual(a, b);
+  });
+});
+
+describe('byMostRecent', () => {
+  test('orders by lastUsedAt, newest first; records without one fall back to id (creation time)', () => {
+    const list = [{ id: 1, lastUsedAt: 50 }, { id: 2 }, { id: 3, lastUsedAt: 90 }, { id: 4 }];
+    assert.deepEqual(
+      byMostRecent(list).map((c) => c.id),
+      [3, 1, 4, 2],
+    );
+    assert.deepEqual(
+      list.map((c) => c.id),
+      [1, 2, 3, 4],
+      'does not mutate its input',
+    );
+  });
+});
+
+describe('recallForKeyId', () => {
+  const b2 = {
+    endpoint: 'https://s3.us-west-004.backblazeb2.com',
+    keyId: 'K004abc',
+    provider: 'b2',
+    regionOverride: 'us-west-004',
+  };
+
+  test('returns null for an unknown or empty key ID', () => {
+    rememberConnection({ ...b2, bucket: 'a', basePrefix: '' }, 1000);
+    assert.equal(recallForKeyId('nope'), null);
+    assert.equal(recallForKeyId(''), null);
+    assert.equal(recallForKeyId(undefined), null);
+  });
+
+  test('returns the endpoint, provider, region and the most recently used bucket for that key', () => {
+    rememberConnection({ ...b2, bucket: 'old', basePrefix: '' }, 1000);
+    rememberConnection({ ...b2, bucket: 'recent', basePrefix: 'f/' }, 2000);
+    const r = recallForKeyId('  K004abc ');
+    assert.deepEqual(r, {
+      endpoint: b2.endpoint,
+      provider: 'b2',
+      regionOverride: 'us-west-004',
+      bucket: 'recent',
+      basePrefix: 'f/',
+      buckets: ['recent', 'old'],
+    });
+  });
+
+  test('a key used on two endpoints recalls the endpoint used most recently', () => {
+    rememberConnection({ ...b2, bucket: 'a', basePrefix: '' }, 3000);
+    rememberConnection(
+      {
+        ...b2,
+        endpoint: 'https://minio.home.test:9000',
+        provider: 'minio',
+        regionOverride: 'us-east-1',
+        bucket: 'm',
+        basePrefix: '',
+      },
+      1000,
+    );
+    assert.equal(recallForKeyId('K004abc').endpoint, b2.endpoint);
   });
 });
