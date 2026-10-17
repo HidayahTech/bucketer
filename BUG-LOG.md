@@ -4,6 +4,35 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-083 — Every GitLab Release since v1.45.0 published with an empty description
+
+**Date:** 2026-10-17 · present through v1.67.1 · fixed in v1.67.2
+
+**Symptom.** The Releases page showed a title and assets but no notes for every Release from v1.45.0
+to v1.67.1; anyone reading a Release, or comparing what a version changed, saw nothing. The six
+from v1.63.4 to v1.67.1 were filled in by hand on 2026-10-17; the 22 from v1.45.0 to v1.63.3 are
+still empty.
+
+**Root cause (verified).** `scripts/release.mjs` built the description from the version's CHANGELOG
+section by keeping only lines whose trimmed text starts with `- `. CHANGELOG entries moved from
+bullet lists to paragraphs; from v1.45.0 on, no line matched and the description was `''`. The
+release job still exited 0, so CI stayed green. Evidence: the Releases API reports description
+length 0 for v1.45.0–v1.63.3 and v1.67.1 and non-zero for bullet-style v1.36.0–v1.44.3.
+
+**Fix.** The CHANGELOG lookup moved to `scripts/changelog-release.mjs` (`releaseNotes`), which
+returns the title and the section's whole body, trimmed; `release.mjs` uses it. Bullet entries come
+out as before. Older empty Releases were not backfilled.
+
+**Test.** New `test/changelog-release.test.js`: prose body kept, bullets kept, empty body → `''`,
+unknown version → `null`, and the real CHANGELOG's top entry has a non-empty description.
+**PRE** (old bullet-only logic): 3/5, the prose and real-CHANGELOG cases fail with description `''`.
+**POST:** 5/5. The CI release job itself is exercised only by the v1.67.2 tag pipeline: its Release
+must show this version's text.
+
+**Why it wasn't caught earlier.** The release script had no test, and an empty description is not an
+error to the API or to CI. Nobody read the Releases page between v1.45.0 and the MR !22 write-up.
+Rule: generated public text needs a test that asserts it is non-empty for the real input.
+
 ## BUG-082 — On a phone, selecting the first row made every row jump 122 px down the page
 
 **Date:** 2026-10-17 · present through v1.67.0 · fixed in v1.67.1

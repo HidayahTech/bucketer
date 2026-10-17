@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.67.2] — 2026-10-17 — Release pages carry their release notes again
+
+No change to the app. Every GitLab Release since v1.45.0 published with an empty description: the release script kept only lines starting with "- " from each changelog entry, and the entries had become paragraphs. Each Release now carries its whole changelog entry, as this list does. The v1.63.4 to v1.67.1 Releases were filled in by hand; older empty ones are unchanged (BUG-083).
+
 ## [1.67.1] — 2026-10-17 — Ticking a file on a phone no longer moves the list
 
 On a phone, ticking the first file inserted the selection bar above the file list and pushed every row about 122 px down the page, so a quick second tap could tick a different file than the one you aimed at, just before a Delete or Move. On phones the selection bar now sits at the bottom of the screen and nothing moves when it appears. The list leaves room under its last row so nothing hides behind the bar, and a row you tab or scroll to stays above it (that last part needs Firefox 121 or newer; other current browsers have it). On wider screens the bar stays above the list (BUG-082).
