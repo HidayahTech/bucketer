@@ -214,13 +214,14 @@ describe('select-all, filter, sort', () => {
       await uploadFiles(page, ['a.txt', 'b.txt', 'c.txt']);
       // Default is name ascending. Click Name once → toggles to descending.
       await page.locator('th:has-text("Name")').click();
-      // Scope to the listing table — the UploadLog also renders tr.file-row rows (no
-      // data-testid), which would inject nulls into the order assertion.
+      // Only listing rows: the UploadLog under Activity also renders tr.file-row rows (no
+      // data-testid) in its own .file-table, so a .file-table scope let them in once they
+      // rendered — three nulls on CI's webkit phone lanes, pipeline 2958991303.
       // Poll rather than read once: on a slow lane the re-render is mid-flight right
-      // after the click, and a snapshot taken then contains nulls (issue #55).
+      // after the click (issue #55).
       const readOrder = () =>
         page
-          .locator('.file-table tbody tr.file-row')
+          .locator('.file-table tbody tr[data-testid^="file-row:"]')
           .evaluateAll((rows) => rows.map((r) => r.getAttribute('data-testid')));
       const expected = ['file-row:c.txt', 'file-row:b.txt', 'file-row:a.txt'];
       // Scaled by lane: this exact 5 s poll blew on webkit-mobile (~7 s) in pipeline #308.

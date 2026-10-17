@@ -1,9 +1,15 @@
 // Copyright (C) 2026 HidayahTech, LLC
 // @generated — do not edit directly. Source of truth: CHANGELOG.md (parsed by build.mjs).
 
-export const CURRENT_VERSION = '1.68.1';
+export const CURRENT_VERSION = '1.68.2';
 
 export const CHANGELOG = [
+  {
+    "version": "1.68.2",
+    "date": "2026-10-17",
+    "title": "A test that counted the upload log as files",
+    "changes": []
+  },
   {
     "version": "1.68.1",
     "date": "2026-10-17",

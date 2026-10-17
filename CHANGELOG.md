@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.68.2] — 2026-10-17 — A test that counted the upload log as files
+
+No change to the app. The test that checks sorting by Name counted the rows of the file list, and it also picked up the rows of the upload log under Activity, which use the same table layout. On GitLab's phone-sized Safari-engine runs the log had filled in by the time the test looked, so it saw three extra blank rows and failed, although the files were in the right order. It now counts only file-list rows.
+
 ## [1.68.1] — 2026-10-17 — The connect screen has no save step
 
 The connect screen lost its "Save current as a bucket…" button, which read "Update this bucket…" once you picked a bucket. Since v1.66.0 every bucket you connect to is remembered on this device without asking, so the button looked like a step you had to take before connecting, and "Update this bucket…" did not say what it would update. To give a bucket your own name, open the menu while connected and use the button under "Accounts & buckets", as before. Nothing about what is remembered has changed: storage address, bucket, key ID and folder, never the secret. This finishes the layout regroup picked in the 2026-10-16 design review.
