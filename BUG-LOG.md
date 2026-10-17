@@ -4,6 +4,42 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-081 — On mobile WebKit in dark mode, v1.64.x lost its page background; file names read at 2.06:1
+
+**Date:** 2026-10-16 · v1.64.0 and v1.64.1 affected (never on `main`) · absent in v1.65.0
+
+**Symptom.** v1.64.1's tag pipeline (https://gitlab.com/hidayahtech/bucketer/-/pipelines/2957730289)
+failed both WebKit mobile lanes (iPhone 13, Pixel 5): `contrast.test.mjs` dark,
+".file-name-previewable: 2.06:1 is below 4.5:1". Auto-retry queued both lanes; that red blocks
+v1.64.1's `release` job, so v1.64.1, like v1.64.0, has no GitLab Release. Nobody was affected:
+MR !22 was never merged and production stayed on v1.63.5.
+
+**Root cause (partly verified).** Verified: on WebKit with a mobile device profile and v1.64.1's CSS,
+`<body>` resolves as if it had no parent. Its computed `--bg`/`--text` are empty, `color-scheme` is
+`normal`, colour is initial black and font-size is 16 px rather than the inherited 15 px. So
+`background: var(--bg)` falls back to transparent, every ancestor of the file name is transparent, and
+the spec measures the light accent against its white fallback. `<html>` itself is correct (`--bg`
+`#1a1b1e`). The same build on desktop WebKit, and v1.65.0 on the same mobile lane, resolve `<body>`
+normally (probe output in the BUCKET-6 handoff). Hypothesis, not isolated: a WebKit style-resolution
+quirk triggered by something in v1.64.x's stylesheet that look B's rewrite removed. Adding
+`-webkit-text-size-adjust: 100%` to v1.64.1 did not change it.
+
+**Fix.** None in code: v1.65.0 (look B) does not show it. Evidence, image
+`mcr.microsoft.com/playwright:v1.60.0-noble` (webkit-2287), lane webkit × iPhone 13,
+`E2E_FILES=contrast.test.mjs`. **v1.64.1 (261d624):** 1 pass / 1 fail, "2.06:1 (dark)", reproducing
+CI exactly. **v1.65.0 (5d48253):** 2/2. v1.65.0 on every mobile lane (chromium, firefox and webkit ×
+iPhone 13 and Pixel 5) with `contrast` + `look-b`: 3/3 on each of 6 lanes.
+
+**Why it wasn't caught earlier.** The pre-push hook runs no browser layer: the browser matrix
+is CI-only by design (since v1.62.3). This session's and BUCKET-5's local container pairs were scoped to
+`E2E_DEVICES=desktop`. A dark-mode contrast spec is device-sensitive, so desktop-only pairs could not
+see it. Rule going forward: a spec that measures rendering (contrast, layout, fonts) runs its pair on
+the mobile devices too.
+
+**Test case.** The existing `test/e2e/browser/contrast.test.mjs` (dark) on webkit × iPhone 13 / Pixel 5
+is the regression test; it now runs in each local pair for rendering specs. Not covered: real iOS
+Safari. The harness cannot represent it, so whether the quirk occurs on a real device is unknown.
+
 ## BUG-080 — The pre-push hook tagged commits that CI's format gate rejects, so the version got no Release
 
 **Date:** 2026-10-16 · v1.62.2 and v1.64.0 affected · fix in the next release
