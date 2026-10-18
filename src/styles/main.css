@@ -1131,6 +1131,8 @@ details[open] .sv-summary::before { transform: rotate(90deg); }
 .changelog-group:first-child { margin-top: 0; }
 .changelog-group-label { display: block; font-weight: 500; color: var(--text); margin-bottom: .2rem; }
 .changelog-group ul { padding-left: 1.25rem; display: flex; flex-direction: column; gap: .2rem; }
+.changelog-para { margin: 0; color: var(--text-muted); line-height: 1.5; }
+.changelog-full-link { align-self: flex-start; margin: .75rem 0; font-size: .875rem; }
 .changelog-upstream { padding-top: .75rem; border-top: 1px solid var(--border); font-size: .8rem; }
 .upstream-result { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
 .upstream-badge { height: 20px; vertical-align: middle; display: block; }

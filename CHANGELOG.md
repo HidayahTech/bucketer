@@ -7,6 +7,10 @@ Heading format: `## [version] — date — Title`
 
 ---
 
+## [1.69.0] — 2026-10-17 — What's new shows what changed, and the page is lighter
+
+The "What's new" window now shows what each release changed. Since v1.45.0 every release here has been written as a paragraph, and the window only showed bullet lists, so for the last 51 releases it showed a version, a date and a title, with nothing underneath. It now shows the paragraphs too. It also lists only the 10 newest releases, and a "Full changelog on GitLab" link at the end opens the complete history. The whole history was about a seventh of the page Bucketer downloads; the page is now about 100 KB smaller (about 36 KB smaller as sent over the network).
+
 ## [1.68.2] — 2026-10-17 — A test that counted the upload log as files
 
 No change to the app. The test that checks sorting by Name counted the rows of the file list, and it also picked up the rows of the upload log under Activity, which use the same table layout. On GitLab's phone-sized Safari-engine runs the log had filled in by the time the test looked, so it saw three extra blank rows and failed, although the files were in the right order. It now counts only file-list rows.
