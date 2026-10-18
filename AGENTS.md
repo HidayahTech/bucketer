@@ -19,7 +19,8 @@ Commit/push confirmation, tests-before-push and `--no-verify`: the global rules.
 Per the global rule, structural guarantees are assertions in `build.mjs`; a failing invariant exits non-zero. When adding one, implement it there and list it here.
 
 - **Update-check metadata within range boundary**: The `build-id` and `app-version` meta tags in `dist/index.html` must both end before byte `UPDATE_CHECK_RANGE_BYTES` (currently 512). `UpdateBanner` uses a `Range: bytes=0-(UPDATE_CHECK_RANGE_BYTES-1)` request as a fallback path to extract the version without fetching the full page. To fix: move the tags earlier in `<head>`, or increase the constant in both `build.mjs` and `UpdateBanner.jsx` (they must be kept in sync).
-- **CHANGELOG.md top entry matches package.json version**: `CHANGELOG.md` is the single source of truth for version history. Before bundling, `build.mjs` parses it and fails if the top entry's version does not match `package.json`. `src/lib/changelog.js` is **generated** by this step — never edit it directly.
+- **CHANGELOG.md top entry matches package.json version**: `CHANGELOG.md` is the single source of truth for version history. Before bundling, `build.mjs` parses it and fails if the top entry's version does not match `package.json`. `src/lib/changelog.js` is **generated** by this step — never edit it directly. It holds only the newest `IN_APP_RELEASES` (10) entries; the modal links to `CHANGELOG.md` on GitLab for the rest. Parsing rules live in `scripts/changelog-parse.mjs`.
+- **Every in-app changelog entry has text** (BUG-084): `build.mjs` fails if any of the newest `IN_APP_RELEASES` entries parses to no paragraphs or bullets. To fix: give the entry a body in `CHANGELOG.md`, or fix the parser if the body is there.
 
 ## Bug tracking
 

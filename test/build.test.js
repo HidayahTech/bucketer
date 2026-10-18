@@ -17,6 +17,7 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { resolve, dirname } from 'node:path';
+import { parseChangelog } from '../scripts/changelog-parse.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const html = readFileSync(resolve(ROOT, 'dist/index.html'), 'utf8');
@@ -259,39 +260,39 @@ describe('Build output — changelog wrapped bullets (#50)', () => {
   // #50: parseChangelog in build.mjs only captured lines starting with "- ",
   // silently dropping a wrapped bullet's indented continuation lines. Every
   // multi-line bullet rendered truncated at its first physical line in the
-  // in-app ChangelogModal. The generated src/lib/changelog.js must contain
-  // the FULL text of a known multi-line bullet.
-  test('v1.38.1 entry retains its continuation lines in generated changelog.js', async () => {
-    const { CHANGELOG } = await import('../src/lib/changelog.js');
-    const entry = CHANGELOG.find((e) => e.version === '1.38.1');
-    assert.ok(entry, 'v1.38.1 entry must exist');
-    const flat = entry.changes.map((c) => (typeof c === 'string' ? c : [c.group, ...c.items].join(' '))).join(' ');
+  // in-app ChangelogModal. The parse of CHANGELOG.md must contain the FULL text
+  // of a known multi-line bullet. (These run the parser on the whole file: the
+  // generated src/lib/changelog.js holds only the newest releases.)
+  const CHANGELOG = parseChangelog(readFileSync(resolve(ROOT, 'CHANGELOG.md'), 'utf8'));
+  const flat = (v) =>
+    CHANGELOG.find((e) => e.version === v)
+      .changes.flatMap(changeTexts)
+      .join(' ');
+
+  test('v1.38.1 entry retains its continuation lines in the parsed changelog', () => {
     assert.ok(
-      flat.includes('x-amz-meta-file-mtime'),
+      CHANGELOG.find((e) => e.version === '1.38.1'),
+      'v1.38.1 entry must exist',
+    );
+    const text = flat('1.38.1');
+    assert.ok(
+      text.includes('x-amz-meta-file-mtime'),
       'the v1.38.1 bullet text from a continuation line must survive parsing — ' +
         'its absence means parseChangelog is still dropping wrapped lines (#50)',
     );
-    assert.ok(!flat.trim().endsWith('value".'), 'the bullet must not end at its first physical line');
+    assert.ok(!text.trim().endsWith('value".'), 'the bullet must not end at its first physical line');
   });
 
   // Follow-up to #50: the modal renders plain text, so inline **bold** markers
   // must be stripped like backticks — otherwise bullets show literal asterisks
   // (e.g. "New **Run diagnostics** button" in the v1.38.0 entry). Glob patterns
   // like src/**/*.js are NOT bold pairs and must survive untouched (v1.12.9).
-  test('no change string retains a strippable **bold** pair', async () => {
-    const { CHANGELOG } = await import('../src/lib/changelog.js');
+  test('no change string retains a strippable **bold** pair', () => {
     for (const entry of CHANGELOG) {
-      for (const c of entry.changes) {
-        const texts = typeof c === 'string' ? [c] : [c.group, ...c.items];
-        for (const t of texts) {
-          assert.ok(!/\*\*[^*]+\*\*/.test(t), `v${entry.version} change retains a bold pair: "${t.slice(0, 80)}"`);
-        }
+      for (const t of entry.changes.flatMap(changeTexts)) {
+        assert.ok(!/\*\*[^*]+\*\*/.test(t), `v${entry.version} change retains a bold pair: "${t.slice(0, 80)}"`);
       }
     }
-    const flat = (v) =>
-      CHANGELOG.find((e) => e.version === v)
-        .changes.map((c) => (typeof c === 'string' ? c : [c.group, ...c.items].join(' ')))
-        .join(' ');
     assert.ok(flat('1.38.0').includes('New Run diagnostics button'), 'v1.38.0 inline bold must render as plain text');
     // v1.33.0 has a bold span wrapped across physical lines — strippable only
     // after continuation joining, which is why cleanup runs post-join.
@@ -302,3 +303,41 @@ describe('Build output — changelog wrapped bullets (#50)', () => {
     assert.ok(flat('1.12.9').includes('src/**/*.js'), 'glob patterns must survive the bold strip');
   });
 });
+
+describe('Build output — in-app changelog is the newest releases, with their text (BUG-084)', () => {
+  // BUG-084: parseChangelog kept only "- " bullets, and every entry since
+  // v1.45.0 is a prose paragraph, so the modal showed 51 releases as a title
+  // with no text. The bundle also carried all 196 releases (~14% of the
+  // gzipped page); it now carries the newest IN_APP_RELEASES and links to
+  // CHANGELOG.md on GitLab for the rest.
+  test('generated changelog.js holds the newest releases, each with text', async () => {
+    const { CHANGELOG, CURRENT_VERSION } = await import('../src/lib/changelog.js');
+    const full = parseChangelog(readFileSync(resolve(ROOT, 'CHANGELOG.md'), 'utf8'));
+    assert.ok(CHANGELOG.length <= 10, `in-app changelog holds ${CHANGELOG.length} entries, expected at most 10`);
+    assert.deepEqual(
+      CHANGELOG.map((e) => e.version),
+      full.slice(0, CHANGELOG.length).map((e) => e.version),
+      'in-app entries must be the newest ones, in order',
+    );
+    assert.equal(CHANGELOG[0].version, CURRENT_VERSION);
+    for (const e of CHANGELOG) assert.ok(e.changes.length > 0, `v${e.version} has no text in the in-app changelog`);
+  });
+
+  test('a prose paragraph is kept, joined across lines, with markers stripped', () => {
+    const [entry] = parseChangelog(
+      '## [1.0.0] — 2026-01-01 — T\n\nFirst line of **prose**\nwith a `wrap`.\n\nSecond paragraph.\n\n- a bullet\n',
+    );
+    assert.deepEqual(entry.changes, [
+      { para: 'First line of prose with a wrap.' },
+      { para: 'Second paragraph.' },
+      'a bullet',
+    ]);
+  });
+});
+
+// Plain strings of one parsed change: a bullet, a { para }, or a { group, items }.
+function changeTexts(c) {
+  if (typeof c === 'string') return [c];
+  if (c.para !== undefined) return [c.para];
+  return [c.group, ...c.items];
+}

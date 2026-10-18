@@ -4,6 +4,43 @@ A living record of real bugs encountered and resolved during development. Each e
 
 ---
 
+## BUG-084 — The in-app "What's new" showed only titles for every release since v1.45.0
+
+**Date:** 2026-10-17 · present v1.45.0 through v1.68.2 · fixed in v1.69.0
+
+**Symptom.** The "What's new" window listed 57 releases (all 51 from v1.45.0 to v1.68.2, plus
+v1.21.0–v1.22.4) as a version, a date and a title with nothing beneath. Someone checking what an
+update changed, before or after entering credentials, learned nothing. The same window also carried all 196
+releases, 115 KB of the 858 KB page (41 of 292 KB gzipped, 14.2%).
+
+**Root cause (verified).** `parseChangelog` in `build.mjs` kept only `- ` bullet lines and
+continuation lines glued to a bullet. CHANGELOG entries moved to paragraphs at v1.45.0, so those
+entries parsed to `changes: []`. Same class as BUG-083 (Releases), whose fix covered only
+`scripts/release.mjs`. Evidence: the v1.68.2 `src/lib/changelog.js` has `changes: []` for those 57
+versions.
+
+**Fix.** The parser moved to `scripts/changelog-parse.mjs`. A non-bullet line after a blank line
+(or the heading) now starts a `{ para }` item, which the modal renders as `<p>`. `###` sub-headings
+are skipped, as before. `build.mjs` writes only the newest 10 entries (`IN_APP_RELEASES`), and the
+modal links to `CHANGELOG.md` on GitLab for the rest. New prod build invariant: every in-app entry
+has text. Side effect, old entries only: five pre-v1.32 entries (v1.31.0, v1.30.0, v1.23.0,
+v1.17.0, v1.16.0) no longer glue a trailing paragraph or `### heading` onto the previous bullet.
+Those entries are no longer in the app. The page is now 755 KB raw, 255 KB gzipped, with the
+changelog at 11 KB (4 KB gzipped).
+
+**Test.** `test/build.test.js` "in-app changelog is the newest releases, with their text": checks
+the generated file has ≤10 entries, the newest in order, each with text, and checks a parser case
+for prose. `test/components/changelog-modal.test.jsx`: every paragraph renders, and the GitLab link
+renders. The #50 bullet tests now run the parser on the whole CHANGELOG.md.
+**PRE** (v1.68.2 generated `changelog.js`): build test fails ("in-app changelog holds 196 entries,
+expected at most 10"); component test fails ("the in-app changelog must contain prose
+paragraphs"). **POST:** both pass; `npm test` 1667/1667, `npm run test:ui` 649/649. No e2e
+coverage: no browser spec opens the changelog window.
+
+**Why it wasn't caught earlier.** The modal tests checked that an entry and the current version
+rendered, never that an entry had text. A title-only entry still looks deliberate. Same rule as BUG-083: generated text needs a
+non-empty assertion on the real input.
+
 ## BUG-083 — Every GitLab Release since v1.45.0 published with an empty description
 
 **Date:** 2026-10-17 · present through v1.67.1 · fixed in v1.67.2

@@ -12,6 +12,7 @@
 import * as esbuild from 'esbuild';
 import { readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'fs';
 import { createHash } from 'node:crypto';
+import { parseChangelog } from './scripts/changelog-parse.mjs';
 
 // ── Build invariant constant (prod only) ─────────────────────────────────────
 // UpdateBanner uses Range: bytes=0-(UPDATE_CHECK_RANGE_BYTES-1) to detect a
@@ -44,60 +45,13 @@ const appVersion = JSON.parse(readFileSync('package.json', 'utf8')).version;
 // CHANGELOG.md is the single source of truth for version history. This step
 // parses it into structured data and writes changelog.js before esbuild runs,
 // so the in-app changelog modal always reflects exactly what is in CHANGELOG.md.
-//
-// Heading format: ## [version] — date — Title
-// Bullet lines (- ...) become the changes array; backtick markers are stripped
-// for plain-text display in the modal. A bullet wrapped across multiple physical
-// lines is joined back into one string: continuation lines (non-empty, not a
-// bullet, not a **group** header, not a --- rule) append to the most recent
-// bullet (#50 — they were previously dropped, truncating every wrapped bullet).
-
-function parseChangelog(src) {
-  const entries = [];
-  const sections = src.split(/^## /m).slice(1); // drop preamble
-  for (const section of sections) {
-    const lines = section.split('\n');
-    const header = lines[0].trim();
-    const m = header.match(/^\[([^\]]+)\]\s+—\s+(\d{4}-\d{2}-\d{2})(?:\s+—\s+(.+))?$/);
-    if (!m) continue;
-    const [, version, date, title] = m;
-    // Two-level parse: **Bold lines** become group labels; following bullet lines
-    // are nested under them. Bullet lines before any group remain plain strings.
-    // Older entries with no bold headers produce a flat string array (unchanged).
-    const rawChanges = [];
-    let currentGroup = null;
-    const appendToLast = (text) => {
-      const list = currentGroup ? currentGroup.items : rawChanges;
-      const last = list.length - 1;
-      if (last >= 0 && typeof list[last] === 'string') list[last] += ' ' + text;
-    };
-    for (const line of lines.slice(1)) {
-      const t = line.trim();
-      const groupMatch = t.match(/^\*\*(.+)\*\*$/);
-      if (groupMatch) {
-        currentGroup = { group: groupMatch[1], items: [] };
-        rawChanges.push(currentGroup);
-      } else if (t.startsWith('- ')) {
-        const text = t.slice(2).trim();
-        if (currentGroup) currentGroup.items.push(text);
-        else rawChanges.push(text);
-      } else if (t && !/^-+$/.test(t)) {
-        appendToLast(t);
-      }
-    }
-    // Plain-text cleanup for modal display: strip backtick and inline **bold**
-    // markers. Runs AFTER continuation-line joining, because a marker pair can
-    // span physical lines in the wrapped source (e.g. the v1.33.0 entry).
-    const clean = (t) => t.replace(/`([^`]+)`/g, '$1').replace(/\*\*([^*]+)\*\*/g, '$1');
-    const changes = rawChanges.map((c) =>
-      typeof c === 'string' ? clean(c) : { group: c.group, items: c.items.map(clean) },
-    );
-    entries.push({ version, date, ...(title ? { title: title.trim() } : {}), changes });
-  }
-  return entries;
-}
+// Only the newest IN_APP_RELEASES entries are written (the full history was
+// ~14% of the gzipped page); the modal links to CHANGELOG.md on GitLab for the
+// rest. Parsing rules: scripts/changelog-parse.mjs.
+const IN_APP_RELEASES = 10;
 
 const changelog = parseChangelog(readFileSync('CHANGELOG.md', 'utf8'));
+const inAppChangelog = changelog.slice(0, IN_APP_RELEASES);
 
 // Build invariant: top CHANGELOG.md entry must match package.json version (prod only).
 if (mode.invariants) {
@@ -109,6 +63,16 @@ if (mode.invariants) {
     );
     process.exit(1);
   }
+  // Build invariant: every in-app entry has text to show (BUG-084: prose entries
+  // parsed to an empty list, and the modal showed only their titles).
+  const bare = inAppChangelog.filter((e) => e.changes.length === 0).map((e) => `v${e.version}`);
+  if (bare.length) {
+    console.error(
+      `\nBuild invariant FAILED: in-app changelog entries with no text: ${bare.join(', ')}.\n` +
+        `Give each a body in CHANGELOG.md, or fix scripts/changelog-parse.mjs if the body is there.`,
+    );
+    process.exit(1);
+  }
 }
 
 const changelogJs = [
@@ -117,11 +81,13 @@ const changelogJs = [
   '',
   `export const CURRENT_VERSION = '${appVersion}';`,
   '',
-  `export const CHANGELOG = ${JSON.stringify(changelog, null, 2)};`,
+  `export const CHANGELOG = ${JSON.stringify(inAppChangelog, null, 2)};`,
   '',
 ].join('\n');
 writeFileSync('src/lib/changelog.js', changelogJs, 'utf8');
-console.log(`  ✓ Generated src/lib/changelog.js from CHANGELOG.md (${changelog.length} entries, v${appVersion})`);
+console.log(
+  `  ✓ Generated src/lib/changelog.js from CHANGELOG.md (newest ${inAppChangelog.length} of ${changelog.length} entries, v${appVersion})`,
+);
 
 // ── Bundle the zip-assembler worker to a standalone IIFE string ─────────────
 // The worker must ship as part of the single-file bundle (no external asset

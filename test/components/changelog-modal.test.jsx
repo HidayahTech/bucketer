@@ -37,6 +37,29 @@ describe('ChangelogModal — content', () => {
     cleanup();
   });
 
+  // BUG-084: prose entries (v1.45.0 onward) rendered as a bare title.
+  test("renders each entry's prose paragraphs, not just its title", () => {
+    const { queryAll, cleanup } = mount(h(ChangelogModal, { onClose: () => {} }));
+    const paras = queryAll('.changelog-para').map((p) => p.textContent);
+    const expected = CHANGELOG.flatMap((e) => e.changes.filter((c) => c.para !== undefined).map((c) => c.para));
+    assert.ok(expected.length > 0, 'the in-app changelog must contain prose paragraphs');
+    assert.deepEqual(paras, expected, 'every paragraph renders, in order');
+    cleanup();
+  });
+
+  test('links to the full changelog on GitLab', () => {
+    const { query, cleanup } = mount(h(ChangelogModal, { onClose: () => {} }));
+    const link = query('.changelog-full-link');
+    assert.ok(link, 'full-changelog link must render');
+    // Modal focuses the first focusable element on open; inside the scrolling
+    // list, that scrolled the dialog to its last entry.
+    assert.equal(link.closest('.changelog-body'), null, 'link must sit outside the scrolling list');
+    assert.equal(link.getAttribute('href'), 'https://gitlab.com/hidayahtech/bucketer/-/blob/main/CHANGELOG.md');
+    assert.equal(link.getAttribute('target'), '_blank');
+    assert.ok(link.getAttribute('rel').includes('noopener'), 'link must not hand the app window to GitLab');
+    cleanup();
+  });
+
   test('shows "Check for upstream release" button in initial idle state', () => {
     const { text, cleanup } = mount(h(ChangelogModal, { onClose: () => {} }));
     assert.ok(text().includes('Check for upstream release'), '"Check for upstream release" button must be present');
