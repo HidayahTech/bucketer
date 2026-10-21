@@ -3,6 +3,23 @@ stages:
   - reproducibility
   - release
 
+# Test each commit once. Without a workflow block GitLab ran a branch pipeline AND an MR
+# pipeline for every commit on a branch with an open MR (CI audit 2026-10-20: all 16 MR
+# commits in 14 days ran twice). MR pipelines while an MR is open, branch pipelines
+# otherwise, plus tags and schedules (the relock-github-mirror schedule).
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS
+      when: never
+    - if: $CI_COMMIT_BRANCH
+    - if: $CI_COMMIT_TAG
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+
+# Release tags run only what the release needs: `test`, `reproducibility` and `release`.
+# The tag points at a commit its branch/MR pipeline already ran in full, so every other job
+# starts with `- if: $CI_COMMIT_TAG` + `when: never`.
+
 test:
   stage: test
   image: node:20-alpine
@@ -47,6 +64,8 @@ deadcode:
   stage: test
   image: node:20-alpine
   rules:
+    - if: $CI_COMMIT_TAG
+      when: never
     - if: '$RELOCK_MIRROR == "true"'
       when: never
     - when: on_success
@@ -63,6 +82,8 @@ lint:
   stage: test
   image: node:20-alpine
   rules:
+    - if: $CI_COMMIT_TAG
+      when: never
     - if: '$RELOCK_MIRROR == "true"'
       when: never
     - when: on_success
@@ -79,6 +100,8 @@ format:
   stage: test
   image: node:20-alpine
   rules:
+    - if: $CI_COMMIT_TAG
+      when: never
     - if: '$RELOCK_MIRROR == "true"'
       when: never
     - when: on_success
@@ -97,6 +120,8 @@ audit:
   image: node:20-alpine
   allow_failure: true
   rules:
+    - if: $CI_COMMIT_TAG
+      when: never
     - if: '$RELOCK_MIRROR == "true"'
       when: never
     - when: on_success
@@ -115,6 +140,8 @@ complexity:
   image: node:20-alpine
   allow_failure: true
   rules:
+    - if: $CI_COMMIT_TAG
+      when: never
     - if: '$RELOCK_MIRROR == "true"'
       when: never
     - when: on_success
@@ -136,6 +163,8 @@ complexity:
   image: mcr.microsoft.com/playwright:v1.60.0-noble
   interruptible: true
   rules:
+    - if: $CI_COMMIT_TAG
+      when: never
     - if: '$RELOCK_MIRROR == "true"'
       when: never
     - when: on_success

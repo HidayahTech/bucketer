@@ -87,16 +87,16 @@ describe('imageTagFromLock', () => {
 // fails hard. Paired with per-lane timeout scaling in test/e2e/harness.mjs. The retry auto-heal
 // is a GitLab-runtime behaviour the local harness cannot represent — this config guard is its
 // durable substitute (harness-fidelity rule).
-describe('e2e browser lanes retry flaky failures (CI)', () => {
-  function section(ci, header) {
-    const lines = ci.split('\n');
-    const start = lines.findIndex((l) => l.startsWith(header));
-    if (start < 0) return '';
-    let end = start + 1;
-    while (end < lines.length && !/^\S/.test(lines[end])) end++;
-    return lines.slice(start, end).join('\n');
-  }
+function section(ci, header) {
+  const lines = ci.split('\n');
+  const start = lines.findIndex((l) => l.startsWith(header));
+  if (start < 0) return '';
+  let end = start + 1;
+  while (end < lines.length && !/^\S/.test(lines[end])) end++;
+  return lines.slice(start, end).join('\n');
+}
 
+describe('e2e browser lanes retry flaky failures (CI)', () => {
   test('.e2e-browser-base declares retry max 2 on flake-shaped failures', async () => {
     const { readFileSync } = await import('node:fs');
     const ci = readFileSync(new URL('../.gitlab-ci.yml', import.meta.url), 'utf8');
@@ -138,6 +138,40 @@ describe('e2e browser lanes retry flaky failures (CI)', () => {
     const block = section(ci, 'complexity:');
     assert.ok(block, '.gitlab-ci.yml must define a complexity job');
     assert.match(block, /allow_failure:\s*true/, 'the complexity job must be non-blocking (allow_failure: true)');
+  });
+});
+
+// Each commit is tested once (CI audit 2026-10-20): the workflow block stops a branch pipeline
+// duplicating the MR pipeline, and release tags run only test + reproducibility + release. Which
+// pipelines GitLab creates is runtime behaviour the local harness cannot represent, so this
+// config guard is its durable substitute (harness-fidelity rule).
+describe('each commit is tested once (CI)', () => {
+  const ciText = async () => {
+    const { readFileSync } = await import('node:fs');
+    return readFileSync(new URL('../.gitlab-ci.yml', import.meta.url), 'utf8');
+  };
+
+  test('workflow rules skip the branch pipeline while an MR is open', async () => {
+    const block = section(await ciText(), 'workflow:');
+    assert.match(block, /\$CI_PIPELINE_SOURCE == "merge_request_event"/);
+    assert.match(block, /\$CI_COMMIT_BRANCH && \$CI_OPEN_MERGE_REQUESTS\s*\n\s*when: never/);
+    for (const rule of ['$CI_COMMIT_TAG', '$CI_PIPELINE_SOURCE == "schedule"']) {
+      assert.ok(block.includes(rule), `workflow rules must still allow ${rule} pipelines`);
+    }
+  });
+
+  test('release tags skip every job the release does not need', async () => {
+    const ci = await ciText();
+    for (const job of ['deadcode:', 'lint:', 'format:', 'audit:', 'complexity:', '.e2e-base:']) {
+      assert.match(
+        section(ci, job),
+        /rules:\s*\n\s*- if: \$CI_COMMIT_TAG\s*\n\s*when: never/,
+        `${job} must skip tag pipelines (first rule)`,
+      );
+    }
+    for (const job of ['test:', 'reproducibility:']) {
+      assert.ok(!section(ci, job).includes('CI_COMMIT_TAG'), `${job} must still run on release tags`);
+    }
   });
 });
 
