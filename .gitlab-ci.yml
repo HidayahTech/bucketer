@@ -28,9 +28,9 @@ test:
       when: never
     - when: on_success
   script:
-    # dist/index.html is tracked, and Laravel Forge deploys the repository on every
-    # push to main — so the committed bundle IS production. A commit that changes
-    # src/ without rebuilding it would silently ship stale code. Snapshot the
+    # dist/index.html is tracked, and the static host (static-1) deploys the committed
+    # bundle on every push to main — so the committed bundle IS production. A commit
+    # that changes src/ without rebuilding it would silently ship stale code. Snapshot the
     # committed bundle before the build overwrites it, then compare.
     - cp dist/index.html /tmp/committed-index.html
     - npm ci
@@ -38,7 +38,7 @@ test:
     - |
       if ! diff -q /tmp/committed-index.html dist/index.html >/dev/null 2>&1; then
         echo "ERROR: committed dist/index.html does not match a build of this source."
-        echo "Forge deploys the committed bundle, so this would ship stale code."
+        echo "The static host deploys the committed bundle on every push to main, so this would ship stale code."
         echo "Fix: run 'npm run build' and commit the result."
         exit 1
       fi

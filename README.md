@@ -175,6 +175,10 @@ First run downloads the ~2 GB image and installs dependencies; later runs skip b
 
 ## Deployment
 
+### Production (bucketer.hidayahtech.net)
+
+Production is served by the HidayahTech static host, static-1. A push to `main` deploys the committed `dist/` folder (one `index.html`) within seconds; there is no separate deploy step, so the pre-push hook is the gate that runs before the site changes, and CI checks afterward. How the host works, and how to roll back: the [static-site standard](https://gitlab.com/hidayahtech/hidayahtech-knowledge/-/blob/main/hidayahtech/static-site-deploys.md) and the [static-1 runbook](https://gitlab.com/hidayahtech/fleet-services/-/blob/main/hosts/static-1/RUNBOOK.md).
+
 ### Any static host
 
 Copy `dist/index.html` to your server or static hosting provider. No server-side logic is required — the file is entirely self-contained.
